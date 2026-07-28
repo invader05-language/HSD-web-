@@ -1,0 +1,14 @@
+# Local design-preview workspace
+.superpowers/
+
+# Private association records are local-only
+社团成立信息表（6.20更新汇总）/
+
+# Mobile concepts are not part of the desktop-first v0.1 delivery
+白云HSD开发者部落-首页设计稿-移动端.png
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
