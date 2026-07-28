@@ -1,5 +1,6 @@
 # Local design-preview workspace
 .superpowers/
+.worktrees/
 
 # Private association records are local-only
 社团成立信息表（6.20更新汇总）/
