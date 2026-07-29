@@ -3,6 +3,8 @@ import { CENTERS as homeCenters } from "../../app/data/home";
 import { CENTER_OPTIONS, CENTERS, getCenterBySlug } from "../../app/data/centers";
 import {
   CORE_PEOPLE,
+  findPublicPerson,
+  getFeaturedHonors,
   getPeopleByCenter,
   PUBLIC_MEMBERS,
   resolvePublicAvatar,
@@ -88,5 +90,22 @@ describe("public people and center directory", () => {
     expect(hiddenPeople).toHaveLength(12);
     expect(hiddenPeople.every((person) => !Object.hasOwn(person, "avatarUrl"))).toBe(true);
     expect(hiddenPeople.every((person) => resolvePublicAvatar(person) === undefined)).toBe(true);
+  });
+
+  it("limits public directory cards to three featured honors", () => {
+    const person = findPublicPerson("lin-development");
+
+    expect(person).toBeDefined();
+    expect(getFeaturedHonors(person!)).toHaveLength(3);
+    expect(getFeaturedHonors(person!).every((honor) => honor.featured)).toBe(true);
+  });
+
+  it("keeps every published honor approved and public", () => {
+    for (const person of [...CORE_PEOPLE, ...PUBLIC_MEMBERS]) {
+      expect(person.honors.every((honor) => honor.approved && honor.visible)).toBe(true);
+      expect(getFeaturedHonors(person).length).toBeLessThanOrEqual(3);
+    }
+
+    expect(findPublicPerson("missing")).toBeUndefined();
   });
 });

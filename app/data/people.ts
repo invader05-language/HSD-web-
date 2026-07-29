@@ -1,5 +1,16 @@
 import type { CenterSlug } from "./centers";
 
+export interface PublicHonor {
+  id: string;
+  title: string;
+  awardedAt: string;
+  description: string;
+  featured: boolean;
+  visible: true;
+  approved: true;
+  order: number;
+}
+
 interface PublicPersonBase {
   id: string;
   name: string;
@@ -10,6 +21,7 @@ interface PublicPersonBase {
   bio: string;
   isCore: boolean;
   order: number;
+  honors: readonly PublicHonor[];
 }
 
 type PublicAvatar =
@@ -33,6 +45,48 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "白泽开发中心",
     direction: "HarmonyOS 与项目工程化",
     bio: "关注原生应用开发与团队协作，希望把每次练习沉淀为可演示的项目成果。",
+    honors: [
+      {
+        id: "lin-harmonyos-practice",
+        title: "HarmonyOS 校园创新实践优秀项目",
+        awardedAt: "2026-05",
+        description: "参与完成校园服务原型的应用开发、联调与公开展示。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      },
+      {
+        id: "lin-software-design",
+        title: "校级软件设计竞赛一等奖",
+        awardedAt: "2025-12",
+        description: "围绕真实校园场景完成需求拆解、工程实现与成果答辩。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 2
+      },
+      {
+        id: "lin-open-source",
+        title: "开源协作实践之星",
+        awardedAt: "2025-10",
+        description: "持续参与代码评审、问题复盘和团队工程规范建设。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 3
+      },
+      {
+        id: "lin-project-delivery",
+        title: "年度项目交付贡献",
+        awardedAt: "2025-06",
+        description: "在项目演示准备与跨模块协作中完成稳定性验证。",
+        featured: false,
+        visible: true,
+        approved: true,
+        order: 4
+      }
+    ],
     avatarVisible: false,
     isCore: true,
     order: 1
@@ -45,6 +99,28 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "新媒体中心",
     direction: "影像叙事与品牌内容",
     bio: "通过摄影、文字和设计记录真实协作，让活动经验被更多人看见。",
+    honors: [
+      {
+        id: "chen-campus-visual",
+        title: "校园影像创作优秀作品",
+        awardedAt: "2026-04",
+        description: "以系列影像记录跨中心项目协作与校园创新现场。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      },
+      {
+        id: "chen-brand-story",
+        title: "年度品牌叙事贡献",
+        awardedAt: "2025-11",
+        description: "完成活动专题的采访、编辑与视觉内容统筹。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 2
+      }
+    ],
     avatarVisible: false,
     isCore: true,
     order: 2
@@ -57,6 +133,18 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "拓维策划中心",
     direction: "活动策划与资源协同",
     bio: "专注把分散的任务和角色连接成有节奏、可执行的活动现场。",
+    honors: [
+      {
+        id: "zhou-event-planning",
+        title: "校园科技活动优秀策划",
+        awardedAt: "2026-03",
+        description: "统筹技术分享活动的流程设计、资源协同与现场执行。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      }
+    ],
     avatarVisible: false,
     isCore: true,
     order: 3
@@ -69,6 +157,18 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "人才发展中心",
     direction: "新人培养与组织支持",
     bio: "关注成员融入与成长反馈，陪伴同学从参与者走向能够承担责任的协作者。",
+    honors: [
+      {
+        id: "wu-learning-support",
+        title: "优秀学习支持项目",
+        awardedAt: "2025-12",
+        description: "组织新人实践活动并完善公开学习指引与反馈流程。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      }
+    ],
     avatarVisible: false,
     isCore: true,
     order: 4
@@ -81,6 +181,28 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "白泽开发中心",
     direction: "质量保障与软硬件联调",
     bio: "关注项目验证、问题复盘与跨模块协作，帮助团队把原型推进到稳定演示。",
+    honors: [
+      {
+        id: "zheng-quality-practice",
+        title: "项目质量实践优秀成员",
+        awardedAt: "2026-01",
+        description: "完善演示项目的验证清单并推动关键问题闭环。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      },
+      {
+        id: "zheng-device-collaboration",
+        title: "软硬件协作实践成果",
+        awardedAt: "2025-09",
+        description: "参与设备联调和异常场景复盘，提升演示稳定性。",
+        featured: false,
+        visible: true,
+        approved: true,
+        order: 2
+      }
+    ],
     avatarVisible: false,
     isCore: true,
     order: 5
@@ -93,6 +215,7 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     centerName: "人才发展中心",
     direction: "学习路径与实践反馈",
     bio: "围绕新人实践设计学习支持，让成员能从一次参与逐步承担完整任务。",
+    honors: [],
     avatarVisible: false,
     isCore: true,
     order: 6
@@ -108,6 +231,18 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "白泽开发中心",
     direction: "AI 应用与后端服务",
     bio: "正在参与校园智能服务原型的接口联调与场景验证。",
+    honors: [
+      {
+        id: "guo-ai-practice",
+        title: "校园 AI 应用实践优秀成果",
+        awardedAt: "2026-04",
+        description: "参与服务接口开发、场景验证与公开成果演示。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      }
+    ],
     avatarVisible: false,
     isCore: false,
     order: 11
@@ -120,6 +255,18 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "新媒体中心",
     direction: "视觉设计与活动摄影",
     bio: "用设计和影像为部落活动留下可以回看的现场记录。",
+    honors: [
+      {
+        id: "he-event-photography",
+        title: "校园活动摄影优秀作品",
+        awardedAt: "2025-11",
+        description: "完成技术活动现场影像记录与公开作品整理。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      }
+    ],
     avatarVisible: false,
     isCore: false,
     order: 12
@@ -132,6 +279,7 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "拓维策划中心",
     direction: "项目统筹与现场执行",
     bio: "在技术分享与项目实训中练习流程设计、沟通和现场协调。",
+    honors: [],
     avatarVisible: false,
     isCore: false,
     order: 13
@@ -144,6 +292,7 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "人才发展中心",
     direction: "成员服务与学习组织",
     bio: "协助新成员了解中心方向，并参与学习活动的组织与反馈。",
+    honors: [],
     avatarVisible: false,
     isCore: false,
     order: 14
@@ -156,6 +305,18 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "新媒体中心",
     direction: "文字编辑与专题策划",
     bio: "参与活动采访和专题内容整理，用清晰表达记录团队的实践过程。",
+    honors: [
+      {
+        id: "xu-feature-writing",
+        title: "校园专题写作优秀作品",
+        awardedAt: "2026-02",
+        description: "完成项目实践专题的采访、资料整理与公开发布。",
+        featured: true,
+        visible: true,
+        approved: true,
+        order: 1
+      }
+    ],
     avatarVisible: false,
     isCore: false,
     order: 15
@@ -168,6 +329,7 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     centerName: "拓维策划中心",
     direction: "活动流程与资源联络",
     bio: "协助技术活动的流程准备与资源联络，在现场实践中积累协作经验。",
+    honors: [],
     avatarVisible: false,
     isCore: false,
     order: 16
@@ -178,6 +340,17 @@ const ALL_PUBLIC_PEOPLE: readonly PublicPerson[] = [...CORE_PEOPLE, ...PUBLIC_ME
 
 export function getPeopleByCenter(slug: string): readonly PublicPerson[] {
   return ALL_PUBLIC_PEOPLE.filter((person) => person.centerSlug === slug);
+}
+
+export function findPublicPerson(id: string): PublicPerson | undefined {
+  return ALL_PUBLIC_PEOPLE.find((person) => person.id === id);
+}
+
+export function getFeaturedHonors(person: PublicPerson): readonly PublicHonor[] {
+  return person.honors
+    .filter((honor) => honor.featured)
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 3);
 }
 
 export function resolvePublicAvatar(person: PublicPerson): string | undefined {

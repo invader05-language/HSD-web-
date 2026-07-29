@@ -56,7 +56,7 @@ test("core search, center filter, and empty state stay local to the directory", 
   await expect(page.getByLabel("搜索核心人员")).toHaveValue("");
   await expect(page.getByLabel("按中心筛选")).toHaveValue("all");
   await expect(page.getByText("共 6 位核心人员")).toBeVisible();
-  await expect(page.locator(".people-core-grid > article")).toHaveCount(6);
+  await expect(page.locator(".people-core-grid > a")).toHaveCount(6);
   await expect(page).toHaveURL(/\/people\/core$/);
 });
 
@@ -90,7 +90,7 @@ test("member search and center filter stay local to the public directory", async
   await expect(page.getByLabel("搜索成员")).toHaveValue("");
   await expect(page.getByLabel("按中心筛选")).toHaveValue("all");
   await expect(page.getByText("共 6 位成员")).toBeVisible();
-  await expect(page.locator(".people-member-list > article")).toHaveCount(6);
+  await expect(page.locator(".people-member-list > a")).toHaveCount(6);
   await expect(page).toHaveURL(/\/people\/members$/);
 });
 
@@ -98,7 +98,7 @@ test("1440px directories retain their approved three- and two-column grids", asy
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.goto("/people/core");
-  const coreBoxes = await cardBoxes(page, ".people-core-grid > article");
+  const coreBoxes = await cardBoxes(page, ".people-core-grid > a");
   expect(coreBoxes).toHaveLength(6);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[1]?.y ?? 0, 0);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[2]?.y ?? 0, 0);
@@ -106,7 +106,7 @@ test("1440px directories retain their approved three- and two-column grids", asy
   expect(coreBoxes[0]?.width).toBeCloseTo(coreBoxes[1]?.width ?? 0, 0);
 
   await page.goto("/people/members");
-  const memberBoxes = await cardBoxes(page, ".people-member-list > article");
+  const memberBoxes = await cardBoxes(page, ".people-member-list > a");
   expect(memberBoxes).toHaveLength(6);
   expect(memberBoxes[0]?.y).toBeCloseTo(memberBoxes[1]?.y ?? 0, 0);
   expect(memberBoxes[2]?.y).toBeGreaterThan((memberBoxes[0]?.y ?? 0) + 100);

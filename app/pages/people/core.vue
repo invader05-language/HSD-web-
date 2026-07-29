@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
-import { CORE_PEOPLE, resolvePublicAvatar } from "~/data/people";
+import { CORE_PEOPLE, getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
 
 useHead({ title: "核心人员名录｜白云 HSD 开发者部落" });
 
@@ -61,7 +61,12 @@ const visiblePeople = computed(() => {
         </div>
 
         <div v-if="visiblePeople.length" class="people-core-grid">
-          <article v-for="person in visiblePeople" :key="person.id">
+          <NuxtLink
+            v-for="person in visiblePeople"
+            :key="person.id"
+            class="directory-card"
+            :to="`/people/${person.id}`"
+          >
             <div class="people-core-grid__identity">
               <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="lg" />
               <span>{{ person.centerName }}</span>
@@ -69,8 +74,18 @@ const visiblePeople = computed(() => {
             <p class="people-core-grid__role">{{ person.role }}</p>
             <h2>{{ person.name }}</h2>
             <strong>{{ person.direction }}</strong>
+            <ul v-if="getFeaturedHonors(person).length" class="featured-honors">
+              <li
+                v-for="honor in getFeaturedHonors(person)"
+                :key="honor.id"
+                data-testid="featured-honor"
+              >
+                重点荣誉 · {{ honor.title }}
+              </li>
+            </ul>
             <p>{{ person.bio }}</p>
-          </article>
+            <span class="directory-card__action">查看成员详情 →</span>
+          </NuxtLink>
         </div>
         <EmptyState v-else title="没有匹配的核心人员" description="请尝试更换关键词或中心筛选条件。">
           <template #action>

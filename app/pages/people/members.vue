@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
-import { PUBLIC_MEMBERS, resolvePublicAvatar } from "~/data/people";
+import { getFeaturedHonors, PUBLIC_MEMBERS, resolvePublicAvatar } from "~/data/people";
 
 useHead({ title: "全体成员名录｜白云 HSD 开发者部落" });
 
@@ -61,15 +61,30 @@ const visibleMembers = computed(() => {
         </div>
 
         <div v-if="visibleMembers.length" class="people-member-list">
-          <article v-for="person in visibleMembers" :key="person.id">
+          <NuxtLink
+            v-for="person in visibleMembers"
+            :key="person.id"
+            class="directory-card people-member-card"
+            :to="`/people/${person.id}`"
+          >
             <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="lg" />
-            <div>
+            <div class="people-member-card__content">
               <span>{{ person.centerName }}</span>
               <h2>{{ person.name }}</h2>
               <strong>{{ person.direction }}</strong>
+              <ul v-if="getFeaturedHonors(person).length" class="featured-honors">
+                <li
+                  v-for="honor in getFeaturedHonors(person)"
+                  :key="honor.id"
+                  data-testid="featured-honor"
+                >
+                  重点荣誉 · {{ honor.title }}
+                </li>
+              </ul>
               <p>{{ person.bio }}</p>
+              <span class="directory-card__action">查看成员详情 →</span>
             </div>
-          </article>
+          </NuxtLink>
         </div>
         <EmptyState v-else title="没有匹配的成员" description="请尝试更换关键词或中心筛选条件。">
           <template #action>

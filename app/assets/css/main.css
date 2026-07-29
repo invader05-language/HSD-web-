@@ -1235,12 +1235,17 @@ a {
   border-left: 1px solid #cfc9c2;
 }
 
-.people-core-grid article {
+.people-core-grid > a {
+  display: flex;
+  height: 100%;
   min-height: 390px;
+  flex-direction: column;
   padding: 32px;
   border-right: 1px solid #cfc9c2;
   border-bottom: 1px solid #cfc9c2;
   background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
 }
 
 .people-core-grid__identity {
@@ -1252,7 +1257,7 @@ a {
 
 .people-core-grid__identity > span,
 .people-core-grid__role,
-.people-member-list article > div > span {
+.people-member-card__content > span:first-child {
   color: var(--brand-red);
   font-size: 14px;
   font-weight: 700;
@@ -1273,8 +1278,8 @@ a {
   margin-top: 6px;
 }
 
-.people-core-grid article > p:last-child,
-.people-member-list article p {
+.people-core-grid .directory-card > p:not(.people-core-grid__role),
+.people-member-card__content > p {
   color: var(--muted);
 }
 
@@ -1285,8 +1290,9 @@ a {
   border-left: 1px solid var(--border);
 }
 
-.people-member-list article {
+.people-member-list > a {
   display: grid;
+  height: 100%;
   min-height: 250px;
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -1295,10 +1301,146 @@ a {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
 }
 
-.people-member-list article p {
+.people-member-card__content {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.people-member-card__content > p {
   margin: 14px 0 0;
+}
+
+.directory-card {
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.directory-card:hover {
+  background: #fff;
+}
+
+.directory-card:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid var(--brand-red);
+  outline-offset: -3px;
+}
+
+.featured-honors {
+  margin: 18px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.featured-honors li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--brand-red);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.directory-card__action {
+  display: block;
+  margin-top: auto;
+  padding-top: 20px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.people-member-card__content .directory-card__action {
+  margin-top: 18px;
+}
+
+.member-detail__layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.3fr);
+  gap: 52px;
+}
+
+.member-detail__profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  padding: 32px;
+  border-top: 3px solid var(--brand-red);
+  background: var(--surface);
+}
+
+.member-detail__profile h2,
+.member-honors h2 {
+  margin: 0;
+}
+
+.member-detail__profile dl {
+  margin: 24px 0 0;
+}
+
+.member-detail__profile dl > div {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.member-detail__profile dt {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.member-detail__profile dd {
+  margin: 5px 0 0;
+  font-weight: 700;
+}
+
+.member-honors {
+  padding: 32px;
+  border-top: 3px solid var(--near-black);
+  background: var(--surface);
+}
+
+.member-honors ol {
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-honors li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 22px;
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+}
+
+.member-honors time {
+  color: var(--brand-red);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.member-honors h3 {
+  margin: 0;
+}
+
+.member-honors li p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.member-detail__navigation {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 24px;
+  padding-top: 6px;
 }
 
 .plain-grid {
@@ -3294,13 +3436,22 @@ label small:not(:empty),
     grid-column: auto;
   }
 
-  .people-core-grid article {
+  .people-core-grid > a {
     min-height: auto;
   }
 
-  .people-member-list article {
+  .people-member-list > a {
     min-height: 220px;
     padding: 24px 20px;
+  }
+
+  .member-detail__layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .member-detail__navigation {
+    grid-column: auto;
   }
 
   .core-team article,
