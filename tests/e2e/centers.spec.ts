@@ -56,8 +56,10 @@ test("all four center routes publish structured details and cross-center navigat
     await expect(page).toHaveURL(new RegExp(`/centers/${center.slug}$`));
     await expect(page.getByRole("heading", { level: 1, name: center.title })).toBeVisible();
     await expect(page.getByText(center.headline, { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "主要方向" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "中心职责" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "成长路径" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "协作方式" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "相关成员" })).toBeVisible();
 
     const navigation = page.getByRole("navigation", { name: "四大中心详情导航" });
@@ -81,6 +83,30 @@ test("all four center routes publish structured details and cross-center navigat
       page.getByRole("link", { name: new RegExp(`下一中心.*${center.nextTitle}`) })
     ).toHaveAttribute("href", center.nextHref);
   }
+});
+
+test("center detail renders authored topics and collaboration as distinct content", async ({ page }) => {
+  await page.goto("/centers/baize-development");
+
+  const topics = page.getByRole("region", { name: "主要方向" });
+  await expect(topics.getByText("鸿蒙开发", { exact: true })).toBeVisible();
+
+  const collaboration = page.getByRole("region", { name: "协作方式" });
+  await expect(collaboration).toContainText(
+    "与策划中心梳理需求，与新媒体中心沉淀项目成果，并为人才发展中心提供技术成长案例。"
+  );
+});
+
+test("1440px overview exposes a non-hover action and the whole center card navigates", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/centers");
+
+  const card = page.getByRole("link", { name: /白泽开发中心.*查看中心详情/ });
+  await expect(card.getByText("查看中心详情 →", { exact: true })).toBeVisible();
+  await card.click({ position: { x: 24, y: 24 } });
+
+  await expect(page).toHaveURL(/\/centers\/baize-development$/);
+  await expect(page.getByRole("heading", { level: 1, name: "白泽开发中心" })).toBeVisible();
 });
 
 test("unknown center slug responds with the Nuxt 404 page", async ({ page }) => {

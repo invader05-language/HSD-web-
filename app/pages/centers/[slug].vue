@@ -40,8 +40,14 @@ useHead(() => ({
           <p class="eyebrow">Center Mission</p>
           <h2>中心使命</h2>
           <p>{{ center.mission }}</p>
-          <p>{{ center.collaboration }}</p>
         </div>
+        <section class="center-profile__topics" aria-labelledby="center-topics-title">
+          <p class="eyebrow">Focus Areas</p>
+          <h2 id="center-topics-title">主要方向</h2>
+          <ul>
+            <li v-for="topic in center.topics" :key="topic">{{ topic }}</li>
+          </ul>
+        </section>
         <div class="center-profile__tracks">
           <section>
             <p class="eyebrow">Responsibilities</p>
@@ -64,6 +70,13 @@ useHead(() => ({
             </ol>
           </section>
         </div>
+        <section class="center-profile__collaboration" aria-labelledby="center-collaboration-title">
+          <div>
+            <p class="eyebrow">Collaboration</p>
+            <h2 id="center-collaboration-title">协作方式</h2>
+          </div>
+          <p>{{ center.collaboration }}</p>
+        </section>
       </div>
     </section>
 

@@ -1096,6 +1096,14 @@ a {
   color: var(--muted);
 }
 
+.empty-state__action {
+  margin-top: 24px;
+}
+
+.empty-state__action :is(a, button) {
+  min-height: 44px;
+}
+
 .pagination {
   display: flex;
   justify-content: center;
@@ -1397,6 +1405,10 @@ a {
   border-right: 1px solid #cfc9c2;
 }
 
+.center-profile__topics {
+  padding: 52px 0 52px 52px;
+}
+
 .center-profile h2 {
   margin: 8px 0 28px;
   font-size: 38px;
@@ -1411,12 +1423,56 @@ a {
 
 .center-profile__tracks {
   display: grid;
+  grid-column: 1 / -1;
   grid-template-columns: repeat(2, 1fr);
+  border-top: 1px solid #cfc9c2;
 }
 
 .center-profile__tracks > section {
   padding: 52px 38px;
   border-right: 1px solid #cfc9c2;
+}
+
+.center-profile__tracks > section:last-child {
+  border-right: 0;
+}
+
+.center-profile__topics ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.center-profile__topics li {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #cfc9c2;
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.center-profile__collaboration {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 52px;
+  padding: 52px 0;
+  border-top: 1px solid #cfc9c2;
+}
+
+.center-profile__collaboration h2 {
+  margin-bottom: 0;
+}
+
+.center-profile__collaboration > p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.85;
 }
 
 .center-profile__tracks ol {
@@ -2424,6 +2480,15 @@ label small:not(:empty),
     border-bottom: 1px solid #cfc9c2;
   }
 
+  .center-profile__topics {
+    padding: 52px 0;
+  }
+
+  .center-profile__collaboration {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
   .center-people__list article {
     grid-template-columns: 72px 160px 1fr;
   }
@@ -2698,6 +2763,7 @@ label small:not(:empty),
   }
 
   .center-profile__intro,
+  .center-profile__topics,
   .center-profile__tracks > section {
     padding: 36px 0;
   }
@@ -2709,6 +2775,10 @@ label small:not(:empty),
   .center-profile__tracks > section {
     border-right: 0;
     border-bottom: 1px solid #cfc9c2;
+  }
+
+  .center-profile__collaboration {
+    padding: 36px 0;
   }
 
   .center-people__list article {

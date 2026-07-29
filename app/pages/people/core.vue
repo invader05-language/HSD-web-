@@ -12,6 +12,11 @@ onMounted(() => {
   isHydrated.value = true;
 });
 
+function clearFilters() {
+  query.value = "";
+  center.value = "all";
+}
+
 const visiblePeople = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
@@ -67,7 +72,11 @@ const visiblePeople = computed(() => {
             <p>{{ person.bio }}</p>
           </article>
         </div>
-        <EmptyState v-else title="没有匹配的核心人员" description="请尝试更换关键词或中心筛选条件。" />
+        <EmptyState v-else title="没有匹配的核心人员" description="请尝试更换关键词或中心筛选条件。">
+          <template #action>
+            <button type="button" class="button button--dark" @click="clearFilters">清除筛选</button>
+          </template>
+        </EmptyState>
       </div>
     </section>
   </div>

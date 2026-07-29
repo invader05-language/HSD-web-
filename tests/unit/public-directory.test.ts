@@ -4,8 +4,8 @@ import { CENTER_OPTIONS, CENTERS, getCenterBySlug } from "../../app/data/centers
 import {
   CORE_PEOPLE,
   getPeopleByCenter,
+  PUBLIC_MEMBERS,
   resolvePublicAvatar,
-  type PublicPerson
 } from "../../app/data/people";
 
 describe("public people and center directory", () => {
@@ -33,45 +33,60 @@ describe("public people and center directory", () => {
     expect(homeCenters).toBe(CENTERS);
   });
 
-  it("keeps the core directory populated with core people", () => {
-    expect(CORE_PEOPLE).not.toHaveLength(0);
+  it("publishes six explicitly named mock core people in display order", () => {
+    expect(CORE_PEOPLE.map((person) => person.id)).toEqual([
+      "lin-development",
+      "chen-media",
+      "zhou-planning",
+      "wu-talent",
+      "zheng-development",
+      "luo-talent"
+    ]);
     expect(CORE_PEOPLE.every((person) => person.isCore)).toBe(true);
+  });
+
+  it("publishes six explicitly named mock members in display order", () => {
+    expect(PUBLIC_MEMBERS.map((person) => person.id)).toEqual([
+      "guo-development",
+      "he-media",
+      "fang-planning",
+      "sun-talent",
+      "xu-media",
+      "tang-planning"
+    ]);
+    expect(PUBLIC_MEMBERS.every((person) => !person.isCore)).toBe(true);
   });
 
   it("returns the approved public people for each center", () => {
     expect(getPeopleByCenter("baize-development").map((person) => person.id)).toEqual([
       "lin-development",
+      "zheng-development",
       "guo-development"
     ]);
     expect(getPeopleByCenter("new-media").map((person) => person.id)).toEqual([
       "chen-media",
-      "he-media"
+      "he-media",
+      "xu-media"
     ]);
     expect(getPeopleByCenter("tuowei-planning").map((person) => person.id)).toEqual([
       "zhou-planning",
-      "fang-planning"
+      "fang-planning",
+      "tang-planning"
     ]);
     expect(getPeopleByCenter("talent-development").map((person) => person.id)).toEqual([
       "wu-talent",
+      "luo-talent",
       "sun-talent"
     ]);
   });
 
-  it("never exposes a private avatar URL", () => {
-    const privatePerson: PublicPerson = {
-      id: "private-avatar",
-      name: "测试成员",
-      role: "成员",
-      centerSlug: "new-media",
-      centerName: "新媒体中心",
-      direction: "影像记录",
-      bio: "该头像选择不公开。",
-      avatarUrl: "/avatars/private-avatar.jpg",
-      avatarVisible: false,
-      isCore: false,
-      order: 99
-    };
+  it("ships hidden-avatar public records without an avatar URL", () => {
+    const hiddenPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS].filter(
+      (person) => !person.avatarVisible
+    );
 
-    expect(resolvePublicAvatar(privatePerson)).toBeUndefined();
+    expect(hiddenPeople).toHaveLength(12);
+    expect(hiddenPeople.every((person) => !Object.hasOwn(person, "avatarUrl"))).toBe(true);
+    expect(hiddenPeople.every((person) => resolvePublicAvatar(person) === undefined)).toBe(true);
   });
 });

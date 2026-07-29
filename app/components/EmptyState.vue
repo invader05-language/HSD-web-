@@ -9,8 +9,13 @@ withDefaults(defineProps<{
 </script>
 
 <template>
-  <div class="empty-state" role="status">
-    <strong>{{ title }}</strong>
-    <p>{{ description }}</p>
+  <div class="empty-state">
+    <div class="empty-state__message" role="status">
+      <strong>{{ title }}</strong>
+      <p>{{ description }}</p>
+    </div>
+    <div v-if="$slots.action" class="empty-state__action">
+      <slot name="action" />
+    </div>
   </div>
 </template>

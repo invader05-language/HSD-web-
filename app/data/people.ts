@@ -1,6 +1,6 @@
 import type { CenterSlug } from "./centers";
 
-export interface PublicPerson {
+interface PublicPersonBase {
   id: string;
   name: string;
   role: string;
@@ -8,11 +8,21 @@ export interface PublicPerson {
   centerName: string;
   direction: string;
   bio: string;
-  avatarUrl?: string;
-  avatarVisible: boolean;
   isCore: boolean;
   order: number;
 }
+
+type PublicAvatar =
+  | {
+      avatarVisible: false;
+      avatarUrl?: never;
+    }
+  | {
+      avatarVisible: true;
+      avatarUrl: string;
+    };
+
+export type PublicPerson = PublicPersonBase & PublicAvatar;
 
 export const CORE_PEOPLE: readonly PublicPerson[] = [
   {
@@ -62,6 +72,30 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     avatarVisible: false,
     isCore: true,
     order: 4
+  },
+  {
+    id: "zheng-development",
+    name: "郑同学",
+    role: "核心成员 · 工程协作",
+    centerSlug: "baize-development",
+    centerName: "白泽开发中心",
+    direction: "质量保障与软硬件联调",
+    bio: "关注项目验证、问题复盘与跨模块协作，帮助团队把原型推进到稳定演示。",
+    avatarVisible: false,
+    isCore: true,
+    order: 5
+  },
+  {
+    id: "luo-talent",
+    name: "罗同学",
+    role: "核心成员 · 学习支持",
+    centerSlug: "talent-development",
+    centerName: "人才发展中心",
+    direction: "学习路径与实践反馈",
+    bio: "围绕新人实践设计学习支持，让成员能从一次参与逐步承担完整任务。",
+    avatarVisible: false,
+    isCore: true,
+    order: 6
   }
 ];
 
@@ -113,6 +147,30 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     avatarVisible: false,
     isCore: false,
     order: 14
+  },
+  {
+    id: "xu-media",
+    name: "许同学",
+    role: "成员",
+    centerSlug: "new-media",
+    centerName: "新媒体中心",
+    direction: "文字编辑与专题策划",
+    bio: "参与活动采访和专题内容整理，用清晰表达记录团队的实践过程。",
+    avatarVisible: false,
+    isCore: false,
+    order: 15
+  },
+  {
+    id: "tang-planning",
+    name: "唐同学",
+    role: "成员",
+    centerSlug: "tuowei-planning",
+    centerName: "拓维策划中心",
+    direction: "活动流程与资源联络",
+    bio: "协助技术活动的流程准备与资源联络，在现场实践中积累协作经验。",
+    avatarVisible: false,
+    isCore: false,
+    order: 16
   }
 ];
 

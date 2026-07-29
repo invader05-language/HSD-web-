@@ -12,6 +12,11 @@ onMounted(() => {
   isHydrated.value = true;
 });
 
+function clearFilters() {
+  query.value = "";
+  center.value = "all";
+}
+
 const visibleMembers = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
@@ -66,7 +71,11 @@ const visibleMembers = computed(() => {
             </div>
           </article>
         </div>
-        <EmptyState v-else title="没有匹配的成员" description="请尝试更换关键词或中心筛选条件。" />
+        <EmptyState v-else title="没有匹配的成员" description="请尝试更换关键词或中心筛选条件。">
+          <template #action>
+            <button type="button" class="button button--dark" @click="clearFilters">清除筛选</button>
+          </template>
+        </EmptyState>
 
         <p class="privacy-note">本页仅展示成员主动公开的基础风采信息，不包含个人联系方式、考核结果或成长记录。</p>
       </div>
