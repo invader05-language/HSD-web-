@@ -49,36 +49,7 @@ export const NEWS = [
   }
 ] as const;
 
-export const CENTERS = [
-  {
-    index: "01",
-    title: "白泽开发中心",
-    role: "研发与技术落地",
-    description: "覆盖 HarmonyOS、后端架构、大模型 AIGC、UI/UX 与嵌入式开发。",
-    topics: ["鸿蒙开发", "AI 与后端", "软硬件联调"]
-  },
-  {
-    index: "02",
-    title: "新媒体中心",
-    role: "品牌视觉与内容传播",
-    description: "负责推文撰写、海报设计、摄影剪辑和社群媒体运营。",
-    topics: ["摄影", "视觉设计", "内容运营"]
-  },
-  {
-    index: "03",
-    title: "拓维策划中心",
-    role: "活动策划与资源协同",
-    description: "策划赛事与技术活动，连接校内外资源并推进现场执行。",
-    topics: ["活动策划", "外联合作", "项目统筹"]
-  },
-  {
-    index: "04",
-    title: "人才发展中心",
-    role: "成员成长与组织建设",
-    description: "为新成员提供循序渐进的学习路径、培训与梯队成长支持。",
-    topics: ["新人培养", "成员服务", "梯队建设"]
-  }
-] as const;
+export { CENTERS } from "./centers";
 
 export const PROJECTS = [
   {
@@ -164,4 +135,3 @@ export const RESOURCES = [
   { type: "项目模板", title: "校园科创项目需求说明模板", access: "公开浏览", to: "/resources" },
   { type: "内部资料", title: "2026 成员训练营课程资料", access: "登录后下载", to: "/login?redirect=%2Fresources" }
 ] as const;
-
