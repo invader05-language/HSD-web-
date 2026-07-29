@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CENTERS as homeCenters } from "../../app/data/home";
-import { CENTERS, getCenterBySlug } from "../../app/data/centers";
+import { CENTER_OPTIONS, CENTERS, getCenterBySlug } from "../../app/data/centers";
 import {
   CORE_PEOPLE,
   getPeopleByCenter,
@@ -20,15 +20,41 @@ describe("public people and center directory", () => {
     expect(getCenterBySlug("missing")).toBeUndefined();
   });
 
+  it("provides center filter options in the approved center order", () => {
+    expect(CENTER_OPTIONS).toEqual([
+      { value: "baize-development", label: "白泽开发中心" },
+      { value: "new-media", label: "新媒体中心" },
+      { value: "tuowei-planning", label: "拓维策划中心" },
+      { value: "talent-development", label: "人才发展中心" }
+    ]);
+  });
+
   it("keeps the homepage center import compatible", () => {
     expect(homeCenters).toBe(CENTERS);
   });
 
-  it("returns only core people for a center and keeps their core status", () => {
+  it("keeps the core directory populated with core people", () => {
+    expect(CORE_PEOPLE).not.toHaveLength(0);
     expect(CORE_PEOPLE.every((person) => person.isCore)).toBe(true);
-    expect(getPeopleByCenter("baize-development").every(
-      (person) => person.centerSlug === "baize-development"
-    )).toBe(true);
+  });
+
+  it("returns the approved public people for each center", () => {
+    expect(getPeopleByCenter("baize-development").map((person) => person.id)).toEqual([
+      "lin-development",
+      "guo-development"
+    ]);
+    expect(getPeopleByCenter("new-media").map((person) => person.id)).toEqual([
+      "chen-media",
+      "he-media"
+    ]);
+    expect(getPeopleByCenter("tuowei-planning").map((person) => person.id)).toEqual([
+      "zhou-planning",
+      "fang-planning"
+    ]);
+    expect(getPeopleByCenter("talent-development").map((person) => person.id)).toEqual([
+      "wu-talent",
+      "sun-talent"
+    ]);
   });
 
   it("never exposes a private avatar URL", () => {

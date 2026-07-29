@@ -86,6 +86,11 @@ export const CENTERS: readonly CenterProfile[] = [
   }
 ];
 
+export const CENTER_OPTIONS = CENTERS.map((center) => ({
+  value: center.slug,
+  label: center.title
+}));
+
 export function getCenterBySlug(slug: string): CenterProfile | undefined {
   return CENTERS.find((center) => center.slug === slug);
 }
