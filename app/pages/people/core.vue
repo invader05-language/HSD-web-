@@ -6,6 +6,11 @@ useHead({ title: "核心人员名录｜白云 HSD 开发者部落" });
 
 const query = ref("");
 const center = ref("all");
+const isHydrated = ref(false);
+
+onMounted(() => {
+  isHydrated.value = true;
+});
 
 const visiblePeople = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
@@ -22,7 +27,7 @@ const visiblePeople = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div :data-directory-hydrated="isHydrated">
     <PageBanner
       eyebrow="Core People"
       title="核心人员名录"
