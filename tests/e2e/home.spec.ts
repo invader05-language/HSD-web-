@@ -20,7 +20,23 @@ test("public detail remains open and personal signup continues through login", a
 });
 
 test("desktop routes do not overflow horizontally", async ({ page }) => {
-  for (const path of ["/", "/about", "/projects", "/activities", "/gallery", "/resources", "/join", "/help"]) {
+  for (const path of [
+    "/",
+    "/about",
+    "/people/core",
+    "/people/members",
+    "/centers",
+    "/centers/baize-development",
+    "/centers/new-media",
+    "/centers/tuowei-planning",
+    "/centers/talent-development",
+    "/projects",
+    "/activities",
+    "/gallery",
+    "/resources",
+    "/join",
+    "/help"
+  ]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${path} should not overflow horizontally`).toBe(false);

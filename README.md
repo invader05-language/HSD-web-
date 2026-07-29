@@ -5,8 +5,8 @@
 ## 当前状态
 
 - 版本：`v0.2 Frontend Prototype`
-- 已实现：完整首页、一级页面、项目/活动二级页、登录、招新报名、成员空间、帮助中心
-- 数据状态：使用 TypeScript Mock 数据，暂未连接真实后台
+- 已实现：完整首页、一级页面、项目/活动二级页、公开人员名录、四个中心详情、登录、招新报名、成员空间、帮助中心
+- 数据状态：仍为纯 Nuxt/Vue/TypeScript 前端原型，业务内容使用 TypeScript Mock 数据；后端与数据库尚未开始
 - 图片状态：未提供正式授权素材的位置统一显示 HSD 素材占位，不使用需求海报或未授权品牌资产
 
 ## 在线试用
@@ -21,7 +21,7 @@
 
 - Nuxt 4 + Vue 3 + TypeScript
 - Tailwind CSS 4 + CSS 设计令牌
-- Pinia
+- Pinia（仅用于现有前端会话状态）
 - VeeValidate + Zod
 - Pretext 文本布局测量
 - Vitest + Playwright
@@ -79,7 +79,13 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 | --- | --- | --- |
 | `/` | 完整首页 | 公开 |
 | `/about` | 部落介绍、核心人员、成员风采 | 公开 |
+| `/people/core` | 核心人员公开名录 | 公开 |
+| `/people/members` | 全体成员公开名录 | 公开 |
 | `/centers` | 四大中心 | 公开 |
+| `/centers/baize-development` | 白泽开发中心详情 | 公开 |
+| `/centers/new-media` | 新媒体中心详情 | 公开 |
+| `/centers/tuowei-planning` | 拓维策划中心详情 | 公开 |
+| `/centers/talent-development` | 人才发展中心详情 | 公开 |
 | `/projects` | 项目列表、筛选、分页状态 | 公开 |
 | `/projects/[slug]` | 项目详情 | 公开 |
 | `/activities` | 活动列表、筛选、分页状态 | 公开 |
@@ -110,6 +116,13 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 - 已上传且选择公开时显示本人头像。
 - 未上传或选择不公开时显示统一的白底 HSD 默认头像。
 - 核心人员重点展示区与普通成员风采区相互独立，普通成员模块继续保留。
+- 公开名录与中心详情只通过 `resolvePublicAvatar` 输出头像：未上传或明确不公开的头像 URL 均不得暴露，改用白底 HSD 默认头像。
+
+## 2026-07-29 变更
+
+- 新增公开的核心人员与全体成员名录：`/people/core`、`/people/members`。
+- 新增四个公开中心详情：`/centers/baize-development`、`/centers/new-media`、`/centers/tuowei-planning`、`/centers/talent-development`。
+- 本阶段仍是纯前端 TypeScript 数据实现；Pinia 仅保存当前演示会话，真实登录、后端 API 与数据库迁移尚未开始。
 
 ## 设计基线
 
