@@ -15,7 +15,7 @@ const route = useRoute();
     <PageBanner
       eyebrow="Resource Center"
       title="把方法、模板与学习路线沉淀下来"
-      description="公开资源无需登录即可浏览；带有“登录后下载”标记的内部资料，会在查看下载权限时要求成员登录。"
+      description="所有条目先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。"
       tone="warm"
       media-label="资源索引与文件视觉位"
     />

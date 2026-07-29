@@ -22,6 +22,26 @@ test("external resources are explicitly marked and open in a new tab", async ({ 
   await expect(link).toHaveAttribute("rel", /noopener/);
 });
 
+test("internal resource login continues to an honest unavailable state", async ({ page }) => {
+  await page.goto("/resources/member-training-package");
+
+  await expect(page.getByRole("button", { name: "文件暂未接入" })).toBeDisabled();
+  await page.getByRole("link", { name: "登录查看下载权限" }).click();
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fresources%2Fmember-training-package$/);
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("form") as Element & { __vueParentComponent?: unknown })?.__vueParentComponent
+  ));
+
+  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+
+  await expect(page).toHaveURL(/\/resources\/member-training-package$/);
+  await expect(page.getByRole("button", { name: "文件暂未接入" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "登录查看下载权限" })).toHaveCount(0);
+  await expect(page.getByText("已登录，文件接入后将开放成员下载权限。", { exact: true })).toBeVisible();
+});
+
 test("assessment results require login and continue back after demo sign-in", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "考核结果" }).click();
@@ -34,7 +54,7 @@ test("assessment results require login and continue back after demo sign-in", as
   await expect(page).toHaveURL(/\/assessment-results$/);
   await expect(page.getByRole("heading", { level: 1, name: "考核结果" })).toBeVisible();
   await expect(page.getByText("考核数据暂未接入", { exact: true })).toBeVisible();
-  await expect(page.getByText(/分数|评级|排名|评语|通过状态/)).toHaveCount(0);
+  await expect(page.getByText(/分数|评级|排名|评语|考核周期|周期|通过状态/)).toHaveCount(0);
 });
 
 test("gallery album uses full media frames and an accessible lightbox", async ({ page }) => {

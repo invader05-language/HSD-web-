@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch
+} from "vue";
 import type { GalleryAsset } from "~/data/gallery";
 
 const props = defineProps<{
@@ -13,11 +21,20 @@ const emit = defineEmits<{
 
 const dialog = ref<HTMLElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
+const imageFailed = ref(false);
 let triggerElement: HTMLElement | null = null;
 
 const activeItem = computed(() => props.items[props.activeIndex]);
+const showImage = computed(() => Boolean(activeItem.value?.imageUrl) && !imageFailed.value);
 const canGoPrevious = computed(() => props.activeIndex > 0);
 const canGoNext = computed(() => props.activeIndex < props.items.length - 1);
+
+watch(
+  () => [activeItem.value?.id, activeItem.value?.imageUrl],
+  () => {
+    imageFailed.value = false;
+  }
+);
 
 function showPrevious() {
   if (canGoPrevious.value) emit("update:activeIndex", props.activeIndex - 1);
@@ -92,7 +109,13 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="gallery-lightbox__stage">
-        <img v-if="activeItem.imageUrl" :src="activeItem.imageUrl" :alt="activeItem.alt">
+        <img
+          v-if="showImage"
+          :key="activeItem.id"
+          :src="activeItem.imageUrl"
+          :alt="activeItem.alt"
+          @error="imageFailed = true"
+        >
         <div v-else class="gallery-lightbox__fallback" aria-hidden="true">&lt; HSD &gt;</div>
         <div class="gallery-lightbox__caption">
           <p>{{ activeIndex + 1 }} / {{ items.length }}</p>

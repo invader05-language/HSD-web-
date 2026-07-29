@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@nuxt/test-utils": "4.1.0",
+    "@vitejs/plugin-vue": "6.0.8",
     "@playwright/test": "1.62.0",
     "@tailwindcss/vite": "4.3.3",
     "@vue/test-utils": "2.4.6",

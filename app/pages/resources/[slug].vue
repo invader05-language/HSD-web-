@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { findResource, PUBLIC_RESOURCES, resourcePrimaryAction } from "~/data/resources";
+import { useSessionStore } from "~/stores/session";
 import { buildLoginTarget } from "~/utils/login-continuation";
 
 const route = useRoute();
+const session = useSessionStore();
 const resource = computed(() => findResource(String(route.params.slug)));
 
 if (!resource.value) {
@@ -67,7 +69,16 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
           <a v-else-if="resource.kind === 'external'" class="button" :href="resource.externalUrl" target="_blank" rel="noopener noreferrer">{{ action }}</a>
           <a v-else-if="resource.kind === 'article'" class="button" href="#resource-content">{{ action }}</a>
 
-          <NuxtLink v-if="resource.access === 'member'" class="text-link" :to="loginTarget">登录查看下载权限</NuxtLink>
+          <NuxtLink
+            v-if="resource.access === 'member' && !session.isAuthenticated"
+            class="text-link"
+            :to="loginTarget"
+          >
+            登录查看下载权限
+          </NuxtLink>
+          <p v-else-if="resource.access === 'member'" class="resource-file-panel__notice">
+            已登录，文件接入后将开放成员下载权限。
+          </p>
           <p v-if="isUnavailable" class="resource-file-panel__notice">真实文件尚未接入，当前不提供下载链接。</p>
         </aside>
       </div>

@@ -1,8 +1,19 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import type { GalleryAsset } from "~/data/gallery";
 
-defineProps<{ item: GalleryAsset; featured?: boolean }>();
+const props = defineProps<{ item: GalleryAsset; featured?: boolean }>();
 defineEmits<{ open: [] }>();
+
+const imageFailed = ref(false);
+const showImage = computed(() => Boolean(props.item.imageUrl) && !imageFailed.value);
+
+watch(
+  () => [props.item.id, props.item.imageUrl],
+  () => {
+    imageFailed.value = false;
+  }
+);
 </script>
 
 <template>
@@ -14,7 +25,13 @@ defineEmits<{ open: [] }>();
     :aria-label="`查看照片：${item.title}`"
     @click="$emit('open')"
   >
-    <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.alt" loading="lazy">
+    <img
+      v-if="showImage"
+      :src="item.imageUrl"
+      :alt="item.alt"
+      loading="lazy"
+      @error="imageFailed = true"
+    >
     <span v-else class="gallery-media-frame__fallback" aria-hidden="true">&lt; HSD &gt;</span>
     <span class="gallery-media-frame__overlay">
       <strong>{{ item.title }}</strong>

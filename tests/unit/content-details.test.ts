@@ -24,8 +24,16 @@ describe("public resource details", () => {
   });
 
   it("keeps file actions honest while real files are not connected", () => {
-    expect(findResource("project-requirement-template")?.status).toBe("not-connected");
-    expect(resourcePrimaryAction(findResource("project-requirement-template")!)).toBe("文件暂未接入");
+    const disconnectedFiles = PUBLIC_RESOURCES.filter((resource) =>
+      ["pdf", "docx", "archive"].includes(resource.kind)
+    );
+
+    expect(disconnectedFiles).toHaveLength(3);
+    for (const resource of disconnectedFiles) {
+      expect(resource.status).toBe("not-connected");
+      expect(resourcePrimaryAction(resource)).toBe("文件暂未接入");
+      expect(resourcePrimaryAction(resource)).not.toContain("下载");
+    }
     expect(findResource("missing")).toBeUndefined();
   });
 });

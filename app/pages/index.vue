@@ -235,7 +235,7 @@ const heroText = usePretextLayout(heroDescription, 31);
         <div>
           <p class="eyebrow">Resources</p>
           <h2>把经验沉淀成下一次出发的起点</h2>
-          <p>公开学习路线与项目模板无需登录；内部课程资料会在下载时要求成员登录。</p>
+          <p>所有资源先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。</p>
           <NuxtLink class="button button--dark" to="/resources">浏览资源中心</NuxtLink>
         </div>
         <div class="resource-list">

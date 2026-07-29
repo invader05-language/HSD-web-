@@ -132,6 +132,6 @@ export const MEMBERS = [
 
 export const RESOURCES = [
   { type: "学习路线", title: "HarmonyOS 原生开发入门清单", access: "公开浏览", to: "/resources/harmonyos-getting-started" },
-  { type: "项目模板", title: "校园科创项目需求说明模板", access: "公开浏览", to: "/resources/project-requirement-template" },
-  { type: "内部资料", title: "2026 成员训练营课程资料", access: "登录后下载", to: "/resources/member-training-package" }
+  { type: "项目模板", title: "校园科创项目需求说明模板", access: "文件暂未接入", to: "/resources/project-requirement-template" },
+  { type: "内部资料", title: "2026 成员训练营课程资料", access: "文件暂未接入", to: "/resources/member-training-package" }
 ] as const;
