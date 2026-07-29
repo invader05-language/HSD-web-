@@ -2046,7 +2046,7 @@ body.is-scroll-locked {
 }
 
 .gallery-lightbox__stage > img {
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .gallery-lightbox__fallback {
