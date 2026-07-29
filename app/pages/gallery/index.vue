@@ -1,17 +1,13 @@
 <script setup lang="ts">
+import { GALLERY_ALBUMS } from "~/data/gallery";
+
 useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
 
 const categories = ["全部", "活动摄影", "海报设计", "短视频", "人物专访"] as const;
 const active = ref("全部");
-const works = [
-  { title: "年度活动影像记录", category: "活动摄影", year: "2026" },
-  { title: "程序员节视觉提案", category: "海报设计", year: "2026" },
-  { title: "项目路演幕后", category: "短视频", year: "2026" },
-  { title: "成员成长访谈", category: "人物专访", year: "2025" },
-  { title: "技术沙龙现场", category: "活动摄影", year: "2025" },
-  { title: "招新品牌视觉", category: "海报设计", year: "2025" }
-];
-const visible = computed(() => active.value === "全部" ? works : works.filter((work) => work.category === active.value));
+const visible = computed(() => active.value === "全部"
+  ? GALLERY_ALBUMS
+  : GALLERY_ALBUMS.filter((album) => album.category === active.value));
 </script>
 
 <template>
@@ -27,10 +23,20 @@ const visible = computed(() => active.value === "全部" ? works : works.filter(
       <div class="shell">
         <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${visible.length} 件作品`" />
         <div v-if="visible.length" class="gallery-catalog">
-          <article v-for="(work, index) in visible" :key="work.title" :class="{ 'is-featured': index === 0 }">
-            <MediaPlaceholder :label="work.title" :detail="`${work.category} · ${work.year}`" />
-            <div><span>{{ work.category }}</span><h2>{{ work.title }}</h2></div>
-          </article>
+          <NuxtLink
+            v-for="(album, index) in visible"
+            :key="album.slug"
+            :to="album.to"
+            class="gallery-album-card"
+            :class="{ 'is-featured': index === 0 }"
+          >
+            <span class="gallery-album-card__fallback" aria-hidden="true">&lt; HSD &gt;</span>
+            <span class="gallery-album-card__copy">
+              <small>{{ album.category }} · {{ album.year }}</small>
+              <strong>{{ album.title }}</strong>
+              <span>{{ album.summary }}</span>
+            </span>
+          </NuxtLink>
         </div>
         <EmptyState v-else />
         <nav class="pagination" aria-label="媒体作品分页">
@@ -40,4 +46,3 @@ const visible = computed(() => active.value === "全部" ? works : works.filter(
     </section>
   </div>
 </template>
-
