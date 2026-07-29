@@ -109,6 +109,13 @@ test("1440px overview exposes a non-hover action and the whole center card navig
   await expect(page.getByRole("heading", { level: 1, name: "白泽开发中心" })).toBeVisible();
 });
 
+test("about collaboration cards navigate from the card body", async ({ page }) => {
+  await page.goto("/about");
+  const card = page.getByRole("link", { name: /新媒体中心.*查看中心详情/ });
+  await card.click({ position: { x: 24, y: 24 } });
+  await expect(page).toHaveURL(/\/centers\/new-media$/);
+});
+
 test("unknown center slug responds with the Nuxt 404 page", async ({ page }) => {
   const response = await page.goto("/centers/missing");
 

@@ -17,6 +17,11 @@ test("members without public honors render no empty honor label", async ({ page 
   const card = page.getByRole("link", { name: /孙同学.*查看成员详情/ });
   await expect(card.getByTestId("featured-honor")).toHaveCount(0);
   await expect(card).not.toContainText("暂无荣誉");
+  await card.click();
+
+  await expect(page).toHaveURL(/\/people\/sun-talent$/);
+  await expect(page.getByRole("heading", { level: 2, name: "个人荣誉" })).toHaveCount(0);
+  await expect(page.getByTestId("honor-record")).toHaveCount(0);
 });
 
 test("unknown public person returns 404", async ({ page }) => {

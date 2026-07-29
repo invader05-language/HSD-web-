@@ -41,7 +41,10 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
     "/projects",
     "/activities",
     "/gallery",
+    "/gallery/annual-activity-record",
     "/resources",
+    "/resources/project-requirement-template",
+    "/people/lin-development",
     "/join",
     "/help"
   ]) {
@@ -49,4 +52,17 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow, `${path} should not overflow horizontally`).toBe(false);
   }
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "考核结果" }).click();
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fassessment-results$/);
+  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/assessment-results$/);
+
+  const assessmentOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  expect(assessmentOverflow, "/assessment-results should not overflow horizontally").toBe(false);
 });

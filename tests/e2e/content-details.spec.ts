@@ -46,14 +46,21 @@ test("gallery album uses full media frames and an accessible lightbox", async ({
   await expect(media).toHaveCount(12);
   await expect(media.first().locator(".media-placeholder")).toHaveCount(0);
   await expect(media.first().getByText("开场前的最后一次确认")).toBeVisible();
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("#__nuxt") as Element & { __vue_app__?: unknown })?.__vue_app__
+  ));
 
   await media.first().click();
   const dialog = page.getByRole("dialog", { name: "照片浏览" });
+  const closeButton = page.getByRole("button", { name: "关闭照片浏览" });
   await expect(dialog).toBeVisible();
+  await expect(closeButton).toBeFocused();
+  await expect(page.locator("body")).toHaveClass(/is-scroll-locked/);
   await page.keyboard.press("ArrowRight");
   await expect(dialog.getByText("分享与讨论")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+  await expect(page.locator("body")).not.toHaveClass(/is-scroll-locked/);
   await expect(media.first()).toBeFocused();
 });
 

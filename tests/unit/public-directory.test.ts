@@ -104,6 +104,18 @@ describe("public people and center directory", () => {
     for (const person of [...CORE_PEOPLE, ...PUBLIC_MEMBERS]) {
       expect(person.honors.every((honor) => honor.approved && honor.visible)).toBe(true);
       expect(getFeaturedHonors(person).length).toBeLessThanOrEqual(3);
+      for (const honor of person.honors) {
+        expect(Object.keys(honor).sort()).toEqual([
+          "approved",
+          "awardedAt",
+          "description",
+          "featured",
+          "id",
+          "order",
+          "title",
+          "visible"
+        ]);
+      }
     }
 
     expect(findPublicPerson("missing")).toBeUndefined();
