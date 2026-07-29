@@ -1,0 +1,9 @@
+.git/
+.nuxt/
+.output/
+node_modules/
+test-results/
+playwright-report/
+artifacts/
+docs/
+*.png

@@ -1,15 +1,26 @@
-# Local design-preview workspace
 .superpowers/
 .worktrees/
 
 # Private association records are local-only
 社团成立信息表（6.20更新汇总）/
 
-# Mobile concepts are not part of the desktop-first v0.1 delivery
+# Mobile concepts are not part of the desktop-first delivery
 白云HSD开发者部落-首页设计稿-移动端.png
+
+# Build and test outputs
+.nuxt/
+.output/
+dist/
+.vercel/
+node_modules/
+test-results/
+playwright-report/
+.env
 
 # OS/editor files
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+
+.vercel
