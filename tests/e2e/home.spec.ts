@@ -19,6 +19,14 @@ test("public detail remains open and personal signup continues through login", a
   await expect(page.getByRole("heading", { name: "成员登录" })).toBeVisible();
 });
 
+test("homepage resource cards open their own detail pages before any file action", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /2026 成员训练营课程资料/ }).click();
+
+  await expect(page).toHaveURL(/\/resources\/member-training-package$/);
+  await expect(page.getByRole("button", { name: "文件暂未接入" })).toBeDisabled();
+});
+
 test("desktop routes do not overflow horizontally", async ({ page }) => {
   for (const path of [
     "/",

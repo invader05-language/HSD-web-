@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOME_SECTIONS, PROJECTS } from "../../app/data/home";
+import { HOME_SECTIONS, PROJECTS, RESOURCES } from "../../app/data/home";
 
 describe("homepage content", () => {
   it("keeps the approved section and project order", () => {
@@ -19,5 +19,13 @@ describe("homepage content", () => {
     expect(PROJECTS[0]?.title).toBe("智巡先锋");
     expect(PROJECTS[1]?.title).toBe("智学领航");
     expect(PROJECTS[2]?.title).toBe("小白云");
+  });
+
+  it("routes every homepage resource card through its matching detail page", () => {
+    expect(RESOURCES.map((resource) => resource.to)).toEqual([
+      "/resources/harmonyos-getting-started",
+      "/resources/project-requirement-template",
+      "/resources/member-training-package"
+    ]);
   });
 });
