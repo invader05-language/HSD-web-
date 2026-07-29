@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { CENTERS } from "~/data/home";
 
+const route = useRoute();
+
 useHead({ title: "四大中心｜白云 HSD 开发者部落" });
 </script>
 
 <template>
-  <div>
+  <NuxtPage v-if="route.params.slug" />
+  <div v-else>
     <PageBanner
       eyebrow="Four Centers"
       title="研发、传播、策划、成长"
@@ -15,7 +18,12 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
     />
     <section class="section section--warm">
       <div class="shell center-detail-list">
-        <article v-for="center in CENTERS" :key="center.title">
+        <NuxtLink
+          v-for="center in CENTERS"
+          :key="center.slug"
+          :to="`/centers/${center.slug}`"
+          class="center-detail-row"
+        >
           <div>
             <span>{{ center.index }}</span>
             <p>{{ center.role }}</p>
@@ -27,7 +35,8 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
           <ul>
             <li v-for="topic in center.topics" :key="topic">{{ topic }}</li>
           </ul>
-        </article>
+          <strong>查看中心详情 →</strong>
+        </NuxtLink>
       </div>
     </section>
     <section class="section">
@@ -41,4 +50,3 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
     </section>
   </div>
 </template>
-

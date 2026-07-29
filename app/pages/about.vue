@@ -89,11 +89,16 @@ useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
           </div>
         </div>
         <div class="plain-grid">
-          <article v-for="center in CENTERS" :key="center.title">
+          <NuxtLink
+            v-for="center in CENTERS"
+            :key="center.slug"
+            :to="`/centers/${center.slug}`"
+          >
             <span>{{ center.index }}</span>
             <h3>{{ center.title }}</h3>
             <p>{{ center.description }}</p>
-          </article>
+            <strong>查看中心详情 →</strong>
+          </NuxtLink>
         </div>
       </div>
     </section>

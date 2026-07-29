@@ -104,7 +104,12 @@ const heroText = usePretextLayout(heroDescription, 31);
           <p>从研发、传播到策划与成长，每个中心都不是附属角色，而是完整协作链路的一部分。</p>
         </div>
         <div class="centers-grid">
-          <article v-for="center in CENTERS" :key="center.title" class="center-card">
+          <NuxtLink
+            v-for="center in CENTERS"
+            :key="center.slug"
+            class="center-card"
+            :to="`/centers/${center.slug}`"
+          >
             <span class="center-card__index">{{ center.index }}</span>
             <p>{{ center.role }}</p>
             <h3>{{ center.title }}</h3>
@@ -112,7 +117,8 @@ const heroText = usePretextLayout(heroDescription, 31);
             <ul>
               <li v-for="topic in center.topics" :key="topic">{{ topic }}</li>
             </ul>
-          </article>
+            <span class="center-card__action">查看中心详情 →</span>
+          </NuxtLink>
         </div>
         <NuxtLink class="button button--dark" to="/centers">了解四大中心</NuxtLink>
       </div>
