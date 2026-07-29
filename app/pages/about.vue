@@ -1,22 +1,8 @@
 <script setup lang="ts">
 import { CENTERS } from "~/data/home";
+import { CORE_PEOPLE, PUBLIC_MEMBERS, resolvePublicAvatar } from "~/data/people";
 
 useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
-
-const coreMembers = [
-  { name: "负责人 A", role: "部落负责人", focus: "组织方向与生态合作" },
-  { name: "负责人 B", role: "项目负责人", focus: "技术项目与赛事推进" },
-  { name: "负责人 C", role: "运营负责人", focus: "内容传播与活动统筹" }
-];
-
-const members = [
-  { name: "成员 01", center: "白泽开发中心", direction: "HarmonyOS" },
-  { name: "成员 02", center: "白泽开发中心", direction: "AI 应用" },
-  { name: "成员 03", center: "新媒体中心", direction: "摄影与剪辑" },
-  { name: "成员 04", center: "新媒体中心", direction: "品牌设计" },
-  { name: "成员 05", center: "拓维策划中心", direction: "活动策划" },
-  { name: "成员 06", center: "人才发展中心", direction: "成员成长" }
-];
 </script>
 
 <template>
@@ -49,17 +35,20 @@ const members = [
             <p class="eyebrow">Core Team</p>
             <h2>核心人员重点展示</h2>
           </div>
-          <p>该区域独立于普通成员名录，用于展示当前承担组织方向、关键项目和跨中心协作职责的核心人员。</p>
+          <div class="section-heading__aside">
+            <p>该区域独立于普通成员名录，用于展示当前承担组织方向、关键项目和跨中心协作职责的核心人员。</p>
+            <NuxtLink to="/people/core" class="directory-link">查看全体核心人员 →</NuxtLink>
+          </div>
         </div>
         <div class="core-team">
-          <article v-for="(member, index) in coreMembers" :key="member.name">
+          <article v-for="(member, index) in CORE_PEOPLE.slice(0, 3)" :key="member.id">
             <div class="core-team__visual">
-              <HsdAvatar :name="member.name" size="lg" />
+              <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
               <span>0{{ index + 1 }}</span>
             </div>
             <p>{{ member.role }}</p>
             <h3>{{ member.name }}</h3>
-            <p>{{ member.focus }}</p>
+            <p>{{ member.direction }}</p>
           </article>
         </div>
       </div>
@@ -72,14 +61,17 @@ const members = [
             <p class="eyebrow">Member Directory</p>
             <h2>成员风采</h2>
           </div>
-          <p>头像与个人资料头像联动；已上传照片显示本人头像，未上传或选择不公开时统一使用白底 HSD 默认头像。</p>
+          <div class="section-heading__aside">
+            <p>头像与个人资料头像联动；已上传照片显示本人头像，未上传或选择不公开时统一使用白底 HSD 默认头像。</p>
+            <NuxtLink to="/people/members" class="directory-link">查看所有成员 →</NuxtLink>
+          </div>
         </div>
         <div class="member-directory">
-          <article v-for="member in members" :key="member.name">
-            <HsdAvatar :name="member.name" size="lg" />
+          <article v-for="member in PUBLIC_MEMBERS" :key="member.id">
+            <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
             <div>
               <h3>{{ member.name }}</h3>
-              <p>{{ member.center }}</p>
+              <p>{{ member.centerName }}</p>
               <span>{{ member.direction }}</span>
             </div>
           </article>
@@ -107,4 +99,3 @@ const members = [
     </section>
   </div>
 </template>
-
