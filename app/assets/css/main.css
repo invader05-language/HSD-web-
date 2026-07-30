@@ -4239,7 +4239,7 @@ label small:not(:empty),
 .admin-nav-group > button {
   display: grid;
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   grid-template-columns: 30px 1fr 18px;
   align-items: center;
   border: 0;
@@ -4287,7 +4287,7 @@ label small:not(:empty),
 
 .admin-sidebar nav a {
   display: grid;
-  min-height: 34px;
+  min-height: 44px;
   align-items: center;
   border-radius: 5px;
   padding: 0 12px;
@@ -4363,6 +4363,9 @@ label small:not(:empty),
 }
 
 .admin-topbar__actions a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
   color: #8f1822;
   font-weight: 700;
 }
@@ -4386,6 +4389,7 @@ label small:not(:empty),
 }
 
 .admin-topbar__actions button {
+  min-height: 44px;
   border: 0;
   padding: 0;
   background: transparent;
