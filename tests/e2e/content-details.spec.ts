@@ -42,19 +42,19 @@ test("internal resource login continues to an honest unavailable state", async (
   await expect(page.getByText("已登录，文件接入后将开放成员下载权限。", { exact: true })).toBeVisible();
 });
 
-test("assessment results require login and continue back after demo sign-in", async ({ page }) => {
+test("member results require login and continue back after demo sign-in", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "考核结果" }).click();
+  await page.getByRole("link", { name: "结果中心" }).click();
 
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fassessment-results$/);
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
   await page.getByLabel("成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 
-  await expect(page).toHaveURL(/\/assessment-results$/);
-  await expect(page.getByRole("heading", { level: 1, name: "考核结果" })).toBeVisible();
-  await expect(page.getByText("考核数据暂未接入", { exact: true })).toBeVisible();
-  await expect(page.getByText(/分数|评级|排名|评语|考核周期|周期|通过状态/)).toHaveCount(0);
+  await expect(page).toHaveURL(/\/member\/results$/);
+  await expect(page.getByRole("heading", { level: 1, name: "结果中心" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "你已正式加入白泽开发中心" })).toBeVisible();
+  await expect(page.getByText(/报到时间|报到地点|携带材料|确认加入|放弃名额/)).toHaveCount(0);
 });
 
 test("gallery album uses full media frames and an accessible lightbox", async ({ page }) => {

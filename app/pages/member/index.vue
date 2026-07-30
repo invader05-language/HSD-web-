@@ -9,14 +9,14 @@ const session = useSessionStore();
   <div class="member-space">
     <aside>
       <div class="member-space__identity"><HsdAvatar :name="session.memberName" size="md" /><div><strong>{{ session.memberName }}</strong><span>HSD 成员</span></div></div>
-      <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><a href="#assessment">考核结果</a><a href="#activities">活动与比赛</a><a href="#growth">成长记录</a></nav>
+      <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><a href="#activities">活动与比赛</a><a href="#growth">成长记录</a></nav>
       <button type="button" @click="session.signOut(); navigateTo('/')">退出登录</button>
     </aside>
     <main id="overview">
       <p class="eyebrow">Member Workspace</p><h1>你好，{{ session.memberName }}</h1><p>这里集中展示与你个人相关的信息；公开内容仍可从官网导航直接访问。</p>
       <div class="member-dashboard">
         <section id="application"><span>申请进度</span><h2>2026 招新申请</h2><strong>已通过</strong><p>下一步：完善个人简介与作品记录。</p></section>
-        <section id="assessment"><span>考核结果</span><h2>基础能力考核</h2><strong>查看结果</strong><p>结果仅本人登录后可见。</p></section>
+        <section id="assessment"><span>结果中心</span><h2>招新录取与阶段考核</h2><NuxtLink class="text-link" to="/member/results">查看当前结果 →</NuxtLink><p>结果仅本人登录后可见。</p></section>
         <section id="activities"><span>活动与比赛</span><h2>2 个待参加事项</h2><strong>查看日程</strong><p>可在这里取消个人报名。</p></section>
         <section id="growth"><span>成长记录</span><h2>3 条项目经历</h2><strong>继续完善</strong><p>记录个人贡献与阶段复盘。</p></section>
       </div>
