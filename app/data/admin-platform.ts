@@ -97,3 +97,13 @@ export function getAdminNavigationState(path: string) {
     ? { groupId: match.groupId, itemId: match.itemId }
     : { groupId: "dashboard", itemId: "dashboard" };
 }
+
+export function getAdminTopbarLabel(path: string) {
+  const state = getAdminNavigationState(path);
+  const group = ADMIN_NAVIGATION.find((item) => item.id === state.groupId);
+  const page = group?.items.find((item) => item.id === state.itemId);
+  return {
+    group: group?.label ?? "工作台",
+    page: page?.label ?? "管理工作台"
+  };
+}

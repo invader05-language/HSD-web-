@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import {
   ADMIN_NAVIGATION,
-  getAdminNavigationState
+  getAdminNavigationState,
+  getAdminTopbarLabel
 } from "~/data/admin-platform";
 import { useSessionStore } from "~/stores/session";
 
 const route = useRoute();
 const session = useSessionStore();
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
+const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
 
 watch(
@@ -82,8 +84,8 @@ function toggleGroup(groupId: string) {
     <div class="admin-workspace">
       <header class="admin-topbar">
         <div>
-          <span>组织管理</span>
-          <strong>/ 招新考核</strong>
+          <span>{{ topbarLabel.group }}</span>
+          <strong>/ {{ topbarLabel.page }}</strong>
         </div>
         <div class="admin-topbar__actions">
           <NuxtLink to="/">返回官网</NuxtLink>
