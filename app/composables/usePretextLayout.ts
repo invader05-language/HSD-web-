@@ -1,5 +1,8 @@
 export function usePretextLayout(text: string, lineHeight = 29) {
   const target = ref<HTMLElement | null>(null);
+  let observer: ResizeObserver | null = null;
+
+  onBeforeUnmount(() => observer?.disconnect());
 
   onMounted(async () => {
     if (!target.value || !text) return;
@@ -13,10 +16,9 @@ export function usePretextLayout(text: string, lineHeight = 29) {
       const result = layout(prepared, target.value.clientWidth, lineHeight);
       target.value.style.setProperty("--pretext-height", `${result.height}px`);
     };
-    const observer = new ResizeObserver(update);
+    observer = new ResizeObserver(update);
     observer.observe(target.value);
     update();
-    onBeforeUnmount(() => observer.disconnect());
   });
 
   return target;

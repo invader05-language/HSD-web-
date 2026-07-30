@@ -5,7 +5,7 @@
 ## 当前状态
 
 - 版本：`v0.2 Frontend Prototype`
-- 已实现：完整首页、一级页面、项目/活动/资源/画廊二级页、公开人员名录与成员详情、四个中心详情、用户结果中心与登录续接、登录、招新报名、成员空间、帮助中心
+- 已实现：完整首页、一级页面、项目/活动/资源/画廊二级页、公开人员名录与成员详情、四个中心详情、用户结果中心、预备成员考核管理台与登录续接、登录、招新报名、成员空间、帮助中心
 - 数据状态：仍为纯 Nuxt/Vue/TypeScript 前端原型，业务内容使用 TypeScript Mock 数据；后端与数据库尚未开始
 - 图片状态：未提供正式授权素材的位置统一显示 HSD 素材占位，不使用需求海报或未授权品牌资产
 
@@ -101,6 +101,7 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 | `/join/apply` | 招新报名表 | 登录后访问 |
 | `/login` | 成员登录与来源路由续接 | 公开 |
 | `/member` | 申请、考核、活动、成长与个人资料 | 登录后访问 |
+| `/admin/recruitment` | 预备成员分组、筛选、考核与线下结果录入工作台 | 登录后访问；正式后端还需校验管理权限 |
 | `/help` | 帮助中心 | 公开 |
 
 ## 权限边界
@@ -133,8 +134,34 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 - 新媒体、拓维策划、人才发展通过一轮面试即可转为正式成员；白泽必须顺序通过三轮，第三轮通过后才能转正。
 - 调剂在线下完成。管理端只录入最终普通中心或未录取结果，不实现线上调剂发起、接收或审批。
 - 个人端已实现当前有效结果、三个志愿、白泽意向方向、最终归属和一名负责人展示，不显示完整历史、调剂过程、分数、公开评语或报到安排。
-- 计划新增受管理权限保护的 `/admin/recruitment`，采用分组名单、筛选、成员详情抽屉和身份变更二次确认。
-- 当前用户端页面使用前端 Mock 数据，不连接真实后端或数据库；管理端仍按独立任务推进。用户端规格见 [`docs/superpowers/specs/2026-07-30-member-results-center-design.md`](docs/superpowers/specs/2026-07-30-member-results-center-design.md)，全系统规格见 [`docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md`](docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md)。
+- 已新增受登录保护的 `/admin/recruitment` 桌面端原型，采用第一志愿分组、组合筛选、名单表格、成员详情抽屉和身份变更二次确认。
+- 用户端与管理端采用同一套 Nuxt Web 工程和部署，共用品牌令牌、登录会话、领域类型和未来 API 契约；两端使用独立路由命名空间与布局，管理导航不会混入官网。
+- 当前用户端和管理端均使用前端 Mock 数据，不连接真实后端或数据库。用户端规格见 [`docs/superpowers/specs/2026-07-30-member-results-center-design.md`](docs/superpowers/specs/2026-07-30-member-results-center-design.md)，全系统规格见 [`docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md`](docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md)。
+
+## 桌面管理平台原型
+
+管理端和官网仍位于同一个 Nuxt 4 工程，但通过 `/admin/**` 路由和 `admin.vue` 布局完全隔离。当前以 `1440px` 桌面 Web 为主要设计目标，并兼容 `1366px` 笔记本宽度。管理端左侧导航固定为视口高度，长页面截图下方不会出现浅色空档。
+
+管理平台分为七个业务域：
+
+| 业务域 | 代表路由 | 主要能力 |
+| --- | --- | --- |
+| 工作台 | `/admin` | 待办、招新进度、内容状态、存储概览、快捷新建 |
+| 招新与考核 | `/admin/recruitment/**` | 批次、报名人员、考核录入、结果发布 |
+| 组织与成员 | `/admin/members/**`、`/admin/core-members`、`/admin/honors` | 成员资料、核心人员、中心组织、荣誉审核 |
+| 项目与活动 | `/admin/projects`、`/admin/activities/**` | 项目成果、活动排期、容量与报名名单 |
+| 内容与门户 | `/admin/content/**` | 快讯/新闻/帮助内容、首页固定槽位、Banner |
+| 媒体与资源 | `/admin/media`、`/admin/gallery`、`/admin/resources`、`/admin/uploads` | 素材审核、画廊专题、资源版本、上传队列 |
+| 系统与权限 | `/admin/accounts`、`/admin/roles`、`/admin/logs`、`/admin/recycle-bin` | 管理账号、角色矩阵、操作日志、可恢复删除 |
+
+原型中的保存、审核、发布和下架是独立状态；身份、结果发布、权限和永久删除等高风险动作均需二次确认。当前所有编辑只更新前端 Mock 会话，不写入数据库。
+
+图片、视频与学习资料的正式实现建议采用“浏览器分片直传对象存储 + 数据库保存元数据和引用关系 + 异步缩略图/转码/病毒扫描 + CDN 分发”。只有处理完成且审核通过的素材才可被官网选择。PDF 预览、Office 转换、临时签名下载和访问日志在原型中明确标记为后端待接入能力。
+
+管理平台完整设计规格与实施计划：
+
+- [`docs/superpowers/specs/2026-07-30-admin-platform-design.md`](docs/superpowers/specs/2026-07-30-admin-platform-design.md)
+- [`docs/superpowers/plans/2026-07-30-admin-platform-prototype.md`](docs/superpowers/plans/2026-07-30-admin-platform-prototype.md)
 
 ## 成员头像规则
 
@@ -168,8 +195,11 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 ## 2026-07-30 变更
 
 - Footer 新增学生社团非商业用途声明。
-- 实现主站用户结果中心、登录续接、旧入口兼容跳转、录取/考核页签、志愿与负责人展示；管理端仍由独立任务推进。
+- 实现主站用户结果中心、登录续接、旧入口兼容跳转、录取/考核页签、志愿与负责人展示。
+- 实现独立管理布局下的预备成员考核台原型，并确认用户端与管理端采用同工程、分路由、分布局架构。
 - 确认三志愿、白泽三轮考核、线下调剂录入、预备成员管理台和正式成员联动设计。
+- 完整扩展桌面管理平台七大业务域，补齐项目活动、门户内容、媒体资源、账号权限与审计页面。
+- 明确媒体文件进入对象存储、数据库只保存元数据与引用，处理和审核完成后才能公开使用。
 - Footer 主体与底栏压缩至更紧凑的桌面比例，并补齐平板换行和手机纵向排列。
 
 ## 设计基线

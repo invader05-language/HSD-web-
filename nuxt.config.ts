@@ -23,7 +23,8 @@ export default defineNuxtConfig({
     "/gallery": { ssr: true },
     "/resources": { ssr: true },
     "/join/**": { ssr: true },
-    "/member/**": { ssr: false }
+    "/member/**": { ssr: false },
+    "/admin/**": { ssr: false }
   },
   vite: {
     define: {

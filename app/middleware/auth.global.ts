@@ -4,6 +4,7 @@ import { buildLoginTarget } from "~/utils/login-continuation";
 export default defineNuxtRouteMiddleware((to) => {
   const protectedRoute =
     to.path.startsWith("/member")
+    || to.path.startsWith("/admin")
     || to.path === "/join/apply"
     || to.path === "/assessment-results";
   if (!protectedRoute) return;
