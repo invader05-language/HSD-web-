@@ -220,6 +220,13 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 
 - [完整首页](artifacts/hsd-homepage-1440.png)
 - [部落介绍、核心人员与成员风采](artifacts/hsd-about-1440.png)
+- [管理工作台](artifacts/admin/hsd-admin-dashboard-1440.png)
+- [招新考核台](artifacts/admin/hsd-admin-recruitment-1440.png)
+- [项目管理](artifacts/admin/hsd-admin-projects-1440.png)
+- [首页内容配置](artifacts/admin/hsd-admin-homepage-config-1440.png)
+- [媒体素材库](artifacts/admin/hsd-admin-media-1440.png)
+- [学习资料](artifacts/admin/hsd-admin-resources-1440.png)
+- [角色权限](artifacts/admin/hsd-admin-roles-1440.png)
 
 ## Mock 边界
 
