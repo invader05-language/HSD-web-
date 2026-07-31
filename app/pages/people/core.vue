@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
-import { CORE_PEOPLE, getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
+import { getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 useHead({ title: "核心人员名录｜白云 HSD 开发者部落" });
 
 const query = ref("");
 const center = ref("all");
 const isHydrated = ref(false);
+const memberRepository = useMemberRepository();
+const corePeople = memberRepository.publicCorePeople;
 
 onMounted(() => {
   isHydrated.value = true;
@@ -20,7 +23,7 @@ function clearFilters() {
 const visiblePeople = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
-  return CORE_PEOPLE.filter((person) => {
+  return corePeople.value.filter((person) => {
     const matchesCenter = center.value === "all" || person.centerSlug === center.value;
     const searchableText = [person.name, person.role, person.centerName, person.direction, person.bio]
       .join(" ")

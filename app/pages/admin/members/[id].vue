@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import {
-  ADMIN_MEMBERS,
   getPublicProfilePreview
 } from "~/data/admin-members";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();
-const member = computed(() => ADMIN_MEMBERS.find((item) => item.id === route.params.id));
+const memberRepository = useMemberRepository();
+const member = computed(() => memberRepository.findAdminMember(String(route.params.id)));
 if (!member.value) {
   throw createError({ statusCode: 404, statusMessage: "成员不存在" });
 }
 const preview = computed(() => getPublicProfilePreview(member.value!));
+const publicPreviewId = computed(() =>
+  member.value?.id === memberRepository.currentProfile.value.id
+    ? memberRepository.currentProfile.value.publicId
+    : member.value?.id.replace("member-", "person-")
+);
 const activeTab = ref("internal");
 const showIdentityConfirm = ref(false);
 useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
@@ -24,7 +30,7 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
       :description="`${member.studentId} · ${member.identity} · ${member.center}`"
     >
       <template #actions>
-        <NuxtLink class="button button--ghost" :to="`/people/${member.id.replace('member-', 'person-')}`" target="_blank">预览公开页面</NuxtLink>
+        <NuxtLink class="button button--ghost" :to="`/people/${publicPreviewId}`" target="_blank">预览公开页面</NuxtLink>
         <button type="button" class="button" @click="showIdentityConfirm = true">调整身份</button>
       </template>
     </AdminPageHeading>

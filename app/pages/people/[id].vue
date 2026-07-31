@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { findPublicPerson, resolvePublicAvatar } from "~/data/people";
+import { resolvePublicAvatar } from "~/data/people";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 const route = useRoute();
-const person = computed(() => findPublicPerson(String(route.params.id)));
+const memberRepository = useMemberRepository();
+const person = computed(() => memberRepository.findPublicPerson(String(route.params.id)));
 
 if (!person.value) {
   throw createError({ statusCode: 404, statusMessage: "成员不存在" });

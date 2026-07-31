@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { CENTERS, getCenterBySlug } from "~/data/centers";
-import { getPeopleByCenter, resolvePublicAvatar } from "~/data/people";
+import { resolvePublicAvatar } from "~/data/people";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 const route = useRoute();
 const center = computed(() => getCenterBySlug(String(route.params.slug)));
+const memberRepository = useMemberRepository();
 
 if (!center.value) {
   throw createError({ statusCode: 404, statusMessage: "中心不存在" });
 }
 
-const people = computed(() => getPeopleByCenter(center.value?.slug ?? ""));
+const people = computed(() => memberRepository.getPeopleByCenter(center.value?.slug ?? ""));
 const centerIndex = computed(() => CENTERS.findIndex((item) => item.slug === center.value?.slug));
 const nextCenter = computed(() => CENTERS[(centerIndex.value + 1) % CENTERS.length]);
 

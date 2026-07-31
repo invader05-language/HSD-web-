@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-  ADMIN_MEMBERS,
   filterAdminMembers,
   type AdminMemberFilters
 } from "~/data/admin-members";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "全体成员｜HSD 管理台" });
@@ -14,7 +14,9 @@ const filters = reactive<AdminMemberFilters>({
   identity: "全部身份",
   publicState: "全部状态"
 });
-const visible = computed(() => filterAdminMembers(ADMIN_MEMBERS, filters));
+const memberRepository = useMemberRepository();
+const adminMembers = memberRepository.adminMembers;
+const visible = computed(() => filterAdminMembers(adminMembers.value, filters));
 </script>
 
 <template>
@@ -28,7 +30,7 @@ const visible = computed(() => filterAdminMembers(ADMIN_MEMBERS, filters));
     </AdminPageHeading>
 
     <section class="admin-summary-strip" aria-label="成员概览">
-      <div><span>全部成员</span><strong>{{ ADMIN_MEMBERS.length }}</strong><small>当前 Mock 名单</small></div>
+      <div><span>全部成员</span><strong>{{ adminMembers.length }}</strong><small>当前 Mock 名单</small></div>
       <div><span>正式成员</span><strong>05</strong><small>已形成中心关系</small></div>
       <div><span>核心成员</span><strong>02</strong><small>重点职责人员</small></div>
       <div><span>资料待审核</span><strong>01</strong><small>公开前需要处理</small></div>

@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { CENTERS } from "~/data/home";
-import { CORE_PEOPLE, PUBLIC_MEMBERS, resolvePublicAvatar } from "~/data/people";
+import { resolvePublicAvatar } from "~/data/people";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
+const memberRepository = useMemberRepository();
+const corePeople = memberRepository.publicCorePeople;
+const publicMembers = memberRepository.publicMembers;
 </script>
 
 <template>
@@ -41,7 +45,7 @@ useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
           </div>
         </div>
         <div class="core-team">
-          <article v-for="(member, index) in CORE_PEOPLE.slice(0, 3)" :key="member.id">
+          <article v-for="(member, index) in corePeople.slice(0, 3)" :key="member.id">
             <div class="core-team__visual">
               <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
               <span>0{{ index + 1 }}</span>
@@ -62,12 +66,12 @@ useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
             <h2>成员风采</h2>
           </div>
           <div class="section-heading__aside">
-            <p>头像与个人资料头像联动；已上传照片显示本人头像，未上传或选择不公开时统一使用白底 HSD 默认头像。</p>
+            <p>头像与个人资料头像联动；已上传照片显示本人头像，没有头像时统一使用白底 HSD 默认头像。</p>
             <NuxtLink to="/people/members" class="directory-link">查看所有成员 →</NuxtLink>
           </div>
         </div>
         <div class="member-directory">
-          <article v-for="member in PUBLIC_MEMBERS" :key="member.id">
+          <article v-for="member in publicMembers" :key="member.id">
             <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
             <div>
               <h3>{{ member.name }}</h3>
@@ -76,7 +80,7 @@ useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
             </div>
           </article>
         </div>
-        <p class="privacy-note">成员可在个人资料中决定是否公开头像；未登录访客仅查看公开的基础风采信息。</p>
+        <p class="privacy-note">成员基础资料默认用于成员展示；未登录访客仅查看公开的基础风采信息。</p>
       </div>
     </section>
 

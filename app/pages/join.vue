@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { CENTERS } from "~/data/home";
-import { buildLoginTarget } from "~/utils/login-continuation";
+import { useSessionStore } from "~/stores/session";
+import { resolveLoginAwareTarget } from "~/utils/login-continuation";
 
 useHead({ title: "加入我们｜白云 HSD 开发者部落" });
-const applyTarget = buildLoginTarget("/join/apply");
+const session = useSessionStore();
+const route = useRoute();
+const isJoinLanding = computed(() => route.path === "/join");
+const applyTarget = computed(() => resolveLoginAwareTarget("/join/apply", session.isAuthenticated));
+const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名表" : "登录后填写报名表");
 </script>
 
 <template>
-  <div>
+  <NuxtPage v-if="!isJoinLanding" />
+  <div v-else>
     <PageBanner
       eyebrow="Join HSD · 2026"
       title="从你的兴趣出发，进入一次真实协作"
@@ -16,7 +22,7 @@ const applyTarget = buildLoginTarget("/join/apply");
       media-label="招新主题视觉素材位"
     >
       <template #actions>
-        <NuxtLink class="button button--light" :to="applyTarget">登录后填写报名表</NuxtLink>
+        <NuxtLink class="button button--light" :to="applyTarget">{{ applyLabel }}</NuxtLink>
         <NuxtLink class="button button--ghost" to="/help#recruitment">查看报名帮助</NuxtLink>
       </template>
     </PageBanner>
@@ -42,9 +48,8 @@ const applyTarget = buildLoginTarget("/join/apply");
           <li><span>02</span><strong>参加交流与基础考核</strong><p>了解彼此期待，完成对应方向的小任务。</p></li>
           <li><span>03</span><strong>查看结果与加入成长路径</strong><p>结果和后续安排仅本人登录后可见。</p></li>
         </ol>
-        <NuxtLink class="button" :to="applyTarget">开始填写报名表</NuxtLink>
+        <NuxtLink class="button" :to="applyTarget">{{ applyLabel }}</NuxtLink>
       </div>
     </section>
   </div>
 </template>
-

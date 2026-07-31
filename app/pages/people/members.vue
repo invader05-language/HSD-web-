@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
-import { getFeaturedHonors, PUBLIC_MEMBERS, resolvePublicAvatar } from "~/data/people";
+import { getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
+import { useMemberRepository } from "~/composables/useMemberRepository";
 
 useHead({ title: "全体成员名录｜白云 HSD 开发者部落" });
 
 const query = ref("");
 const center = ref("all");
 const isHydrated = ref(false);
+const memberRepository = useMemberRepository();
+const publicMembers = memberRepository.publicMembers;
 
 onMounted(() => {
   isHydrated.value = true;
@@ -20,7 +23,7 @@ function clearFilters() {
 const visibleMembers = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
-  return PUBLIC_MEMBERS.filter((person) => {
+  return publicMembers.value.filter((person) => {
     const matchesCenter = center.value === "all" || person.centerSlug === center.value;
     const searchableText = [person.name, person.centerName, person.direction, person.bio]
       .join(" ")
@@ -36,7 +39,7 @@ const visibleMembers = computed(() => {
     <PageBanner
       eyebrow="Public Members"
       title="全体成员名录"
-      description="浏览成员公开的基础风采与实践方向。头像未上传或选择不公开时，统一显示白底 HSD 默认头像。"
+      description="浏览成员公开的基础风采与实践方向。头像未上传时，统一显示白底 HSD 默认头像。"
       tone="dark"
       media-label="成员共同实践影像素材位"
     />
