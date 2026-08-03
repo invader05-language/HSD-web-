@@ -1,3 +1,5 @@
+import { RELEASE_FEATURES, type ReleaseFeatures } from "../config/release-features";
+
 export interface AdminNavigationItem {
   id: string;
   label: string;
@@ -84,11 +86,18 @@ export const ADMIN_ROUTES = ADMIN_NAVIGATION.flatMap((group) =>
   group.items.map((item) => item.to)
 );
 
-export function getAdminNavigationForAccess(access: AdminNavigationAccess) {
+export function getAdminNavigationForAccess(
+  access: AdminNavigationAccess,
+  features: ReleaseFeatures = RELEASE_FEATURES
+) {
   return ADMIN_NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter(
-      (item) => item.id !== "accounts" || access.canManageAdminAccounts
+      (item) => (item.id !== "accounts" || access.canManageAdminAccounts)
+        && (item.id !== "logs" || features.auditLog)
+        && (item.id !== "recycle-bin" || features.recycleBin)
+        && (item.id !== "uploads" || features.uploadTasks)
+        && (item.id !== "batches" || features.recruitmentBatches)
     )
   })).filter((group) => group.items.length > 0);
 }

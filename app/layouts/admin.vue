@@ -4,6 +4,7 @@ import {
   getAdminNavigationState,
   getAdminTopbarLabel
 } from "~/data/admin-platform";
+import { RELEASE_FEATURES } from "~/config/release-features";
 import { getAdminQualificationLabel } from "~/data/admin-system";
 import { useSessionStore } from "~/stores/session";
 
@@ -11,8 +12,11 @@ const route = useRoute();
 const session = useSessionStore();
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
-const navigation = computed(() => getAdminNavigationForAccess(session));
+const navigation = computed(() => getAdminNavigationForAccess(session, RELEASE_FEATURES));
 const currentIdentity = computed(() => session.currentAccount ?? null);
+const releaseNotice = ref(
+  typeof route.query.notice === "string" ? route.query.notice : undefined
+);
 const adminLevelLabel = computed(() => session.currentAccount
   ? getAdminQualificationLabel(session.currentAccount)
   : "未登录");
@@ -25,6 +29,14 @@ watch(
     expandedGroups.value = new Set([...expandedGroups.value, groupId]);
   }
 );
+
+onMounted(() => {
+  if (!releaseNotice.value) return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("notice");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+});
 
 watch(
   () => route.fullPath,
@@ -135,6 +147,9 @@ function toggleGroup(groupId: string) {
       </nav>
 
       <main id="admin-main-content">
+        <p v-if="releaseNotice" class="admin-release-notice" role="status">
+          {{ releaseNotice }}
+        </p>
         <slot />
       </main>
     </div>
