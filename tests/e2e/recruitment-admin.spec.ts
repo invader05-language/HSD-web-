@@ -91,6 +91,14 @@ test("application roster filters, sorts, and opens a read-only application recor
   await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/candidate-lin$/);
   await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
   await expect(page.getByLabel("联系方式")).toHaveValue("lin@example.com");
+  await expect(page.getByText("2026-07-30 14:28 提交")).toBeVisible();
   await expect(page.getByText("考核处理")).toHaveCount(0);
   await expect(page.getByText("内部备注")).toHaveCount(0);
+});
+
+test("unknown application records return a 404 response", async ({ page }) => {
+  const response = await page.goto("/admin/recruitment/applications/missing");
+
+  expect(response?.status()).toBe(404);
+  await expect(page.getByText("报名记录不存在")).toBeVisible();
 });

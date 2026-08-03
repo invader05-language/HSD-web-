@@ -2,6 +2,7 @@
 import {
   ADMIN_CANDIDATES,
   filterAndSortRecruitmentApplications,
+  formatRecruitmentApplicationSubmittedAt,
   type RecruitmentCenter,
   type RecruitmentApplicationSort
 } from "~/data/recruitment-admin";
@@ -50,7 +51,7 @@ const visible = computed(() => filterAndSortRecruitmentApplications(ADMIN_CANDID
               <td>{{ candidate.preferences[2] || "—" }}</td>
               <td>{{ candidate.baizeDirection || "—" }}</td>
               <td>{{ candidate.acceptsAdjustment ? "接受" : "不接受" }}</td>
-              <td>{{ candidate.updatedAt }}</td>
+              <td>{{ formatRecruitmentApplicationSubmittedAt(candidate) }}</td>
               <td><NuxtLink :to="`/admin/recruitment/applications/${candidate.id}`" :aria-label="`查看报名 ${candidate.name}`">查看报名</NuxtLink></td>
             </tr>
           </tbody>

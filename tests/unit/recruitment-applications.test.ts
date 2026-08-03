@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ADMIN_CANDIDATES,
   filterAndSortRecruitmentApplications,
-  findRecruitmentApplication
+  findRecruitmentApplication,
+  formatRecruitmentApplicationSubmittedAt,
+  requireRecruitmentApplication
 } from "../../app/data/recruitment-admin";
 
 describe("recruitment application directory", () => {
@@ -29,5 +31,26 @@ describe("recruitment application directory", () => {
   it("finds a known application and returns undefined for an unknown id", () => {
     expect(findRecruitmentApplication("candidate-lin")?.name).toBe("林同学");
     expect(findRecruitmentApplication("missing")).toBeUndefined();
+  });
+
+  it("formats the submitted timestamp instead of the mutable workflow timestamp", () => {
+    expect(formatRecruitmentApplicationSubmittedAt({
+      submittedAt: "2026-07-30T14:28:00.000Z"
+    })).toBe("2026-07-30 14:28");
+  });
+
+  it("requires an existing application with the specified 404 error details", () => {
+    expect(requireRecruitmentApplication("candidate-lin").name).toBe("林同学");
+    let error: unknown;
+    try {
+      requireRecruitmentApplication("missing");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      statusCode: 404,
+      statusMessage: "报名记录不存在"
+    });
   });
 });

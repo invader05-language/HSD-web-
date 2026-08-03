@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { findRecruitmentApplication } from "~/data/recruitment-admin";
+import {
+  formatRecruitmentApplicationSubmittedAt,
+  requireRecruitmentApplication
+} from "~/data/recruitment-admin";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
-const application = computed(() => findRecruitmentApplication(String(route.params.id)));
-
-if (!application.value) {
-  throw createError({ statusCode: 404, statusMessage: "报名记录不存在" });
-}
+const application = computed(() => requireRecruitmentApplication(
+  String(route.params.id),
+  () => createError({ statusCode: 404, statusMessage: "报名记录不存在" })
+));
 
 useHead({ title: `${application.value.name}｜报名资料｜HSD 管理台` });
 </script>
@@ -28,7 +30,7 @@ useHead({ title: `${application.value.name}｜报名资料｜HSD 管理台` });
     <section class="admin-list-card">
       <header>
         <div><span>Submitted Information</span><h2>报名资料</h2></div>
-        <p>{{ application.updatedAt }} 提交</p>
+        <p>{{ formatRecruitmentApplicationSubmittedAt(application) }} 提交</p>
       </header>
       <div class="admin-detail-form">
         <div class="admin-form-grid">

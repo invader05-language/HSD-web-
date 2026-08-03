@@ -278,6 +278,28 @@ export function findRecruitmentApplication(id: string): AdminCandidate | undefin
   return ADMIN_CANDIDATES.find((candidate) => candidate.id === id);
 }
 
+export function requireRecruitmentApplication(
+  id: string,
+  createNotFoundError: () => unknown = () => ({
+    statusCode: 404,
+    statusMessage: "报名记录不存在"
+  })
+): AdminCandidate {
+  const application = findRecruitmentApplication(id);
+
+  if (!application) {
+    throw createNotFoundError();
+  }
+
+  return application;
+}
+
+export function formatRecruitmentApplicationSubmittedAt(
+  application: Pick<AdminCandidate, "submittedAt">
+): string {
+  return application.submittedAt.slice(0, 16).replace("T", " ");
+}
+
 export function filterRecruitmentCandidates(
   candidates: AdminCandidate[],
   filters: RecruitmentAdminFilters

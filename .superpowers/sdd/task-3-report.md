@@ -1,72 +1,42 @@
-# Task 3 Report: Admin Navigation And Qualification Configuration
+# Task 3 report: recruitment applications
 
-## Delivered
+## Scope delivered
 
-- Renamed the last administration group to `系统管理`, removed the role-matrix navigation entry, and made `管理员资格配置` visible only when the session exposes owner account-management capability.
-- Updated the admin frame to show the authenticated account name, account ID, and derived management level in both the sidebar and top bar.
-- Replaced `/admin/accounts` with the owner-only `管理员资格配置` table. It renders the mutable account store, management level/status, configuring actor/time, and most recent mock login time.
-- Added confirmation-driven grant, revoke, enable, and disable controls. The owner row is explicitly protected and cannot be changed.
-- Extended the mutable access store with owner-authorized qualification changes, per-session qualification metadata, and in-memory audit records. The existing logs page now reads those live records, so a change appears in-session immediately.
-- Replaced the old role-matrix page with a screenless compatibility redirect. The existing route guard retains owner redirect and administrator denial behavior.
-- Updated the forbidden page to identify the active account, its actual management level, and the missing qualification.
+- Added typed submission timestamps, submitted applicant detail fields, filtering/sorting, and lookup helpers.
+- Replaced the inert application-row button with a route to a full-width, read-only application record page.
+- Removed the application-status selector and made the submission-time control an explicit sort selector.
+- Added focused domain coverage and browser coverage for filtering, sorting, and the read-only record.
 
-## TDD Evidence
+## TDD evidence
 
-1. Added navigation and audit-store assertions before production changes.
-2. RED: `pnpm vitest run tests/unit/admin-platform.test.ts tests/unit/admin-topbar.test.ts tests/unit/admin-access.test.ts` failed because the role entry/navigation labels and mutable qualification audit APIs did not exist.
-3. GREEN: focused navigation, route, access, audit, and topbar tests passed after implementation.
-4. Added an owner-enforcement assertion for a platform-admin actor.
-5. RED: `pnpm vitest run tests/unit/admin-access.test.ts` failed because the new store action accepted a non-owner actor.
-6. GREEN: the focused access suite passed after adding the owner check.
+1. Added `tests/unit/recruitment-applications.test.ts` before production implementation.
+2. Ran the focused test and observed all three cases fail because the planned domain functions were not exported:
+   `TypeError: filterAndSortRecruitmentApplications is not a function` and
+   `TypeError: findRecruitmentApplication is not a function`.
+3. Implemented the minimal domain interface and route page.
+4. Re-ran the focused test successfully: 1 file, 3 tests passed.
 
-## Verification
+## Validation
 
-- `pnpm vitest run tests/unit/admin-platform.test.ts tests/unit/admin-topbar.test.ts tests/unit/admin-access.test.ts tests/unit/route-access.test.ts tests/unit/admin-system.test.ts`: 5 files passed, 27 tests passed.
-- `pnpm vitest run tests/unit/login-continuation.test.ts tests/unit/login-mode.test.ts`: 2 files passed, 13 tests passed.
-- `pnpm typecheck`: passed.
-- `git diff --check`: passed.
-- Local development server responded with HTTP 200 at `http://localhost:3001/admin/accounts`.
+- PASS: `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/recruitment-applications.test.ts`
+- BLOCKED outside Task 3: `sh scripts/with-hsd-node.sh corepack pnpm run typecheck` currently fails in concurrent member-profile / join-apply changes. The reported errors are in `app/data/member-profile.ts`, `app/pages/join/apply.vue`, and `app/pages/member/profile.vue`; none originate from Task 3 files.
 
-## Concern
+## Deliberate exclusions
 
-- The qualification records are intentional front-end Mock state. They reset with the Pinia session/reload and must become server-validated, durable audit data when a backend is introduced.
+- No export implementation was added; Task 4 owns exports.
+- The detail view contains no assessment action, note editor, mutation control, or application-status badge.
 
-## Review Remediation
+## Follow-up review repair
 
-### TDD Evidence
+Resolved both P1 findings from review `2a55f25..ce7d189`.
 
-1. RED: `pnpm vitest run tests/unit/route-access.test.ts tests/unit/admin-platform.test.ts` failed as expected: non-owner `/admin/accounts` access lost its denied target, and the retired `ADMIN_ROLES`/`.admin-role-layout` surfaces still existed.
-2. GREEN: `pnpm vitest run tests/unit/route-access.test.ts tests/unit/admin-platform.test.ts tests/unit/admin-access.test.ts tests/unit/admin-audit.test.ts tests/unit/admin-topbar.test.ts` passed: 5 files, 28 tests.
+- Added `formatRecruitmentApplicationSubmittedAt` and used it in both the list and read-only record header. The formatter reads only `submittedAt`; `updatedAt` remains reserved for the assessment workflow UI.
+- Added `requireRecruitmentApplication`, which accepts the page's `createError` factory. Because the detail page resolves it in a computed value, a client-side parameter change from a known record to an unknown ID evaluates again and throws `createError({ statusCode: 404, statusMessage: "报名记录不存在" })` instead of rendering an empty page.
+- Extended unit coverage to five cases, including submission-time formatting and missing-record 404 details. The two new assertions were first observed failing because both helper functions were absent, then passed after the minimal implementation.
+- Extended Playwright coverage to assert the detail timestamp and an unknown-record 404 response. The E2E run could not start system Chrome: every case aborted during browser launch with `SIGABRT` (and cleanup reported `kill EPERM`), before application assertions ran.
 
-### Verification
+### Follow-up validation
 
-- `pnpm typecheck`: passed.
-- `pnpm build`: passed.
-- `git diff --check`: passed.
-- A production server served `/admin/recruitment` with HTTP 200 at `http://127.0.0.1:49852`.
-- Browser regression tests were attempted against that production server, but local Chrome aborted during launch before either test created a page (`SIGABRT` / `Target page, context or browser has been closed`). The failure is host-browser startup, not an assertion result.
-
-### Remediations
-
-- Forbidden redirects now retain an encoded canonical `from` route. The forbidden page recognizes only a string canonical `/admin/accounts` source as requiring owner qualification; arrays and external-looking values fall back safely to ordinary administrator qualification.
-- The layout, account table, forbidden page, and audit records use one current-level label function, including `普通成员`.
-- The legacy role-matrix data, tests, CSS, and stale browser workflow are removed; audit filtering remains covered in `tests/unit/admin-audit.test.ts`.
-- At the 390px breakpoint, the top bar keeps a compact identity and exposes a filtered two-column navigation sheet. Non-owner sessions do not receive the owner-only account configuration link.
-- The qualification danger color is scoped to qualification actions without `!important`.
-
-## E2E Fixture Remediation (2026-08-03)
-
-- The `signInToAdmin` helper now accepts an optional `account` argument and keeps `admin-alliance` as its default, preserving owner-based scenarios.
-- The 390px navigation scenario explicitly signs in as `media-admin`, so its platform-administrator identity and hidden owner-only account configuration link are asserted against the same account.
-- `pnpm typecheck`: passed.
-- `pnpm exec playwright test tests/e2e/admin-platform.spec.ts --list`: passed, collecting 9 tests.
-- Focused browser execution was attempted before the change but Nuxt failed during server startup with `EMFILE: too many open files, watch`; no assertion ran. The port was not reachable after Playwright cleaned up the failed server process.
-- A fresh focused attempt after the change with `CHOKIDAR_USEPOLLING=1` stopped before browser launch because Nuxt reported an existing worktree dev-server lock (PID 84611), while `127.0.0.1:49852` was not reachable. The process was left untouched; no browser assertion result is available.
-
-## Final Access-Flow Coverage (2026-08-03)
-
-- The administrator platform suite now covers member/admin login mode switching, owner confirmation for grant, revoke, enable, and disable changes, audit-log visibility, and a newly qualified account entering the management workbench without receiving owner-only navigation.
-- Legacy E2E login fields now target the current accessible label, `学号或成员账号`.
-- Playwright collected all 55 E2E scenarios, including 12 administration-platform scenarios.
-- Full browser execution remains blocked before assertions by the local Nuxt watcher limit: `EMFILE: too many open files, watch`.
-- The equivalent owner grant, audit-log visibility, and post-grant administrator login flow were manually verified against the no-watch production preview at `http://127.0.0.1:3003`.
+- PASS: `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/recruitment-applications.test.ts` — 1 file, 5 tests passed.
+- BLOCKED outside Task 3: `sh scripts/with-hsd-node.sh corepack pnpm run typecheck` remains blocked by concurrent Task 5 member-normalization migration errors in public/member/admin-member/join pages; no reported error references the Task 3 files.
+- BLOCKED by local Chrome environment: `sh scripts/with-hsd-node.sh corepack pnpm exec playwright test tests/e2e/recruitment-admin.spec.ts` — 6/6 abort at browser launch, before test execution.
