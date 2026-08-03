@@ -43,7 +43,21 @@ export function useMemberRepository() {
     const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
     const projectedStaticPeople = staticPeople.flatMap((person) => {
       const storedProfile = storedProfiles.value.find((item) => item.publicId === person.id);
-      if (!storedProfile) return [person];
+      if (!storedProfile) {
+        const matchingAdminMembers = adminMembers.value.filter((member) => (
+          member.identity === "正式成员"
+          && member.name === person.name
+          && member.center === person.centerName
+        ));
+        const centerLeadership = matchingAdminMembers.length === 1
+          ? matchingAdminMembers[0]?.centerLeadership
+          : undefined;
+
+        return [{
+          ...person,
+          isCore: person.memberDuty === "核心人员" || Boolean(centerLeadership),
+        }];
+      }
       if (!isFormalMemberProfile(storedProfile)) return [];
       const adminMember = adminMembers.value.find((item) => item.id === storedProfile.id);
       return [projectMemberToPublic(storedProfile, person, adminMember?.centerLeadership)];

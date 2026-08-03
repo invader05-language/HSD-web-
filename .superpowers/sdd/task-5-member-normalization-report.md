@@ -48,3 +48,19 @@ Resolved the three Task 5 review findings:
 - Full unit verification: `26 files / 143 tests` passed.
 - `git diff --check`: passed.
 - `pnpm typecheck`: still fails only in the previously identified Task 8 consumer pages that reference removed `role`, `direction`, and `publicState` fields; the follow-up domain files introduce no additional reported type errors.
+
+## Static projection follow-up
+
+Resolved the remaining static-record projection gap:
+
+- Static public people without a stored member profile no longer return their legacy `isCore` value unchanged. Their public core state is rebuilt from `memberDuty === "核心人员"`.
+- A static person can additionally inherit current center-lead status only when the repository finds exactly one formal admin-member record with the same name and center. Ambiguous or absent matches do not grant core status.
+- The center-lead contribution remains reactive because the unique match is evaluated against the administrator projection backed by `useAdminAccessStore`.
+
+### Static projection TDD evidence
+
+- Added two regression tests first and observed the expected two failures: a legacy `isCore: true` static record with `memberDuty: "普通成员"` remained core, and a uniquely matched static member did not start from the normalized non-core state.
+- After implementation, the focused public-directory test passed: `1 file / 13 tests`.
+- Task 5 focused verification passed: `4 files / 38 tests`.
+- Full unit verification passed: `26 files / 145 tests`.
+- `pnpm typecheck` remains blocked only by Task 8 consumer pages that still reference the removed `role`, `direction`, and `publicState` fields. No error points to the Task 5 domain or test files changed in this follow-up.

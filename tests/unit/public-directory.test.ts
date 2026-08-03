@@ -13,6 +13,7 @@ import {
 import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
 import { useMemberRepository } from "../../app/composables/useMemberRepository";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
+import { useAdminAccessStore } from "../../app/stores/admin-access";
 
 describe("public people and center directory", () => {
   beforeEach(() => {
@@ -89,6 +90,44 @@ describe("public people and center directory", () => {
     };
 
     expect(repository.findPublicPerson(publicId)).toBeUndefined();
+  });
+
+  it("derives a static public person's core state from member duty instead of legacy isCore", () => {
+    const person = CORE_PEOPLE.find((item) => item.id === "chen-media")!;
+    const originalDuty = person.memberDuty;
+
+    try {
+      person.memberDuty = "普通成员";
+      expect(person.isCore).toBe(true);
+
+      const repository = useMemberRepository();
+
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(false);
+    } finally {
+      person.memberDuty = originalDuty;
+    }
+  });
+
+  it("adds a uniquely matched static center lead to the public core projection", () => {
+    const person = CORE_PEOPLE.find((item) => item.id === "wu-talent")!;
+    const originalDuty = person.memberDuty;
+    const accessStore = useAdminAccessStore();
+    const owner = { account: "admin-alliance", name: "张同学", level: "owner" } as const;
+
+    try {
+      person.memberDuty = "普通成员";
+      const repository = useMemberRepository();
+
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(false);
+      expect(accessStore.assignAdminCenterRole(
+        "member-wu",
+        "人才发展中心负责人",
+        owner,
+      )).toBe(true);
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(true);
+    } finally {
+      person.memberDuty = originalDuty;
+    }
   });
 
   it("returns the approved public people for each center", () => {
