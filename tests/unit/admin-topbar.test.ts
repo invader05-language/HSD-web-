@@ -11,9 +11,9 @@ describe("administration topbar wayfinding", () => {
       group: "媒体与资源",
       page: "媒体素材库"
     });
-    expect(getAdminTopbarLabel("/admin/roles")).toEqual({
-      group: "系统与权限",
-      page: "角色权限"
+    expect(getAdminTopbarLabel("/admin/accounts")).toEqual({
+      group: "系统管理",
+      page: "管理员资格配置"
     });
   });
 });

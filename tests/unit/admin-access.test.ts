@@ -97,4 +97,34 @@ describe("mock administration access", () => {
       adminAccessEnabled: true
     });
   });
+
+  it("records each actual owner qualification change and protects the owner account", () => {
+    const access = useAdminAccessStore();
+    const actor = { name: "联盟管理员", level: "owner" as const };
+
+    const initialCount = access.auditRecords.length;
+    expect(
+      access.changeAdminQualification(DEMO_MEMBER_ACCOUNT, "grant", {
+        name: "周同学",
+        level: "admin"
+      })
+    ).toBe(false);
+    expect(access.changeAdminQualification(DEMO_MEMBER_ACCOUNT, "grant", actor)).toBe(true);
+    expect(access.changeAdminQualification(DEMO_MEMBER_ACCOUNT, "grant", actor)).toBe(false);
+    expect(access.changeAdminQualification("media-admin", "disable", actor)).toBe(true);
+    expect(access.changeAdminQualification("admin-alliance", "disable", actor)).toBe(false);
+
+    expect(access.auditRecords).toHaveLength(initialCount + 2);
+    expect(access.auditRecords[0]).toMatchObject({
+      actor: "联盟管理员",
+      role: "联盟总负责人",
+      module: "系统管理",
+      action: "停用管理员资格",
+      target: "周同学（media-admin）",
+      result: "成功"
+    });
+    expect(access.getQualification(DEMO_MEMBER_ACCOUNT)).toMatchObject({
+      configuredBy: "联盟管理员"
+    });
+  });
 });

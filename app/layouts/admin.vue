@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import {
-  ADMIN_NAVIGATION,
+  getAdminNavigationForAccess,
   getAdminNavigationState,
   getAdminTopbarLabel
 } from "~/data/admin-platform";
 import { useSessionStore } from "~/stores/session";
-import { useCurrentMember } from "~/composables/useCurrentMember";
 
 const route = useRoute();
 const session = useSessionStore();
-const { profile: currentMember } = useCurrentMember();
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
+const navigation = computed(() => getAdminNavigationForAccess(session));
+const currentIdentity = computed(() => session.currentAccount ?? null);
+const adminLevelLabel = computed(() =>
+  session.adminLevel === "owner" ? "联盟总负责人" : "平台管理员"
+);
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
 
 watch(
@@ -49,7 +52,7 @@ function toggleGroup(groupId: string) {
 
       <nav aria-label="管理端导航">
         <section
-          v-for="(group, groupIndex) in ADMIN_NAVIGATION"
+          v-for="(group, groupIndex) in navigation"
           :key="group.id"
           class="admin-nav-group"
           :class="{ 'is-current': activeNavigation.groupId === group.id }"
@@ -78,8 +81,8 @@ function toggleGroup(groupId: string) {
 
       <div class="admin-sidebar__footer">
         <span>当前身份</span>
-        <strong>联盟总负责人</strong>
-        <small>前端原型账号</small>
+        <strong>{{ currentIdentity?.name ?? "未登录" }}</strong>
+        <small>{{ adminLevelLabel }} · {{ currentIdentity?.account ?? "-" }}</small>
       </div>
     </aside>
 
@@ -91,7 +94,7 @@ function toggleGroup(groupId: string) {
         </div>
         <div class="admin-topbar__actions">
           <NuxtLink to="/">返回官网</NuxtLink>
-          <span>{{ currentMember.name }}</span>
+          <span>{{ currentIdentity?.name ?? "未登录" }} · {{ adminLevelLabel }}</span>
           <button type="button" @click="session.signOut(); navigateTo('/')">退出</button>
         </div>
       </header>
