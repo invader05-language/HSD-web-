@@ -46,7 +46,6 @@ async function signIn(values: Record<string, unknown>) {
       <div>
         <NuxtLink class="brand-lockup" to="/"><span class="brand-lockup__mark">&lt; HSD &gt;</span><span class="brand-lockup__name">白云 HSD 开发者部落</span></NuxtLink>
         <h2>成员登录</h2>
-        <p>登录后将继续前往：<code>{{ redirectTarget }}</code></p>
         <Form v-slot="{ errors }" @submit="signIn">
           <label>学号或成员账号<Field name="account" autocomplete="username" :rules="rules.account" /><small>{{ errors.account }}</small></label>
           <label>密码<Field name="password" type="password" autocomplete="current-password" :rules="rules.password" /><small>{{ errors.password }}</small></label>

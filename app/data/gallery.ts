@@ -119,6 +119,90 @@ export const GALLERY_ALBUMS: readonly GalleryAlbum[] = [
       { id: "recruitment-03", title: "现场导视系统", caption: "让咨询、交流和报名路径更直接", alt: "招新现场导视系统", aspect: "portrait" }
     ],
     to: "/gallery/recruitment-brand-visual"
+  },
+  {
+    slug: "developer-camp-documentary",
+    title: "开发者训练营纪实",
+    category: "活动摄影",
+    year: "2026",
+    summary: "记录集中学习、分组实践与阶段复盘中的真实协作片段。",
+    team: "新媒体中心 · 摄影组",
+    assets: [
+      { id: "camp-01", title: "晨间任务发布", caption: "从明确当天目标开始训练", alt: "训练营晨间任务发布现场", aspect: "wide" },
+      { id: "camp-02", title: "小组实践", caption: "围绕真实问题完成分工与实现", alt: "训练营成员分组实践", aspect: "landscape" },
+      { id: "camp-03", title: "阶段复盘", caption: "把当天的问题和经验沉淀下来", alt: "训练营阶段复盘现场", aspect: "portrait" }
+    ],
+    to: "/gallery/developer-camp-documentary"
+  },
+  {
+    slug: "campus-innovation-week-visuals",
+    title: "校园科创周视觉组",
+    category: "海报设计",
+    year: "2026",
+    summary: "围绕校园科创主题完成主视觉、日程与现场导视设计。",
+    team: "新媒体中心 · 视觉设计组",
+    assets: [
+      { id: "innovation-01", title: "科创周主视觉", caption: "建立统一的活动识别", alt: "校园科创周主视觉", aspect: "wide" },
+      { id: "innovation-02", title: "日程信息版式", caption: "让多场活动更容易快速查找", alt: "校园科创周日程版式", aspect: "portrait" },
+      { id: "innovation-03", title: "现场导视", caption: "延伸视觉系统到真实场景", alt: "校园科创周现场导视", aspect: "landscape" }
+    ],
+    to: "/gallery/campus-innovation-week-visuals"
+  },
+  {
+    slug: "meet-four-centers",
+    title: "一分钟认识四大中心",
+    category: "短视频",
+    year: "2026",
+    summary: "用简洁的短视频介绍研发、媒体、策划与人才发展的协作关系。",
+    team: "新媒体中心 · 视频组",
+    assets: [
+      { id: "centers-video-01", title: "开场脚本", caption: "在一分钟内建立完整信息结构", alt: "四大中心短视频脚本", aspect: "wide" },
+      { id: "centers-video-02", title: "中心采访", caption: "由真实成员说明各自方向", alt: "四大中心成员采访", aspect: "landscape" },
+      { id: "centers-video-03", title: "成片包装", caption: "统一字幕、转场与品牌信息", alt: "四大中心短视频成片包装", aspect: "portrait" }
+    ],
+    to: "/gallery/meet-four-centers"
+  },
+  {
+    slug: "project-lead-interviews",
+    title: "项目负责人访谈",
+    category: "人物专访",
+    year: "2026",
+    summary: "从负责人视角回顾项目决策、团队协作与迭代过程。",
+    team: "新媒体中心 · 采编组",
+    assets: [
+      { id: "lead-01", title: "为什么开始", caption: "从最初的问题谈起", alt: "项目负责人访谈开场", aspect: "portrait" },
+      { id: "lead-02", title: "关键取舍", caption: "复盘推进过程中最重要的判断", alt: "项目负责人复盘关键取舍", aspect: "landscape" },
+      { id: "lead-03", title: "交给下一位成员", caption: "把经验转化为可复用的方法", alt: "项目负责人分享团队经验", aspect: "wide" }
+    ],
+    to: "/gallery/project-lead-interviews"
+  },
+  {
+    slug: "community-open-day",
+    title: "部落开放日摄影",
+    category: "活动摄影",
+    year: "2025",
+    summary: "记录开放日中的项目体验、方向咨询与成员交流。",
+    team: "新媒体中心 · 摄影组",
+    assets: [
+      { id: "open-day-01", title: "项目体验区", caption: "让来访同学直接操作项目原型", alt: "部落开放日项目体验区", aspect: "wide" },
+      { id: "open-day-02", title: "方向咨询", caption: "成员介绍不同中心的实践内容", alt: "部落开放日方向咨询", aspect: "portrait" },
+      { id: "open-day-03", title: "自由交流", caption: "在面对面沟通中了解彼此", alt: "部落开放日自由交流", aspect: "landscape" }
+    ],
+    to: "/gallery/community-open-day"
+  },
+  {
+    slug: "competition-departure-film",
+    title: "赛事出征短片",
+    category: "短视频",
+    year: "2025",
+    summary: "从准备、出发到现场记录团队参与科创赛事的完整过程。",
+    team: "新媒体中心 · 视频组",
+    assets: [
+      { id: "competition-01", title: "出发前检查", caption: "逐项确认设备、材料与演示版本", alt: "赛事出发前团队检查材料", aspect: "landscape" },
+      { id: "competition-02", title: "抵达赛场", caption: "记录团队进入比赛状态的时刻", alt: "团队抵达科创赛事现场", aspect: "wide" },
+      { id: "competition-03", title: "赛后回顾", caption: "把现场经验带回下一轮实践", alt: "赛事结束后的团队回顾", aspect: "portrait" }
+    ],
+    to: "/gallery/competition-departure-film"
   }
 ];
 

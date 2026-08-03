@@ -10,13 +10,36 @@ test("desktop homepage exposes the approved content sequence", async ({ page }) 
   await expect(page.getByRole("heading", { name: "由成员记录，也由成员创作" })).toBeVisible();
 });
 
-test("public detail remains open and personal signup continues through login", async ({ page }) => {
+test("public detail continues through login without exposing the raw user redirect", async ({ page }) => {
   await page.goto("/activities/harmonyos-salon");
   await expect(page.getByRole("heading", { name: "HarmonyOS 原生应用入门" })).toBeVisible();
 
   await page.getByRole("link", { name: "登录后提交报名" }).click();
   await expect(page).toHaveURL(/\/login\?redirect=/);
   await expect(page.getByRole("heading", { name: "成员登录" })).toBeVisible();
+  await expect(page.getByText(/登录后将继续前往/)).toHaveCount(0);
+});
+
+test("authenticated activity signup uses the current session without asking for login again", async ({ page }) => {
+  await page.goto("/login?redirect=%2Factivities%2Fharmonyos-salon");
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("form") as Element & {
+      __vueParentComponent?: unknown
+    })?.__vueParentComponent
+  ));
+  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/activities\/harmonyos-salon$/);
+
+  const signupLinks = page.getByRole("link", { name: "立即报名", exact: true });
+  await expect(signupLinks).toHaveCount(2);
+  await expect(page.getByText("登录后报名", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("登录后提交报名", { exact: true })).toHaveCount(0);
+
+  for (let index = 0; index < 2; index += 1) {
+    await expect(signupLinks.nth(index)).toHaveAttribute("href", "/activities/harmonyos-salon?signup=1");
+  }
 });
 
 test("homepage resource cards open their own detail pages before any file action", async ({ page }) => {

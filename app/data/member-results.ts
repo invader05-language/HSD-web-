@@ -33,6 +33,7 @@ export interface ResponsibleContact {
   role: string;
   name: string;
   contact: string;
+  displayContact: string;
 }
 
 export interface MemberResultRecord {
@@ -73,7 +74,8 @@ export const DEMO_MEMBER_RESULT: MemberResultRecord = {
   responsibleContact: {
     role: "白泽开发中心负责人",
     name: "负责人姓名",
-    contact: "138 **** 8899"
+    contact: "13800008899",
+    displayContact: "138 **** 8899"
   }
 };
 

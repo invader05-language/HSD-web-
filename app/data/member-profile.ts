@@ -17,7 +17,10 @@ export interface MemberProfile {
   avatarUrl?: string;
 }
 
-export type MemberProfilePatch = Partial<Pick<MemberProfile, "direction" | "bio" | "avatarUrl">>;
+export type MemberProfilePatch = Partial<Pick<
+  MemberProfile,
+  "name" | "grade" | "className" | "direction" | "bio" | "avatarUrl"
+>>;
 export type MemberRegistrationProfilePatch = Pick<
   MemberProfile,
   "name" | "studentId" | "grade" | "className" | "direction" | "bio" | "avatarUrl"

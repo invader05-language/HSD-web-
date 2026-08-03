@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { findActivity } from "~/data/activities";
-import { buildLoginTarget } from "~/utils/login-continuation";
+import { useSessionStore } from "~/stores/session";
+import { resolveLoginAwareTarget } from "~/utils/login-continuation";
 
 const route = useRoute();
+const session = useSessionStore();
 const activity = computed(() => findActivity(String(route.params.slug)));
 
 if (!activity.value) {
   throw createError({ statusCode: 404, statusMessage: "活动不存在" });
 }
 
-const signupTarget = computed(() => buildLoginTarget(`${route.path}?signup=1`));
+const signupTarget = computed(() => resolveLoginAwareTarget(`${route.path}?signup=1`, session.isAuthenticated));
+const signupLabel = computed(() => session.isAuthenticated ? "立即报名" : "登录后报名");
+const signupSubmitLabel = computed(() => session.isAuthenticated ? "立即报名" : "登录后提交报名");
 useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
 </script>
 
@@ -23,7 +27,7 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
       media-label="活动现场或主题视觉素材位"
     >
       <template #actions>
-        <NuxtLink class="button button--light" :to="signupTarget">登录后报名</NuxtLink>
+        <NuxtLink class="button button--light" :to="signupTarget">{{ signupLabel }}</NuxtLink>
       </template>
     </PageBanner>
     <section class="section section--cool">
@@ -48,7 +52,7 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
             <div><dt>名额</dt><dd>{{ activity.capacity }}</dd></div>
             <div><dt>状态</dt><dd>{{ activity.status }}</dd></div>
           </dl>
-          <NuxtLink class="button" :to="signupTarget">登录后提交报名</NuxtLink>
+          <NuxtLink class="button" :to="signupTarget">{{ signupSubmitLabel }}</NuxtLink>
           <p>浏览活动详情无需登录，只有提交或取消报名属于个人操作。</p>
         </aside>
       </div>

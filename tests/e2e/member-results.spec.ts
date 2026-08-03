@@ -6,7 +6,8 @@ async function completeDemoLogin(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "登录并继续" }).click();
 }
 
-test("results center shows the current admission and assessment views inside the main site", async ({ page }) => {
+test("results center shows the current admission and assessment views inside the main site", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await page.getByRole("link", { name: "结果中心" }).click();
 
@@ -26,6 +27,8 @@ test("results center shows the current admission and assessment views inside the
 
   await page.getByRole("button", { name: "复制联系方式" }).click();
   await expect(page.getByRole("button", { name: "已复制" })).toBeVisible();
+  await expect(page.getByText("138 **** 8899", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("13800008899");
 
   await page.getByRole("tab", { name: "阶段考核" }).click();
   await expect(page.getByRole("tab", { name: "阶段考核" })).toHaveAttribute("aria-selected", "true");

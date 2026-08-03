@@ -41,7 +41,7 @@ describe("public resource details", () => {
 describe("gallery album details", () => {
   it("publishes gallery albums with twelve-item incremental batches", () => {
     const album = findGalleryAlbum("annual-activity-record");
-    expect(GALLERY_ALBUMS).toHaveLength(6);
+    expect(GALLERY_ALBUMS.every((item) => item.to === `/gallery/${item.slug}`)).toBe(true);
     expect(album?.assets).toHaveLength(18);
     expect(getGalleryBatch(album!, 12)).toHaveLength(12);
     expect(findGalleryAlbum("missing")).toBeUndefined();

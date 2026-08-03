@@ -5,9 +5,26 @@ useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
 
 const categories = ["全部", "活动摄影", "海报设计", "短视频", "人物专访"] as const;
 const active = ref("全部");
-const visible = computed(() => active.value === "全部"
+const pageSize = 6;
+const currentPage = ref(1);
+const filtered = computed(() => active.value === "全部"
   ? GALLERY_ALBUMS
   : GALLERY_ALBUMS.filter((album) => album.category === active.value));
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)));
+const visible = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filtered.value.slice(start, start + pageSize);
+});
+
+watch(active, () => {
+  currentPage.value = 1;
+});
+
+async function goToPage(page: number) {
+  currentPage.value = Math.min(Math.max(page, 1), pageCount.value);
+  await nextTick();
+  document.getElementById("gallery-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 </script>
 
 <template>
@@ -21,8 +38,8 @@ const visible = computed(() => active.value === "全部"
     />
     <section class="section section--cool">
       <div class="shell">
-        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${visible.length} 件作品`" />
-        <div v-if="visible.length" class="gallery-catalog">
+        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${filtered.length} 件作品`" />
+        <div v-if="visible.length" id="gallery-results" class="gallery-catalog">
           <NuxtLink
             v-for="(album, index) in visible"
             :key="album.slug"
@@ -39,9 +56,12 @@ const visible = computed(() => active.value === "全部"
           </NuxtLink>
         </div>
         <EmptyState v-else />
-        <nav class="pagination" aria-label="媒体作品分页">
-          <button type="button" disabled>上一页</button><button type="button" class="is-active">1</button><button type="button">2</button><button type="button">下一页</button>
-        </nav>
+        <PaginationControls
+          :model-value="currentPage"
+          :page-count="pageCount"
+          label="媒体作品分页"
+          @update:model-value="goToPage"
+        />
       </div>
     </section>
   </div>

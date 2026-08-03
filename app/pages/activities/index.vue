@@ -4,9 +4,20 @@ import { ACTIVITY_DETAILS, ACTIVITY_FILTERS } from "~/data/activities";
 useHead({ title: "活动中心｜白云 HSD 开发者部落" });
 
 const activeFilter = ref("全部");
-const visibleActivities = computed(() => {
+const pageSize = 6;
+const currentPage = ref(1);
+const filteredActivities = computed(() => {
   if (activeFilter.value === "全部") return ACTIVITY_DETAILS;
   return ACTIVITY_DETAILS.filter((activity) => activity.type === activeFilter.value);
+});
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredActivities.value.length / pageSize)));
+const visibleActivities = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredActivities.value.slice(start, start + pageSize);
+});
+
+watch(activeFilter, () => {
+  currentPage.value = 1;
 });
 </script>
 
@@ -21,7 +32,7 @@ const visibleActivities = computed(() => {
     />
     <section class="section">
       <div class="shell">
-        <FilterToolbar v-model="activeFilter" :filters="ACTIVITY_FILTERS" :result-label="`共 ${visibleActivities.length} 场活动`" />
+        <FilterToolbar v-model="activeFilter" :filters="ACTIVITY_FILTERS" :result-label="`共 ${filteredActivities.length} 场活动`" />
         <div v-if="visibleActivities.length" class="activity-catalog">
           <NuxtLink v-for="activity in visibleActivities" :key="activity.slug" :to="`/activities/${activity.slug}`">
             <time :datetime="activity.date">{{ activity.date.slice(5).replace('-', '.') }}</time>
@@ -34,9 +45,7 @@ const visibleActivities = computed(() => {
           </NuxtLink>
         </div>
         <EmptyState v-else />
-        <nav class="pagination" aria-label="活动分页">
-          <button type="button" disabled>上一页</button><button type="button" class="is-active">1</button><button type="button" disabled>下一页</button>
-        </nav>
+        <PaginationControls v-model="currentPage" :page-count="pageCount" label="活动分页" />
       </div>
     </section>
   </div>

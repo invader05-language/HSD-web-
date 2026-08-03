@@ -4030,6 +4030,10 @@ label small:not(:empty),
   gap: 18px;
 }
 
+.member-profile-fields + .member-profile-readonly-grid {
+  margin-top: 24px;
+}
+
 .member-profile-fields label {
   display: grid;
   gap: 8px;
