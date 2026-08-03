@@ -8,6 +8,11 @@ export interface RouteAccessSession {
 
 const ADMIN_FORBIDDEN = "/admin/forbidden";
 
+function normalizeRoutePath(path: string): string {
+  const normalizedPath = path.toLowerCase();
+  return normalizedPath.length > 1 ? normalizedPath.replace(/\/+$/, "") : normalizedPath;
+}
+
 function isProtectedRoute(path: string): boolean {
   return path.startsWith("/member")
     || path.startsWith("/admin")
@@ -20,14 +25,15 @@ export function resolveProtectedRouteTarget(
   fullPath: string,
   session: RouteAccessSession
 ): string | undefined {
-  if (!isProtectedRoute(path)) return undefined;
+  const normalizedPath = normalizeRoutePath(path);
+  if (!isProtectedRoute(normalizedPath)) return undefined;
   if (!session.isAuthenticated) return buildLoginTarget(fullPath);
-  if (!path.startsWith("/admin") || path === ADMIN_FORBIDDEN) return undefined;
+  if (!normalizedPath.startsWith("/admin") || normalizedPath === ADMIN_FORBIDDEN) return undefined;
   if (!session.canAccessAdmin) return ADMIN_FORBIDDEN;
-  if (path === "/admin/roles") {
+  if (normalizedPath === "/admin/roles") {
     return session.canManageAdminAccounts ? "/admin/accounts" : ADMIN_FORBIDDEN;
   }
-  if (path === "/admin/accounts" && !session.canManageAdminAccounts) {
+  if (normalizedPath === "/admin/accounts" && !session.canManageAdminAccounts) {
     return ADMIN_FORBIDDEN;
   }
   return undefined;

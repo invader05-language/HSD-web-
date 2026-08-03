@@ -36,12 +36,22 @@ describe("resolveProtectedRouteTarget", () => {
       .toBe("/login?redirect=%2Fmember%2Fresults");
   });
 
+  it("treats uppercase admin routes as protected administrator destinations", () => {
+    expect(resolveProtectedRouteTarget("/ADMIN/ACCOUNTS", "/ADMIN/ACCOUNTS", signedOut))
+      .toBe("/login?mode=admin&redirect=%2FADMIN%2FACCOUNTS");
+  });
+
   it("denies members who try to enter an admin route", () => {
     expect(resolveProtectedRouteTarget("/admin", "/admin", member)).toBe("/admin/forbidden");
   });
 
   it("limits administrator account configuration to owners", () => {
     expect(resolveProtectedRouteTarget("/admin/accounts", "/admin/accounts", admin))
+      .toBe("/admin/forbidden");
+  });
+
+  it("keeps the trailing-slash accounts route owner-only", () => {
+    expect(resolveProtectedRouteTarget("/admin/accounts/", "/admin/accounts/", admin))
       .toBe("/admin/forbidden");
   });
 
@@ -53,6 +63,11 @@ describe("resolveProtectedRouteTarget", () => {
   it("denies the legacy roles address to non-owner administrators", () => {
     expect(resolveProtectedRouteTarget("/admin/roles", "/admin/roles", admin))
       .toBe("/admin/forbidden");
+  });
+
+  it("redirects the trailing-slash legacy roles address for owners", () => {
+    expect(resolveProtectedRouteTarget("/admin/roles/", "/admin/roles/", owner))
+      .toBe("/admin/accounts");
   });
 
   it("allows administrators into regular admin modules", () => {

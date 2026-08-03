@@ -10,11 +10,12 @@ const MEMBER_HOME = "/member";
 const ADMIN_HOME = "/admin";
 
 function isSafeInternalTarget(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
+  return typeof value === "string" && /^\/(?![\\/])/.test(value);
 }
 
 function isAdminTarget(value: string): boolean {
-  return value === ADMIN_HOME || value.startsWith(`${ADMIN_HOME}/`);
+  const normalizedTarget = value.toLowerCase();
+  return normalizedTarget === ADMIN_HOME || normalizedTarget.startsWith(`${ADMIN_HOME}/`);
 }
 
 export function buildLoginTarget(target: string): string {

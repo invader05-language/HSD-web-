@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLoginTarget,
+  normalizeRedirectTarget,
   resolveLoginAwareTarget,
   resolveLoginContinuation
 } from "../../app/utils/login-continuation";
@@ -49,6 +50,12 @@ describe("resolveLoginContinuation", () => {
       .toEqual({ mode: "admin", memberTarget: "/member/results", adminTarget: "/admin" });
     expect(resolveLoginContinuation({ mode: "member", redirect: "/admin/logs" }))
       .toEqual({ mode: "member", memberTarget: "/member", adminTarget: "/admin/logs" });
+  });
+
+  it("rejects backslash protocol-relative redirects", () => {
+    expect(normalizeRedirectTarget("/\\\\evil.example/admin")).toBe("/member");
+    expect(resolveLoginContinuation({ mode: "admin", redirect: "/\\\\evil.example/admin" }))
+      .toEqual({ mode: "admin", memberTarget: "/member", adminTarget: "/admin" });
   });
 });
 
