@@ -2,10 +2,11 @@ import { expect, test } from "@playwright/test";
 
 async function signInToAdmin(
   page: import("@playwright/test").Page,
-  target = "/admin/recruitment"
+  target = "/admin/recruitment",
+  account = "admin-alliance"
 ) {
   await page.goto(target);
-  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("学号或成员账号").fill(account);
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
   await expect(page).toHaveURL(new RegExp(`${target.replace("/", "\\/")}$`));
@@ -48,7 +49,7 @@ test("administrator denial identifies the owner-only destination", async ({ page
 
 test("mobile administration retains identity and filtered navigation", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signInToAdmin(page);
+  await signInToAdmin(page, "/admin/recruitment", "media-admin");
 
   await expect(page.locator(".admin-topbar__identity")).toContainText("周同学 · 平台管理员");
   await page.getByRole("button", { name: "打开管理导航" }).click();
