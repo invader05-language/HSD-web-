@@ -25,7 +25,7 @@
 **Interfaces:**
 - Produces `getAdminCandidateDisplay(account: MockAccount): { name: string; affiliation: string; identity: string }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add the import and test to `tests/unit/admin-access.test.ts`:
 
@@ -46,23 +46,23 @@ it("maps candidate display fields to name, affiliation, and identity", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `pnpm exec vitest run tests/unit/admin-access.test.ts -t "candidate display"`
 
 Expected: FAIL because `getAdminCandidateDisplay` does not exist yet.
 
-- [ ] **Step 3: Implement the minimal mapping**
+- [x] **Step 3: Implement the minimal mapping**
 
 Use `ADMIN_MEMBERS` by `account.memberId` for affiliation. Use `getAdminQualificationLabel(account)` for configured admins and `普通成员` for members. Fall back to `待确定` when a demo applicant has no `ADMIN_MEMBERS` record.
 
-- [ ] **Step 4: Run the focused test and verify it passes**
+- [x] **Step 4: Run the focused test and verify it passes**
 
 Run: `pnpm exec vitest run tests/unit/admin-access.test.ts -t "candidate display"`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/data/admin-system.ts tests/unit/admin-access.test.ts
@@ -80,7 +80,7 @@ git commit -m "feat: add administrator candidate display mapping"
 - Consumes `getAdminCandidateDisplay` from Task 1.
 - Keeps existing candidate selection, search, submit handlers, and role options unchanged.
 
-- [ ] **Step 1: Add the browser assertions**
+- [x] **Step 1: Add the browser assertions**
 
 Update the reassignment flow with these assertions after opening the dialog:
 
@@ -93,27 +93,27 @@ await expect(candidate).toContainText("新媒体中心负责人");
 
 The account remains in the accessible name only; it is not rendered in the three visible columns.
 
-- [ ] **Step 2: Run the focused E2E collection/check**
+- [x] **Step 2: Run the focused E2E collection/check**
 
 Run: `pnpm exec playwright test tests/e2e/admin-qualification-v2.spec.ts --list`
 
 Expected: the file is collected successfully; a full browser run may require the local Playwright runtime.
 
-- [ ] **Step 3: Render the display model**
+- [x] **Step 3: Render the display model**
 
 Import `getAdminCandidateDisplay`, render three spans in each candidate button, and retain an accessible account label for automation and keyboard users without showing the account in the visual columns.
 
-- [ ] **Step 4: Update the layout styles**
+- [x] **Step 4: Update the layout styles**
 
 Change `.admin-candidate-list button` to a three-column grid and style the three values with the existing admin typography. Add a scoped owner-dialog footer margin that matches the spacing already produced by the administrator dialog.
 
-- [ ] **Step 5: Run focused unit and type checks**
+- [x] **Step 5: Run focused unit and type checks**
 
 Run: `pnpm exec vitest run tests/unit/admin-access.test.ts && pnpm run typecheck`
 
 Expected: PASS with no TypeScript errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/pages/admin/accounts.vue app/assets/css/main.css tests/e2e/admin-qualification-v2.spec.ts
@@ -125,24 +125,24 @@ git commit -m "fix: simplify administrator candidate options"
 **Files:**
 - Verify: `app/pages/admin/accounts.vue`, `app/assets/css/main.css`, `app/data/admin-system.ts`
 
-- [ ] **Step 1: Run the full unit suite**
+- [x] **Step 1: Run the full unit suite**
 
 Run: `pnpm run test:unit`
 
 Expected: all existing and new tests pass.
 
-- [ ] **Step 2: Build the application**
+- [x] **Step 2: Build the application**
 
 Run: `pnpm run build`
 
 Expected: Nuxt production build completes successfully.
 
-- [ ] **Step 3: Check the diff**
+- [x] **Step 3: Check the diff**
 
 Run: `git diff --check`
 
 Expected: no whitespace errors.
 
-- [ ] **Step 4: Manually verify the preview**
+- [x] **Step 4: Manually verify the preview**
 
 Open `/admin/accounts`, open both add dialogs, and verify the three columns and owner footer spacing at desktop and narrow viewport widths.
