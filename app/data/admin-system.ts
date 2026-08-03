@@ -61,6 +61,8 @@ export function getAdminCandidateDisplay(account: MockAccount): AdminCandidateDi
 
 export type MockLoginResult =
   | { status: "success"; account: MockAccount }
+  | { status: "password_change_required"; account: MockAccount }
+  | { status: "invalid_credentials"; account: string }
   | { status: "unknown-account"; account: string }
   | { status: "admin-access-missing"; account: MockAccount }
   | { status: "admin-access-disabled"; account: MockAccount };

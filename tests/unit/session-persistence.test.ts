@@ -15,6 +15,64 @@ describe("session persistence", () => {
     window.history.pushState({}, "", "/");
   });
 
+  function registerFirstLoginAccount() {
+    const access = useAdminAccessStore();
+    access.registerFormalMemberAccount({
+      account: "20269999",
+      memberId: "member-20269999",
+      name: "新成员",
+      adminLevel: "member",
+      adminAccessEnabled: true,
+      mustChangePassword: true
+    });
+    access.persistAccessState();
+  }
+
+  it("accepts only the fixed initial password for a first-login account", () => {
+    registerFirstLoginAccount();
+    const session = useSessionStore();
+
+    expect(session.signIn("20269999", "wrong-password")).toMatchObject({
+      status: "invalid_credentials"
+    });
+    expect(session.isAuthenticated).toBe(false);
+
+    expect(session.signIn("20269999", "hsd1314")).toMatchObject({
+      status: "password_change_required"
+    });
+    expect(session.isAuthenticated).toBe(true);
+    expect(session.mustChangePassword).toBe(true);
+  });
+
+  it("restores a first-login session without removing its restriction", () => {
+    registerFirstLoginAccount();
+    useSessionStore().signIn("20269999", "hsd1314");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+    expect(restored.restore()).toBe(true);
+    expect(restored.currentAccountId).toBe("20269999");
+    expect(restored.mustChangePassword).toBe(true);
+  });
+
+  it("completes the mock password-change flow without persisting the replacement password", () => {
+    registerFirstLoginAccount();
+    const session = useSessionStore();
+    session.signIn("20269999", "hsd1314");
+
+    expect(session.completePasswordChange("hsd1314", "hsd1314")).toEqual({
+      status: "invalid_input",
+      errors: { password: "新密码不能与初始密码相同。" }
+    });
+    expect(session.completePasswordChange("new-pass-2026", "new-pass-2026"))
+      .toEqual({ status: "success" });
+    expect(session.mustChangePassword).toBe(false);
+    expect(window.localStorage.getItem("baiyun-hsd-admin-access"))
+      .not.toContain("new-pass-2026");
+    expect(window.sessionStorage.getItem(SESSION_STORAGE_KEY))
+      .not.toContain("new-pass-2026");
+  });
+
   it("serializes only the authenticated account, issued-at time, and storage version", () => {
     const session = useSessionStore();
 

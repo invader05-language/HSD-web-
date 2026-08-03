@@ -8,6 +8,7 @@ import {
   type LoginMode
 } from "~/utils/login-continuation";
 import { getLoginDestination, getLoginErrorMessage } from "~/utils/login-mode";
+import { buildPasswordChangeTarget } from "~/utils/password-change";
 
 const route = useRoute();
 const session = useSessionStore();
@@ -51,8 +52,16 @@ async function signIn(values: Record<string, unknown>) {
   submitting.value = true;
   serverError.value = "";
   await new Promise((resolve) => setTimeout(resolve, 450));
-  const result = session.signIn(String(values.account ?? ""), { requireAdmin: isAdminMode.value });
+  const result = session.signIn(
+    String(values.account ?? ""),
+    String(values.password ?? ""),
+    { requireAdmin: isAdminMode.value }
+  );
   submitting.value = false;
+  if (result.status === "password_change_required") {
+    await navigateTo(buildPasswordChangeTarget(redirectTarget.value));
+    return;
+  }
   if (result.status !== "success") {
     serverError.value = getLoginErrorMessage(result.status);
     return;

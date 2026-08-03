@@ -64,3 +64,36 @@ test("avatar selection previews locally and the profile remains usable on mobile
   await expect(page.getByRole("button", { name: "移除当前预览" })).toBeVisible();
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 390);
 });
+
+test("a newly created account must replace its initial password before entering member pages", async ({ page }) => {
+  await page.goto("/admin/members");
+  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await page.getByRole("button", { name: "添加成员" }).click();
+  const drawer = page.getByRole("dialog", { name: "添加正式成员" });
+  await drawer.getByLabel("姓名").fill("新成员");
+  await drawer.getByLabel("学号 / 登录帐号").fill("20269999");
+  await drawer.getByLabel("年级").fill("2026 级");
+  await drawer.getByLabel("班级").fill("软件工程 3 班");
+  await drawer.getByLabel("实践方向").selectOption("后端架构");
+  await page.getByRole("button", { name: "确认添加" }).click();
+  await page.getByRole("button", { name: "退出" }).click();
+
+  await page.goto("/login?redirect=%2Fmember%2Fprofile");
+
+  await page.getByLabel("学号或成员账号").fill("20269999");
+  await page.getByLabel("密码", { exact: true }).fill("hsd1314");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+
+  await expect(page).toHaveURL(/\/member\/change-password\?redirect=%2Fmember%2Fprofile$/);
+  await page.reload();
+  await expect(page).toHaveURL(/\/member\/change-password/);
+  await page.getByLabel("新密码", { exact: true }).fill("new-pass-2026");
+  await page.getByLabel("确认新密码", { exact: true }).fill("new-pass-2026");
+  await page.getByRole("button", { name: "保存新密码并继续" }).click();
+
+  await expect(page).toHaveURL(/\/member\/profile$/);
+  await expect(page.evaluate(() => window.localStorage.getItem("baiyun-hsd-admin-access")))
+    .resolves.not.toContain("new-pass-2026");
+});

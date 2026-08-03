@@ -1,9 +1,11 @@
 import { buildLoginTarget } from "./login-continuation";
+import { buildPasswordChangeTarget } from "./password-change";
 
 export interface RouteAccessSession {
   isAuthenticated: boolean;
   canAccessAdmin: boolean;
   canManageAdminAccounts: boolean;
+  mustChangePassword?: boolean;
 }
 
 const ADMIN_FORBIDDEN = "/admin/forbidden";
@@ -36,6 +38,11 @@ export function resolveProtectedRouteTarget(
   session: RouteAccessSession
 ): string | undefined {
   const normalizedPath = normalizeRoutePath(path);
+  if (session.isAuthenticated && session.mustChangePassword) {
+    return normalizedPath === "/member/change-password"
+      ? undefined
+      : buildPasswordChangeTarget(fullPath);
+  }
   if (!isProtectedRoute(normalizedPath)) return undefined;
   if (!session.isAuthenticated) return buildLoginTarget(fullPath);
   if (!normalizedPath.startsWith("/admin") || normalizedPath === ADMIN_FORBIDDEN) return undefined;
