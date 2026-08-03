@@ -94,11 +94,16 @@ test("application roster filters, sorts, and opens a read-only application recor
   await expect(page.getByText("2026-07-30 14:28 提交")).toBeVisible();
   await expect(page.getByText("考核处理")).toHaveCount(0);
   await expect(page.getByText("内部备注")).toHaveCount(0);
-});
 
-test("unknown application records return a 404 response", async ({ page }) => {
-  const response = await page.goto("/admin/recruitment/applications/missing");
+  await page.evaluate(async () => {
+    const nuxt = (window as Window & {
+      $nuxt?: { $router?: { push: (path: string) => Promise<unknown> } };
+    }).$nuxt;
 
-  expect(response?.status()).toBe(404);
+    if (!nuxt?.$router) throw new Error("Nuxt client router is unavailable");
+    await nuxt.$router.push("/admin/recruitment/applications/missing");
+  });
+
+  await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/missing$/);
   await expect(page.getByText("报名记录不存在")).toBeVisible();
 });

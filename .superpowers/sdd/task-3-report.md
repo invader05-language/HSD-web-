@@ -40,3 +40,16 @@ Resolved both P1 findings from review `2a55f25..ce7d189`.
 - PASS: `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/recruitment-applications.test.ts` — 1 file, 5 tests passed.
 - BLOCKED outside Task 3: `sh scripts/with-hsd-node.sh corepack pnpm run typecheck` remains blocked by concurrent Task 5 member-normalization migration errors in public/member/admin-member/join pages; no reported error references the Task 3 files.
 - BLOCKED by local Chrome environment: `sh scripts/with-hsd-node.sh corepack pnpm exec playwright test tests/e2e/recruitment-admin.spec.ts` — 6/6 abort at browser launch, before test execution.
+
+## E2E 404 evidence repair
+
+Review found that the former unknown-record E2E test went directly to the protected URL while signed out. That could only exercise the route guard/login redirect, rather than the application's authenticated 404 handling.
+
+- Folded the unknown-record assertion into the existing authenticated application-record journey.
+- The test now completes the existing `admin-alliance` administrator login, opens `candidate-lin`, then uses the Nuxt client router to navigate to `/admin/recruitment/applications/missing`.
+- It asserts both the resulting missing-record URL and the `报名记录不存在` error view, so the check covers a client-side parameter transition from a valid record in an authenticated session.
+
+### E2E repair validation
+
+- PASS: `sh scripts/with-hsd-node.sh corepack pnpm exec playwright test tests/e2e/recruitment-admin.spec.ts --list` — 5 tests discovered, including the repaired authenticated record journey.
+- BLOCKED by local Chrome environment: `sh scripts/with-hsd-node.sh corepack pnpm exec playwright test tests/e2e/recruitment-admin.spec.ts` — all 5 cases abort during Chrome launch with `SIGABRT`; cleanup also reports `kill EPERM`, before any application assertion can run. This prevents observing the normal TDD red/green browser result, but the failure is independent of the test body and matches the pre-existing environment failure.
