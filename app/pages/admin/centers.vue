@@ -11,7 +11,6 @@ useHead({ title: "中心组织｜HSD 管理台" });
       <article v-for="(center, index) in ADMIN_CENTER_SUMMARIES" :key="center.name">
         <span>0{{ index + 1 }}</span><AdminStatusPill :status="center.state"/><h2>{{ center.name }}</h2><p>{{ center.description }}</p>
         <dl><div><dt>成员</dt><dd>{{ center.members }}</dd></div><div><dt>核心人员</dt><dd>{{ center.core }}</dd></div><div><dt>负责人</dt><dd>{{ center.lead }}</dd></div></dl>
-        <button>配置中心资料 →</button>
       </article>
     </section>
   </div>

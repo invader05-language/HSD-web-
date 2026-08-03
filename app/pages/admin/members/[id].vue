@@ -12,11 +12,13 @@ if (!member.value) {
   throw createError({ statusCode: 404, statusMessage: "成员不存在" });
 }
 const preview = computed(() => getPublicProfilePreview(member.value!));
-const publicPreviewId = computed(() =>
-  member.value?.id === memberRepository.currentProfile.value.id
-    ? memberRepository.currentProfile.value.publicId
-    : member.value?.id.replace("member-", "person-")
-);
+const publicPerson = computed(() => memberRepository.allPublicPeople.value.find((person) => (
+  person.name === member.value?.name && person.centerName === member.value?.center
+)));
+const publicPreviewId = computed(() => publicPerson.value?.id);
+const displayDuty = computed(() => member.value?.centerLeadership
+  ? "核心人员 · 中心负责人"
+  : member.value?.memberDuty);
 const activeTab = ref("internal");
 const showIdentityConfirm = ref(false);
 useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
@@ -30,7 +32,7 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
       :description="`${member.studentId} · ${member.identity} · ${member.center}`"
     >
       <template #actions>
-        <NuxtLink class="button button--ghost" :to="`/people/${publicPreviewId}`" target="_blank">预览公开页面</NuxtLink>
+        <NuxtLink v-if="publicPreviewId" class="button button--ghost" :to="`/people/${publicPreviewId}`" target="_blank">预览公开页面</NuxtLink>
         <button type="button" class="button" @click="showIdentityConfirm = true">调整身份</button>
       </template>
     </AdminPageHeading>
@@ -39,12 +41,12 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
       <aside class="admin-member-profile-card">
         <div class="admin-member-avatar"><span>&lt; HSD &gt;</span><small>{{ preview.usesDefaultAvatar ? "默认公开头像" : "成员公开头像" }}</small></div>
         <h2>{{ member.name }}</h2>
-        <p>{{ member.role }}</p>
+        <p>{{ displayDuty }}</p>
         <dl>
           <div><dt>当前身份</dt><dd>{{ member.identity }}</dd></div>
           <div><dt>所属中心</dt><dd>{{ member.center }}</dd></div>
-          <div><dt>实践方向</dt><dd>{{ member.direction }}</dd></div>
-          <div><dt>公开状态</dt><dd>{{ member.publicState }}</dd></div>
+          <div><dt>成员职责</dt><dd>{{ displayDuty }}</dd></div>
+          <div v-if="member.center === '白泽开发中心'"><dt>实践方向</dt><dd>{{ member.baizeDirection || "—" }}</dd></div>
         </dl>
       </aside>
 
@@ -60,21 +62,22 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
           <div class="admin-form-grid">
             <label>学号<input :value="member.studentId"></label>
             <label>年级<input :value="member.grade"></label>
-            <label>当前身份<select :value="member.identity"><option>正式成员</option><option>预备成员</option><option>核心成员</option></select></label>
+            <label>当前身份<select :value="member.identity"><option>正式成员</option><option>预备成员</option></select></label>
             <label>所属中心<select :value="member.center"><option>白泽开发中心</option><option>新媒体中心</option><option>拓维策划中心</option><option>人才发展中心</option></select></label>
+            <label>成员职责<select :value="member.memberDuty"><option>普通成员</option><option>核心人员</option></select></label>
             <label>手机号<input value="138 **** 8899"></label>
             <label>账号状态<select><option>正常</option><option>停用</option></select></label>
           </div>
         </div>
 
         <div v-else-if="activeTab === 'public'" class="admin-detail-form">
-          <header><span>Public Profile</span><h2>公开页面展示内容</h2><p>上传头像后自动公开；未上传或移除头像时输出白底 HSD 默认头像。</p></header>
+          <header><span>Public Profile</span><h2>公开页面展示内容</h2><p>正式成员的姓名、头像、中心、职责、白泽实践方向和个人简介默认公开；未上传头像时输出白底 HSD 默认头像。</p></header>
           <div class="admin-form-grid">
             <label>公开名称<input :value="member.name"></label>
-            <label>公开职责<input :value="member.role"></label>
+            <label>公开职责<input :value="displayDuty"></label>
+            <label v-if="member.center === '白泽开发中心'">实践方向<input :value="member.baizeDirection || '—'" readonly></label>
             <label class="is-wide">个人介绍<textarea rows="5" :value="member.profileSummary"></textarea></label>
             <label>头像展示<input :value="preview.usesDefaultAvatar ? '未上传，使用默认 HSD 头像' : '已上传，自动公开'" readonly></label>
-            <label>资料状态<select :value="member.publicState"><option>已公开</option><option>未公开</option><option>资料待审核</option></select></label>
           </div>
         </div>
 

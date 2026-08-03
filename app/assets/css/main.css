@@ -4091,6 +4091,7 @@ label small:not(:empty),
 }
 
 .member-profile-fields input,
+.member-profile-fields select,
 .member-profile-fields textarea {
   width: 100%;
   border: 1px solid #cfcac5;
@@ -4102,6 +4103,7 @@ label small:not(:empty),
 }
 
 .member-profile-fields input:focus,
+.member-profile-fields select:focus,
 .member-profile-fields textarea:focus {
   border-color: var(--brand-red);
   box-shadow: 0 0 0 3px rgb(177 32 43 / 13%);
@@ -8221,6 +8223,18 @@ body.is-admin-drawer-open {
 .admin-owner-list .admin-owner-lock {
   color: #777d84;
   font-size: 10px;
+}
+
+.admin-core-member-list article {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@media (max-width: 720px) {
+  .admin-core-member-list article {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+  }
 }
 
 .admin-qualification-dialog {

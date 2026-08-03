@@ -29,6 +29,7 @@ test("core people directory publishes the approved people without login", async 
   await expect(page.getByRole("heading", { level: 2, name: "林同学" })).toBeVisible();
   await expect(page.getByRole("img", { name: "林同学的默认 HSD 头像" })).toBeVisible();
   await expect(page.getByText("共 6 位核心人员")).toBeVisible();
+  await expect(page.getByText("主动公开", { exact: false })).toHaveCount(0);
 });
 
 test("core search, center filter, and empty state stay local to the directory", async ({ page }) => {
@@ -78,6 +79,7 @@ test("member search and center filter stay local to the public directory", async
   await expect(page.getByRole("heading", { level: 2, name: "何同学" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "郭同学" })).toHaveCount(0);
   await expect(page.getByText("共 2 位成员")).toBeVisible();
+  await expect(page.getByRole("link", { name: /何同学/ }).locator(".people-member-card__content > strong")).toHaveCount(0);
   await expect(page).toHaveURL(/\/people\/members$/);
 
   await page.getByLabel("搜索成员").fill("不存在");
@@ -92,6 +94,19 @@ test("member search and center filter stay local to the public directory", async
   await expect(page.getByText("共 6 位成员")).toBeVisible();
   await expect(page.locator(".people-member-list > a")).toHaveCount(6);
   await expect(page).toHaveURL(/\/people\/members$/);
+});
+
+test("only Baize public profiles render a practice direction and empty public fields leave no placeholder", async ({ page }) => {
+  await page.goto("/people/guo-development");
+  await expect(page.getByText("实践方向", { exact: true })).toBeVisible();
+  await expect(page.getByText("后端架构", { exact: true })).toBeVisible();
+
+  await page.goto("/people/he-media");
+  await expect(page.getByText("实践方向", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".member-detail__profile dd:empty")).toHaveCount(0);
+
+  await page.goto("/centers/new-media");
+  await expect(page.locator(".center-people__list article > p:empty")).toHaveCount(0);
 });
 
 test("1440px directories retain their approved three- and two-column grids", async ({ page }) => {

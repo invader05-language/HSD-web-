@@ -177,6 +177,40 @@ describe("formal member account creation", () => {
     });
   });
 
+  it("promotes an existing formal member to core without changing administrator qualification", () => {
+    const administration = useMemberAdministrationStore();
+    const access = useAdminAccessStore();
+    const repository = useMemberRepository();
+    const accountBefore = { ...access.getAccount("member-gao")! };
+
+    expect(repository.findAdminMember("member-gao")?.memberDuty).toBe("普通成员");
+    expect(administration.promoteFormalMemberToCore("member-gao")).toEqual({
+      status: "success",
+    });
+    expect(repository.findAdminMember("member-gao")?.memberDuty).toBe("核心人员");
+    expect(repository.publicCorePeople.value.some((person) => person.name === "高同学")).toBe(true);
+    expect(access.getAccount("member-gao")).toEqual(accountBefore);
+
+    setActivePinia(createPinia());
+    expect(useMemberRepository().findAdminMember("member-gao")?.memberDuty).toBe("核心人员");
+    expect(useMemberRepository().publicCorePeople.value.some((person) => person.name === "高同学"))
+      .toBe(true);
+  });
+
+  it("does not manually promote preparatory, missing, or already-core members", () => {
+    const administration = useMemberAdministrationStore();
+
+    expect(administration.promoteFormalMemberToCore("member-wang")).toEqual({
+      status: "not_eligible",
+    });
+    expect(administration.promoteFormalMemberToCore("missing-member")).toEqual({
+      status: "not_eligible",
+    });
+    expect(administration.promoteFormalMemberToCore("member-lin")).toEqual({
+      status: "already_core",
+    });
+  });
+
   it("restores both non-empty storage values when the access-state write fails", () => {
     const access = useAdminAccessStore();
     const profiles = useMemberProfileStore();

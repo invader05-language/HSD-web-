@@ -143,16 +143,51 @@ test("dashboard prioritizes actionable work instead of decorative charts", async
   await expect(page.getByRole("menu", { name: "快捷新建" })).toContainText("上传学习资料");
 });
 
-test("member administration separates internal public and growth information", async ({ page }) => {
+test("member administration defaults formal profiles to public without visibility controls", async ({ page }) => {
   await signInToAdmin(page, "/admin/members");
 
   await expect(page.getByRole("heading", { level: 1, name: "全体成员" })).toBeVisible();
   await expect(page.getByRole("table", { name: "成员管理名单" })).toBeVisible();
+  await expect(page.getByLabel("公开资料")).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "公开资料" })).toHaveCount(0);
+  await expect(page.getByText("资料待审核", { exact: true })).toHaveCount(0);
+
+  const mediaRow = page.getByRole("row").filter({ hasText: "李同学" });
+  await expect(mediaRow.getByRole("cell", { name: "—", exact: true })).toBeVisible();
+
   await page.getByRole("link", { name: "查看成员 林同学" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "内部资料" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "公开资料" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "成长与荣誉" })).toBeVisible();
+  await page.getByRole("tab", { name: "公开资料" }).click();
+  await expect(page.getByLabel("资料状态")).toHaveCount(0);
+  await expect(page.getByText("公开状态", { exact: true })).toHaveCount(0);
+});
+
+test("core-member administration only adds eligible formal members and keeps centres read-only", async ({ page }) => {
+  await signInToAdmin(page, "/admin/core-members");
+
+  await expect(page.getByRole("heading", { level: 1, name: "核心人员配置" })).toBeVisible();
+  await expect(page.getByText(/任期|公开展示|暂不公开|拖动手柄|部落介绍展示预览/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "移除", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "添加核心人员" }).click();
+  const dialog = page.getByRole("dialog", { name: "添加核心人员" });
+  await expect(dialog.getByText("高同学", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: /选择 高同学/ }).click();
+  await dialog.getByRole("button", { name: "确认添加" }).click();
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("高同学");
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("核心人员");
+
+  await page.reload();
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("高同学");
+
+  await page.getByRole("link", { name: "中心组织", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "中心组织" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /配置中心资料/ })).toHaveCount(0);
+  await expect(page.getByText("配置中心资料", { exact: false })).toHaveCount(0);
 });
 
 test("project activity and portal content share a clear draft review publish workflow", async ({ page }) => {

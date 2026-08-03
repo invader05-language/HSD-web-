@@ -131,6 +131,12 @@ describe("member profile domain", () => {
     expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
   });
 
+  it("ignores a disabled center-lead qualification when deriving core membership", () => {
+    const repository = useMemberRepository();
+
+    expect(repository.findAdminMember("member-zhao")?.centerLeadership).toBeUndefined();
+  });
+
   it("keeps an unsaved draft separate from the saved profile", () => {
     const session = useSessionStore();
     const store = useMemberProfileStore();

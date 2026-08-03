@@ -50,9 +50,9 @@ const publicMembers = memberRepository.publicMembers;
               <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
               <span>0{{ index + 1 }}</span>
             </div>
-            <p>{{ member.role }}</p>
+            <p>{{ member.memberDuty }}</p>
             <h3>{{ member.name }}</h3>
-            <p>{{ member.direction }}</p>
+            <p v-if="member.baizeDirection">{{ member.baizeDirection }}</p>
           </article>
         </div>
       </div>
@@ -76,7 +76,7 @@ const publicMembers = memberRepository.publicMembers;
             <div>
               <h3>{{ member.name }}</h3>
               <p>{{ member.centerName }}</p>
-              <span>{{ member.direction }}</span>
+              <span v-if="member.baizeDirection">{{ member.baizeDirection }}</span>
             </div>
           </article>
         </div>

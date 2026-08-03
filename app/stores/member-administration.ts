@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ADMIN_ACCESS_STORAGE_KEY, type MockAccount } from "../data/admin-system";
+import { ADMIN_MEMBERS } from "../data/admin-members";
 import type { MemberProfile } from "../data/member-profile";
 import {
   MEMBER_PROFILE_STORAGE_KEY,
@@ -15,6 +16,12 @@ import {
 } from "../utils/member-account-form";
 
 export type { CreateFormalMemberInput, CreateFormalMemberResult } from "../utils/member-account-form";
+
+export type PromoteFormalMemberToCoreResult =
+  | { status: "success" }
+  | { status: "already_core" }
+  | { status: "not_eligible" }
+  | { status: "storage_unavailable" };
 
 function getRequiredStorage(): Storage {
   try {
@@ -134,5 +141,82 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
-  return { createFormalMember };
+  function promoteFormalMemberToCore(memberId: string): PromoteFormalMemberToCoreResult {
+    const profiles = useMemberProfileStore();
+    const access = useAdminAccessStore();
+    const storedProfile = profiles.profiles[memberId];
+    const staticMember = ADMIN_MEMBERS.find((member) => member.id === memberId);
+    const identity = storedProfile?.identity ?? staticMember?.identity;
+
+    if (identity !== "正式成员" || (!storedProfile && !staticMember)) {
+      return { status: "not_eligible" };
+    }
+
+    const enabledCenterLead = access.accounts.some((account) => (
+      account.memberId === memberId
+      && account.adminLevel === "admin"
+      && account.adminAccessEnabled
+      && Boolean(account.adminCenterRole)
+    ));
+    if (storedProfile?.memberDuty === "核心人员"
+      || staticMember?.memberDuty === "核心人员"
+      || enabledCenterLead) {
+      return { status: "already_core" };
+    }
+
+    let storage: Storage;
+    let previousProfileState: string | null;
+    try {
+      storage = getRequiredStorage();
+      previousProfileState = storage.getItem(MEMBER_PROFILE_STORAGE_KEY);
+    } catch {
+      return { status: "storage_unavailable" };
+    }
+
+    const previousProfiles = Object.fromEntries(
+      Object.entries(profiles.profiles).map(([profileId, profile]) => [
+        profileId,
+        { ...profile },
+      ])
+    );
+
+    try {
+      if (storedProfile) {
+        profiles.profiles[memberId] = {
+          ...storedProfile,
+          memberDuty: "核心人员",
+        };
+      } else if (staticMember) {
+        const publicId = createPublicMemberId(profiles.profiles);
+        const profile: MemberProfile = {
+          id: staticMember.id,
+          publicId,
+          name: staticMember.name,
+          studentId: staticMember.studentId,
+          grade: staticMember.grade,
+          className: "暂未录入",
+          center: staticMember.center,
+          centerSlug: getCenterSlug(staticMember.center),
+          memberDuty: "核心人员",
+          identity: "正式成员",
+          ...(staticMember.baizeDirection ? { baizeDirection: staticMember.baizeDirection } : {}),
+          bio: staticMember.profileSummary,
+          ...(staticMember.avatarUrl ? { avatarUrl: staticMember.avatarUrl } : {}),
+        };
+        if (!profiles.addFormalProfile(profile)) throw new Error("core member conflict");
+      }
+      profiles.persistProfileState();
+      return { status: "success" };
+    } catch {
+      profiles.replaceProfiles(previousProfiles);
+      try {
+        restoreStoredValue(storage, MEMBER_PROFILE_STORAGE_KEY, previousProfileState);
+      } catch {
+        // The in-memory profile state has already been restored.
+      }
+      return { status: "storage_unavailable" };
+    }
+  }
+
+  return { createFormalMember, promoteFormalMemberToCore };
 });

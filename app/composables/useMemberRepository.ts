@@ -27,6 +27,7 @@ export function useMemberRepository() {
       const qualification = adminAccessStore.accounts.find((account) => (
         account.memberId === member.id
         && account.adminLevel === "admin"
+        && account.adminAccessEnabled
         && account.adminCenterRole
       ));
       const qualifiedMember = {
