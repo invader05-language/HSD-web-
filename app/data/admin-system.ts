@@ -41,6 +41,23 @@ export function getAdminQualificationLabel(account: MockAccount): string {
   return getAdminLevelLabel(account.adminLevel);
 }
 
+export interface AdminCandidateDisplay {
+  name: string;
+  affiliation: string;
+  identity: string;
+}
+
+export function getAdminCandidateDisplay(account: MockAccount): AdminCandidateDisplay {
+  const member = ADMIN_MEMBERS.find((item) => item.id === account.memberId);
+  return {
+    name: account.name,
+    affiliation: member?.center ?? "待确定",
+    identity: account.adminLevel === "member"
+      ? "普通成员"
+      : getAdminQualificationLabel(account)
+  };
+}
+
 export type MockLoginResult =
   | { status: "success"; account: MockAccount }
   | { status: "unknown-account"; account: string }

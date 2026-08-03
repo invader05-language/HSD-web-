@@ -7,6 +7,7 @@ import {
   ADMIN_ACCESS_STORAGE_VERSION,
   DEMO_APPLICANT_ACCOUNT,
   DEMO_MEMBER_ACCOUNT,
+  getAdminCandidateDisplay,
   getAdminQualificationLabel,
   getAdminLevelLabel,
   MOCK_ACCOUNTS
@@ -36,6 +37,19 @@ describe("mock administration access", () => {
     expect(getAdminLevelLabel("member")).toBe("普通成员");
     expect(getAdminLevelLabel("admin")).toBe("中心负责人");
     expect(getAdminLevelLabel("owner")).toBe("联盟总负责人");
+  });
+
+  it("maps candidate display fields to name, affiliation, and identity", () => {
+    expect(getAdminCandidateDisplay(MOCK_ACCOUNTS.find((account) => account.account === "media-admin")!)).toEqual({
+      name: "李同学",
+      affiliation: "新媒体中心",
+      identity: "新媒体中心负责人"
+    });
+    expect(getAdminCandidateDisplay(MOCK_ACCOUNTS.find((account) => account.account === "demo-member")!)).toEqual({
+      name: "林同学",
+      affiliation: "白泽开发中心",
+      identity: "普通成员"
+    });
   });
 
   it("assigns every ordinary administrator one of the four typed center lead roles", () => {
