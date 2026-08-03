@@ -149,9 +149,11 @@ export const useSessionStore = defineStore("session", {
       const account = persisted && access.getAccount(persisted.accountId);
       const routeRequiresAdmin = typeof window !== "undefined"
         && window.location.pathname.startsWith("/admin");
+      const restoreRequiresAdmin = routeRequiresAdmin
+        && !(account?.mustChangePassword && account.adminLevel === "member");
       const result = persisted && account
         ? access.resolveLogin(persisted.accountId, {
-            requireAdmin: routeRequiresAdmin
+            requireAdmin: restoreRequiresAdmin
           })
         : undefined;
       if (!persisted || !result || result.status !== "success") {

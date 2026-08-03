@@ -6,6 +6,7 @@ import {
   useSessionStore
 } from "../../app/stores/session";
 import { useAdminAccessStore } from "../../app/stores/admin-access";
+import { resolveProtectedRouteTarget } from "../../app/utils/route-access";
 
 describe("session persistence", () => {
   beforeEach(() => {
@@ -47,12 +48,15 @@ describe("session persistence", () => {
   it("restores a first-login session without removing its restriction", () => {
     registerFirstLoginAccount();
     useSessionStore().signIn("20269999", "hsd1314");
+    window.history.pushState({}, "", "/admin");
     setActivePinia(createPinia());
 
     const restored = useSessionStore();
     expect(restored.restore()).toBe(true);
     expect(restored.currentAccountId).toBe("20269999");
     expect(restored.mustChangePassword).toBe(true);
+    expect(resolveProtectedRouteTarget("/admin", "/admin", restored))
+      .toBe("/member/change-password?redirect=%2Fmember");
   });
 
   it("completes the mock password-change flow without persisting the replacement password", () => {
