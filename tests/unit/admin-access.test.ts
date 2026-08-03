@@ -253,6 +253,34 @@ describe("mock administration access", () => {
     expect(restored.auditRecords[0]?.action).toBe("分配中心负责人资格");
   });
 
+  it("migrates v1 access state without losing existing administrator qualifications", () => {
+    const owner = { account: "admin-alliance", name: "张同学", level: "owner" as const };
+    const access = useAdminAccessStore();
+    expect(access.assignAdminCenterRole(
+      DEMO_MEMBER_ACCOUNT,
+      "白泽开发中心负责人",
+      owner,
+    )).toBe(true);
+
+    const legacyState = JSON.parse(localStorage.getItem(ADMIN_ACCESS_STORAGE_KEY)!);
+    legacyState.version = 1;
+    legacyState.accounts = legacyState.accounts.map((account: Record<string, unknown>) => {
+      const { mustChangePassword: _removed, ...legacyAccount } = account;
+      return legacyAccount;
+    });
+    localStorage.setItem(ADMIN_ACCESS_STORAGE_KEY, JSON.stringify(legacyState));
+
+    setActivePinia(createPinia());
+    const migrated = useAdminAccessStore();
+    expect(migrated.getAccount(DEMO_MEMBER_ACCOUNT)).toMatchObject({
+      adminLevel: "admin",
+      adminCenterRole: "白泽开发中心负责人",
+      mustChangePassword: false,
+    });
+    expect(migrated.auditRecords[0]?.action).toBe("分配中心负责人资格");
+    expect(migrated.accounts.every((account) => account.mustChangePassword === false)).toBe(true);
+  });
+
   it("falls back to initial fixtures when persisted qualification state has an invalid shape or version", () => {
     localStorage.setItem(ADMIN_ACCESS_STORAGE_KEY, "not-json");
     setActivePinia(createPinia());

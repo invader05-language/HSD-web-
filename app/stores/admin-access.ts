@@ -188,22 +188,33 @@ function isValidPersistedAccounts(value: unknown): value is MockAccount[] {
   return ownerCount >= 1 && ownerCount <= 2;
 }
 
+function migratePersistedAccounts(value: unknown, version: unknown): unknown {
+  if (version !== 1 || !Array.isArray(value)) return value;
+  return value.map((account) => (
+    isRecord(account)
+      ? { ...account, mustChangePassword: false }
+      : account
+  ));
+}
+
 function parsePersistedState(serialized: string | null): AdminAccessState | undefined {
   if (!serialized) return undefined;
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed)
-      || parsed.version !== ADMIN_ACCESS_STORAGE_VERSION
-      || !isValidPersistedAccounts(parsed.accounts)
+      || (parsed.version !== 1 && parsed.version !== ADMIN_ACCESS_STORAGE_VERSION)
       || !isRecord(parsed.qualificationDetails)
       || !Array.isArray(parsed.auditRecords)) {
       return undefined;
     }
 
+    const accounts = migratePersistedAccounts(parsed.accounts, parsed.version);
+    if (!isValidPersistedAccounts(accounts)) return undefined;
+
     const qualificationDetails = parsed.qualificationDetails;
     const auditRecords = parsed.auditRecords;
     const expectedAccounts = new Set(
-      parsed.accounts.map((account) => account.account)
+      accounts.map((account) => account.account)
     );
     const detailKeys = Object.keys(qualificationDetails);
     if (detailKeys.length !== expectedAccounts.size
@@ -221,7 +232,7 @@ function parsePersistedState(serialized: string | null): AdminAccessState | unde
     }
 
     return {
-      accounts: parsed.accounts.map((account) => ({
+      accounts: accounts.map((account) => ({
         account: account.account,
         memberId: account.memberId,
         name: account.name,

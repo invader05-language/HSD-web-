@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { ADMIN_MEMBERS } from "../data/admin-members";
+import { ADMIN_MEMBERS, type AdminMember } from "../data/admin-members";
 import {
   CORE_PEOPLE,
   PUBLIC_MEMBERS,
@@ -22,8 +22,8 @@ export function useMemberRepository() {
   const formalProfiles = computed(() =>
     storedProfiles.value.filter(isFormalMemberProfile)
   );
-  const adminMembers = computed(() =>
-    ADMIN_MEMBERS.map((member) => {
+  const adminMembers = computed(() => {
+    const addCenterLeadership = (member: AdminMember): AdminMember => {
       const qualification = adminAccessStore.accounts.find((account) => (
         account.memberId === member.id
         && account.adminLevel === "admin"
@@ -35,10 +35,34 @@ export function useMemberRepository() {
       };
       if (!qualifiedMember.centerLeadership) delete qualifiedMember.centerLeadership;
 
+      return qualifiedMember;
+    };
+
+    const staticMembers = ADMIN_MEMBERS.map((member) => {
+      const qualifiedMember = addCenterLeadership(member);
+
       const profile = formalProfiles.value.find((item) => item.id === member.id);
       return profile ? projectMemberToAdmin(profile, qualifiedMember) : qualifiedMember;
-    })
-  );
+    });
+    const staticMemberIds = new Set(ADMIN_MEMBERS.map((member) => member.id));
+    const createdMembers = formalProfiles.value
+      .filter((profile) => !staticMemberIds.has(profile.id))
+      .map((profile) => projectMemberToAdmin(profile, addCenterLeadership({
+        id: profile.id,
+        name: profile.name,
+        studentId: profile.studentId,
+        center: profile.center as AdminMember["center"],
+        identity: "正式成员",
+        grade: profile.grade,
+        memberDuty: profile.memberDuty,
+        ...(profile.baizeDirection ? { baizeDirection: profile.baizeDirection } : {}),
+        avatarUrl: profile.avatarUrl ?? null,
+        profileSummary: profile.bio,
+        updatedAt: "刚刚更新",
+      })));
+
+    return [...staticMembers, ...createdMembers];
+  });
   const allPublicPeople = computed<readonly PublicPerson[]>(() => {
     const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
     const projectedStaticPeople = staticPeople.flatMap((person) => {

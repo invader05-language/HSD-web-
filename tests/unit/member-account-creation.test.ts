@@ -11,6 +11,7 @@ import {
   type CreateFormalMemberInput,
 } from "../../app/stores/member-administration";
 import { ADMIN_ACCESS_STORAGE_KEY } from "../../app/data/admin-system";
+import { useMemberRepository } from "../../app/composables/useMemberRepository";
 
 const validInput: CreateFormalMemberInput = {
   name: "郑同学",
@@ -49,7 +50,6 @@ describe("formal member account creation", () => {
     });
     expect(access.getAccount(validInput.studentId)).not.toHaveProperty("password");
     expect(profiles.getProfile("member-20269999")).toMatchObject({
-      publicId: "member-20269999",
       identity: "正式成员",
       center: "白泽开发中心",
       centerSlug: "baize-development",
@@ -57,6 +57,50 @@ describe("formal member account creation", () => {
       baizeDirection: "后端架构",
       bio: "",
     });
+  });
+
+  it("adds the created profile to the admin member repository and restores it after refresh", () => {
+    const repository = useMemberRepository();
+
+    expect(useMemberAdministrationStore().createFormalMember(validInput)).toMatchObject({
+      status: "success",
+    });
+    expect(repository.findAdminMember("member-20269999")).toMatchObject({
+      id: "member-20269999",
+      name: "郑同学",
+      studentId: "20269999",
+      identity: "正式成员",
+      center: "白泽开发中心",
+      memberDuty: "普通成员",
+      baizeDirection: "后端架构",
+    });
+
+    setActivePinia(createPinia());
+    expect(useMemberRepository().findAdminMember("member-20269999")).toMatchObject({
+      name: "郑同学",
+      studentId: "20269999",
+      identity: "正式成员",
+    });
+  });
+
+  it("uses a stable public route id that does not expose the student id", () => {
+    expect(useMemberAdministrationStore().createFormalMember(validInput)).toMatchObject({
+      status: "success",
+    });
+
+    const profile = useMemberProfileStore().getProfile("member-20269999");
+    expect(profile.publicId).toBeTruthy();
+    expect(profile.publicId).not.toContain(validInput.studentId);
+    expect(useMemberRepository().findPublicPerson(profile.publicId!)).toMatchObject({
+      id: profile.publicId,
+      name: "郑同学",
+    });
+    expect(useMemberRepository().findPublicPerson(profile.publicId!)).not.toHaveProperty("studentId");
+
+    const publicId = profile.publicId;
+    setActivePinia(createPinia());
+    expect(useMemberProfileStore().getProfile("member-20269999").publicId).toBe(publicId);
+    expect(useMemberRepository().findPublicPerson(publicId!)).toMatchObject({ id: publicId });
   });
 
   it("rejects duplicate student ids across all accounts without changing either store", () => {
@@ -133,12 +177,21 @@ describe("formal member account creation", () => {
     });
   });
 
-  it("rolls both memory stores back when either versioned persistence write fails", () => {
+  it("restores both non-empty storage values when the access-state write fails", () => {
     const access = useAdminAccessStore();
     const profiles = useMemberProfileStore();
+    const previousAccessState = '{"existing":"access"}';
+    const previousProfileState = '{"existing":"profile"}';
+    localStorage.setItem(ADMIN_ACCESS_STORAGE_KEY, previousAccessState);
+    localStorage.setItem(MEMBER_PROFILE_STORAGE_KEY, previousProfileState);
+
     const originalSetItem = localStorage.setItem.bind(localStorage);
+    let rejectedAccessWrite = false;
     const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
-      if (key === MEMBER_PROFILE_STORAGE_KEY) throw new Error("storage unavailable");
+      if (key === ADMIN_ACCESS_STORAGE_KEY && !rejectedAccessWrite) {
+        rejectedAccessWrite = true;
+        throw new Error("storage unavailable");
+      }
       originalSetItem(key, value);
     });
 
@@ -147,6 +200,37 @@ describe("formal member account creation", () => {
     });
     expect(access.getAccount("20269999")).toBeUndefined();
     expect(() => profiles.getProfile("member-20269999")).toThrow("成员档案不存在");
+    expect(localStorage.getItem(ADMIN_ACCESS_STORAGE_KEY)).toBe(previousAccessState);
+    expect(localStorage.getItem(MEMBER_PROFILE_STORAGE_KEY)).toBe(previousProfileState);
+
+    setItem.mockRestore();
+  });
+
+  it("restores both non-empty storage values when the profile-state write fails", () => {
+    const access = useAdminAccessStore();
+    const profiles = useMemberProfileStore();
+    const previousAccessState = '{"existing":"access"}';
+    const previousProfileState = '{"existing":"profile"}';
+    localStorage.setItem(ADMIN_ACCESS_STORAGE_KEY, previousAccessState);
+    localStorage.setItem(MEMBER_PROFILE_STORAGE_KEY, previousProfileState);
+
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    let rejectedProfileWrite = false;
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === MEMBER_PROFILE_STORAGE_KEY && !rejectedProfileWrite) {
+        rejectedProfileWrite = true;
+        throw new Error("storage unavailable");
+      }
+      originalSetItem(key, value);
+    });
+
+    expect(useMemberAdministrationStore().createFormalMember(validInput)).toEqual({
+      status: "storage_unavailable",
+    });
+    expect(access.getAccount("20269999")).toBeUndefined();
+    expect(() => profiles.getProfile("member-20269999")).toThrow("成员档案不存在");
+    expect(localStorage.getItem(ADMIN_ACCESS_STORAGE_KEY)).toBe(previousAccessState);
+    expect(localStorage.getItem(MEMBER_PROFILE_STORAGE_KEY)).toBe(previousProfileState);
 
     setItem.mockRestore();
   });

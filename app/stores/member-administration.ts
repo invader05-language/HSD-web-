@@ -30,6 +30,21 @@ function restoreStoredValue(storage: Storage, key: string, value: string | null)
   else storage.setItem(key, value);
 }
 
+function createPublicMemberId(profiles: Record<string, MemberProfile>): string {
+  const existingPublicIds = new Set(
+    Object.values(profiles)
+      .map((profile) => profile.publicId)
+      .filter((publicId): publicId is string => Boolean(publicId))
+  );
+  let sequence = 1;
+  let candidate = "";
+  do {
+    candidate = `formal-member-${String(sequence).padStart(4, "0")}`;
+    sequence += 1;
+  } while (existingPublicIds.has(candidate));
+  return candidate;
+}
+
 export const useMemberAdministrationStore = defineStore("member-administration", () => {
   function createFormalMember(input: CreateFormalMemberInput): CreateFormalMemberResult {
     const errors = validateCreateFormalMemberInput(input);
@@ -72,6 +87,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     );
 
     const memberId = `member-${normalized.studentId}`;
+    const publicId = createPublicMemberId(profiles.profiles);
     const account: MockAccount = {
       account: normalized.studentId,
       memberId,
@@ -82,7 +98,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     };
     const profile: MemberProfile = {
       id: memberId,
-      publicId: memberId,
+      publicId,
       name: normalized.name,
       studentId: normalized.studentId,
       grade: normalized.grade,
