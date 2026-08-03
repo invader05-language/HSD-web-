@@ -40,6 +40,14 @@ describe("first-login password change", () => {
       .toBe("/member/change-password?redirect=%2Fmember%2Fprofile%3Ftab%3Dbasic");
   });
 
+  it("rejects member continuations containing backslashes", () => {
+    expect(normalizePasswordChangeContinuation("/member/\\\\evil.example")).toBe("/member");
+  });
+
+  it("rejects member continuations with a protocol-relative path", () => {
+    expect(normalizePasswordChangeContinuation("/member//evil.example")).toBe("/member");
+  });
+
   it("allows only the change-password route while the session is restricted", () => {
     expect(resolveProtectedRouteTarget(
       "/member/profile",

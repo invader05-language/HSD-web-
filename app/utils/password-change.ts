@@ -28,7 +28,11 @@ export function normalizePasswordChangeContinuation(value: unknown): string {
   if (typeof value !== "string" || !/^\/member(?:[/?#]|$)/i.test(value)) {
     return MEMBER_HOME;
   }
-  const normalizedPath = value.split(/[?#]/, 1)[0]?.replace(/\/+$/, "").toLowerCase();
+  const path = value.split(/[?#]/, 1)[0] ?? "";
+  if (value.includes("\\") || path.includes("//")) {
+    return MEMBER_HOME;
+  }
+  const normalizedPath = path.replace(/\/+$/, "").toLowerCase();
   return normalizedPath === PASSWORD_CHANGE_PATH ? MEMBER_HOME : value;
 }
 
