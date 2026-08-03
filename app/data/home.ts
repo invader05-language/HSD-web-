@@ -69,14 +69,14 @@ export const PROJECTS = [
   {
     slug: "xiaobaiyun",
     title: "小白云",
-    category: "校园数字化服务",
+    category: "校园服务",
     description: "聚合课表、通知、二手与路线信息，帮助新生更快适应校园生活。",
     achievement: "服务 1000+ 校园用户"
   },
   {
     slug: "zhineng-banlv",
     title: "智能伴侣",
-    category: "嵌入式 × 交互",
+    category: "HarmonyOS",
     description: "探索软硬件联动的陪伴型应用，用可感知交互连接校园生活场景。",
     achievement: "原型迭代中"
   }
