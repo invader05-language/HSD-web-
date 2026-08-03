@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 import { CENTERS as homeCenters } from "../../app/data/home";
 import { CENTER_OPTIONS, CENTERS, getCenterBySlug } from "../../app/data/centers";
 import {
@@ -9,8 +10,15 @@ import {
   PUBLIC_MEMBERS,
   resolvePublicAvatar,
 } from "../../app/data/people";
+import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
+import { useMemberRepository } from "../../app/composables/useMemberRepository";
+import { useMemberProfileStore } from "../../app/stores/member-profile";
 
 describe("public people and center directory", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   it("publishes the four approved centers in collaboration order", () => {
     expect(CENTERS.map((center) => center.slug)).toEqual([
       "baize-development",
@@ -67,6 +75,20 @@ describe("public people and center directory", () => {
     expect(people.filter((person) => person.centerSlug !== "baize-development")
       .every((person) => person.baizeDirection === undefined)).toBe(true);
     expect(people.every((person) => !Object.hasOwn(person, "direction"))).toBe(true);
+  });
+
+  it("removes a stored member from the public directory as soon as they become preparatory", () => {
+    const profileStore = useMemberProfileStore();
+    const repository = useMemberRepository();
+    const publicId = DEMO_MEMBER_PROFILE.publicId!;
+
+    expect(repository.findPublicPerson(publicId)).toBeDefined();
+    profileStore.profiles[DEMO_MEMBER_PROFILE.id] = {
+      ...profileStore.getProfile(DEMO_MEMBER_PROFILE.id),
+      identity: "预备成员",
+    };
+
+    expect(repository.findPublicPerson(publicId)).toBeUndefined();
   });
 
   it("returns the approved public people for each center", () => {

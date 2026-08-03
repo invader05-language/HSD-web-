@@ -1,13 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ADMIN_CANDIDATES,
+  type AdminCandidate,
   filterAndSortRecruitmentApplications,
   findRecruitmentApplication,
   formatRecruitmentApplicationSubmittedAt,
   requireRecruitmentApplication
 } from "../../app/data/recruitment-admin";
+import {
+  BAIZE_DIRECTIONS,
+  isBaizeDirection,
+  type BaizeDirection,
+} from "../../app/data/recruitment-application";
 
 describe("recruitment application directory", () => {
+  it("uses the shared five-value Baize direction contract", () => {
+    expectTypeOf<AdminCandidate["baizeDirection"]>()
+      .toEqualTypeOf<BaizeDirection | undefined>();
+    expect(ADMIN_CANDIDATES.every((candidate) => (
+      candidate.baizeDirection === undefined
+      || BAIZE_DIRECTIONS.includes(candidate.baizeDirection)
+    ))).toBe(true);
+    expect(isBaizeDirection("鸿蒙开发")).toBe(true);
+    expect(isBaizeDirection("任意方向")).toBe(false);
+  });
+
   it("filters applications by applicant and first-choice center", () => {
     expect(filterAndSortRecruitmentApplications(ADMIN_CANDIDATES, {
       query: "林",

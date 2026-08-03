@@ -57,7 +57,7 @@ export const DEMO_APPLICANT_PROFILE: MemberProfile = {
 export function isFormalMemberProfile(
   profile: MemberProfile,
 ): profile is MemberProfile & Required<Pick<MemberProfile, "publicId" | "centerSlug">> {
-  return profile.identity !== "预备成员"
+  return profile.identity === "正式成员"
     && Boolean(profile.publicId)
     && Boolean(profile.centerSlug);
 }
@@ -71,6 +71,7 @@ export function cloneMemberProfile(profile: MemberProfile): MemberProfile {
 export function projectMemberToPublic(
   profile: MemberProfile,
   base?: PublicPerson,
+  centerLeadership?: AdminMember["centerLeadership"],
 ): PublicPerson {
   const centerSlug = profile.centerSlug ?? base?.centerSlug;
   if (!centerSlug) throw new Error(`正式成员缺少中心标识：${profile.id}`);
@@ -82,7 +83,7 @@ export function projectMemberToPublic(
     centerSlug,
     centerName: profile.center,
     bio: profile.bio,
-    isCore: profile.memberDuty === "核心人员" || Boolean(base?.isCore),
+    isCore: profile.memberDuty === "核心人员" || Boolean(centerLeadership),
     order: base?.order ?? Number.MAX_SAFE_INTEGER,
     honors: base?.honors ?? [],
     baizeDirection: base?.baizeDirection,

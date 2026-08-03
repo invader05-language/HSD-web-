@@ -11,6 +11,7 @@ import { ADMIN_MEMBERS } from "../../app/data/admin-members";
 import { CORE_PEOPLE } from "../../app/data/people";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useSessionStore } from "../../app/stores/session";
+import { useAdminAccessStore } from "../../app/stores/admin-access";
 import { useMemberRepository } from "../../app/composables/useMemberRepository";
 import {
   isSupportedAvatar,
@@ -103,6 +104,31 @@ describe("member profile domain", () => {
     expect(publicPerson).not.toHaveProperty("studentId");
     expect(publicPerson).not.toHaveProperty("className");
     expect(publicPerson).not.toHaveProperty("baizeDirection");
+  });
+
+  it("derives core membership from member duty or the current center-lead qualification", () => {
+    const profileStore = useMemberProfileStore();
+    const accessStore = useAdminAccessStore();
+    const repository = useMemberRepository();
+    const memberId = DEMO_MEMBER_PROFILE.id;
+    const publicId = DEMO_MEMBER_PROFILE.publicId!;
+    const owner = { account: "admin-alliance", name: "张同学", level: "owner" } as const;
+
+    profileStore.profiles[memberId] = {
+      ...profileStore.getProfile(memberId),
+      memberDuty: "普通成员",
+    };
+    expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
+
+    expect(accessStore.assignAdminCenterRole(
+      "demo-member",
+      "白泽开发中心负责人",
+      owner,
+    )).toBe(true);
+    expect(repository.findPublicPerson(publicId)?.isCore).toBe(true);
+
+    expect(accessStore.revokeAdmin("demo-member", owner)).toBe(true);
+    expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
   });
 
   it("keeps an unsaved draft separate from the saved profile", () => {

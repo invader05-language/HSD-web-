@@ -19,6 +19,11 @@ export type RecruitmentCenter = (typeof RECRUITMENT_CENTERS)[number];
 export type BaizeDirection = (typeof BAIZE_DIRECTIONS)[number];
 export type LaterChoice = Exclude<RecruitmentCenter, "白泽开发中心">;
 
+export function isBaizeDirection(value: unknown): value is BaizeDirection {
+  return typeof value === "string"
+    && (BAIZE_DIRECTIONS as readonly string[]).includes(value);
+}
+
 export type RegistrationProfileDraft = Pick<
   MemberProfile,
   "name" | "studentId" | "grade" | "className" | "bio" | "avatarUrl"

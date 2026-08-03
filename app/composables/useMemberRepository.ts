@@ -12,23 +12,49 @@ import {
 } from "../data/member-profile";
 import { useCurrentMember } from "./useCurrentMember";
 import { useMemberProfileStore } from "../stores/member-profile";
+import { useAdminAccessStore } from "../stores/admin-access";
 
 export function useMemberRepository() {
   const { profile: currentProfile } = useCurrentMember();
   const profileStore = useMemberProfileStore();
+  const adminAccessStore = useAdminAccessStore();
+  const storedProfiles = computed(() => Object.values(profileStore.profiles));
   const formalProfiles = computed(() =>
-    Object.values(profileStore.profiles).filter(isFormalMemberProfile)
+    storedProfiles.value.filter(isFormalMemberProfile)
+  );
+  const adminMembers = computed(() =>
+    ADMIN_MEMBERS.map((member) => {
+      const qualification = adminAccessStore.accounts.find((account) => (
+        account.memberId === member.id
+        && account.adminLevel === "admin"
+        && account.adminCenterRole
+      ));
+      const qualifiedMember = {
+        ...member,
+        centerLeadership: qualification?.adminCenterRole,
+      };
+      if (!qualifiedMember.centerLeadership) delete qualifiedMember.centerLeadership;
+
+      const profile = formalProfiles.value.find((item) => item.id === member.id);
+      return profile ? projectMemberToAdmin(profile, qualifiedMember) : qualifiedMember;
+    })
   );
   const allPublicPeople = computed<readonly PublicPerson[]>(() => {
     const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
-    const projectedStaticPeople = staticPeople.map((person) => {
-      const profile = formalProfiles.value.find((item) => item.publicId === person.id);
-      return profile ? projectMemberToPublic(profile, person) : person;
+    const projectedStaticPeople = staticPeople.flatMap((person) => {
+      const storedProfile = storedProfiles.value.find((item) => item.publicId === person.id);
+      if (!storedProfile) return [person];
+      if (!isFormalMemberProfile(storedProfile)) return [];
+      const adminMember = adminMembers.value.find((item) => item.id === storedProfile.id);
+      return [projectMemberToPublic(storedProfile, person, adminMember?.centerLeadership)];
     });
     const staticIds = new Set(staticPeople.map((person) => person.id));
     const newFormalPeople = formalProfiles.value
       .filter((profile) => !staticIds.has(profile.publicId))
-      .map((profile) => projectMemberToPublic(profile));
+      .map((profile) => {
+        const adminMember = adminMembers.value.find((item) => item.id === profile.id);
+        return projectMemberToPublic(profile, undefined, adminMember?.centerLeadership);
+      });
 
     return [...projectedStaticPeople, ...newFormalPeople];
   });
@@ -37,12 +63,6 @@ export function useMemberRepository() {
   );
   const publicMembers = computed(() =>
     allPublicPeople.value.filter((person) => !person.isCore)
-  );
-  const adminMembers = computed(() =>
-    ADMIN_MEMBERS.map((member) => {
-      const profile = formalProfiles.value.find((item) => item.id === member.id);
-      return profile ? projectMemberToAdmin(profile, member) : member;
-    })
   );
 
   function findPublicPerson(id: string) {

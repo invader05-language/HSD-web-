@@ -36,6 +36,13 @@ describe("administration member directory", () => {
     expect(ADMIN_MEMBERS.every((member) => !Object.hasOwn(member, "direction"))).toBe(true);
   });
 
+  it("keeps center leadership independent from the member-duty field", () => {
+    const centerLeads = ADMIN_MEMBERS.filter((member) => member.centerLeadership);
+
+    expect(centerLeads.length).toBeGreaterThan(0);
+    expect(centerLeads.every((member) => member.memberDuty === "普通成员")).toBe(true);
+  });
+
   it("never exposes a preparatory member through the formal public preview", () => {
     const applicant = ADMIN_MEMBERS.find((member) => member.name === "王同学");
     expect(applicant).toBeTruthy();

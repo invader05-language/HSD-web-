@@ -1,3 +1,5 @@
+import type { BaizeDirection } from "./recruitment-application";
+
 export type RecruitmentCenter =
   | "白泽开发中心"
   | "新媒体中心"
@@ -31,7 +33,7 @@ export interface AdminCandidate {
   bio?: string;
   identity: CandidateIdentity;
   preferences: [RecruitmentCenter, RecruitmentCenter?, RecruitmentCenter?];
-  baizeDirection?: string;
+  baizeDirection?: BaizeDirection;
   acceptsAdjustment: boolean;
   stage: RecruitmentStage;
   result: RecruitmentResult;
