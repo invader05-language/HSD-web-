@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ADMIN_ACCESS_STORAGE_KEY, type MockAccount } from "../data/admin-system";
 import { ADMIN_MEMBERS } from "../data/admin-members";
+import { findStaticPublicPersonForMember } from "../data/people";
 import type { MemberProfile } from "../data/member-profile";
 import {
   MEMBER_PROFILE_STORAGE_KEY,
@@ -146,6 +147,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     const access = useAdminAccessStore();
     const storedProfile = profiles.profiles[memberId];
     const staticMember = ADMIN_MEMBERS.find((member) => member.id === memberId);
+    const staticPublicPerson = findStaticPublicPersonForMember(memberId);
     const identity = storedProfile?.identity ?? staticMember?.identity;
 
     if (identity !== "正式成员" || (!storedProfile && !staticMember)) {
@@ -158,9 +160,14 @@ export const useMemberAdministrationStore = defineStore("member-administration",
       && account.adminAccessEnabled
       && Boolean(account.adminCenterRole)
     ));
-    if (storedProfile?.memberDuty === "核心人员"
+    const publicIdentityNeedsRepair = Boolean(
+      storedProfile
+      && staticPublicPerson
+      && storedProfile.publicId !== staticPublicPerson.id
+    );
+    if (!publicIdentityNeedsRepair && (storedProfile?.memberDuty === "核心人员"
       || staticMember?.memberDuty === "核心人员"
-      || enabledCenterLead) {
+      || enabledCenterLead)) {
       return { status: "already_core" };
     }
 
@@ -184,24 +191,41 @@ export const useMemberAdministrationStore = defineStore("member-administration",
       if (storedProfile) {
         profiles.profiles[memberId] = {
           ...storedProfile,
+          ...(staticPublicPerson ? {
+            publicId: staticPublicPerson.id,
+            name: staticPublicPerson.name,
+            center: staticPublicPerson.centerName,
+            centerSlug: staticPublicPerson.centerSlug,
+            bio: staticPublicPerson.bio,
+            baizeDirection: staticPublicPerson.baizeDirection,
+            avatarUrl: staticPublicPerson.avatarVisible
+              ? staticPublicPerson.avatarUrl
+              : undefined,
+          } : {}),
           memberDuty: "核心人员",
         };
       } else if (staticMember) {
-        const publicId = createPublicMemberId(profiles.profiles);
+        const publicId = staticPublicPerson?.id ?? createPublicMemberId(profiles.profiles);
         const profile: MemberProfile = {
           id: staticMember.id,
           publicId,
-          name: staticMember.name,
+          name: staticPublicPerson?.name ?? staticMember.name,
           studentId: staticMember.studentId,
           grade: staticMember.grade,
           className: "暂未录入",
-          center: staticMember.center,
-          centerSlug: getCenterSlug(staticMember.center),
+          center: staticPublicPerson?.centerName ?? staticMember.center,
+          centerSlug: staticPublicPerson?.centerSlug ?? getCenterSlug(staticMember.center),
           memberDuty: "核心人员",
           identity: "正式成员",
-          ...(staticMember.baizeDirection ? { baizeDirection: staticMember.baizeDirection } : {}),
-          bio: staticMember.profileSummary,
-          ...(staticMember.avatarUrl ? { avatarUrl: staticMember.avatarUrl } : {}),
+          ...((staticPublicPerson?.baizeDirection ?? staticMember.baizeDirection)
+            ? { baizeDirection: staticPublicPerson?.baizeDirection ?? staticMember.baizeDirection }
+            : {}),
+          bio: staticPublicPerson?.bio ?? staticMember.profileSummary,
+          ...((staticPublicPerson?.avatarVisible ? staticPublicPerson.avatarUrl : staticMember.avatarUrl)
+            ? { avatarUrl: staticPublicPerson?.avatarVisible
+              ? staticPublicPerson.avatarUrl
+              : staticMember.avatarUrl! }
+            : {}),
         };
         if (!profiles.addFormalProfile(profile)) throw new Error("core member conflict");
       }

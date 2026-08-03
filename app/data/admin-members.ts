@@ -134,13 +134,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
   }
 ];
 
-export const CORE_MEMBER_PLACEMENTS = [
-  { id: "core-01", memberId: "member-zhang", name: "张同学", role: "拓维策划中心负责人", term: "2026.07 — 2027.06", public: true },
-  { id: "core-02", memberId: "member-zhao", name: "赵同学", role: "人才发展中心负责人", term: "2026.07 — 2027.06", public: true },
-  { id: "core-03", memberId: "member-lin", name: "林同学", role: "白泽项目联络人", term: "2026.09 — 2027.06", public: true },
-  { id: "core-04", memberId: "member-li", name: "李同学", role: "新媒体内容联络人", term: "2026.09 — 2027.06", public: false }
-];
-
 export const HONOR_REVIEW_RECORDS = [
   { id: "honor-01", member: "林同学", title: "HarmonyOS 创新赛校级一等奖", type: "比赛奖项", consent: true, proof: "已上传", status: "待审核", submittedAt: "07-30 14:20" },
   { id: "honor-02", member: "李同学", title: "招新主视觉设计入选", type: "优秀作品", consent: true, proof: "已上传", status: "待审核", submittedAt: "07-30 11:08" },

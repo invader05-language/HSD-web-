@@ -2,6 +2,8 @@ import { computed } from "vue";
 import { ADMIN_MEMBERS, type AdminMember } from "../data/admin-members";
 import {
   CORE_PEOPLE,
+  getStaticMemberIdForPublicPerson,
+  getStaticPublicIdForMember,
   PUBLIC_MEMBERS,
   type PublicPerson,
 } from "../data/people";
@@ -13,6 +15,7 @@ import {
 import { useCurrentMember } from "./useCurrentMember";
 import { useMemberProfileStore } from "../stores/member-profile";
 import { useAdminAccessStore } from "../stores/admin-access";
+import { getCenterSlug } from "../utils/member-account-form";
 
 export function useMemberRepository() {
   const { profile: currentProfile } = useCurrentMember();
@@ -67,35 +70,73 @@ export function useMemberRepository() {
   const allPublicPeople = computed<readonly PublicPerson[]>(() => {
     const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
     const projectedStaticPeople = staticPeople.flatMap((person) => {
-      const storedProfile = storedProfiles.value.find((item) => item.publicId === person.id);
+      const linkedMemberId = getStaticMemberIdForPublicPerson(person.id);
+      const storedProfile = linkedMemberId
+        ? storedProfiles.value.find((item) => item.id === linkedMemberId)
+        : storedProfiles.value.find((item) => item.publicId === person.id);
       if (!storedProfile) {
-        const matchingAdminMembers = adminMembers.value.filter((member) => (
-          member.identity === "正式成员"
-          && member.name === person.name
-          && member.center === person.centerName
-        ));
-        const centerLeadership = matchingAdminMembers.length === 1
-          ? matchingAdminMembers[0]?.centerLeadership
+        const linkedAdminMember = linkedMemberId
+          ? adminMembers.value.find((member) => member.id === linkedMemberId)
           : undefined;
 
         return [{
           ...person,
-          isCore: person.memberDuty === "核心人员" || Boolean(centerLeadership),
+          isCore: person.memberDuty === "核心人员" || Boolean(linkedAdminMember?.centerLeadership),
         }];
       }
       if (!isFormalMemberProfile(storedProfile)) return [];
       const adminMember = adminMembers.value.find((item) => item.id === storedProfile.id);
-      return [projectMemberToPublic(storedProfile, person, adminMember?.centerLeadership)];
+      return [projectMemberToPublic(
+        { ...storedProfile, publicId: person.id },
+        person,
+        adminMember?.centerLeadership,
+      )];
     });
     const staticIds = new Set(staticPeople.map((person) => person.id));
     const newFormalPeople = formalProfiles.value
-      .filter((profile) => !staticIds.has(profile.publicId))
+      .filter((profile) => (
+        !staticIds.has(profile.publicId)
+        && !getStaticPublicIdForMember(profile.id)
+      ))
       .map((profile) => {
         const adminMember = adminMembers.value.find((item) => item.id === profile.id);
         return projectMemberToPublic(profile, undefined, adminMember?.centerLeadership);
       });
 
-    return [...projectedStaticPeople, ...newFormalPeople];
+    const representedMemberIds = new Set([
+      ...formalProfiles.value.map((profile) => profile.id),
+      ...staticPeople
+        .map((person) => getStaticMemberIdForPublicPerson(person.id))
+        .filter((memberId): memberId is string => Boolean(memberId)),
+    ]);
+    const projectedCenterLeads = adminMembers.value
+      .filter((member) => (
+        member.identity === "正式成员"
+        && Boolean(member.centerLeadership)
+        && !representedMemberIds.has(member.id)
+      ))
+      .map((member): PublicPerson => {
+        const base = {
+          id: `platform-${member.id}`,
+          name: member.name,
+          memberDuty: member.memberDuty,
+          centerSlug: getCenterSlug(member.center),
+          centerName: member.center,
+          bio: member.profileSummary,
+          isCore: true,
+          order: Number.MAX_SAFE_INTEGER,
+          honors: [],
+          ...(member.center === "白泽开发中心" && member.baizeDirection
+            ? { baizeDirection: member.baizeDirection }
+            : {}),
+        };
+
+        return member.avatarUrl
+          ? { ...base, avatarVisible: true, avatarUrl: member.avatarUrl }
+          : { ...base, avatarVisible: false };
+      });
+
+    return [...projectedStaticPeople, ...newFormalPeople, ...projectedCenterLeads];
   });
   const publicCorePeople = computed(() =>
     allPublicPeople.value.filter((person) => person.isCore)

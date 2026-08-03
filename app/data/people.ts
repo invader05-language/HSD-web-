@@ -331,6 +331,27 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
 
 const ALL_PUBLIC_PEOPLE: readonly PublicPerson[] = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
 
+// Static public fixtures predate the member profile store. Keep their public route
+// identity explicitly linked to the platform member instead of guessing by name.
+const STATIC_PUBLIC_ID_BY_MEMBER_ID: Readonly<Record<string, PublicPerson["id"]>> = {
+  "member-lin": "lin-development",
+  "member-wu": "wu-talent",
+};
+
+export function getStaticPublicIdForMember(memberId: string): string | undefined {
+  return STATIC_PUBLIC_ID_BY_MEMBER_ID[memberId];
+}
+
+export function getStaticMemberIdForPublicPerson(publicId: string): string | undefined {
+  return Object.entries(STATIC_PUBLIC_ID_BY_MEMBER_ID)
+    .find(([, linkedPublicId]) => linkedPublicId === publicId)?.[0];
+}
+
+export function findStaticPublicPersonForMember(memberId: string): PublicPerson | undefined {
+  const publicId = getStaticPublicIdForMember(memberId);
+  return publicId ? ALL_PUBLIC_PEOPLE.find((person) => person.id === publicId) : undefined;
+}
+
 export function getPeopleByCenter(slug: string): readonly PublicPerson[] {
   return ALL_PUBLIC_PEOPLE.filter((person) => person.centerSlug === slug);
 }

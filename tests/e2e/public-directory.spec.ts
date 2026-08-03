@@ -27,8 +27,9 @@ test("core people directory publishes the approved people without login", async 
   await expect(page).toHaveURL(/\/people\/core$/);
   await expect(page.getByRole("heading", { level: 1, name: "核心人员名录" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "林同学" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "李同学" })).toBeVisible();
   await expect(page.getByRole("img", { name: "林同学的默认 HSD 头像" })).toBeVisible();
-  await expect(page.getByText("共 6 位核心人员")).toBeVisible();
+  await expect(page.getByText("共 7 位核心人员")).toBeVisible();
   await expect(page.getByText("主动公开", { exact: false })).toHaveCount(0);
 });
 
@@ -44,7 +45,8 @@ test("core search, center filter, and empty state stay local to the directory", 
   await page.getByLabel("搜索核心人员").fill("");
   await page.getByLabel("按中心筛选").selectOption("new-media");
   await expect(page.getByRole("heading", { level: 2, name: "陈同学" })).toBeVisible();
-  await expect(page.getByText("共 1 位核心人员")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "李同学" })).toBeVisible();
+  await expect(page.getByText("共 2 位核心人员")).toBeVisible();
   await expect(page).toHaveURL(/\/people\/core$/);
 
   await page.getByLabel("搜索核心人员").fill("不存在");
@@ -56,8 +58,8 @@ test("core search, center filter, and empty state stay local to the directory", 
   await clearButton.click();
   await expect(page.getByLabel("搜索核心人员")).toHaveValue("");
   await expect(page.getByLabel("按中心筛选")).toHaveValue("all");
-  await expect(page.getByText("共 6 位核心人员")).toBeVisible();
-  await expect(page.locator(".people-core-grid > a")).toHaveCount(6);
+  await expect(page.getByText("共 7 位核心人员")).toBeVisible();
+  await expect(page.locator(".people-core-grid > a")).toHaveCount(7);
   await expect(page).toHaveURL(/\/people\/core$/);
 });
 
@@ -114,7 +116,7 @@ test("1440px directories retain their approved three- and two-column grids", asy
 
   await page.goto("/people/core");
   const coreBoxes = await cardBoxes(page, ".people-core-grid > a");
-  expect(coreBoxes).toHaveLength(6);
+  expect(coreBoxes).toHaveLength(7);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[1]?.y ?? 0, 0);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[2]?.y ?? 0, 0);
   expect(coreBoxes[3]?.y).toBeGreaterThan((coreBoxes[0]?.y ?? 0) + 100);

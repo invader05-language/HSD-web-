@@ -8,6 +8,7 @@ import {
   projectMemberToPublic,
 } from "../../app/data/member-profile";
 import { ADMIN_MEMBERS } from "../../app/data/admin-members";
+import * as adminMemberData from "../../app/data/admin-members";
 import { CORE_PEOPLE } from "../../app/data/people";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useSessionStore } from "../../app/stores/session";
@@ -135,6 +136,24 @@ describe("member profile domain", () => {
     const repository = useMemberRepository();
 
     expect(repository.findAdminMember("member-zhao")?.centerLeadership).toBeUndefined();
+  });
+
+  it("projects an enabled formal center lead without a stored profile into the public core directory", () => {
+    const repository = useMemberRepository();
+    const centerLead = repository.publicCorePeople.value.find((person) => person.name === "李同学");
+
+    expect(centerLead).toMatchObject({
+      id: "platform-member-li",
+      name: "李同学",
+      centerName: "新媒体中心",
+      memberDuty: "普通成员",
+      isCore: true,
+    });
+    expect(centerLead).not.toHaveProperty("studentId");
+  });
+
+  it("removes the legacy core placement contract with role, term, and public switches", () => {
+    expect(adminMemberData).not.toHaveProperty("CORE_MEMBER_PLACEMENTS");
   });
 
   it("keeps an unsaved draft separate from the saved profile", () => {

@@ -11,6 +11,7 @@ import {
   type CreateFormalMemberInput,
 } from "../../app/stores/member-administration";
 import { ADMIN_ACCESS_STORAGE_KEY } from "../../app/data/admin-system";
+import { CORE_PEOPLE } from "../../app/data/people";
 import { useMemberRepository } from "../../app/composables/useMemberRepository";
 
 const validInput: CreateFormalMemberInput = {
@@ -195,6 +196,28 @@ describe("formal member account creation", () => {
     expect(useMemberRepository().findAdminMember("member-gao")?.memberDuty).toBe("核心人员");
     expect(useMemberRepository().publicCorePeople.value.some((person) => person.name === "高同学"))
       .toBe(true);
+  });
+
+  it("reuses the existing public identity and honors when promoting a static member", () => {
+    const administration = useMemberAdministrationStore();
+    const profiles = useMemberProfileStore();
+    const repository = useMemberRepository();
+    const existingPublicPerson = CORE_PEOPLE.find((person) => person.id === "wu-talent")!;
+
+    expect(administration.promoteFormalMemberToCore("member-wu")).toEqual({
+      status: "success",
+    });
+    expect(profiles.getProfile("member-wu").publicId).toBe(existingPublicPerson.id);
+
+    const projectedPeople = repository.publicCorePeople.value.filter(
+      (person) => person.id === existingPublicPerson.id || person.name === existingPublicPerson.name,
+    );
+    expect(projectedPeople).toHaveLength(1);
+    expect(projectedPeople[0]).toMatchObject({
+      id: existingPublicPerson.id,
+      bio: existingPublicPerson.bio,
+      honors: existingPublicPerson.honors,
+    });
   });
 
   it("does not manually promote preparatory, missing, or already-core members", () => {
