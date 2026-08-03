@@ -109,15 +109,11 @@ export const useSessionStore = defineStore("session", {
       this.currentAccountId = result.account.account;
       this.currentMemberId = result.account.memberId;
       const storage = getSessionStorage();
-      if (options.requireAdmin) {
-        storage?.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-          version: SESSION_STORAGE_VERSION,
-          accountId: result.account.account,
-          issuedAt: Date.now()
-        } satisfies PersistedSession));
-      } else {
-        storage?.removeItem(SESSION_STORAGE_KEY);
-      }
+      storage?.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+        version: SESSION_STORAGE_VERSION,
+        accountId: result.account.account,
+        issuedAt: Date.now()
+      } satisfies PersistedSession));
       return result;
     },
     restore(): boolean {
@@ -125,9 +121,15 @@ export const useSessionStore = defineStore("session", {
       if (!storage) return false;
 
       const persisted = readPersistedSession(storage);
-      const result = persisted && useAdminAccessStore().resolveLogin(persisted.accountId, {
-        requireAdmin: true
-      });
+      const access = useAdminAccessStore();
+      const account = persisted && access.getAccount(persisted.accountId);
+      const routeRequiresAdmin = typeof window !== "undefined"
+        && window.location.pathname.startsWith("/admin");
+      const result = persisted && account
+        ? access.resolveLogin(persisted.accountId, {
+            requireAdmin: routeRequiresAdmin || account.adminLevel !== "member"
+          })
+        : undefined;
       if (!persisted || !result || result.status !== "success") {
         this.signOut();
         return false;

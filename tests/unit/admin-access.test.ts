@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import {
   ADMIN_CENTER_LEAD_LABELS,
@@ -115,32 +115,53 @@ describe("mock administration access", () => {
   it("lets the access boundary grant and revoke admin eligibility without changing owner access", () => {
     const access = useAdminAccessStore();
     const session = useSessionStore();
+    const owner = { account: "admin-alliance", name: "张同学", level: "owner" as const };
 
-    expect(access.grantAdmin(DEMO_MEMBER_ACCOUNT)).toBe(true);
+    expect(access.grantAdmin(DEMO_MEMBER_ACCOUNT, owner)).toBe(true);
     session.signIn(DEMO_MEMBER_ACCOUNT);
     expect(session.adminLevel).toBe("admin");
     expect(session.canAccessAdmin).toBe(true);
 
-    expect(access.revokeAdmin(DEMO_MEMBER_ACCOUNT)).toBe(true);
+    expect(access.revokeAdmin(DEMO_MEMBER_ACCOUNT, owner)).toBe(true);
     expect(session.adminLevel).toBe("member");
     expect(session.canAccessAdmin).toBe(false);
 
-    expect(access.revokeAdmin("admin-alliance")).toBe(false);
-    expect(access.setAdminAccessEnabled("admin-alliance", false)).toBe(false);
+    expect(access.revokeAdmin("admin-alliance", owner)).toBe(false);
+    expect(access.setAdminAccessEnabled("admin-alliance", false, owner)).toBe(false);
     expect(access.getAccount("admin-alliance")).toMatchObject({
       adminLevel: "owner",
       adminAccessEnabled: true
     });
   });
 
-  it("enables access when promoting a disabled administrator to owner", () => {
+  it("does not expose an unaudited owner promotion through the legacy level setter", () => {
     const access = useAdminAccessStore();
 
-    expect(access.setAdminLevel("disabled-admin", "owner")).toBe(true);
+    expect(access.setAdminLevel("disabled-admin", "owner", {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    })).toBe(false);
     expect(access.getAccount("disabled-admin")).toMatchObject({
-      adminLevel: "owner",
-      adminAccessEnabled: true
+      adminLevel: "admin",
+      adminAccessEnabled: false
     });
+  });
+
+  it("derives owner authorization from the actor account instead of caller-supplied claims", () => {
+    const access = useAdminAccessStore();
+
+    expect(access.assignAdminCenterRole(DEMO_MEMBER_ACCOUNT, "白泽开发中心负责人", {
+      account: DEMO_MEMBER_ACCOUNT,
+      name: "伪造负责人",
+      level: "owner"
+    })).toBe(false);
+    expect(access.assignAdminCenterRole(DEMO_MEMBER_ACCOUNT, "白泽开发中心负责人", {
+      account: "admin-alliance",
+      name: "伪造姓名",
+      level: "member"
+    })).toBe(true);
+    expect(access.auditRecords[0]?.actor).toBe("张同学");
   });
 
   it("limits platform owners to two, keeps one owner, and rejects self-demotion", () => {
@@ -171,6 +192,7 @@ describe("mock administration access", () => {
     const initialCount = access.auditRecords.length;
     expect(
       access.changeAdminQualification(DEMO_MEMBER_ACCOUNT, "grant", {
+        account: "media-admin",
         name: "周同学",
         level: "admin"
       })
@@ -224,5 +246,19 @@ describe("mock administration access", () => {
       adminLevel: "owner",
       adminAccessEnabled: true
     });
+  });
+
+  it("falls back to initial fixtures when browser storage reads throw", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+
+    setActivePinia(createPinia());
+    expect(useAdminAccessStore().getAccount("admin-alliance")).toMatchObject({
+      adminLevel: "owner",
+      adminAccessEnabled: true
+    });
+
+    getItem.mockRestore();
   });
 });

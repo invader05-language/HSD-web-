@@ -8166,6 +8166,136 @@ body.is-admin-drawer-open {
   color: #8a9097;
 }
 
+.admin-qualification-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.admin-qualification-header-actions .button {
+  min-height: 34px;
+  padding-inline: 13px;
+  font-size: 10px;
+}
+
+.admin-qualification-header-actions .button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.admin-owner-list {
+  display: grid;
+}
+
+.admin-owner-list article {
+  display: grid;
+  min-height: 76px;
+  grid-template-columns: minmax(170px, 0.8fr) minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid #eceef0;
+  padding: 14px 22px;
+}
+
+.admin-owner-list article:last-child {
+  border-bottom: 0;
+}
+
+.admin-owner-list article > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-owner-list strong {
+  color: #353a40;
+  font-size: 12px;
+}
+
+.admin-owner-list small,
+.admin-owner-current {
+  color: #969ca3;
+  font-size: 9px;
+}
+
+.admin-owner-list .admin-owner-lock {
+  color: #777d84;
+  font-size: 10px;
+}
+
+.admin-qualification-dialog {
+  width: min(100%, 540px);
+}
+
+.admin-dialog-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  color: #747a82;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-dialog-field input,
+.admin-dialog-field select {
+  min-height: 40px;
+  border: 1px solid #d9dde1;
+  border-radius: 4px;
+  padding: 0 11px;
+  background: #fff;
+  color: #34383e;
+  font-size: 11px;
+}
+
+.admin-candidate-list {
+  display: grid;
+  max-height: 220px;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-y: auto;
+  border: 1px solid #e0e3e6;
+  border-radius: 5px;
+  padding: 7px;
+  background: #fafbfb;
+}
+
+.admin-candidate-list button {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 11px;
+  background: #fff;
+  color: #444a51;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.admin-candidate-list button:hover,
+.admin-candidate-list button.is-selected {
+  border-color: #c6424d;
+  background: #fff7f7;
+  color: #9e1b26;
+}
+
+.admin-candidate-list button small {
+  color: #969ca3;
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.admin-empty-row {
+  padding: 18px;
+  color: #969ca3;
+  font-size: 10px;
+  text-align: center;
+}
+
 .admin-qualification-actions {
   min-width: 132px;
 }

@@ -67,13 +67,16 @@ test("owner qualification changes are confirmed and written to the audit log", a
 
   const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
   const confirm = page.getByRole("alertdialog");
-  const memberRow = accounts.getByRole("row").filter({ hasText: "demo-member" });
   const adminRow = accounts.getByRole("row").filter({ hasText: "media-admin" });
 
-  await memberRow.getByRole("button", { name: "授予管理员资格" }).click();
-  await expect(confirm).toContainText("确认授予管理员资格？");
-  await confirm.getByRole("button", { name: "确认变更" }).click();
-  await expect(memberRow).toContainText("平台管理员");
+  await page.getByRole("button", { name: "添加管理员" }).click();
+  const addDialog = page.getByRole("dialog", { name: "添加管理员" });
+  await addDialog.getByLabel("搜索平台用户").fill("demo-member");
+  await addDialog.getByRole("button", { name: /选择 demo-member/ }).click();
+  await addDialog.getByLabel("管理级别").selectOption({ label: "白泽开发中心负责人" });
+  await addDialog.getByRole("button", { name: "确认添加" }).click();
+  const memberRow = accounts.getByRole("row").filter({ hasText: "demo-member" });
+  await expect(memberRow).toContainText("白泽开发中心负责人");
 
   await adminRow.getByRole("button", { name: "停用管理员资格" }).click();
   await confirm.getByRole("button", { name: "确认变更" }).click();
@@ -89,7 +92,7 @@ test("owner qualification changes are confirmed and written to the audit log", a
 
   await page.getByRole("link", { name: "操作日志", exact: true }).click();
   const audit = page.getByRole("table", { name: "管理员操作日志" });
-  await expect(audit).toContainText("授予管理员资格");
+  await expect(audit).toContainText("分配中心负责人资格");
   await expect(audit).toContainText("停用管理员资格");
   await expect(audit).toContainText("启用管理员资格");
   await expect(audit).toContainText("撤销管理员资格");
@@ -99,9 +102,12 @@ test("a newly qualified account can start an admin session but cannot manage acc
   await signInToAdmin(page, "/admin/accounts");
 
   const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
-  const memberRow = accounts.getByRole("row").filter({ hasText: "demo-member" });
-  await memberRow.getByRole("button", { name: "授予管理员资格" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "确认变更" }).click();
+  await page.getByRole("button", { name: "添加管理员" }).click();
+  const addDialog = page.getByRole("dialog", { name: "添加管理员" });
+  await addDialog.getByLabel("搜索平台用户").fill("demo-member");
+  await addDialog.getByRole("button", { name: /选择 demo-member/ }).click();
+  await addDialog.getByLabel("管理级别").selectOption({ label: "白泽开发中心负责人" });
+  await addDialog.getByRole("button", { name: "确认添加" }).click();
 
   await page.getByRole("button", { name: "退出" }).click();
   await page.getByRole("link", { name: "登录", exact: true }).click();
@@ -119,7 +125,7 @@ test("mobile administration retains identity and filtered navigation", async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   await signInToAdmin(page, "/admin/recruitment", "media-admin");
 
-  await expect(page.locator(".admin-topbar__identity")).toContainText("周同学 · 平台管理员");
+  await expect(page.locator(".admin-topbar__identity")).toContainText("李同学 · 新媒体中心负责人");
   await page.getByRole("button", { name: "打开管理导航" }).click();
   const mobileNavigation = page.getByRole("navigation", { name: "移动端管理导航" });
   await expect(mobileNavigation).toContainText("项目管理");

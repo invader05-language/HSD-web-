@@ -26,7 +26,7 @@ export interface AdminQualificationDetails {
 }
 
 export interface AdminQualificationActor {
-  account?: string;
+  account: string;
   name: string;
   level: AdminLevel;
 }
@@ -239,7 +239,13 @@ function getStorage(): Storage | undefined {
 }
 
 function restoreInitialOrPersistedState(): AdminAccessState {
-  const persisted = parsePersistedState(getStorage()?.getItem(ADMIN_ACCESS_STORAGE_KEY) ?? null);
+  let serialized: string | null = null;
+  try {
+    serialized = getStorage()?.getItem(ADMIN_ACCESS_STORAGE_KEY) ?? null;
+  } catch {
+    serialized = null;
+  }
+  const persisted = parsePersistedState(serialized);
   return persisted ?? createInitialState();
 }
 
@@ -262,7 +268,7 @@ function createPersistedState(state: AdminAccessState): PersistedAdminAccessStat
 }
 
 function isCurrentActor(target: MockAccount, actor: AdminQualificationActor): boolean {
-  return Boolean(actor.account) && target.account === actor.account;
+  return target.account === actor.account;
 }
 
 export const useAdminAccessStore = defineStore("admin-access", {
@@ -272,6 +278,11 @@ export const useAdminAccessStore = defineStore("admin-access", {
     getQualification: (state) => (account: string) => state.qualificationDetails[account]
   },
   actions: {
+    resolveOwnerActor(actor: AdminQualificationActor): AdminQualificationActor | undefined {
+      const account = this.getAccount(actor.account);
+      if (!account || account.adminLevel !== "owner" || !account.adminAccessEnabled) return undefined;
+      return { account: account.account, name: account.name, level: "owner" };
+    },
     persistQualificationState() {
       try {
         getStorage()?.setItem(
@@ -285,47 +296,23 @@ export const useAdminAccessStore = defineStore("admin-access", {
     resolveLogin(account: string, options: { requireAdmin?: boolean } = {}) {
       return resolveMockLogin(this.accounts, account, options.requireAdmin ?? false);
     },
-    grantAdmin(account: string, centerRole: AdminCenterRole = ADMIN_CENTER_LEAD_LABELS[0]): boolean {
-      const target = this.getAccount(account);
-      if (!target || target.adminLevel === "owner") return false;
-
-      target.adminLevel = "admin";
-      target.adminCenterRole = centerRole;
-      target.adminAccessEnabled = true;
-      this.persistQualificationState();
-      return true;
+    grantAdmin(
+      account: string,
+      actor: AdminQualificationActor,
+      centerRole: AdminCenterRole = ADMIN_CENTER_LEAD_LABELS[0]
+    ): boolean {
+      return this.assignAdminCenterRole(account, centerRole, actor);
     },
-    revokeAdmin(account: string): boolean {
-      const target = this.getAccount(account);
-      if (!target || target.adminLevel !== "admin") return false;
-
-      target.adminLevel = "member";
-      delete target.adminCenterRole;
-      target.adminAccessEnabled = true;
-      this.persistQualificationState();
-      return true;
+    revokeAdmin(account: string, actor: AdminQualificationActor): boolean {
+      return this.changeAdminQualification(account, "revoke", actor);
     },
-    setAdminAccessEnabled(account: string, enabled: boolean): boolean {
-      const target = this.getAccount(account);
-      if (!target || target.adminLevel !== "admin") return false;
-
-      target.adminAccessEnabled = enabled;
-      this.persistQualificationState();
-      return true;
+    setAdminAccessEnabled(account: string, enabled: boolean, actor: AdminQualificationActor): boolean {
+      return this.changeAdminQualification(account, enabled ? "enable" : "disable", actor);
     },
-    setAdminLevel(account: string, level: AdminLevel): boolean {
-      const target = this.getAccount(account);
-      if (!target || (target.adminLevel === "owner" && level !== "owner")) return false;
-      if (level === "owner" && this.accounts.filter((item) => item.adminLevel === "owner").length >= 2) {
-        return false;
-      }
-
-      target.adminLevel = level;
-      target.adminAccessEnabled = true;
-      if (level === "admin") target.adminCenterRole ??= ADMIN_CENTER_LEAD_LABELS[0];
-      else delete target.adminCenterRole;
-      this.persistQualificationState();
-      return true;
+    setAdminLevel(account: string, level: AdminLevel, actor: AdminQualificationActor): boolean {
+      if (level === "owner") return false;
+      if (level === "admin") return this.assignAdminCenterRole(account, ADMIN_CENTER_LEAD_LABELS[0], actor);
+      return this.changeAdminQualification(account, "revoke", actor);
     },
     appendQualificationAudit(
       actor: AdminQualificationActor,
@@ -337,9 +324,7 @@ export const useAdminAccessStore = defineStore("admin-access", {
       this.auditRecords.unshift({
         id: `qualification-${target.account}-${Date.now()}`,
         actor: actor.name,
-        role: actor.account
-          ? getAdminQualificationLabel(this.getAccount(actor.account) ?? { ...target, adminLevel: actor.level })
-          : getAdminLevelLabel(actor.level),
+        role: getAdminQualificationLabel(this.getAccount(actor.account) ?? target),
         module: "系统管理",
         action,
         target: `${target.name}（${target.account}）`,
@@ -364,22 +349,24 @@ export const useAdminAccessStore = defineStore("admin-access", {
       actor: AdminQualificationActor
     ): boolean {
       const target = this.getAccount(account);
-      if (!target || actor.level !== "owner" || target.adminLevel === "owner") return false;
+      const authorizedActor = this.resolveOwnerActor(actor);
+      if (!target || !authorizedActor || target.adminLevel === "owner") return false;
 
       const before = { ...target };
       target.adminLevel = "admin";
       target.adminCenterRole = centerRole;
       target.adminAccessEnabled = true;
       const configuredAt = formatAuditTime();
-      this.updateQualificationDetails(target, actor, configuredAt);
-      this.appendQualificationAudit(actor, "分配中心负责人资格", target, before, configuredAt);
+      this.updateQualificationDetails(target, authorizedActor, configuredAt);
+      this.appendQualificationAudit(authorizedActor, "分配中心负责人资格", target, before, configuredAt);
       this.persistQualificationState();
       return true;
     },
     promoteToOwner(account: string, actor: AdminQualificationActor): boolean {
       const target = this.getAccount(account);
+      const authorizedActor = this.resolveOwnerActor(actor);
       const ownerCount = this.accounts.filter((item) => item.adminLevel === "owner").length;
-      if (!target || actor.level !== "owner" || target.adminLevel === "owner" || ownerCount >= 2) {
+      if (!target || !authorizedActor || target.adminLevel === "owner" || ownerCount >= 2) {
         return false;
       }
 
@@ -388,8 +375,8 @@ export const useAdminAccessStore = defineStore("admin-access", {
       delete target.adminCenterRole;
       target.adminAccessEnabled = true;
       const configuredAt = formatAuditTime();
-      this.updateQualificationDetails(target, actor, configuredAt);
-      this.appendQualificationAudit(actor, "提升为联盟总负责人", target, before, configuredAt);
+      this.updateQualificationDetails(target, authorizedActor, configuredAt);
+      this.appendQualificationAudit(authorizedActor, "提升为联盟总负责人", target, before, configuredAt);
       this.persistQualificationState();
       return true;
     },
@@ -399,12 +386,13 @@ export const useAdminAccessStore = defineStore("admin-access", {
       centerRole: AdminCenterRole = ADMIN_CENTER_LEAD_LABELS[0]
     ): boolean {
       const target = this.getAccount(account);
+      const authorizedActor = this.resolveOwnerActor(actor);
       const ownerCount = this.accounts.filter((item) => item.adminLevel === "owner").length;
       if (!target
-        || actor.level !== "owner"
+        || !authorizedActor
         || target.adminLevel !== "owner"
         || ownerCount <= 1
-        || isCurrentActor(target, actor)) {
+        || isCurrentActor(target, authorizedActor)) {
         return false;
       }
 
@@ -413,8 +401,8 @@ export const useAdminAccessStore = defineStore("admin-access", {
       target.adminCenterRole = centerRole;
       target.adminAccessEnabled = true;
       const configuredAt = formatAuditTime();
-      this.updateQualificationDetails(target, actor, configuredAt);
-      this.appendQualificationAudit(actor, "撤销联盟总负责人资格", target, before, configuredAt);
+      this.updateQualificationDetails(target, authorizedActor, configuredAt);
+      this.appendQualificationAudit(authorizedActor, "撤销联盟总负责人资格", target, before, configuredAt);
       this.persistQualificationState();
       return true;
     },
@@ -424,7 +412,8 @@ export const useAdminAccessStore = defineStore("admin-access", {
       actor: AdminQualificationActor
     ): boolean {
       const target = this.getAccount(account);
-      if (!target || actor.level !== "owner" || target.adminLevel === "owner" || isCurrentActor(target, actor)) {
+      const authorizedActor = this.resolveOwnerActor(actor);
+      if (!target || !authorizedActor || target.adminLevel === "owner" || isCurrentActor(target, authorizedActor)) {
         return false;
       }
 
@@ -446,14 +435,14 @@ export const useAdminAccessStore = defineStore("admin-access", {
       }
 
       const configuredAt = formatAuditTime();
-      this.updateQualificationDetails(target, actor, configuredAt);
+      this.updateQualificationDetails(target, authorizedActor, configuredAt);
       const actionLabels: Record<AdminQualificationChange, string> = {
         grant: "授予中心负责人资格",
         revoke: "撤销管理员资格",
         enable: "启用管理员资格",
         disable: "停用管理员资格"
       };
-      this.appendQualificationAudit(actor, actionLabels[change], target, before, configuredAt);
+      this.appendQualificationAudit(authorizedActor, actionLabels[change], target, before, configuredAt);
       this.persistQualificationState();
       return true;
     }

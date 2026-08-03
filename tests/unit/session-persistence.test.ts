@@ -12,6 +12,7 @@ describe("session persistence", () => {
     setActivePinia(createPinia());
     window.localStorage.clear();
     window.sessionStorage.clear();
+    window.history.pushState({}, "", "/");
   });
 
   it("serializes only the authenticated account, issued-at time, and storage version", () => {
@@ -26,13 +27,23 @@ describe("session persistence", () => {
     });
   });
 
-  it("does not persist member-mode sessions as administrator sessions", () => {
+  it("persists and restores member-mode sessions without elevating them", () => {
     const session = useSessionStore();
 
     session.signIn("demo-member");
 
     expect(session.isAuthenticated).toBe(true);
-    expect(window.sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem(SESSION_STORAGE_KEY)!)).toMatchObject({
+      version: SESSION_STORAGE_VERSION,
+      accountId: "demo-member",
+      issuedAt: expect.any(Number)
+    });
+
+    setActivePinia(createPinia());
+    const restored = useSessionStore();
+    expect(restored.restore()).toBe(true);
+    expect(restored.adminLevel).toBe("member");
+    expect(restored.canAccessAdmin).toBe(false);
   });
 
   it("restores a valid session into a fresh Pinia store", () => {
@@ -72,7 +83,11 @@ describe("session persistence", () => {
       accountId: "media-admin",
       issuedAt: Date.now()
     }));
-    useAdminAccessStore().setAdminAccessEnabled("media-admin", false);
+    useAdminAccessStore().setAdminAccessEnabled("media-admin", false, {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    });
 
     const session = useSessionStore();
 
@@ -87,7 +102,12 @@ describe("session persistence", () => {
       accountId: "media-admin",
       issuedAt: Date.now()
     }));
-    useAdminAccessStore().revokeAdmin("media-admin");
+    useAdminAccessStore().revokeAdmin("media-admin", {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    });
+    window.history.pushState({}, "", "/admin/accounts");
 
     const session = useSessionStore();
 

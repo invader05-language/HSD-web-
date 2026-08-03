@@ -4,7 +4,7 @@ import {
   getAdminNavigationState,
   getAdminTopbarLabel
 } from "~/data/admin-platform";
-import { getAdminLevelLabel } from "~/data/admin-system";
+import { getAdminQualificationLabel } from "~/data/admin-system";
 import { useSessionStore } from "~/stores/session";
 
 const route = useRoute();
@@ -13,7 +13,9 @@ const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess(session));
 const currentIdentity = computed(() => session.currentAccount ?? null);
-const adminLevelLabel = computed(() => getAdminLevelLabel(session.adminLevel));
+const adminLevelLabel = computed(() => session.currentAccount
+  ? getAdminQualificationLabel(session.currentAccount)
+  : "未登录");
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
 const mobileNavigationOpen = ref(false);
 
