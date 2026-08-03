@@ -1,4 +1,7 @@
 export interface MemberProfileDraftValues {
+  name: string;
+  grade: string;
+  className: string;
   direction: string;
   bio: string;
 }
@@ -14,8 +17,15 @@ export function validateMemberProfileDraft(
   draft: MemberProfileDraftValues
 ): MemberProfileFormErrors {
   const errors: MemberProfileFormErrors = {};
+  const name = draft.name.trim();
+  const grade = draft.grade.trim();
+  const className = draft.className.trim();
   const direction = draft.direction.trim();
   const bio = draft.bio.trim();
+
+  if (name.length < 2 || name.length > 20) errors.name = "姓名应为 2–20 个字符。";
+  if (!grade || grade.length > 12) errors.grade = "请填写不超过 12 个字符的年级。";
+  if (className.length < 2 || className.length > 30) errors.className = "班级应为 2–30 个字符。";
 
   if (!direction) errors.direction = "请填写实践方向。";
   else if (direction.length > MAX_DIRECTION_LENGTH) {

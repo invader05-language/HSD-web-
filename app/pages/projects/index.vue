@@ -4,9 +4,20 @@ import { PROJECT_DETAILS, PROJECT_FILTERS } from "~/data/projects";
 useHead({ title: "项目成果｜白云 HSD 开发者部落" });
 
 const activeFilter = ref("全部");
-const visibleProjects = computed(() => {
+const pageSize = 6;
+const currentPage = ref(1);
+const filteredProjects = computed(() => {
   if (activeFilter.value === "全部") return PROJECT_DETAILS;
   return PROJECT_DETAILS.filter((project) => project.category.includes(activeFilter.value));
+});
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredProjects.value.length / pageSize)));
+const visibleProjects = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredProjects.value.slice(start, start + pageSize);
+});
+
+watch(activeFilter, () => {
+  currentPage.value = 1;
 });
 </script>
 
@@ -21,7 +32,7 @@ const visibleProjects = computed(() => {
     />
     <section class="section section--cool">
       <div class="shell">
-        <FilterToolbar v-model="activeFilter" :filters="PROJECT_FILTERS" :result-label="`共 ${visibleProjects.length} 个项目`" />
+        <FilterToolbar v-model="activeFilter" :filters="PROJECT_FILTERS" :result-label="`共 ${filteredProjects.length} 个项目`" />
         <div v-if="visibleProjects.length" class="catalog-grid">
           <NuxtLink v-for="project in visibleProjects" :key="project.slug" :to="`/projects/${project.slug}`" class="catalog-card">
             <MediaPlaceholder :label="`${project.title} 项目素材位`" />
@@ -34,9 +45,7 @@ const visibleProjects = computed(() => {
           </NuxtLink>
         </div>
         <EmptyState v-else />
-        <nav class="pagination" aria-label="项目分页">
-          <button type="button" disabled>上一页</button><button type="button" class="is-active">1</button><button type="button" disabled>下一页</button>
-        </nav>
+        <PaginationControls v-model="currentPage" :page-count="pageCount" label="项目分页" />
       </div>
     </section>
   </div>

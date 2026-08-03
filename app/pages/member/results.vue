@@ -6,6 +6,7 @@ import {
 } from "~/data/member-results";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
+import { copyTextToClipboard } from "~/utils/clipboard";
 
 type ResultTab = "admission" | "assessment";
 
@@ -19,7 +20,8 @@ const result = computed(() =>
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
 const activeTab = ref<ResultTab>("admission");
-const copied = ref(false);
+const copyStatus = ref<"idle" | "success" | "error">("idle");
+let copyResetTimer: number | undefined;
 
 function activateTab(tab: ResultTab) {
   activeTab.value = tab;
@@ -36,15 +38,17 @@ async function moveTab(event: KeyboardEvent, current: ResultTab) {
 
 async function copyContact() {
   if (!result.value.responsibleContact) return;
-  try {
-    await navigator.clipboard?.writeText(result.value.responsibleContact.contact);
-  } finally {
-    copied.value = true;
-    window.setTimeout(() => {
-      copied.value = false;
-    }, 1600);
-  }
+  if (copyResetTimer) window.clearTimeout(copyResetTimer);
+  const succeeded = await copyTextToClipboard(result.value.responsibleContact.contact);
+  copyStatus.value = succeeded ? "success" : "error";
+  copyResetTimer = window.setTimeout(() => {
+    copyStatus.value = "idle";
+  }, 1800);
 }
+
+onBeforeUnmount(() => {
+  if (copyResetTimer) window.clearTimeout(copyResetTimer);
+});
 </script>
 
 <template>
@@ -161,8 +165,10 @@ async function copyContact() {
                 <p>{{ result.responsibleContact.role }}</p>
                 <h3>{{ result.responsibleContact.name }}</h3>
                 <div>
-                  <span>{{ result.responsibleContact.contact }}</span>
-                  <button type="button" @click="copyContact">{{ copied ? "已复制" : "复制联系方式" }}</button>
+                  <span>{{ result.responsibleContact.displayContact }}</span>
+                  <button type="button" @click="copyContact">
+                    {{ copyStatus === "success" ? "已复制" : copyStatus === "error" ? "复制失败，请重试" : "复制联系方式" }}
+                  </button>
                 </div>
               </section>
             </aside>

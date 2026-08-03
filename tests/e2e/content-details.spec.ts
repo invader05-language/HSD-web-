@@ -57,6 +57,46 @@ test("member results require login and continue back after demo sign-in", async 
   await expect(page.getByText(/报到时间|报到地点|携带材料|确认加入|放弃名额/)).toHaveCount(0);
 });
 
+test("gallery pagination moves between distinct album pages", async ({ page }) => {
+  await page.goto("/gallery");
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("#__nuxt") as Element & { __vue_app__?: unknown })?.__vue_app__
+  ));
+
+  await expect(page.getByRole("link", { name: /年度活动影像记录/ })).toBeVisible();
+  await page.getByRole("button", { name: "下一页" }).click();
+
+  await expect(page.getByRole("link", { name: /开发者训练营纪实/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /年度活动影像记录/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "2", exact: true })).toHaveClass(/is-active/);
+  await expect(page.getByRole("button", { name: "上一页" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "下一页" })).toBeDisabled();
+});
+
+test("gallery page count follows the filtered result count", async ({ page }) => {
+  await page.goto("/gallery");
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("#__nuxt") as Element & { __vue_app__?: unknown })?.__vue_app__
+  ));
+
+  await page.getByRole("button", { name: "海报设计", exact: true }).click();
+
+  await expect(page.getByText("共 3 件作品", { exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "媒体作品分页" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "2", exact: true })).toHaveCount(0);
+});
+
+test("single-page catalogs do not expose dead previous or next controls", async ({ page }) => {
+  for (const [path, label] of [
+    ["/projects", "项目分页"],
+    ["/activities", "活动分页"],
+    ["/resources", "资源分页"],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole("navigation", { name: label })).toHaveCount(0);
+  }
+});
+
 test("gallery album uses full media frames and an accessible lightbox", async ({ page }) => {
   await page.goto("/gallery");
   await page.getByRole("link", { name: /年度活动影像记录/ }).click();

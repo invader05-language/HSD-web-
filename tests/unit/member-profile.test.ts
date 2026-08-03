@@ -129,14 +129,27 @@ describe("member profile domain", () => {
     expect(withoutAvatar).not.toHaveProperty("avatarUrl");
   });
 
-  it("requires non-blank direction and bio within the field limits", () => {
-    expect(validateMemberProfileDraft({ direction: "  ", bio: "简介" })).toEqual({
+  it("validates editable personal basics together with direction and bio", () => {
+    const validDraft = {
+      name: "林同学",
+      grade: "2026 级",
+      className: "软件工程 1 班",
+      direction: "开发",
+      bio: "简介",
+    };
+
+    expect(validateMemberProfileDraft({ ...validDraft, direction: "  " })).toEqual({
       direction: "请填写实践方向。",
     });
-    expect(validateMemberProfileDraft({ direction: "开发", bio: "  " })).toEqual({
+    expect(validateMemberProfileDraft({ ...validDraft, bio: "  " })).toEqual({
       bio: "请填写个人简介。",
     });
-    expect(validateMemberProfileDraft({ direction: "开发", bio: "简介" })).toEqual({});
+    expect(validateMemberProfileDraft({ ...validDraft, name: "林", grade: " ", className: "1" })).toEqual({
+      name: "姓名应为 2–20 个字符。",
+      grade: "请填写不超过 12 个字符的年级。",
+      className: "班级应为 2–30 个字符。",
+    });
+    expect(validateMemberProfileDraft(validDraft)).toEqual({});
   });
 
   it("accepts common image files and rejects unsupported or oversized files", () => {

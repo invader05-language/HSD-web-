@@ -22,6 +22,9 @@ let draftObjectUrl: string | undefined;
 const avatarSource = computed(() => draft.avatarUrl || undefined);
 
 function clearErrors() {
+  delete errors.name;
+  delete errors.grade;
+  delete errors.className;
   delete errors.direction;
   delete errors.bio;
   delete errors.avatar;
@@ -79,6 +82,9 @@ async function saveProfile() {
   await new Promise((resolve) => window.setTimeout(resolve, 180));
   const previousAvatarUrl = currentProfile.value.avatarUrl;
   currentMember.updateProfile({
+    name: draft.name.trim(),
+    grade: draft.grade.trim(),
+    className: draft.className.trim(),
     direction: draft.direction.trim(),
     bio: draft.bio.trim(),
     avatarUrl: draft.avatarUrl,
@@ -126,7 +132,7 @@ onBeforeUnmount(() => {
         <p class="member-profile-breadcrumb">成员空间　/　<strong>个人资料</strong></p>
         <p class="eyebrow">Member Profile</p>
         <h1>编辑个人资料</h1>
-        <p class="member-profile-lead">完善你的成员资料。学籍和组织资料由部落统一维护，不能在此修改。</p>
+        <p class="member-profile-lead">完善你的个人与成员资料。姓名、年级和班级可由本人修改；学号和组织归属由部落统一维护。</p>
 
         <div class="member-profile-note">
           <strong>前端演示预览</strong>
@@ -141,14 +147,31 @@ onBeforeUnmount(() => {
         <form class="member-profile-card" novalidate @submit.prevent="saveProfile">
           <section class="member-profile-section">
             <div class="member-profile-section__head">
-              <div><span class="member-profile-number">01</span><div><h2>身份与组织资料</h2><p>这些信息用于学籍和组织识别，由授权管理员维护。</p></div></div>
-              <span class="member-profile-readonly">系统只读</span>
+              <div><span class="member-profile-number">01</span><div><h2>个人基础与组织资料</h2><p>个人基础信息可自行修改；学号和组织信息由授权管理员维护。</p></div></div>
+              <span class="member-profile-readonly">部分可编辑</span>
+            </div>
+            <div class="member-profile-fields">
+              <label>
+                <span>姓名</span>
+                <input v-model="draft.name" maxlength="20" autocomplete="name" :aria-invalid="Boolean(errors.name)" aria-describedby="name-help name-error">
+                <small id="name-help">填写本人常用姓名，保存后同步到成员空间与公开展示。</small>
+                <small v-if="errors.name" id="name-error" class="member-profile-error">{{ errors.name }}</small>
+              </label>
+              <label>
+                <span>年级</span>
+                <input v-model="draft.grade" maxlength="12" placeholder="如：2026 级" :aria-invalid="Boolean(errors.grade)" aria-describedby="grade-help grade-error">
+                <small id="grade-help">填写当前所属年级。</small>
+                <small v-if="errors.grade" id="grade-error" class="member-profile-error">{{ errors.grade }}</small>
+              </label>
+              <label class="member-profile-field-wide">
+                <span>班级</span>
+                <input v-model="draft.className" maxlength="30" placeholder="如：软件工程 1 班" :aria-invalid="Boolean(errors.className)" aria-describedby="class-help class-error">
+                <small id="class-help">填写当前专业与班级信息。</small>
+                <small v-if="errors.className" id="class-error" class="member-profile-error">{{ errors.className }}</small>
+              </label>
             </div>
             <div class="member-profile-readonly-grid">
-              <div><span>姓名</span><strong>{{ draft.name }}</strong></div>
               <div><span>学号</span><strong>{{ draft.studentId }}</strong></div>
-              <div><span>年级</span><strong>{{ draft.grade }}</strong></div>
-              <div><span>班级</span><strong>{{ draft.className }}</strong></div>
               <div><span>所属中心</span><strong>{{ currentProfile.identity === "预备成员" ? "待确定" : draft.center }}</strong></div>
               <div><span>组织职务</span><strong>{{ currentProfile.identity === "预备成员" ? "暂无组织职务" : draft.role }}</strong></div>
             </div>
