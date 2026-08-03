@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveProtectedRouteTarget } from "../../app/utils/route-access";
+import {
+  getRequiredAdminAccess,
+  resolveProtectedRouteTarget
+} from "../../app/utils/route-access";
 
 const signedOut = {
   isAuthenticated: false,
@@ -42,17 +45,18 @@ describe("resolveProtectedRouteTarget", () => {
   });
 
   it("denies members who try to enter an admin route", () => {
-    expect(resolveProtectedRouteTarget("/admin", "/admin", member)).toBe("/admin/forbidden");
+    expect(resolveProtectedRouteTarget("/admin", "/admin", member))
+      .toBe("/admin/forbidden?from=%2Fadmin");
   });
 
-  it("limits administrator account configuration to owners", () => {
+  it("preserves the canonical denied account configuration target for administrators", () => {
     expect(resolveProtectedRouteTarget("/admin/accounts", "/admin/accounts", admin))
-      .toBe("/admin/forbidden");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
   });
 
   it("keeps the trailing-slash accounts route owner-only", () => {
     expect(resolveProtectedRouteTarget("/admin/accounts/", "/admin/accounts/", admin))
-      .toBe("/admin/forbidden");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
   });
 
   it("redirects the legacy roles address to accounts for owners", () => {
@@ -62,7 +66,7 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("denies the legacy roles address to non-owner administrators", () => {
     expect(resolveProtectedRouteTarget("/admin/roles", "/admin/roles", admin))
-      .toBe("/admin/forbidden");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
   });
 
   it("redirects the trailing-slash legacy roles address for owners", () => {
@@ -72,5 +76,11 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("allows administrators into regular admin modules", () => {
     expect(resolveProtectedRouteTarget("/admin/logs", "/admin/logs", admin)).toBeUndefined();
+  });
+
+  it("treats only the canonical account configuration source as owner-only", () => {
+    expect(getRequiredAdminAccess("/admin/accounts/")).toBe("owner");
+    expect(getRequiredAdminAccess(["/admin/accounts"])).toBe("admin");
+    expect(getRequiredAdminAccess("https://example.com/admin/accounts")).toBe("admin");
   });
 });

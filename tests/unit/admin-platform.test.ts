@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   ADMIN_NAVIGATION,
   ADMIN_ROUTES,
@@ -51,6 +52,14 @@ describe("administration platform navigation", () => {
   it("publishes a unique route for every administration entry", () => {
     expect(new Set(ADMIN_ROUTES).size).toBe(ADMIN_ROUTES.length);
     expect(ADMIN_ROUTES.every((route) => route.startsWith("/admin"))).toBe(true);
+  });
+
+  it("does not retain the retired role matrix implementation surface", () => {
+    const systemData = readFileSync("app/data/admin-system.ts", "utf8");
+    const styles = readFileSync("app/assets/css/main.css", "utf8");
+
+    expect(systemData).not.toContain("ADMIN_ROLES");
+    expect(styles).not.toContain(".admin-role-layout");
   });
 });
 

@@ -4,6 +4,7 @@ import {
   getAdminNavigationState,
   getAdminTopbarLabel
 } from "~/data/admin-platform";
+import { getAdminLevelLabel } from "~/data/admin-system";
 import { useSessionStore } from "~/stores/session";
 
 const route = useRoute();
@@ -12,15 +13,21 @@ const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess(session));
 const currentIdentity = computed(() => session.currentAccount ?? null);
-const adminLevelLabel = computed(() =>
-  session.adminLevel === "owner" ? "联盟总负责人" : "平台管理员"
-);
+const adminLevelLabel = computed(() => getAdminLevelLabel(session.adminLevel));
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
+const mobileNavigationOpen = ref(false);
 
 watch(
   () => activeNavigation.value.groupId,
   (groupId) => {
     expandedGroups.value = new Set([...expandedGroups.value, groupId]);
+  }
+);
+
+watch(
+  () => route.fullPath,
+  () => {
+    mobileNavigationOpen.value = false;
   }
 );
 
@@ -94,10 +101,36 @@ function toggleGroup(groupId: string) {
         </div>
         <div class="admin-topbar__actions">
           <NuxtLink to="/">返回官网</NuxtLink>
-          <span>{{ currentIdentity?.name ?? "未登录" }} · {{ adminLevelLabel }}</span>
+          <span class="admin-topbar__identity">{{ currentIdentity?.name ?? "未登录" }} · {{ adminLevelLabel }}</span>
+          <button
+            type="button"
+            class="admin-mobile-nav-trigger"
+            :aria-expanded="mobileNavigationOpen"
+            aria-controls="admin-mobile-navigation"
+            aria-label="打开管理导航"
+            @click="mobileNavigationOpen = !mobileNavigationOpen"
+          ><span aria-hidden="true">&#9776;</span></button>
           <button type="button" @click="session.signOut(); navigateTo('/')">退出</button>
         </div>
       </header>
+
+      <nav
+        v-if="mobileNavigationOpen"
+        id="admin-mobile-navigation"
+        class="admin-mobile-nav"
+        aria-label="移动端管理导航"
+      >
+        <section v-for="group in navigation" :key="group.id">
+          <strong>{{ group.label }}</strong>
+          <NuxtLink
+            v-for="item in group.items"
+            :key="item.id"
+            :to="item.to"
+            :class="{ 'is-active': activeNavigation.itemId === item.id }"
+            @click="mobileNavigationOpen = false"
+          >{{ item.label }}</NuxtLink>
+        </section>
+      </nav>
 
       <main id="admin-main-content">
         <slot />

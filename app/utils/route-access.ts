@@ -20,6 +20,16 @@ function isProtectedRoute(path: string): boolean {
     || path === "/assessment-results";
 }
 
+function buildAdminForbiddenTarget(path: string): string {
+  return `${ADMIN_FORBIDDEN}?from=${encodeURIComponent(normalizeRoutePath(path))}`;
+}
+
+export function getRequiredAdminAccess(source: unknown): "admin" | "owner" {
+  return typeof source === "string" && normalizeRoutePath(source) === "/admin/accounts"
+    ? "owner"
+    : "admin";
+}
+
 export function resolveProtectedRouteTarget(
   path: string,
   fullPath: string,
@@ -29,12 +39,14 @@ export function resolveProtectedRouteTarget(
   if (!isProtectedRoute(normalizedPath)) return undefined;
   if (!session.isAuthenticated) return buildLoginTarget(fullPath);
   if (!normalizedPath.startsWith("/admin") || normalizedPath === ADMIN_FORBIDDEN) return undefined;
-  if (!session.canAccessAdmin) return ADMIN_FORBIDDEN;
+  if (!session.canAccessAdmin) return buildAdminForbiddenTarget(normalizedPath);
   if (normalizedPath === "/admin/roles") {
-    return session.canManageAdminAccounts ? "/admin/accounts" : ADMIN_FORBIDDEN;
+    return session.canManageAdminAccounts
+      ? "/admin/accounts"
+      : buildAdminForbiddenTarget("/admin/accounts");
   }
   if (normalizedPath === "/admin/accounts" && !session.canManageAdminAccounts) {
-    return ADMIN_FORBIDDEN;
+    return buildAdminForbiddenTarget(normalizedPath);
   }
   return undefined;
 }

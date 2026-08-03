@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import {
   ADMIN_AUDIT_RECORDS,
   findMockAccount,
+  getAdminLevelLabel,
   MOCK_ACCOUNTS,
   resolveMockLogin,
   type AdminLevel,
@@ -70,12 +71,6 @@ function formatAuditTime(date = new Date()) {
     .map((part) => String(part).padStart(2, "0"))
     .join(":");
   return `${parts} ${time}`;
-}
-
-function levelLabel(level: AdminLevel) {
-  if (level === "owner") return "联盟总负责人";
-  if (level === "admin") return "平台管理员";
-  return "普通成员";
 }
 
 export const useAdminAccessStore = defineStore("admin-access", {
@@ -166,12 +161,12 @@ export const useAdminAccessStore = defineStore("admin-access", {
       this.auditRecords.unshift({
         id: `qualification-${target.account}-${Date.now()}`,
         actor: actor.name,
-        role: levelLabel(actor.level),
+        role: getAdminLevelLabel(actor.level),
         module: "系统管理",
         action: actionLabels[change],
         target: `${target.name}（${target.account}）`,
-        before: `${levelLabel(before.adminLevel)} · ${before.adminAccessEnabled ? "已启用" : "已停用"}`,
-        after: `${levelLabel(target.adminLevel)} · ${target.adminAccessEnabled ? "已启用" : "已停用"}`,
+        before: `${getAdminLevelLabel(before.adminLevel)} · ${before.adminAccessEnabled ? "已启用" : "已停用"}`,
+        after: `${getAdminLevelLabel(target.adminLevel)} · ${target.adminAccessEnabled ? "已启用" : "已停用"}`,
         result: "成功",
         time: configuredAt,
         ip: "127.0.0.1",

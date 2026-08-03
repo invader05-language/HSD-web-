@@ -30,3 +30,26 @@
 ## Concern
 
 - The qualification records are intentional front-end Mock state. They reset with the Pinia session/reload and must become server-validated, durable audit data when a backend is introduced.
+
+## Review Remediation
+
+### TDD Evidence
+
+1. RED: `pnpm vitest run tests/unit/route-access.test.ts tests/unit/admin-platform.test.ts` failed as expected: non-owner `/admin/accounts` access lost its denied target, and the retired `ADMIN_ROLES`/`.admin-role-layout` surfaces still existed.
+2. GREEN: `pnpm vitest run tests/unit/route-access.test.ts tests/unit/admin-platform.test.ts tests/unit/admin-access.test.ts tests/unit/admin-audit.test.ts tests/unit/admin-topbar.test.ts` passed: 5 files, 28 tests.
+
+### Verification
+
+- `pnpm typecheck`: passed.
+- `pnpm build`: passed.
+- `git diff --check`: passed.
+- A production server served `/admin/recruitment` with HTTP 200 at `http://127.0.0.1:49852`.
+- Browser regression tests were attempted against that production server, but local Chrome aborted during launch before either test created a page (`SIGABRT` / `Target page, context or browser has been closed`). The failure is host-browser startup, not an assertion result.
+
+### Remediations
+
+- Forbidden redirects now retain an encoded canonical `from` route. The forbidden page recognizes only a string canonical `/admin/accounts` source as requiring owner qualification; arrays and external-looking values fall back safely to ordinary administrator qualification.
+- The layout, account table, forbidden page, and audit records use one current-level label function, including `普通成员`.
+- The legacy role-matrix data, tests, CSS, and stale browser workflow are removed; audit filtering remains covered in `tests/unit/admin-audit.test.ts`.
+- At the 390px breakpoint, the top bar keeps a compact identity and exposes a filtered two-column navigation sheet. Non-owner sessions do not receive the owner-only account configuration link.
+- The qualification danger color is scoped to qualification actions without `!important`.

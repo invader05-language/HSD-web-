@@ -4,6 +4,7 @@ import {
   ADMIN_LEVELS,
   DEMO_APPLICANT_ACCOUNT,
   DEMO_MEMBER_ACCOUNT,
+  getAdminLevelLabel,
   MOCK_ACCOUNTS
 } from "../../app/data/admin-system";
 import { useAdminAccessStore } from "../../app/stores/admin-access";
@@ -23,6 +24,12 @@ describe("mock administration access", () => {
     expect(MOCK_ACCOUNTS.map((account) => account.adminLevel)).toEqual(
       expect.arrayContaining(["member", "admin", "owner"])
     );
+  });
+
+  it("labels every current account level without elevating ordinary members", () => {
+    expect(getAdminLevelLabel("member")).toBe("普通成员");
+    expect(getAdminLevelLabel("admin")).toBe("平台管理员");
+    expect(getAdminLevelLabel("owner")).toBe("联盟总负责人");
   });
 
   it("preserves the existing member and applicant account-to-profile mappings", () => {

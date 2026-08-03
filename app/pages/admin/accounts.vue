@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AdminLevel } from "~/data/admin-system";
+import { getAdminLevelLabel, type AdminLevel } from "~/data/admin-system";
 import {
   type AdminQualificationChange,
   useAdminAccessStore
@@ -30,12 +30,6 @@ const actionLabels: Record<AdminQualificationChange, string> = {
   enable: "启用管理员资格",
   disable: "停用管理员资格"
 };
-
-function levelLabel(level: AdminLevel) {
-  if (level === "owner") return "联盟总负责人";
-  if (level === "admin") return "平台管理员";
-  return "普通成员";
-}
 
 function accessStatus(account: { adminLevel: AdminLevel; adminAccessEnabled: boolean }) {
   if (account.adminLevel === "member") return "未配置";
@@ -87,7 +81,7 @@ function confirmChange() {
           <tbody>
             <tr v-for="account in accounts" :key="account.account">
               <td><strong>{{ account.name }}</strong><small>{{ account.account }}</small></td>
-              <td>{{ levelLabel(account.adminLevel) }}</td>
+              <td>{{ getAdminLevelLabel(account.adminLevel) }}</td>
               <td><AdminStatusPill :status="accessStatus(account)" /></td>
               <td><strong>{{ account.qualification?.configuredBy ?? "-" }}</strong><small>{{ account.qualification?.configuredAt ?? "-" }}</small></td>
               <td>{{ account.qualification?.lastLoginAt ?? "尚未登录" }}</td>
