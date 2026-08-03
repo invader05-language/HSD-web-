@@ -33,6 +33,11 @@ describe("mock administration access", () => {
     );
   });
 
+  it("marks existing accounts as password-change complete without persisting a password", () => {
+    expect(MOCK_ACCOUNTS.every((account) => account.mustChangePassword === false)).toBe(true);
+    expect(MOCK_ACCOUNTS.every((account) => !("password" in account))).toBe(true);
+  });
+
   it("labels account boundaries without presenting ordinary admins as generic platform administrators", () => {
     expect(getAdminLevelLabel("member")).toBe("普通成员");
     expect(getAdminLevelLabel("admin")).toBe("中心负责人");

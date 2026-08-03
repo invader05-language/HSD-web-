@@ -154,30 +154,35 @@ function isAuditRecord(value: unknown): value is AdminAuditRecord {
 }
 
 function isValidPersistedAccounts(value: unknown): value is MockAccount[] {
-  if (!Array.isArray(value) || value.length !== MOCK_ACCOUNTS.length) return false;
+  if (!Array.isArray(value) || value.length < MOCK_ACCOUNTS.length) return false;
 
   const seenAccounts = new Set<string>();
   for (const account of value) {
     if (!isRecord(account) || "password" in account) return false;
-    const initial = typeof account.account === "string"
-      ? MOCK_ACCOUNTS.find((item) => item.account === account.account)
-      : undefined;
-    if (!initial
-      || seenAccounts.has(initial.account)
-      || account.memberId !== initial.memberId
-      || account.name !== initial.name
+    if (typeof account.account !== "string"
+      || !account.account.trim()
+      || seenAccounts.has(account.account)
+      || typeof account.memberId !== "string"
+      || !account.memberId.trim()
+      || typeof account.name !== "string"
+      || !account.name.trim()
       || !isAdminLevel(account.adminLevel)
-      || typeof account.adminAccessEnabled !== "boolean") {
+      || typeof account.adminAccessEnabled !== "boolean"
+      || typeof account.mustChangePassword !== "boolean") {
       return false;
     }
+    const initial = MOCK_ACCOUNTS.find((item) => item.account === account.account);
+    if (initial && (account.memberId !== initial.memberId || account.name !== initial.name)) return false;
     if (account.adminLevel === "admin") {
       if (!isAdminCenterRole(account.adminCenterRole)) return false;
     } else if (account.adminCenterRole !== undefined) {
       return false;
     }
     if (account.adminLevel === "owner" && !account.adminAccessEnabled) return false;
-    seenAccounts.add(initial.account);
+    seenAccounts.add(account.account);
   }
+
+  if (!MOCK_ACCOUNTS.every((account) => seenAccounts.has(account.account))) return false;
 
   const ownerCount = value.filter((account) => account.adminLevel === "owner").length;
   return ownerCount >= 1 && ownerCount <= 2;
@@ -197,7 +202,9 @@ function parsePersistedState(serialized: string | null): AdminAccessState | unde
 
     const qualificationDetails = parsed.qualificationDetails;
     const auditRecords = parsed.auditRecords;
-    const expectedAccounts = new Set(MOCK_ACCOUNTS.map((account) => account.account));
+    const expectedAccounts = new Set(
+      parsed.accounts.map((account) => account.account)
+    );
     const detailKeys = Object.keys(qualificationDetails);
     if (detailKeys.length !== expectedAccounts.size
       || !detailKeys.every((account) => expectedAccounts.has(account))
@@ -220,6 +227,7 @@ function parsePersistedState(serialized: string | null): AdminAccessState | unde
         name: account.name,
         adminLevel: account.adminLevel,
         adminAccessEnabled: account.adminAccessEnabled,
+        mustChangePassword: account.mustChangePassword,
         ...(account.adminCenterRole ? { adminCenterRole: account.adminCenterRole } : {})
       })),
       qualificationDetails: restoredDetails,
@@ -258,6 +266,7 @@ function createPersistedState(state: AdminAccessState): PersistedAdminAccessStat
       name: account.name,
       adminLevel: account.adminLevel,
       adminAccessEnabled: account.adminAccessEnabled,
+      mustChangePassword: account.mustChangePassword,
       ...(account.adminCenterRole ? { adminCenterRole: account.adminCenterRole } : {})
     })),
     qualificationDetails: Object.fromEntries(
@@ -285,13 +294,28 @@ export const useAdminAccessStore = defineStore("admin-access", {
     },
     persistQualificationState() {
       try {
-        getStorage()?.setItem(
-          ADMIN_ACCESS_STORAGE_KEY,
-          JSON.stringify(createPersistedState(this))
-        );
+        this.persistAccessState();
       } catch {
         // Storage is optional for this frontend mock; memory state remains usable.
       }
+    },
+    persistAccessState() {
+      const storage = getStorage();
+      if (!storage) throw new Error("管理员帐号存储不可用");
+      storage.setItem(
+        ADMIN_ACCESS_STORAGE_KEY,
+        JSON.stringify(createPersistedState(this))
+      );
+    },
+    registerFormalMemberAccount(account: MockAccount): boolean {
+      if (this.getAccount(account.account)) return false;
+      this.accounts.push({ ...account });
+      this.qualificationDetails[account.account] = {
+        configuredBy: "系统创建",
+        configuredAt: formatAuditTime(),
+        lastLoginAt: "尚未登录"
+      };
+      return true;
     },
     resolveLogin(account: string, options: { requireAdmin?: boolean } = {}) {
       return resolveMockLogin(this.accounts, account, options.requireAdmin ?? false);
