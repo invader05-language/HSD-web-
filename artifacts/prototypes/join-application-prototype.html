@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>加入 HSD｜成员注册与招新报名原型</title>
+  <style>
+    :root { --red:#b1202b; --red-dark:#8f1822; --ink:#211f1e; --warm:#f4f0eb; --cool:#f5f6f7; --surface:#fff; --muted:#6f6963; --line:#e2dfdb; --radius:5px; --error:#8f1822; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:0; color:var(--ink); background:var(--cool); font:16px/1.55 "PingFang SC","Microsoft YaHei",sans-serif; }
+    button,input,select,textarea { font:inherit; }
+    button { cursor:pointer; }
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid rgba(177,32,43,.25); outline-offset:2px; }
+    .site-header { height:72px; border-bottom:1px solid var(--line); background:rgba(255,255,255,.97); }
+    .header-inner { width:min(1240px,calc(100% - 64px)); height:100%; margin:auto; display:flex; justify-content:space-between; align-items:center; gap:20px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:800; white-space:nowrap; }
+    .brand-mark { color:var(--red); letter-spacing:-.05em; }
+    .top-nav { display:flex; gap:17px; color:#4f4a46; font-size:14px; }
+    .top-nav span:last-child { color:var(--red); font-weight:800; }
+    .member-chip { display:flex; align-items:center; gap:8px; padding:7px 10px 7px 7px; border:1px solid var(--line); background:#fff; font-size:13px; font-weight:800; white-space:nowrap; }
+    .mini-avatar,.avatar-preview { display:grid; place-items:center; overflow:hidden; border:1px solid #d5cec8; border-radius:50%; background:#fff; color:#988f88; font-weight:800; }
+    .mini-avatar { width:28px; height:28px; font-size:9px; }
+    .mini-avatar img,.avatar-preview img { width:100%; height:100%; object-fit:cover; }
+    .page { width:min(1240px,calc(100% - 64px)); margin:0 auto; padding:50px 0 84px; }
+    .eyebrow { margin:0; color:var(--red); font-size:12px; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
+    h1 { margin:4px 0 10px; font-size:48px; line-height:1.15; letter-spacing:-.045em; }
+    .lead { max-width:700px; margin:0; color:var(--muted); }
+    .prototype-note { display:flex; gap:14px; align-items:center; margin:28px 0 24px; padding:13px 17px; border-left:3px solid var(--red); background:var(--warm); color:#564f4a; font-size:14px; }
+    .prototype-note strong { color:var(--red); white-space:nowrap; }
+    .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:0; margin:0 0 22px; border:1px solid var(--line); background:#fff; }
+    .step-button { position:relative; min-height:84px; display:flex; align-items:center; gap:13px; padding:16px 19px; border:0; border-right:1px solid var(--line); background:#fff; color:var(--muted); text-align:left; }
+    .step-button:last-child { border-right:0; }
+    .step-button:hover { background:var(--cool); color:var(--ink); }
+    .step-button.active { color:var(--ink); box-shadow:inset 0 -3px 0 var(--red); }
+    .step-button.complete .step-no { background:var(--ink); border-color:var(--ink); color:#fff; }
+    .step-no { width:30px; height:30px; display:grid; place-items:center; flex:none; border:1px solid #cbc5c0; border-radius:50%; color:var(--red); font-size:12px; font-weight:900; }
+    .step-button.active .step-no { border-color:var(--red); background:var(--red); color:#fff; }
+    .step-copy small,.step-copy strong { display:block; }
+    .step-copy small { color:var(--muted); font-size:12px; }
+    .step-copy strong { margin-top:1px; font-size:15px; }
+    .application-layout { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:22px; align-items:start; }
+    .form-card,.guidance { border:1px solid var(--line); background:var(--surface); }
+    .form-card { min-width:0; }
+    .form-step { display:none; }
+    .form-step.active { display:block; }
+    .card-section { padding:32px 36px; border-bottom:1px solid var(--line); }
+    .card-section:last-child { border-bottom:0; }
+    .section-head { display:flex; gap:14px; align-items:flex-start; margin-bottom:25px; }
+    .section-number { color:var(--red); font-size:13px; font-weight:900; letter-spacing:.12em; }
+    h2 { margin:0; font-size:25px; line-height:1.25; letter-spacing:-.025em; }
+    .section-head p { margin:5px 0 0; color:var(--muted); font-size:14px; }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    label { display:grid; gap:8px; color:#4f4a46; font-size:14px; font-weight:800; }
+    .required { color:var(--red); }
+    input,select,textarea { width:100%; border:1px solid #cfcac5; border-radius:var(--radius); background:#fff; color:var(--ink); outline:0; padding:11px 12px; }
+    input:focus,select:focus,textarea:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(177,32,43,.12); }
+    textarea { min-height:112px; resize:vertical; }
+    .wide { grid-column:1/-1; }
+    .field-help { margin:-2px 0 0; color:var(--muted); font-size:12px; font-weight:400; }
+    .field-error { min-height:18px; margin:-2px 0 0; color:var(--error); font-size:12px; font-weight:700; }
+    .invalid { border-color:var(--error) !important; }
+    .avatar-panel { display:grid; grid-template-columns:100px minmax(0,1fr); gap:21px; align-items:center; }
+    .avatar-preview { width:94px; height:94px; font-size:12px; }
+    .upload-box { padding:15px 17px; border:1px dashed #aaa39e; background:var(--cool); }
+    .upload-box strong,.upload-box span { display:block; }
+    .upload-box span { margin-top:3px; color:var(--muted); font-size:13px; }
+    .upload-actions { display:flex; gap:12px; align-items:center; margin-top:10px; }
+    .text-button { padding:0; border:0; background:transparent; color:var(--red); font-size:14px; font-weight:800; }
+    .text-button:disabled { color:#aaa39e; cursor:not-allowed; }
+    .managed-note { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; border:1px solid var(--line); background:var(--line); }
+    .managed-item { padding:14px; background:var(--cool); }
+    .managed-item span,.managed-item strong { display:block; }
+    .managed-item span { color:var(--muted); font-size:12px; }
+    .managed-item strong { margin-top:4px; font-size:14px; }
+    .choice-rules { margin:18px 0 0; padding:13px 15px; border-left:3px solid var(--red); background:var(--warm); color:#564f4a; font-size:13px; }
+    .conditional { display:none; margin-top:18px; padding:18px; border:1px solid #e6c8cc; background:#fffafa; }
+    .conditional.visible { display:block; }
+    .conditional h3 { margin:0 0 4px; font-size:16px; }
+    .conditional p { margin:0 0 14px; color:var(--muted); font-size:13px; }
+    .footer { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:21px 36px; border-top:1px solid var(--line); background:#fff; }
+    .footer-copy { color:var(--muted); font-size:13px; }
+    .actions { display:flex; gap:10px; flex:none; }
+    .button { min-height:44px; padding:0 18px; border:1px solid var(--red); border-radius:var(--radius); background:var(--red); color:#fff; font-weight:800; }
+    .button:hover { background:var(--red-dark); }
+    .button.ghost { background:#fff; color:var(--red); }
+    .button.ghost:hover { background:#fff7f8; }
+    .guidance { position:sticky; top:20px; }
+    .guidance section { padding:22px; border-bottom:1px solid var(--line); }
+    .guidance section:last-child { border-bottom:0; }
+    .guidance h2 { font-size:18px; }
+    .guidance p,.guidance li { color:var(--muted); font-size:13px; }
+    .guidance p { margin:8px 0 0; }
+    .guidance ol { margin:12px 0 0; padding-left:21px; }
+    .guidance li + li { margin-top:7px; }
+    .guidance strong { color:var(--ink); }
+    .summary-group + .summary-group { margin-top:25px; }
+    .summary-group h3 { margin:0 0 10px; color:var(--red); font-size:14px; letter-spacing:.08em; }
+    .summary-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); border-top:1px solid var(--line); border-left:1px solid var(--line); }
+    .summary-item { min-height:67px; padding:12px 13px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--cool); }
+    .summary-item.wide { grid-column:1/-1; }
+    .summary-item span,.summary-item strong { display:block; }
+    .summary-item span { color:var(--muted); font-size:12px; }
+    .summary-item strong { margin-top:3px; font-size:14px; word-break:break-word; }
+    .consent { display:flex; gap:10px; align-items:flex-start; color:#4f4a46; font-size:14px; font-weight:400; }
+    .consent input { width:18px; height:18px; margin:3px 0 0; flex:none; accent-color:var(--red); }
+    .success { display:none; padding:56px 36px; text-align:center; }
+    .success.visible { display:block; }
+    .success-mark { width:48px; height:48px; display:grid; place-items:center; margin:0 auto 16px; border-radius:50%; background:var(--red); color:#fff; font-size:25px; font-weight:900; }
+    .success h2 { font-size:30px; }
+    .success p { max-width:530px; margin:10px auto 0; color:var(--muted); }
+    .success-state { display:grid; grid-template-columns:1fr 1fr; gap:1px; max-width:470px; margin:26px auto; border:1px solid var(--line); background:var(--line); text-align:left; }
+    .success-state div { padding:14px; background:var(--cool); }
+    .success-state span,.success-state strong { display:block; }
+    .success-state span { color:var(--muted); font-size:12px; }
+    .success-state strong { margin-top:3px; }
+    .success .actions { justify-content:center; }
+    @media (max-width:900px) { .top-nav { display:none; } .application-layout { grid-template-columns:1fr; } .guidance { position:static; } }
+    @media (max-width:640px) {
+      .site-header { height:64px; } .header-inner,.page { width:calc(100% - 32px); } .brand { gap:7px; font-size:13px; } .brand-mark { font-size:12px; } .member-chip { padding:5px; } .member-chip span:last-child { display:none; }
+      .page { padding:34px 0 52px; } h1 { font-size:37px; } .lead { font-size:15px; } .prototype-note { display:block; margin:23px 0 18px; } .prototype-note strong { display:block; margin-bottom:3px; }
+      .steps { gap:7px; padding:8px; border:0; background:transparent; } .step-button { min-height:38px; justify-content:center; padding:0; border:1px solid var(--line); border-radius:var(--radius); } .step-button.active { border-color:var(--red); box-shadow:none; } .step-no { width:24px; height:24px; font-size:11px; } .step-copy { display:none; }
+      .card-section { padding:25px 20px; } .section-head { gap:10px; } h2 { font-size:23px; } .fields,.managed-note,.summary-grid { grid-template-columns:1fr; } .summary-item.wide { grid-column:auto; } .avatar-panel { grid-template-columns:74px minmax(0,1fr); gap:13px; } .avatar-preview { width:70px; height:70px; font-size:10px; } .upload-actions { flex-wrap:wrap; }
+      .footer { flex-direction:column; align-items:stretch; padding:20px; } .actions { display:grid; grid-template-columns:1fr 1fr; } .actions .button { padding:0 10px; } .success { padding:43px 20px; } .success h2 { font-size:26px; } .success-state { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand"><span class="brand-mark">&lt; HSD &gt;</span><span>白云 HSD 开发者部落</span></div>
+      <nav class="top-nav" aria-label="官网导航"><span>首页</span><span>部落介绍</span><span>四大中心</span><span>项目成果</span><span>活动中心</span><span>结果中心</span><span>加入我们</span></nav>
+      <div class="member-chip" aria-label="当前已登录"><span class="mini-avatar">HSD</span><span>已登录成员</span></div>
+    </div>
+  </header>
+  <main class="page">
+    <p class="eyebrow">Member Onboarding</p>
+    <h1>成员注册与招新报名</h1>
+    <p class="lead">你已登录。完成以下资料后，将建立个人中心中展示的成员资料，并同时提交本次招新报名。</p>
+    <div class="prototype-note"><strong>前端演示预览</strong><span>本页面不连接后端，也不会进行真实文件上传；填写内容仅保留在当前页面演示中。</span></div>
+
+    <nav class="steps" aria-label="报名步骤">
+      <button class="step-button active" type="button" data-step-target="1" aria-current="step"><span class="step-no">01</span><span class="step-copy"><small>个人中心资料</small><strong>完善个人资料</strong></span></button>
+      <button class="step-button" type="button" data-step-target="2"><span class="step-no">02</span><span class="step-copy"><small>报名中心选择</small><strong>填写报名志愿</strong></span></button>
+      <button class="step-button" type="button" data-step-target="3"><span class="step-no">03</span><span class="step-copy"><small>提交前检查</small><strong>确认并提交</strong></span></button>
+    </nav>
+
+    <div class="application-layout" id="application">
+      <form class="form-card" id="application-form" novalidate>
+        <section class="form-step active" data-step="1" aria-labelledby="profile-title">
+          <div class="card-section">
+            <div class="section-head"><span class="section-number">01</span><div><h2 id="profile-title">完善个人资料</h2><p>这些资料将在提交后展示于你的个人中心，用于建立初始成员档案。</p></div></div>
+            <div class="avatar-panel">
+              <div class="avatar-preview" id="avatar-preview">HSD</div>
+              <div class="upload-box"><strong>选择个人头像（可选）</strong><span>仅做浏览器本地预览，不会上传服务器。</span><div class="upload-actions"><input id="avatar" type="file" accept="image/*" aria-describedby="avatar-help"><button class="text-button" type="button" id="remove-avatar" disabled>移除图片</button></div><span id="avatar-help">支持本地图片文件。</span></div>
+            </div>
+          </div>
+          <div class="card-section">
+            <div class="fields">
+              <label>姓名 <span class="required">*</span><input id="name" name="name" required autocomplete="name"><span class="field-error" id="name-error"></span></label>
+              <label>学号 <span class="required">*</span><input id="studentId" name="studentId" required inputmode="numeric"><span class="field-error" id="studentId-error"></span></label>
+              <label>年级 <span class="required">*</span><select id="grade" name="grade" required><option value="">请选择年级</option><option>2026 级</option><option>2025 级</option><option>2024 级</option><option>2023 级</option></select><span class="field-error" id="grade-error"></span></label>
+              <label>班级 <span class="required">*</span><input id="className" name="className" required placeholder="例如：软件工程 1 班"><span class="field-error" id="className-error"></span></label>
+              <label>实践方向 <span class="required">*</span><input id="practice" name="practice" required placeholder="例如：HarmonyOS 与项目工程化"><span class="field-help">用一句话描述希望参与的实践方向。</span><span class="field-error" id="practice-error"></span></label>
+              <label>联系方式 <span class="required">*</span><input id="contact" name="contact" required placeholder="手机号或常用邮箱"><span class="field-help">仅用于招新联系，不会展示在公开成员资料中。</span><span class="field-error" id="contact-error"></span></label>
+              <label class="wide">个人简介 <span class="required">*</span><textarea id="bio" name="bio" required maxlength="180" placeholder="用一两句话介绍你的兴趣、技能或期待。"></textarea><span class="field-help">最多 180 字，提交后展示在个人中心资料中。</span><span class="field-error" id="bio-error"></span></label>
+            </div>
+          </div>
+          <div class="card-section">
+            <div class="section-head"><span class="section-number">系统</span><div><h2>提交后由系统管理</h2><p>以下初始组织信息会随报名建立，暂不支持在此修改。</p></div></div>
+            <div class="managed-note"><div class="managed-item"><span>成员身份</span><strong>预备成员</strong></div><div class="managed-item"><span>所属中心</span><strong>待确定</strong></div><div class="managed-item"><span>组织职务</span><strong>暂无组织职务</strong></div></div>
+          </div>
+          <footer class="footer"><span class="footer-copy">下一步填写报名志愿。</span><div class="actions"><button class="button" type="button" data-next="2">下一步</button></div></footer>
+        </section>
+
+        <section class="form-step" data-step="2" aria-labelledby="preference-title">
+          <div class="card-section">
+            <div class="section-head"><span class="section-number">02</span><div><h2 id="preference-title">填写报名志愿</h2><p>按优先级选择想加入的中心；第一志愿会作为报名的主要意向。</p></div></div>
+            <div class="fields">
+              <label>第一志愿 <span class="required">*</span><select id="firstChoice" name="firstChoice" required><option value="">请选择第一志愿</option><option value="白泽开发中心">白泽开发中心</option><option value="新媒体中心">新媒体中心</option><option value="拓维策划中心">拓维策划中心</option><option value="人才发展中心">人才发展中心</option></select><span class="field-error" id="firstChoice-error"></span></label>
+              <label>服从调剂 <span class="required">*</span><select id="adjustment" name="adjustment" required><option value="">请选择意向</option><option value="服从调剂">服从调剂</option><option value="不服从调剂">不服从调剂</option></select><span class="field-help">招新分配时是否接受未填报中心的协调安排。</span><span class="field-error" id="adjustment-error"></span></label>
+              <label>第二志愿 <select id="secondChoice" name="secondChoice"><option value="">暂不填写</option><option value="新媒体中心">新媒体中心</option><option value="拓维策划中心">拓维策划中心</option><option value="人才发展中心">人才发展中心</option></select><span class="field-help">选填；不包含白泽开发中心。</span><span class="field-error" id="secondChoice-error"></span></label>
+              <label>第三志愿 <select id="thirdChoice" name="thirdChoice"><option value="">暂不填写</option><option value="新媒体中心">新媒体中心</option><option value="拓维策划中心">拓维策划中心</option><option value="人才发展中心">人才发展中心</option></select><span class="field-help">选填；不能与已选志愿重复。</span><span class="field-error" id="thirdChoice-error"></span></label>
+            </div>
+            <div class="conditional" id="baize-panel" aria-live="polite">
+              <h3>白泽意向方向 <span class="required">*</span></h3>
+              <p>第一志愿为白泽开发中心时，请且仅请选择一个方向。</p>
+              <label for="baizeDirection">意向方向<select id="baizeDirection" name="baizeDirection"><option value="">请选择方向</option><option>鸿蒙开发</option><option>后端架构</option><option>大模型 AIGC</option><option>UI/UX 设计</option><option>嵌入式开发</option></select><span class="field-error" id="baizeDirection-error"></span></label>
+            </div>
+            <p class="choice-rules"><strong>选择规则：</strong>第一志愿必填；第二、第三志愿选填；同一中心不可重复。白泽开发中心仅可作为第一志愿，选择其他第一志愿时会自动清除白泽方向。</p>
+          </div>
+          <footer class="footer"><button class="text-button" type="button" data-previous="1">← 返回完善资料</button><div class="actions"><button class="button" type="button" data-next="3">确认志愿</button></div></footer>
+        </section>
+
+        <section class="form-step" data-step="3" aria-labelledby="confirm-title">
+          <div class="card-section">
+            <div class="section-head"><span class="section-number">03</span><div><h2 id="confirm-title">确认并提交</h2><p>请核对以下只读信息。需要修改时可返回对应步骤编辑。</p></div></div>
+            <div class="summary-group"><h3>成员资料</h3><div class="summary-grid" id="profile-summary"></div></div>
+            <div class="summary-group"><h3>报名志愿</h3><div class="summary-grid" id="preference-summary"></div></div>
+          </div>
+          <div class="card-section">
+            <label class="consent"><input id="consent" type="checkbox" required><span>我确认以上资料真实有效，并同意将其用于成员资料建立与本次招新报名处理。<span class="required">*</span></span></label><span class="field-error" id="consent-error"></span>
+          </div>
+          <footer class="footer"><button class="text-button" type="button" data-previous="2">← 返回编辑</button><div class="actions"><button class="button ghost" type="button" id="return-to-edit">返回修改</button><button class="button" type="submit">提交成员注册与报名</button></div></footer>
+        </section>
+        <section class="success" id="success-state" aria-live="polite">
+          <div class="success-mark">✓</div><h2>成员注册与招新报名已提交</h2><p>你的资料已作为本次前端演示中的初始成员档案，报名志愿也已进入待处理状态。</p>
+          <div class="success-state"><div><span>成员身份</span><strong>预备成员</strong></div><div><span>所属中心</span><strong>待确定</strong></div></div>
+          <div class="actions"><a class="button ghost" href="#personal-center">进入个人中心</a><a class="button" href="#results-center">查看结果中心</a></div>
+        </section>
+      </form>
+
+      <aside class="guidance" aria-label="报名说明">
+        <section><h2>报名说明</h2><p>此页面面向已登录成员。提交的是成员资料建立与招新报名，不会创建第二个登录账号。</p></section>
+        <section><h2>填写顺序</h2><ol><li><strong>完善资料</strong>：作为个人中心的初始展示材料。</li><li><strong>选择志愿</strong>：中心不能重复，白泽仅可作为第一志愿。</li><li><strong>确认提交</strong>：阅读汇总后完成本次报名。</li></ol></section>
+        <section><h2>联系信息</h2><p>联系方式仅用于招新沟通，不会出现在公开成员资料或官网展示中。</p></section>
+      </aside>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const form = document.querySelector('#application-form');
+      const stepButtons = [...document.querySelectorAll('[data-step-target]')];
+      const steps = [...document.querySelectorAll('.form-step')];
+      const fields = ['name','studentId','grade','className','practice','contact','bio','firstChoice','adjustment','secondChoice','thirdChoice','baizeDirection','consent'];
+      const field = (id) => document.getElementById(id);
+      let currentStep = 1;
+      let avatarUrl = null;
+
+      function showError(id, message) {
+        const control = field(id); const error = field(`${id}-error`);
+        if (!control || !error) return;
+        error.textContent = message;
+        control.classList.toggle('invalid', Boolean(message));
+        control.setAttribute('aria-invalid', message ? 'true' : 'false');
+        control.setAttribute('aria-describedby', `${id}-error`);
+      }
+      function clearError(id) { showError(id, ''); }
+      function invalidMessage(control) {
+        if (control.type === 'checkbox') return '请确认并勾选同意事项。';
+        return `请填写${control.closest('label')?.childNodes[0]?.textContent.trim() || '此项'}。`;
+      }
+      function updateBaize() {
+        const isBaize = field('firstChoice').value === '白泽开发中心';
+        field('baize-panel').classList.toggle('visible', isBaize);
+        field('baizeDirection').required = isBaize;
+        if (!isBaize) { field('baizeDirection').value = ''; clearError('baizeDirection'); }
+      }
+      function updateChoiceOptions() {
+        const selected = [field('firstChoice').value, field('secondChoice').value, field('thirdChoice').value];
+        ['secondChoice','thirdChoice'].forEach((id) => {
+          [...field(id).options].forEach((option) => { option.disabled = option.value !== '' && selected.includes(option.value) && option.value !== field(id).value; });
+        });
+      }
+      function validateStep(step) {
+        const ids = step === 1 ? fields.slice(0,7) : step === 2 ? fields.slice(7,12) : ['consent'];
+        let firstInvalid = null;
+        ids.forEach((id) => {
+          const control = field(id); if (!control || control.disabled || !control.required && !control.value) { clearError(id); return; }
+          if (!control.checkValidity()) { showError(id, invalidMessage(control)); firstInvalid ||= control; } else { clearError(id); }
+        });
+        if (step === 2) {
+          if (field('secondChoice').value && field('secondChoice').value === field('firstChoice').value) { showError('secondChoice', '志愿中心不能重复。'); firstInvalid ||= field('secondChoice'); }
+          if (field('thirdChoice').value && [field('firstChoice').value, field('secondChoice').value].includes(field('thirdChoice').value)) { showError('thirdChoice', '志愿中心不能重复。'); firstInvalid ||= field('thirdChoice'); }
+        }
+        if (firstInvalid) { firstInvalid.focus(); return false; }
+        return true;
+      }
+      function summaryItem(label, value, wide = false) {
+        const item = document.createElement('div'); item.className = `summary-item${wide ? ' wide' : ''}`;
+        const labelElement = document.createElement('span'); labelElement.textContent = label;
+        const valueElement = document.createElement('strong'); valueElement.textContent = value || '—';
+        item.append(labelElement, valueElement); return item;
+      }
+      function refreshSummary() {
+        field('profile-summary').replaceChildren(...[summaryItem('姓名',field('name').value),summaryItem('学号',field('studentId').value),summaryItem('年级',field('grade').value),summaryItem('班级',field('className').value),summaryItem('实践方向',field('practice').value),summaryItem('联系方式（仅招新联系）',field('contact').value),summaryItem('个人简介',field('bio').value,true)]);
+        const baize = field('firstChoice').value === '白泽开发中心' ? field('baizeDirection').value : '不适用';
+        field('preference-summary').replaceChildren(...[summaryItem('第一志愿',field('firstChoice').value),summaryItem('第二志愿',field('secondChoice').value),summaryItem('第三志愿',field('thirdChoice').value),summaryItem('调剂意向',field('adjustment').value),summaryItem('白泽意向方向',baize,true)]);
+      }
+      function showStep(step) {
+        if (step === 3) refreshSummary();
+        currentStep = step;
+        steps.forEach((section) => section.classList.toggle('active', Number(section.dataset.step) === step));
+        stepButtons.forEach((button) => { const n = Number(button.dataset.stepTarget); button.classList.toggle('active', n === step); button.classList.toggle('complete', n < step); button.toggleAttribute('aria-current', n === step); });
+        document.querySelector(`[data-step="${step}"]`).scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+      function gotoStep(step, validate = false) {
+        if (validate && step > currentStep) {
+          while (currentStep < step) {
+            if (!validateStep(currentStep)) return;
+            if (currentStep + 1 < step) showStep(currentStep + 1);
+            else break;
+          }
+        }
+        showStep(step);
+      }
+      function clearAvatar() {
+        if (avatarUrl) URL.revokeObjectURL(avatarUrl); avatarUrl = null;
+        field('avatar').value = ''; field('avatar-preview').textContent = 'HSD'; field('remove-avatar').disabled = true;
+      }
+      field('avatar').addEventListener('change', (event) => {
+        const file = event.target.files[0]; if (!file) return;
+        if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+        avatarUrl = URL.createObjectURL(file); field('avatar-preview').innerHTML = `<img src="${avatarUrl}" alt="所选头像预览">`; field('remove-avatar').disabled = false;
+      });
+      field('remove-avatar').addEventListener('click', clearAvatar);
+      window.addEventListener('beforeunload', () => { if (avatarUrl) URL.revokeObjectURL(avatarUrl); });
+      fields.forEach((id) => field(id)?.addEventListener('input', () => clearError(id)));
+      ['firstChoice','secondChoice','thirdChoice'].forEach((id) => field(id).addEventListener('change', () => { updateBaize(); updateChoiceOptions(); clearError(id); }));
+      document.querySelectorAll('[data-next]').forEach((button) => button.addEventListener('click', () => gotoStep(Number(button.dataset.next), true)));
+      document.querySelectorAll('[data-previous]').forEach((button) => button.addEventListener('click', () => gotoStep(Number(button.dataset.previous))));
+      stepButtons.forEach((button) => button.addEventListener('click', () => { const target = Number(button.dataset.stepTarget); gotoStep(target, target > currentStep); }));
+      field('return-to-edit').addEventListener('click', () => gotoStep(1));
+      form.addEventListener('submit', (event) => { event.preventDefault(); for (const step of [1,2,3]) { showStep(step); if (!validateStep(step)) return; } refreshSummary(); steps.forEach((section) => section.classList.remove('active')); field('success-state').classList.add('visible'); document.querySelector('.steps').setAttribute('hidden',''); field('success-state').scrollIntoView({ behavior:'smooth', block:'center' }); });
+      updateBaize(); updateChoiceOptions();
+    })();
+  </script>
+</body>
+</html>

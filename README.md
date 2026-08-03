@@ -30,25 +30,31 @@
 
 ## 本地运行
 
-要求 Node.js 20+ 与 pnpm 10+。
+要求 Node.js `22.19.0` 与 pnpm `10.33.0`。项目使用仓库内的 Node 与 Corepack 缓存，不需要全局安装或激活 pnpm。Node 下载到 `HSDweb/.tools`，该目录不会提交 Git；包装器只为自身启动的子进程临时调整 `PATH`，不会替换系统 Node，也不会调用或修改 Flutter、Dart、FVM、Android/iOS 环境。
 
 ```bash
-pnpm install
-pnpm run dev
+cd /Users/AnpointWork/HSDweb
+sh scripts/install-hsd-node.sh
+sh scripts/with-hsd-node.sh node --version
+sh scripts/with-hsd-node.sh corepack pnpm --version
+sh scripts/with-hsd-node.sh corepack pnpm install --frozen-lockfile
+sh scripts/with-hsd-node.sh corepack pnpm run dev
 ```
+
+Corepack 缓存位于 `HSDweb/.tools/corepack`。
 
 生产构建与预览：
 
 ```bash
-pnpm run build
-pnpm run preview
+sh scripts/with-hsd-node.sh corepack pnpm run build
+sh scripts/with-hsd-node.sh corepack pnpm run preview
 ```
 
 Vercel 免费套餐部署：
 
 ```bash
 vercel build --prod
-pnpm run vercel:materialize
+corepack pnpm run vercel:materialize
 vercel deploy --prebuilt --prod
 ```
 
@@ -58,7 +64,7 @@ vercel deploy --prebuilt --prod
 EdgeOne Pages 静态部署：
 
 ```bash
-pnpm exec nuxi generate
+sh scripts/with-hsd-node.sh corepack pnpm exec nuxi generate
 tar.exe -a -cf artifacts/baiyun-hsd-edgeone-clean.zip -C .output/public .
 ```
 
@@ -67,11 +73,15 @@ tar.exe -a -cf artifacts/baiyun-hsd-edgeone-clean.zip -C .output/public .
 测试：
 
 ```bash
-pnpm run test:unit
-pnpm run test:e2e
+sh scripts/with-hsd-node.sh corepack pnpm run typecheck
+sh scripts/with-hsd-node.sh corepack pnpm run test:unit
+sh scripts/with-hsd-node.sh corepack pnpm run build
+NUXT_TELEMETRY_DISABLED=1 sh scripts/with-hsd-node.sh corepack pnpm run test:e2e
 ```
 
 Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome。
+
+Flutter、Dart、FVM 和 Android/iOS 环境与本项目相互独立；本项目不要求修改这些环境。
 
 ## 页面路由
 
