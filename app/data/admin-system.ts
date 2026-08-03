@@ -1,3 +1,93 @@
+import {
+  DEMO_APPLICANT_PROFILE,
+  DEMO_MEMBER_PROFILE
+} from "./member-profile";
+
+export const ADMIN_LEVELS = ["member", "admin", "owner"] as const;
+export type AdminLevel = (typeof ADMIN_LEVELS)[number];
+
+export const DEMO_MEMBER_ACCOUNT = "demo-member";
+export const DEMO_APPLICANT_ACCOUNT = "demo-applicant";
+
+export interface MockAccount {
+  account: string;
+  memberId: string;
+  name: string;
+  adminLevel: AdminLevel;
+  adminAccessEnabled: boolean;
+}
+
+export type MockLoginResult =
+  | { status: "success"; account: MockAccount }
+  | { status: "unknown-account"; account: string }
+  | { status: "admin-access-missing"; account: MockAccount }
+  | { status: "admin-access-disabled"; account: MockAccount };
+
+// This is the sole mock account and authorization source. Profile fixtures remain separate.
+export const MOCK_ACCOUNTS: MockAccount[] = [
+  {
+    account: DEMO_MEMBER_ACCOUNT,
+    memberId: DEMO_MEMBER_PROFILE.id,
+    name: DEMO_MEMBER_PROFILE.name,
+    adminLevel: "member",
+    adminAccessEnabled: true
+  },
+  {
+    account: DEMO_APPLICANT_ACCOUNT,
+    memberId: DEMO_APPLICANT_PROFILE.id,
+    name: DEMO_APPLICANT_PROFILE.name,
+    adminLevel: "member",
+    adminAccessEnabled: true
+  },
+  {
+    account: "media-admin",
+    memberId: DEMO_MEMBER_PROFILE.id,
+    name: "周同学",
+    adminLevel: "admin",
+    adminAccessEnabled: true
+  },
+  {
+    account: "admin-alliance",
+    memberId: DEMO_MEMBER_PROFILE.id,
+    name: "联盟管理员",
+    adminLevel: "owner",
+    adminAccessEnabled: true
+  },
+  {
+    account: "disabled-admin",
+    memberId: DEMO_MEMBER_PROFILE.id,
+    name: "已停用管理员",
+    adminLevel: "admin",
+    adminAccessEnabled: false
+  }
+];
+
+export function findMockAccount(
+  accounts: MockAccount[],
+  account: string
+): MockAccount | undefined {
+  return accounts.find((item) => item.account === account.trim());
+}
+
+export function resolveMockLogin(
+  accounts: MockAccount[],
+  account: string,
+  requireAdmin = false
+): MockLoginResult {
+  const matchedAccount = findMockAccount(accounts, account);
+  if (!matchedAccount) return { status: "unknown-account", account: account.trim() };
+
+  if (requireAdmin && matchedAccount.adminLevel === "member") {
+    return { status: "admin-access-missing", account: matchedAccount };
+  }
+
+  if (requireAdmin && !matchedAccount.adminAccessEnabled) {
+    return { status: "admin-access-disabled", account: matchedAccount };
+  }
+
+  return { status: "success", account: matchedAccount };
+}
+
 export type PermissionAction =
   | "view"
   | "create"
