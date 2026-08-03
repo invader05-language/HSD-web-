@@ -2,13 +2,25 @@ import {
   DEMO_APPLICANT_PROFILE,
   DEMO_MEMBER_PROFILE
 } from "./member-profile";
+import { ADMIN_MEMBERS } from "./admin-members";
 
 export const ADMIN_LEVELS = ["member", "admin", "owner"] as const;
 export type AdminLevel = (typeof ADMIN_LEVELS)[number];
 
+export const ADMIN_CENTER_LEAD_LABELS = [
+  "白泽开发中心负责人",
+  "新媒体中心负责人",
+  "拓维策划中心负责人",
+  "人才发展中心负责人"
+] as const;
+export type AdminCenterRole = (typeof ADMIN_CENTER_LEAD_LABELS)[number];
+
+export const ADMIN_ACCESS_STORAGE_KEY = "baiyun-hsd-admin-access";
+export const ADMIN_ACCESS_STORAGE_VERSION = 1;
+
 export function getAdminLevelLabel(level: AdminLevel): string {
   if (level === "owner") return "联盟总负责人";
-  if (level === "admin") return "平台管理员";
+  if (level === "admin") return "中心负责人";
   return "普通成员";
 }
 
@@ -21,6 +33,12 @@ export interface MockAccount {
   name: string;
   adminLevel: AdminLevel;
   adminAccessEnabled: boolean;
+  adminCenterRole?: AdminCenterRole;
+}
+
+export function getAdminQualificationLabel(account: MockAccount): string {
+  if (account.adminLevel === "admin") return account.adminCenterRole ?? "中心负责人";
+  return getAdminLevelLabel(account.adminLevel);
 }
 
 export type MockLoginResult =
@@ -29,7 +47,23 @@ export type MockLoginResult =
   | { status: "admin-access-missing"; account: MockAccount }
   | { status: "admin-access-disabled"; account: MockAccount };
 
-// This is the sole mock account and authorization source. Profile fixtures remain separate.
+function getPlatformMember(memberId: string) {
+  const member = ADMIN_MEMBERS.find((item) => item.id === memberId);
+  if (!member) throw new Error(`管理员账号成员不存在：${memberId}`);
+  return member;
+}
+
+function createPlatformMemberAccount(
+  account: string,
+  memberId: string,
+  options: Pick<MockAccount, "adminLevel" | "adminAccessEnabled" | "adminCenterRole">
+): MockAccount {
+  const member = getPlatformMember(memberId);
+  return { account, memberId: member.id, name: member.name, ...options };
+}
+
+// Account authorization remains centralized here. Platform-member-backed accounts reuse
+// the established administrator member fixtures instead of defining parallel user records.
 export const MOCK_ACCOUNTS: MockAccount[] = [
   {
     account: DEMO_MEMBER_ACCOUNT,
@@ -45,27 +79,40 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
     adminLevel: "member",
     adminAccessEnabled: true
   },
-  {
-    account: "media-admin",
-    memberId: DEMO_MEMBER_PROFILE.id,
-    name: "周同学",
+  createPlatformMemberAccount("media-admin", "member-li", {
     adminLevel: "admin",
-    adminAccessEnabled: true
-  },
-  {
-    account: "admin-alliance",
-    memberId: DEMO_MEMBER_PROFILE.id,
-    name: "联盟管理员",
+    adminAccessEnabled: true,
+    adminCenterRole: "新媒体中心负责人"
+  }),
+  createPlatformMemberAccount("admin-alliance", "member-zhang", {
     adminLevel: "owner",
     adminAccessEnabled: true
-  },
-  {
-    account: "disabled-admin",
-    memberId: DEMO_MEMBER_PROFILE.id,
-    name: "已停用管理员",
+  }),
+  createPlatformMemberAccount("disabled-admin", "member-zhao", {
     adminLevel: "admin",
-    adminAccessEnabled: false
-  }
+    adminAccessEnabled: false,
+    adminCenterRole: "人才发展中心负责人"
+  }),
+  createPlatformMemberAccount("member-lin", "member-lin", {
+    adminLevel: "member",
+    adminAccessEnabled: true
+  }),
+  createPlatformMemberAccount("member-gao", "member-gao", {
+    adminLevel: "member",
+    adminAccessEnabled: true
+  }),
+  createPlatformMemberAccount("member-wang", "member-wang", {
+    adminLevel: "member",
+    adminAccessEnabled: true
+  }),
+  createPlatformMemberAccount("member-chen", "member-chen", {
+    adminLevel: "member",
+    adminAccessEnabled: true
+  }),
+  createPlatformMemberAccount("member-wu", "member-wu", {
+    adminLevel: "member",
+    adminAccessEnabled: true
+  })
 ];
 
 export function findMockAccount(
@@ -112,7 +159,7 @@ export interface AdminAuditRecord {
 export const ADMIN_AUDIT_RECORDS: AdminAuditRecord[] = [
   {
     id: "log-001",
-    actor: "联盟管理员",
+    actor: "张同学",
     role: "联盟总负责人",
     module: "招新与考核",
     action: "发布 2026 秋季招新录取结果",
@@ -126,8 +173,8 @@ export const ADMIN_AUDIT_RECORDS: AdminAuditRecord[] = [
   },
   {
     id: "log-002",
-    actor: "周同学",
-    role: "平台管理员",
+    actor: "李同学",
+    role: "新媒体中心负责人",
     module: "媒体与资源",
     action: "审核通过首页主视觉",
     target: "2026 招新首页主视觉",
@@ -141,7 +188,7 @@ export const ADMIN_AUDIT_RECORDS: AdminAuditRecord[] = [
   {
     id: "log-003",
     actor: "陈同学",
-    role: "平台管理员",
+    role: "拓维策划中心负责人",
     module: "组织与成员",
     action: "更新成员中心归属",
     target: "成员 2026012042",
@@ -154,8 +201,8 @@ export const ADMIN_AUDIT_RECORDS: AdminAuditRecord[] = [
   },
   {
     id: "log-004",
-    actor: "周同学",
-    role: "平台管理员",
+    actor: "李同学",
+    role: "新媒体中心负责人",
     module: "系统管理",
     action: "尝试访问管理员资格配置",
     target: "管理员资格配置",
