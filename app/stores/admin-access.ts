@@ -53,7 +53,7 @@ export const useAdminAccessStore = defineStore("admin-access", {
       if (!target || (target.adminLevel === "owner" && level !== "owner")) return false;
 
       target.adminLevel = level;
-      if (level === "admin") target.adminAccessEnabled = true;
+      if (level === "admin" || level === "owner") target.adminAccessEnabled = true;
       if (level === "member") target.adminAccessEnabled = true;
       return true;
     }

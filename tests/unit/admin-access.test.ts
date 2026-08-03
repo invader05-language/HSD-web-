@@ -87,4 +87,14 @@ describe("mock administration access", () => {
       adminAccessEnabled: true
     });
   });
+
+  it("enables access when promoting a disabled administrator to owner", () => {
+    const access = useAdminAccessStore();
+
+    expect(access.setAdminLevel("disabled-admin", "owner")).toBe(true);
+    expect(access.getAccount("disabled-admin")).toMatchObject({
+      adminLevel: "owner",
+      adminAccessEnabled: true
+    });
+  });
 });
