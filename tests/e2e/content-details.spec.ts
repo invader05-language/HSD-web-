@@ -32,7 +32,7 @@ test("internal resource login continues to an honest unavailable state", async (
     (document.querySelector("form") as Element & { __vueParentComponent?: unknown })?.__vueParentComponent
   ));
 
-  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 
@@ -47,7 +47,7 @@ test("member results require login and continue back after demo sign-in", async 
   await page.getByRole("link", { name: "结果中心" }).click();
 
   await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
-  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 

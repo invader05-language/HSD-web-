@@ -62,3 +62,11 @@
 - `pnpm exec playwright test tests/e2e/admin-platform.spec.ts --list`: passed, collecting 9 tests.
 - Focused browser execution was attempted before the change but Nuxt failed during server startup with `EMFILE: too many open files, watch`; no assertion ran. The port was not reachable after Playwright cleaned up the failed server process.
 - A fresh focused attempt after the change with `CHOKIDAR_USEPOLLING=1` stopped before browser launch because Nuxt reported an existing worktree dev-server lock (PID 84611), while `127.0.0.1:49852` was not reachable. The process was left untouched; no browser assertion result is available.
+
+## Final Access-Flow Coverage (2026-08-03)
+
+- The administrator platform suite now covers member/admin login mode switching, owner confirmation for grant, revoke, enable, and disable changes, audit-log visibility, and a newly qualified account entering the management workbench without receiving owner-only navigation.
+- Legacy E2E login fields now target the current accessible label, `学号或成员账号`.
+- Playwright collected all 55 E2E scenarios, including 12 administration-platform scenarios.
+- Full browser execution remains blocked before assertions by the local Nuxt watcher limit: `EMFILE: too many open files, watch`.
+- The equivalent owner grant, audit-log visibility, and post-grant administrator login flow were manually verified against the no-watch production preview at `http://127.0.0.1:3003`.

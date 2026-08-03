@@ -47,6 +47,74 @@ test("administrator denial identifies the owner-only destination", async ({ page
   await expect(page.getByText("联盟总负责人资格", { exact: true })).toBeVisible();
 });
 
+test("login modes reject members from administrator access and admit qualified accounts", async ({ page }) => {
+  await page.goto("/login");
+
+  await expect(page.getByRole("radio", { name: "成员登录" })).toBeChecked();
+  await page.getByRole("radio", { name: "管理员登录" }).check();
+  await page.getByLabel("学号或成员账号").fill("demo-member");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page.getByRole("alert")).toContainText("该账号未获管理员资格");
+
+  await page.getByLabel("学号或成员账号").fill("media-admin");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+});
+
+test("owner qualification changes are confirmed and written to the audit log", async ({ page }) => {
+  await signInToAdmin(page, "/admin/accounts");
+
+  const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
+  const confirm = page.getByRole("alertdialog");
+  const memberRow = accounts.getByRole("row").filter({ hasText: "demo-member" });
+  const adminRow = accounts.getByRole("row").filter({ hasText: "media-admin" });
+
+  await memberRow.getByRole("button", { name: "授予管理员资格" }).click();
+  await expect(confirm).toContainText("确认授予管理员资格？");
+  await confirm.getByRole("button", { name: "确认变更" }).click();
+  await expect(memberRow).toContainText("平台管理员");
+
+  await adminRow.getByRole("button", { name: "停用管理员资格" }).click();
+  await confirm.getByRole("button", { name: "确认变更" }).click();
+  await expect(adminRow).toContainText("已停用");
+
+  await adminRow.getByRole("button", { name: "启用管理员资格" }).click();
+  await confirm.getByRole("button", { name: "确认变更" }).click();
+  await expect(adminRow).toContainText("已启用");
+
+  await memberRow.getByRole("button", { name: "撤销资格" }).click();
+  await confirm.getByRole("button", { name: "确认变更" }).click();
+  await expect(memberRow).toContainText("普通成员");
+
+  await page.getByRole("link", { name: "操作日志", exact: true }).click();
+  const audit = page.getByRole("table", { name: "管理员操作日志" });
+  await expect(audit).toContainText("授予管理员资格");
+  await expect(audit).toContainText("停用管理员资格");
+  await expect(audit).toContainText("启用管理员资格");
+  await expect(audit).toContainText("撤销管理员资格");
+});
+
+test("a newly qualified account can start an admin session but cannot manage accounts", async ({ page }) => {
+  await signInToAdmin(page, "/admin/accounts");
+
+  const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
+  const memberRow = accounts.getByRole("row").filter({ hasText: "demo-member" });
+  await memberRow.getByRole("button", { name: "授予管理员资格" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "确认变更" }).click();
+
+  await page.getByRole("button", { name: "退出" }).click();
+  await page.getByRole("link", { name: "登录", exact: true }).click();
+  await page.getByRole("radio", { name: "管理员登录" }).check();
+  await page.getByLabel("学号或成员账号").fill("demo-member");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  await page.getByRole("button", { name: /系统管理/ }).click();
+  await expect(page.getByRole("link", { name: "管理员资格配置", exact: true })).toHaveCount(0);
+});
+
 test("mobile administration retains identity and filtered navigation", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signInToAdmin(page, "/admin/recruitment", "media-admin");
