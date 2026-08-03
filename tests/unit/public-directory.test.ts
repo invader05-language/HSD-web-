@@ -59,6 +59,16 @@ describe("public people and center directory", () => {
     expect(PUBLIC_MEMBERS.every((person) => !person.isCore)).toBe(true);
   });
 
+  it("publishes only normalized member duties and Baize-only directions", () => {
+    const people = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
+    expect(people.every((person) => ["普通成员", "核心人员"].includes(person.memberDuty))).toBe(true);
+    expect(people.filter((person) => person.centerSlug === "baize-development")
+      .every((person) => person.baizeDirection)).toBe(true);
+    expect(people.filter((person) => person.centerSlug !== "baize-development")
+      .every((person) => person.baizeDirection === undefined)).toBe(true);
+    expect(people.every((person) => !Object.hasOwn(person, "direction"))).toBe(true);
+  });
+
   it("returns the approved public people for each center", () => {
     expect(getPeopleByCenter("baize-development").map((person) => person.id)).toEqual([
       "lin-development",

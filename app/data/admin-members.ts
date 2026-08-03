@@ -1,11 +1,14 @@
+import type { MemberDuty } from "./member-profile";
+import type { BaizeDirection } from "./recruitment-application";
+
 export type AdminCenter =
   | "白泽开发中心"
   | "新媒体中心"
   | "拓维策划中心"
   | "人才发展中心";
 
-export type AdminMemberIdentity = "正式成员" | "预备成员" | "核心成员";
-export type AdminPublicState = "已公开" | "未公开" | "资料待审核";
+export type AdminMemberIdentity = "正式成员" | "预备成员";
+export type AdminCenterLeadership = `${AdminCenter}负责人`;
 
 export interface AdminMember {
   id: string;
@@ -14,9 +17,9 @@ export interface AdminMember {
   center: AdminCenter;
   identity: AdminMemberIdentity;
   grade: string;
-  direction: string;
-  role: string;
-  publicState: AdminPublicState;
+  memberDuty: MemberDuty;
+  baizeDirection?: BaizeDirection;
+  centerLeadership?: AdminCenterLeadership;
   avatarUrl: string | null;
   profileSummary: string;
   updatedAt: string;
@@ -26,7 +29,6 @@ export interface AdminMemberFilters {
   query: string;
   center: AdminCenter | "全部中心";
   identity: AdminMemberIdentity | "全部身份";
-  publicState: AdminPublicState | "全部状态";
 }
 
 export const ADMIN_MEMBERS: AdminMember[] = [
@@ -37,9 +39,8 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "白泽开发中心",
     identity: "正式成员",
     grade: "2026 级",
-    direction: "鸿蒙开发",
-    role: "应用开发成员",
-    publicState: "已公开",
+    memberDuty: "核心人员",
+    baizeDirection: "鸿蒙开发",
     avatarUrl: "/images/members/member-lin.webp",
     profileSummary: "参与 HarmonyOS 原生应用开发与项目联调。",
     updatedAt: "07-30 15:20"
@@ -51,9 +52,8 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "白泽开发中心",
     identity: "正式成员",
     grade: "2026 级",
-    direction: "大模型 AIGC",
-    role: "AI 应用成员",
-    publicState: "已公开",
+    memberDuty: "普通成员",
+    baizeDirection: "大模型 AIGC",
     avatarUrl: null,
     profileSummary: "负责大模型应用验证和公开演示内容。",
     updatedAt: "07-30 14:42"
@@ -65,9 +65,7 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "新媒体中心",
     identity: "预备成员",
     grade: "2026 级",
-    direction: "摄影剪辑",
-    role: "预备成员",
-    publicState: "未公开",
+    memberDuty: "普通成员",
     avatarUrl: "/private/avatars/member-wang-original.jpg",
     profileSummary: "报名资料尚未转为公开成员资料。",
     updatedAt: "07-30 12:16"
@@ -79,9 +77,7 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "新媒体中心",
     identity: "正式成员",
     grade: "2026 级",
-    direction: "内容运营",
-    role: "内容编辑",
-    publicState: "资料待审核",
+    memberDuty: "普通成员",
     avatarUrl: null,
     profileSummary: "参与推文写作、视觉内容整理和媒体运营。",
     updatedAt: "07-30 10:34"
@@ -91,11 +87,10 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     name: "张同学",
     studentId: "20250012",
     center: "拓维策划中心",
-    identity: "核心成员",
+    identity: "正式成员",
     grade: "2025 级",
-    direction: "活动策划",
-    role: "中心负责人",
-    publicState: "已公开",
+    memberDuty: "核心人员",
+    centerLeadership: "拓维策划中心负责人",
     avatarUrl: null,
     profileSummary: "负责赛事活动策划与跨中心协作。",
     updatedAt: "07-29 20:18"
@@ -107,9 +102,7 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "拓维策划中心",
     identity: "预备成员",
     grade: "2026 级",
-    direction: "赛事统筹",
-    role: "预备成员",
-    publicState: "未公开",
+    memberDuty: "普通成员",
     avatarUrl: null,
     profileSummary: "等待线下最终结果录入。",
     updatedAt: "07-29 22:08"
@@ -119,11 +112,10 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     name: "赵同学",
     studentId: "20250008",
     center: "人才发展中心",
-    identity: "核心成员",
+    identity: "正式成员",
     grade: "2025 级",
-    direction: "成员成长",
-    role: "中心负责人",
-    publicState: "已公开",
+    memberDuty: "核心人员",
+    centerLeadership: "人才发展中心负责人",
     avatarUrl: "/images/members/member-zhao.webp",
     profileSummary: "负责新人培养、训练营与成长反馈。",
     updatedAt: "07-29 18:36"
@@ -135,9 +127,7 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     center: "人才发展中心",
     identity: "正式成员",
     grade: "2025 级",
-    direction: "培训组织",
-    role: "成长伙伴",
-    publicState: "已公开",
+    memberDuty: "普通成员",
     avatarUrl: null,
     profileSummary: "参与新人学习支持和活动组织。",
     updatedAt: "07-29 17:20"
@@ -179,9 +169,7 @@ export function filterAdminMembers(
       filters.center === "全部中心" || member.center === filters.center;
     const matchesIdentity =
       filters.identity === "全部身份" || member.identity === filters.identity;
-    const matchesPublicState =
-      filters.publicState === "全部状态" || member.publicState === filters.publicState;
-    return matchesQuery && matchesCenter && matchesIdentity && matchesPublicState;
+    return matchesQuery && matchesCenter && matchesIdentity;
   });
 }
 
@@ -190,7 +178,9 @@ export function getPublicProfilePreview(member: AdminMember) {
   return {
     name: member.name,
     center: member.center,
-    role: member.role,
+    memberDuty: member.memberDuty,
+    centerLeadership: member.centerLeadership,
+    baizeDirection: member.baizeDirection,
     summary: member.profileSummary,
     avatarUrl: canExposeAvatar ? member.avatarUrl : null,
     usesDefaultAvatar: !canExposeAvatar

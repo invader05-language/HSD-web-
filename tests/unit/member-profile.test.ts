@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import {
   DEMO_APPLICANT_PROFILE,
   DEMO_MEMBER_PROFILE,
+  MEMBER_DUTIES,
   projectMemberToAdmin,
   projectMemberToPublic,
 } from "../../app/data/member-profile";
@@ -25,6 +26,12 @@ describe("member profile domain", () => {
     expect(DEMO_MEMBER_PROFILE.className).toBeTruthy();
     expect(DEMO_MEMBER_PROFILE).not.toHaveProperty("publicVisible");
     expect(DEMO_MEMBER_PROFILE).not.toHaveProperty("avatarVisible");
+  });
+
+  it("uses one two-value member-duty contract", () => {
+    expect(MEMBER_DUTIES).toEqual(["普通成员", "核心人员"]);
+    expect(MEMBER_DUTIES).toContain(DEMO_MEMBER_PROFILE.memberDuty);
+    expect(MEMBER_DUTIES).toContain(DEMO_APPLICANT_PROFILE.memberDuty);
   });
 
   it("uses the session store as the only source of the current member id", () => {
@@ -51,10 +58,12 @@ describe("member profile domain", () => {
 
     session.signIn("demo-applicant");
     profileStore.updateProfile(session.currentMemberId, {
-      direction: "预备成员的新方向",
+      baizeDirection: "鸿蒙开发",
       bio: "预备成员的新简介，不得覆盖任何正式成员公开资料。",
       avatarUrl: "blob:applicant-avatar",
     });
+
+    expect(profileStore.getProfile(session.currentMemberId).baizeDirection).toBeUndefined();
 
     expect(repository.findPublicPerson(DEMO_APPLICANT_PROFILE.id)).toBeUndefined();
     expect(repository.findAdminMember(DEMO_APPLICANT_PROFILE.id)).toBeUndefined();
@@ -62,41 +71,78 @@ describe("member profile domain", () => {
     expect(repository.findAdminMember(DEMO_MEMBER_PROFILE.id)).toEqual(formalAdminMember);
   });
 
+  it("automatically projects a newly stored formal profile into the public directory", () => {
+    const profileStore = useMemberProfileStore();
+    profileStore.profiles["member-new"] = {
+      id: "member-new",
+      publicId: "new-media-member",
+      name: "新成员",
+      studentId: "20269999",
+      grade: "2026 级",
+      className: "数字媒体 1 班",
+      center: "新媒体中心",
+      centerSlug: "new-media",
+      memberDuty: "普通成员",
+      identity: "正式成员",
+      bio: "",
+    };
+
+    const repository = useMemberRepository();
+    const publicPerson = repository.findPublicPerson("new-media-member");
+
+    expect(publicPerson).toMatchObject({
+      id: "new-media-member",
+      name: "新成员",
+      centerName: "新媒体中心",
+      centerSlug: "new-media",
+      memberDuty: "普通成员",
+      bio: "",
+      isCore: false,
+      avatarVisible: false,
+    });
+    expect(publicPerson).not.toHaveProperty("studentId");
+    expect(publicPerson).not.toHaveProperty("className");
+    expect(publicPerson).not.toHaveProperty("baizeDirection");
+  });
+
   it("keeps an unsaved draft separate from the saved profile", () => {
     const session = useSessionStore();
     const store = useMemberProfileStore();
     const draft = store.createDraft(session.currentMemberId);
 
-    draft.direction = "新的实践方向";
+    draft.baizeDirection = "后端架构";
     draft.bio = "新的个人简介";
 
-    expect(store.getProfile(session.currentMemberId).direction).toBe(DEMO_MEMBER_PROFILE.direction);
+    expect(store.getProfile(session.currentMemberId).baizeDirection).toBe(DEMO_MEMBER_PROFILE.baizeDirection);
     expect(store.getProfile(session.currentMemberId).bio).toBe(DEMO_MEMBER_PROFILE.bio);
 
-    store.updateProfile(session.currentMemberId, { direction: draft.direction, bio: draft.bio });
+    store.updateProfile(session.currentMemberId, {
+      baizeDirection: draft.baizeDirection,
+      bio: draft.bio,
+    });
 
-    expect(store.getProfile(session.currentMemberId).direction).toBe("新的实践方向");
+    expect(store.getProfile(session.currentMemberId).baizeDirection).toBe("后端架构");
     expect(store.getProfile(session.currentMemberId).bio).toBe("新的个人简介");
   });
 
   it("can cancel a draft by starting from the latest saved snapshot", () => {
     const session = useSessionStore();
     const store = useMemberProfileStore();
-    store.updateProfile(session.currentMemberId, { direction: "已保存方向" });
+    store.updateProfile(session.currentMemberId, { baizeDirection: "大模型 AIGC" });
 
     const draft = store.createDraft(session.currentMemberId);
-    draft.direction = "未保存方向";
+    draft.baizeDirection = "UI/UX 设计";
 
     const cancelled = store.createDraft(session.currentMemberId);
-    expect(cancelled.direction).toBe("已保存方向");
-    expect(store.getProfile(session.currentMemberId).direction).toBe("已保存方向");
+    expect(cancelled.baizeDirection).toBe("大模型 AIGC");
+    expect(store.getProfile(session.currentMemberId).baizeDirection).toBe("大模型 AIGC");
   });
 
   it("projects the same saved values to public and admin records", () => {
     const session = useSessionStore();
     const store = useMemberProfileStore();
     store.updateProfile(session.currentMemberId, {
-      direction: "统一方向",
+      baizeDirection: "嵌入式开发",
       bio: "统一简介",
       avatarUrl: "blob:demo-avatar"
     });
@@ -107,10 +153,34 @@ describe("member profile domain", () => {
     const publicProjection = projectMemberToPublic(profile, publicBase);
     const adminProjection = projectMemberToAdmin(profile, adminBase);
 
-    expect(publicProjection.direction).toBe(adminProjection.direction);
+    expect(publicProjection.baizeDirection).toBe(adminProjection.baizeDirection);
+    expect(publicProjection.baizeDirection).toBe("嵌入式开发");
     expect(publicProjection.bio).toBe(adminProjection.profileSummary);
     expect(publicProjection.avatarVisible).toBe(true);
     expect(adminProjection.avatarUrl).toBe("blob:demo-avatar");
+  });
+
+  it("never projects private member fields and hides directions outside Baize", () => {
+    const baizeBase = CORE_PEOPLE.find((person) => person.id === DEMO_MEMBER_PROFILE.publicId)!;
+    const baizeProjection = projectMemberToPublic(
+      { ...DEMO_MEMBER_PROFILE, baizeDirection: "鸿蒙开发" },
+      baizeBase,
+    );
+    const nonBaizeProjection = projectMemberToPublic(
+      {
+        ...DEMO_MEMBER_PROFILE,
+        center: "新媒体中心",
+        centerSlug: "new-media",
+        baizeDirection: "鸿蒙开发",
+      },
+      { ...baizeBase, centerSlug: "new-media", centerName: "新媒体中心" },
+    );
+
+    expect(baizeProjection.baizeDirection).toBe("鸿蒙开发");
+    expect(nonBaizeProjection.baizeDirection).toBeUndefined();
+    expect(nonBaizeProjection).not.toHaveProperty("studentId");
+    expect(nonBaizeProjection).not.toHaveProperty("className");
+    expect(nonBaizeProjection).not.toHaveProperty("identity");
   });
 
   it("automatically publishes an uploaded avatar and falls back after removal", () => {
@@ -129,14 +199,22 @@ describe("member profile domain", () => {
     expect(withoutAvatar).not.toHaveProperty("avatarUrl");
   });
 
-  it("requires non-blank direction and bio within the field limits", () => {
-    expect(validateMemberProfileDraft({ direction: "  ", bio: "简介" })).toEqual({
-      direction: "请填写实践方向。",
-    });
-    expect(validateMemberProfileDraft({ direction: "开发", bio: "  " })).toEqual({
-      bio: "请填写个人简介。",
-    });
-    expect(validateMemberProfileDraft({ direction: "开发", bio: "简介" })).toEqual({});
+  it("requires a valid direction only for Baize and keeps bio optional", () => {
+    expect(validateMemberProfileDraft({
+      center: "白泽开发中心",
+      baizeDirection: undefined,
+      bio: "",
+    })).toEqual({ baizeDirection: "请选择白泽实践方向。" });
+    expect(validateMemberProfileDraft({
+      center: "新媒体中心",
+      baizeDirection: undefined,
+      bio: "  ",
+    })).toEqual({});
+    expect(validateMemberProfileDraft({
+      center: "白泽开发中心",
+      baizeDirection: "鸿蒙开发",
+      bio: "简介",
+    })).toEqual({});
   });
 
   it("accepts common image files and rejects unsupported or oversized files", () => {

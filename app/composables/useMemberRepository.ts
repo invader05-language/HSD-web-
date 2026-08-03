@@ -19,22 +19,25 @@ export function useMemberRepository() {
   const formalProfiles = computed(() =>
     Object.values(profileStore.profiles).filter(isFormalMemberProfile)
   );
-  const publicCorePeople = computed(() =>
-    CORE_PEOPLE.map((person) => {
+  const allPublicPeople = computed<readonly PublicPerson[]>(() => {
+    const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
+    const projectedStaticPeople = staticPeople.map((person) => {
       const profile = formalProfiles.value.find((item) => item.publicId === person.id);
       return profile ? projectMemberToPublic(profile, person) : person;
-    })
+    });
+    const staticIds = new Set(staticPeople.map((person) => person.id));
+    const newFormalPeople = formalProfiles.value
+      .filter((profile) => !staticIds.has(profile.publicId))
+      .map((profile) => projectMemberToPublic(profile));
+
+    return [...projectedStaticPeople, ...newFormalPeople];
+  });
+  const publicCorePeople = computed(() =>
+    allPublicPeople.value.filter((person) => person.isCore)
   );
   const publicMembers = computed(() =>
-    PUBLIC_MEMBERS.map((person) => {
-      const profile = formalProfiles.value.find((item) => item.publicId === person.id);
-      return profile ? projectMemberToPublic(profile, person) : person;
-    })
+    allPublicPeople.value.filter((person) => !person.isCore)
   );
-  const allPublicPeople = computed<readonly PublicPerson[]>(() => [
-    ...publicCorePeople.value,
-    ...publicMembers.value,
-  ]);
   const adminMembers = computed(() =>
     ADMIN_MEMBERS.map((member) => {
       const profile = formalProfiles.value.find((item) => item.id === member.id);

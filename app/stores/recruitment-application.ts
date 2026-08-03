@@ -79,7 +79,9 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         firstChoice,
         secondChoice: applicationDraft.secondChoice,
         thirdChoice: applicationDraft.thirdChoice,
-        baizeDirection: applicationDraft.baizeDirection,
+        baizeDirection: firstChoice === "白泽开发中心"
+          ? applicationDraft.baizeDirection
+          : undefined,
         acceptsAdjustment,
         status: "submitted",
         submittedAt: new Date().toISOString(),

@@ -21,7 +21,7 @@ export type LaterChoice = Exclude<RecruitmentCenter, "白泽开发中心">;
 
 export type RegistrationProfileDraft = Pick<
   MemberProfile,
-  "name" | "studentId" | "grade" | "className" | "direction" | "bio" | "avatarUrl"
+  "name" | "studentId" | "grade" | "className" | "bio" | "avatarUrl"
 >;
 
 export interface RecruitmentApplicationDraft {
@@ -56,7 +56,6 @@ export function createRegistrationProfileDraft(profile: MemberProfile): Registra
     studentId: profile.studentId,
     grade: profile.grade,
     className: profile.className,
-    direction: profile.direction,
     bio: profile.bio,
     avatarUrl: profile.avatarUrl,
   };

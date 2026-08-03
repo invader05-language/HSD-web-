@@ -25,16 +25,16 @@ export const useMemberProfileStore = defineStore("member-profile", {
       return cloneMemberProfile(this.getProfile(memberId));
     },
     updateProfile(memberId: string, patch: MemberProfilePatch) {
-      this.profiles[memberId] = {
+      this.profiles[memberId] = cloneMemberProfile({
         ...this.getProfile(memberId),
         ...patch,
-      };
+      });
     },
     registerProfile(memberId: string, patch: MemberRegistrationProfilePatch) {
-      this.profiles[memberId] = {
+      this.profiles[memberId] = cloneMemberProfile({
         ...this.getProfile(memberId),
         ...patch,
-      };
+      });
     },
   },
 });
