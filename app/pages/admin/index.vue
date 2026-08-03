@@ -3,7 +3,6 @@ import {
   ADMIN_CONTENT_ACTIVITY,
   ADMIN_DASHBOARD_METRICS,
   ADMIN_QUICK_CREATE,
-  ADMIN_RECENT_ACTIVITY,
   ADMIN_RECRUITMENT_PROGRESS,
   ADMIN_STORAGE_OVERVIEW,
   ADMIN_TODOS
@@ -125,20 +124,5 @@ const quickCreateOpen = ref(false);
         <footer><span>Mock 存储配额</span><strong>37.4 GB / 100 GB</strong></footer>
       </section>
     </div>
-
-    <section class="admin-dashboard-panel admin-dashboard-recent">
-      <header>
-        <div><span>Audit Preview</span><h2>最近操作记录</h2></div>
-        <NuxtLink to="/admin/logs">完整日志 →</NuxtLink>
-      </header>
-      <div>
-        <article v-for="(item, index) in ADMIN_RECENT_ACTIVITY" :key="item.action">
-          <span>{{ String(index + 1).padStart(2, "0") }}</span>
-          <strong>{{ item.actor }}</strong>
-          <p>{{ item.action }}</p>
-          <small>{{ item.time }}</small>
-        </article>
-      </div>
-    </section>
   </div>
 </template>

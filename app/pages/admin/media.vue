@@ -20,7 +20,7 @@ const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
 <template>
   <div class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Media Library" title="媒体素材库" description="集中管理图片、视频及其授权、处理、审核和使用位置；原文件计划进入对象存储，数据库只保存元数据与引用关系。">
-      <template #actions><NuxtLink class="button button--ghost" to="/admin/uploads">查看上传任务</NuxtLink><button type="button" class="button" @click="showUpload = true">上传素材</button></template>
+      <template #actions><button type="button" class="button" @click="showUpload = true">上传素材</button></template>
     </AdminPageHeading>
     <section class="admin-summary-strip" aria-label="素材概览">
       <div><span>全部素材</span><strong>486</strong><small>图片 391 · 视频 76</small></div>
@@ -55,7 +55,7 @@ const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
         <aside class="admin-candidate-drawer" aria-label="素材详情">
           <header class="admin-drawer__header"><div><span>ASSET DETAIL</span><h2>{{ selected.name }}</h2><p>{{ selected.type }} · {{ selected.dimensions }} · {{ selected.size }}</p></div><button type="button" aria-label="关闭素材详情" @click="selected = null">×</button></header>
           <div class="admin-drawer__body"><section><header><span>01</span><h3>预览与状态</h3></header><div class="admin-asset-detail-visual" :style="{ '--asset-accent': selected.accent }">&lt; HSD &gt;</div><p class="admin-inline-note">{{ canSelectAsset(selected) ? "该素材已完成处理和审核，可用于官网。" : "该素材尚未达到公开使用条件。" }}</p></section><section><header><span>02</span><h3>公开信息</h3></header><label>替代文本<textarea v-model="selected.alt" rows="3" placeholder="描述图片内容，帮助无障碍访问"></textarea></label></section><section><header><span>03</span><h3>使用位置</h3></header><ul class="admin-usage-list"><li v-for="usage in selected.usages" :key="usage">{{ usage }}</li><li v-if="!selected.usages.length">当前未被任何页面使用</li></ul></section></div>
-          <footer class="admin-drawer__footer"><span>删除前将检查所有引用位置</span><button type="button" class="button button--ghost">移入回收站</button><button type="button" class="button">保存元数据</button></footer>
+          <footer class="admin-drawer__footer"><span>保存前将检查素材元数据与使用位置</span><button type="button" class="button">保存元数据</button></footer>
         </aside>
       </div>
     </Teleport>

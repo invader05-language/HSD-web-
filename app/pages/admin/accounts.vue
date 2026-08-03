@@ -219,7 +219,7 @@ function confirmChange() {
         <section class="admin-system-confirm" role="alertdialog" aria-modal="true" aria-labelledby="qualification-confirm-title" aria-describedby="qualification-confirm-description">
           <span>ADMINISTRATION ACCESS</span>
           <h2 id="qualification-confirm-title">确认{{ actionLabels[pendingChange.change] }}？</h2>
-          <p id="qualification-confirm-description">你将对 {{ pendingChange.name }} 的管理资格执行此操作。变更会立即影响其后续登录、导航和路由访问，并写入操作日志。</p>
+          <p id="qualification-confirm-description">你将对 {{ pendingChange.name }} 的管理资格执行此操作。变更会立即影响其后续登录、导航和路由访问。</p>
           <dl><div><dt>操作</dt><dd>{{ actionLabels[pendingChange.change] }}</dd></div><div><dt>执行人</dt><dd>{{ session.currentAccount?.name ?? "-" }}</dd></div></dl>
           <footer><button type="button" class="button button--ghost" @click="closeConfirmation">取消</button><button ref="confirmButton" type="button" class="button" @click="confirmChange">确认变更</button></footer>
         </section>

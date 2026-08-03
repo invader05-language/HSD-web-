@@ -62,7 +62,7 @@ test("login modes reject members from administrator access and admit qualified a
   await expect(page).toHaveURL(/\/admin$/);
 });
 
-test("owner qualification changes are confirmed and written to the audit log", async ({ page }) => {
+test("owner qualification changes are confirmed without an audit-log entry point", async ({ page }) => {
   await signInToAdmin(page, "/admin/accounts");
 
   const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
@@ -90,12 +90,7 @@ test("owner qualification changes are confirmed and written to the audit log", a
   await confirm.getByRole("button", { name: "确认变更" }).click();
   await expect(memberRow).toContainText("普通成员");
 
-  await page.getByRole("link", { name: "操作日志", exact: true }).click();
-  const audit = page.getByRole("table", { name: "管理员操作日志" });
-  await expect(audit).toContainText("分配中心负责人资格");
-  await expect(audit).toContainText("停用管理员资格");
-  await expect(audit).toContainText("启用管理员资格");
-  await expect(audit).toContainText("撤销管理员资格");
+  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
 });
 
 test("a newly qualified account can start an admin session but cannot manage accounts", async ({ page }) => {
@@ -140,6 +135,9 @@ test("dashboard prioritizes actionable work instead of decorative charts", async
   await expect(page.getByRole("heading", { name: "今日待办" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "招新进度" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "媒体与存储" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "上传任务", exact: true })).toHaveCount(0);
+  await expect(page.getByText("最近操作记录", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "新建" }).click();
   await expect(page.getByRole("menu", { name: "快捷新建" })).toContainText("上传学习资料");
@@ -184,6 +182,8 @@ test("media uploads and learning resources expose honest storage states", async 
   await expect(page.getByRole("heading", { name: "上传新素材" })).toBeVisible();
   await expect(page.getByText("等待上传")).toBeVisible();
   await page.getByRole("button", { name: "关闭上传面板" }).click();
+  await page.locator(".admin-asset-card").first().click();
+  await expect(page.getByRole("button", { name: "移入回收站" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "学习资料", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "学习资料" })).toBeVisible();
@@ -191,11 +191,4 @@ test("media uploads and learning resources expose honest storage states", async 
   await page.getByRole("button", { name: "编辑资源 HarmonyOS 入门路线" }).click();
   await expect(page.getByText("版本历史")).toBeVisible();
   await expect(page.getByText("病毒扫描与 Office 转换将在后端接入")).toBeVisible();
-});
-
-test("audit records make sensitive operations reviewable", async ({ page }) => {
-  await signInToAdmin(page, "/admin/logs");
-  await expect(page.getByRole("heading", { level: 1, name: "操作日志" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "管理员操作日志" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "变更前 / 变更后" }).first()).toBeVisible();
 });
