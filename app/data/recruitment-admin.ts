@@ -25,6 +25,10 @@ export interface AdminCandidate {
   id: string;
   name: string;
   studentId: string;
+  grade: string;
+  className: string;
+  contact: string;
+  bio?: string;
   identity: CandidateIdentity;
   preferences: [RecruitmentCenter, RecruitmentCenter?, RecruitmentCenter?];
   baizeDirection?: string;
@@ -32,9 +36,18 @@ export interface AdminCandidate {
   stage: RecruitmentStage;
   result: RecruitmentResult;
   finalCenter?: RecruitmentCenter;
+  submittedAt: string;
   updatedAt: string;
   rounds?: AssessmentRound[];
   internalNote?: string;
+}
+
+export type RecruitmentApplicationSort = "submittedAt.desc" | "submittedAt.asc";
+
+export interface RecruitmentApplicationFilters {
+  query: string;
+  firstChoice: RecruitmentCenter | "全部中心";
+  sort: RecruitmentApplicationSort;
 }
 
 export interface RecruitmentAdminFilters {
@@ -96,12 +109,17 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     id: "candidate-lin",
     name: "林同学",
     studentId: "20260001",
+    grade: "2026 级",
+    className: "软件工程 1 班",
+    contact: "lin@example.com",
+    bio: "希望通过原生应用开发与团队协作积累可展示的项目实践。",
     identity: "预备成员",
     preferences: ["白泽开发中心", "新媒体中心", "人才发展中心"],
     baizeDirection: "鸿蒙开发",
     acceptsAdjustment: true,
     stage: "第二轮考核",
     result: "待公布",
+    submittedAt: "2026-07-30T14:28:00.000Z",
     updatedAt: "07-30 14:28",
     rounds: [
       { label: "第一轮考核", result: "通过", editable: false },
@@ -113,12 +131,16 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     id: "candidate-zhou",
     name: "周同学",
     studentId: "20260002",
+    grade: "2026 级",
+    className: "软件工程 2 班",
+    contact: "zhou@example.com",
     identity: "预备成员",
     preferences: ["白泽开发中心", "拓维策划中心"],
     baizeDirection: "后端架构",
     acceptsAdjustment: false,
     stage: "第一轮考核",
     result: "待公布",
+    submittedAt: "2026-07-30T13:45:00.000Z",
     updatedAt: "07-30 13:45",
     rounds: [
       { label: "第一轮考核", result: "待公布", editable: true },
@@ -130,6 +152,10 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     id: "candidate-gao",
     name: "高同学",
     studentId: "20260003",
+    grade: "2026 级",
+    className: "计算机科学与技术 1 班",
+    contact: "gao@example.com",
+    bio: "关注大模型应用与校园服务场景，希望参与完整产品的设计和交付。",
     identity: "正式成员",
     preferences: ["白泽开发中心", "人才发展中心"],
     baizeDirection: "大模型 AIGC",
@@ -137,6 +163,7 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     stage: "已结束",
     result: "已录取",
     finalCenter: "白泽开发中心",
+    submittedAt: "2026-07-29T21:12:00.000Z",
     updatedAt: "07-29 21:12",
     rounds: [
       { label: "第一轮考核", result: "通过", editable: false },
@@ -148,45 +175,63 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     id: "candidate-wang",
     name: "王同学",
     studentId: "20260004",
+    grade: "2026 级",
+    className: "新闻传播学 1 班",
+    contact: "wang@example.com",
     identity: "预备成员",
     preferences: ["新媒体中心", "人才发展中心", "拓维策划中心"],
     acceptsAdjustment: true,
     stage: "面试",
     result: "待公布",
+    submittedAt: "2026-07-30T12:16:00.000Z",
     updatedAt: "07-30 12:16"
   },
   {
     id: "candidate-li",
     name: "李同学",
     studentId: "20260005",
+    grade: "2026 级",
+    className: "网络与新媒体 1 班",
+    contact: "li@example.com",
+    bio: "希望用影像和内容记录真实协作，让技术成果更容易被看见。",
     identity: "正式成员",
     preferences: ["新媒体中心", "拓维策划中心"],
     acceptsAdjustment: true,
     stage: "已结束",
     result: "已录取",
     finalCenter: "新媒体中心",
+    submittedAt: "2026-07-30T10:34:00.000Z",
     updatedAt: "07-30 10:34"
   },
   {
     id: "candidate-zhang",
     name: "张同学",
     studentId: "20260006",
+    grade: "2026 级",
+    className: "工商管理 1 班",
+    contact: "zhang@example.com",
     identity: "预备成员",
     preferences: ["拓维策划中心", "人才发展中心"],
     acceptsAdjustment: false,
     stage: "面试",
     result: "待公布",
+    submittedAt: "2026-07-30T09:50:00.000Z",
     updatedAt: "07-30 09:50"
   },
   {
     id: "candidate-chen",
     name: "陈同学",
     studentId: "20260007",
+    grade: "2026 级",
+    className: "市场营销 1 班",
+    contact: "chen@example.com",
+    bio: "希望在赛事和活动策划中提升项目协同与现场执行能力。",
     identity: "预备成员",
     preferences: ["拓维策划中心", "新媒体中心", "人才发展中心"],
     acceptsAdjustment: true,
     stage: "线下结果待录入",
     result: "待处理",
+    submittedAt: "2026-07-29T22:08:00.000Z",
     updatedAt: "07-29 22:08",
     internalNote: "面试未通过，等待线下确认最终去向。"
   },
@@ -194,14 +239,44 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     id: "candidate-wu",
     name: "吴同学",
     studentId: "20260008",
+    grade: "2026 级",
+    className: "人力资源管理 1 班",
+    contact: "wu@example.com",
     identity: "未录取",
     preferences: ["人才发展中心", "新媒体中心"],
     acceptsAdjustment: false,
     stage: "已结束",
     result: "未通过",
+    submittedAt: "2026-07-29T20:40:00.000Z",
     updatedAt: "07-29 20:40"
   }
 ];
+
+export function filterAndSortRecruitmentApplications(
+  candidates: AdminCandidate[],
+  filters: RecruitmentApplicationFilters
+): AdminCandidate[] {
+  const query = filters.query.trim().toLocaleLowerCase();
+
+  return candidates
+    .filter((candidate) => {
+      const matchesQuery = !query
+        || candidate.name.toLocaleLowerCase().includes(query)
+        || candidate.studentId.toLocaleLowerCase().includes(query);
+      const matchesFirstChoice = filters.firstChoice === "全部中心"
+        || candidate.preferences[0] === filters.firstChoice;
+      return matchesQuery && matchesFirstChoice;
+    })
+    .slice()
+    .sort((left, right) => {
+      const difference = Date.parse(left.submittedAt) - Date.parse(right.submittedAt);
+      return filters.sort === "submittedAt.asc" ? difference : -difference;
+    });
+}
+
+export function findRecruitmentApplication(id: string): AdminCandidate | undefined {
+  return ADMIN_CANDIDATES.find((candidate) => candidate.id === id);
+}
 
 export function filterRecruitmentCandidates(
   candidates: AdminCandidate[],

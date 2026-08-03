@@ -78,3 +78,19 @@ test("recruitment batches and publication complete the administration workflow",
   await expect(page.getByRole("button", { name: "发布所选结果" })).toBeVisible();
   await expect(page.getByText("内部保存不等于对成员公开")).toBeVisible();
 });
+
+test("application roster filters, sorts, and opens a read-only application record", async ({ page }) => {
+  await page.goto("/admin/recruitment/applications");
+  await completeAdminDemoLogin(page, "/admin/recruitment/applications");
+
+  await page.getByLabel("搜索报名人").fill("林");
+  await expect(page.getByRole("row")).toHaveCount(2);
+  await page.getByLabel("排序").selectOption("submittedAt.asc");
+  await page.getByRole("link", { name: "查看报名 林同学" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/candidate-lin$/);
+  await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
+  await expect(page.getByLabel("联系方式")).toHaveValue("lin@example.com");
+  await expect(page.getByText("考核处理")).toHaveCount(0);
+  await expect(page.getByText("内部备注")).toHaveCount(0);
+});
