@@ -30,8 +30,12 @@ test("administrator assignment can reassign an existing center administrator", a
   await page.getByRole("button", { name: "添加管理员" }).click();
   const dialog = page.getByRole("dialog", { name: "添加管理员" });
   await dialog.getByLabel("搜索平台用户").fill("media-admin");
-  await expect(dialog.getByRole("button", { name: /选择 media-admin/ })).toContainText("新媒体中心负责人");
-  await dialog.getByRole("button", { name: /选择 media-admin/ }).click();
+  const candidate = dialog.getByRole("button", { name: /选择 media-admin/ });
+  await expect(candidate.locator(".admin-candidate-name")).toHaveText("李同学");
+  await expect(candidate.locator(".admin-candidate-affiliation")).toHaveText("新媒体中心");
+  await expect(candidate.locator(".admin-candidate-identity")).toHaveText("新媒体中心负责人");
+  await expect(candidate).not.toContainText("member-li");
+  await candidate.click();
   await dialog.getByLabel("管理级别").selectOption({ label: "拓维策划中心负责人" });
   await dialog.getByRole("button", { name: "确认添加" }).click();
 

@@ -8227,6 +8227,10 @@ body.is-admin-drawer-open {
   width: min(100%, 540px);
 }
 
+.admin-qualification-dialog.is-owner > footer {
+  margin-top: 28px;
+}
+
 .admin-dialog-field {
   display: grid;
   gap: 7px;
@@ -8262,7 +8266,7 @@ body.is-admin-drawer-open {
 .admin-candidate-list button {
   display: grid;
   min-height: 44px;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(84px, 0.9fr) minmax(84px, 0.9fr);
   align-items: center;
   gap: 10px;
   border: 1px solid transparent;
@@ -8276,17 +8280,29 @@ body.is-admin-drawer-open {
   text-align: left;
 }
 
+.admin-candidate-list button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-candidate-list button .admin-candidate-name {
+  color: #444a51;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-candidate-list button .admin-candidate-affiliation,
+.admin-candidate-list button .admin-candidate-identity {
+  color: #969ca3;
+  font-size: 9px;
+  font-weight: 400;
+}
+
 .admin-candidate-list button:hover,
 .admin-candidate-list button.is-selected {
   border-color: #c6424d;
   background: #fff7f7;
   color: #9e1b26;
-}
-
-.admin-candidate-list button small {
-  color: #969ca3;
-  font-size: 9px;
-  font-weight: 400;
 }
 
 .admin-empty-row {

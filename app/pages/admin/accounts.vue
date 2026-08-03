@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ADMIN_CENTER_LEAD_LABELS,
+  getAdminCandidateDisplay,
   getAdminQualificationLabel,
   type AdminCenterRole,
   type MockAccount
@@ -191,7 +192,7 @@ function confirmChange() {
 
     <Teleport to="body">
       <div v-if="qualificationDialog" class="admin-drawer-backdrop admin-modal-center" @click.self="closeAddDialog" @keydown.esc="closeAddDialog">
-        <section class="admin-system-confirm admin-qualification-dialog" role="dialog" aria-modal="true" :aria-label="qualificationDialog === 'owner' ? '增设联盟总负责人' : '添加管理员'">
+        <section class="admin-system-confirm admin-qualification-dialog" :class="{ 'is-owner': qualificationDialog === 'owner' }" role="dialog" aria-modal="true" :aria-label="qualificationDialog === 'owner' ? '增设联盟总负责人' : '添加管理员'">
           <span>ADMINISTRATION ACCESS</span>
           <h2>{{ qualificationDialog === "owner" ? "增设联盟总负责人" : "添加管理员" }}</h2>
           <p>{{ qualificationDialog === "owner" ? "从平台全部用户中选择第二位联盟总负责人。负责人席位最多两人。" : "从平台全部用户中选择账号，并绑定一个中心负责人管理级别。" }}</p>
@@ -201,10 +202,11 @@ function confirmChange() {
               v-for="candidate in candidates"
               :key="candidate.account"
               type="button"
+              :aria-label="`选择 ${candidate.account}`"
               :class="{ 'is-selected': selectedCandidate === candidate.account }"
               :aria-selected="selectedCandidate === candidate.account"
               @click="selectedCandidate = candidate.account"
-            >选择 {{ candidate.account }}<small>{{ candidate.name }} · {{ candidate.memberId }} · {{ getAdminQualificationLabel(candidate) }}</small></button>
+            ><span class="admin-candidate-name">{{ getAdminCandidateDisplay(candidate).name }}</span><span class="admin-candidate-affiliation">{{ getAdminCandidateDisplay(candidate).affiliation }}</span><span class="admin-candidate-identity">{{ getAdminCandidateDisplay(candidate).identity }}</span></button>
             <p v-if="candidates.length === 0" class="admin-empty-row">没有匹配的可选平台用户</p>
           </div>
           <label v-if="qualificationDialog === 'admin'" class="admin-dialog-field">管理级别<select v-model="selectedRole" aria-label="管理级别"><option v-for="role in ADMIN_CENTER_LEAD_LABELS" :key="role" :value="role">{{ role }}</option></select></label>
