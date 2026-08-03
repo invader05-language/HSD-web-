@@ -77,7 +77,7 @@ function confirmChange() {
       </header>
       <div class="admin-table-scroll">
         <table aria-label="管理员资格配置列表">
-          <thead><tr><th>成员账号</th><th>管理级别</th><th>资格状态</th><th>配置人 / 时间</th><th>最近登录</th><th><span class="sr-only">资格操作</span></th></tr></thead>
+          <thead><tr><th>成员账号</th><th>管理级别</th><th>资格状态</th><th>配置人 / 时间</th><th>最近登录</th><th aria-label="资格操作"></th></tr></thead>
           <tbody>
             <tr v-for="account in accounts" :key="account.account">
               <td><strong>{{ account.name }}</strong><small>{{ account.account }}</small></td>

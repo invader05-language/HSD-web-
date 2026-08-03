@@ -8157,7 +8157,7 @@ body.is-admin-drawer-open {
 }
 
 .admin-qualification-page .admin-list-card table {
-  min-width: 1020px;
+  min-width: 900px;
 }
 
 .admin-qualification-page .admin-list-card td small {
@@ -8167,7 +8167,7 @@ body.is-admin-drawer-open {
 }
 
 .admin-qualification-actions {
-  min-width: 154px;
+  min-width: 132px;
 }
 
 .admin-qualification-actions button {

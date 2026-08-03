@@ -53,3 +53,12 @@
 - The legacy role-matrix data, tests, CSS, and stale browser workflow are removed; audit filtering remains covered in `tests/unit/admin-audit.test.ts`.
 - At the 390px breakpoint, the top bar keeps a compact identity and exposes a filtered two-column navigation sheet. Non-owner sessions do not receive the owner-only account configuration link.
 - The qualification danger color is scoped to qualification actions without `!important`.
+
+## E2E Fixture Remediation (2026-08-03)
+
+- The `signInToAdmin` helper now accepts an optional `account` argument and keeps `admin-alliance` as its default, preserving owner-based scenarios.
+- The 390px navigation scenario explicitly signs in as `media-admin`, so its platform-administrator identity and hidden owner-only account configuration link are asserted against the same account.
+- `pnpm typecheck`: passed.
+- `pnpm exec playwright test tests/e2e/admin-platform.spec.ts --list`: passed, collecting 9 tests.
+- Focused browser execution was attempted before the change but Nuxt failed during server startup with `EMFILE: too many open files, watch`; no assertion ran. The port was not reachable after Playwright cleaned up the failed server process.
+- A fresh focused attempt after the change with `CHOKIDAR_USEPOLLING=1` stopped before browser launch because Nuxt reported an existing worktree dev-server lock (PID 84611), while `127.0.0.1:49852` was not reachable. The process was left untouched; no browser assertion result is available.
