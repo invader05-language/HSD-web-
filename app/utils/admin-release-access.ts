@@ -1,8 +1,25 @@
 import { RELEASE_FEATURES, type ReleaseFeatures } from "../config/release-features";
+import { ref } from "vue";
 
 export interface DisabledAdminRoute {
   to: string;
   notice: "当前版本暂未开放";
+}
+
+export function createReleaseNoticeState() {
+  const notice = ref<string>();
+
+  function receive(value: unknown) {
+    if (typeof value !== "string" || value.length === 0) {
+      notice.value = undefined;
+      return false;
+    }
+
+    notice.value = value;
+    return true;
+  }
+
+  return { notice, receive };
 }
 
 export function resolveDisabledAdminRoute(
