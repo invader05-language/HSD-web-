@@ -6,6 +6,10 @@ import {
   type RecruitmentCenter,
   type RecruitmentApplicationSort
 } from "~/data/recruitment-admin";
+import {
+  buildRecruitmentExportName,
+  serializeRecruitmentCsv
+} from "~/utils/recruitment-export";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "报名人员｜HSD 管理台" });
@@ -18,6 +22,20 @@ const visible = computed(() => filterAndSortRecruitmentApplications(ADMIN_CANDID
   firstChoice: center.value,
   sort: sort.value
 }));
+
+function exportRecruitmentCsv() {
+  if (!visible.value.length) return;
+
+  const blob = new Blob([serializeRecruitmentCsv(visible.value)], {
+    type: "text/csv;charset=utf-8"
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = buildRecruitmentExportName("2026 秋季招新", new Date());
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 
 <template>
@@ -27,7 +45,9 @@ const visible = computed(() => filterAndSortRecruitmentApplications(ADMIN_CANDID
       title="报名人员"
       description="查看本批次报名资料和三个中心志愿；考核操作仍在预备成员考核台完成。"
     >
-      <template #actions><button type="button" class="button button--ghost">导出当前名单</button></template>
+      <template #actions>
+        <button type="button" class="button button--ghost" :disabled="visible.length === 0" @click="exportRecruitmentCsv">导出当前名单</button>
+      </template>
     </AdminPageHeading>
 
     <section class="admin-list-card">
@@ -40,6 +60,7 @@ const visible = computed(() => filterAndSortRecruitmentApplications(ADMIN_CANDID
         <label>第一志愿<select v-model="center"><option>全部中心</option><option>白泽开发中心</option><option>新媒体中心</option><option>拓维策划中心</option><option>人才发展中心</option></select></label>
         <label>排序<select v-model="sort"><option value="submittedAt.desc">最新提交</option><option value="submittedAt.asc">最早提交</option></select></label>
       </div>
+      <p v-if="visible.length === 0" class="admin-empty-copy">当前没有可导出的报名人员</p>
       <div class="admin-table-scroll">
         <table aria-label="招新报名人员">
           <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
