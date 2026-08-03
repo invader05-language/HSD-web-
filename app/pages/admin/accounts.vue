@@ -46,7 +46,9 @@ const owners = computed(() => accounts.value.filter((account) => account.adminLe
 const administrators = computed(() => accounts.value.filter((account) => account.adminLevel === "admin"));
 const ownerLimitReached = computed(() => owners.value.length >= 2);
 const candidates = computed(() => accounts.value.filter((account) => {
-  if (account.adminLevel !== "member") return false;
+  // Owners are already protected assignments; every other platform account can
+  // be selected for owner promotion or center-role assignment.
+  if (account.adminLevel === "owner") return false;
   const query = candidateQuery.value.trim().toLocaleLowerCase();
   if (!query) return true;
   return [account.name, account.account, account.memberId]
@@ -202,7 +204,7 @@ function confirmChange() {
               :class="{ 'is-selected': selectedCandidate === candidate.account }"
               :aria-selected="selectedCandidate === candidate.account"
               @click="selectedCandidate = candidate.account"
-            >选择 {{ candidate.account }}<small>{{ candidate.name }} · {{ candidate.memberId }}</small></button>
+            >选择 {{ candidate.account }}<small>{{ candidate.name }} · {{ candidate.memberId }} · {{ getAdminQualificationLabel(candidate) }}</small></button>
             <p v-if="candidates.length === 0" class="admin-empty-row">没有匹配的可选平台用户</p>
           </div>
           <label v-if="qualificationDialog === 'admin'" class="admin-dialog-field">管理级别<select v-model="selectedRole" aria-label="管理级别"><option v-for="role in ADMIN_CENTER_LEAD_LABELS" :key="role" :value="role">{{ role }}</option></select></label>

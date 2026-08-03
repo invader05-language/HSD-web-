@@ -88,12 +88,51 @@ describe("session persistence", () => {
       name: "张同学",
       level: "owner"
     });
+    window.history.pushState({}, "", "/admin/accounts");
 
     const session = useSessionStore();
 
     expect(session.restore()).toBe(false);
     expect(session.isAuthenticated).toBe(false);
     expect(window.sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it("keeps member identity after an administrator is disabled on a member route", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin");
+    useAdminAccessStore().setAdminAccessEnabled("media-admin", false, {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    });
+    window.history.pushState({}, "", "/member");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+
+    expect(restored.restore()).toBe(true);
+    expect(restored.currentAccountId).toBe("media-admin");
+    expect(restored.adminLevel).toBe("admin");
+    expect(restored.canAccessAdmin).toBe(false);
+  });
+
+  it("keeps member identity after administrator qualification is revoked on a member route", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin");
+    useAdminAccessStore().revokeAdmin("media-admin", {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    });
+    window.history.pushState({}, "", "/member");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+
+    expect(restored.restore()).toBe(true);
+    expect(restored.currentAccountId).toBe("media-admin");
+    expect(restored.adminLevel).toBe("member");
+    expect(restored.canAccessAdmin).toBe(false);
   });
 
   it("invalidates a restored administrator session when qualification is revoked", () => {

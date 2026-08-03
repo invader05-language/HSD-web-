@@ -24,6 +24,21 @@ test("owner can add a platform user with a center administrator level", async ({
   await expect(row).toContainText("已启用");
 });
 
+test("administrator assignment can reassign an existing center administrator", async ({ page }) => {
+  await signInAsOwner(page);
+
+  await page.getByRole("button", { name: "添加管理员" }).click();
+  const dialog = page.getByRole("dialog", { name: "添加管理员" });
+  await dialog.getByLabel("搜索平台用户").fill("media-admin");
+  await expect(dialog.getByRole("button", { name: /选择 media-admin/ })).toContainText("新媒体中心负责人");
+  await dialog.getByRole("button", { name: /选择 media-admin/ }).click();
+  await dialog.getByLabel("管理级别").selectOption({ label: "拓维策划中心负责人" });
+  await dialog.getByRole("button", { name: "确认添加" }).click();
+
+  const row = page.getByRole("row").filter({ hasText: "media-admin" });
+  await expect(row).toContainText("拓维策划中心负责人");
+});
+
 test("owner can add a second protected owner but cannot exceed two", async ({ page }) => {
   await signInAsOwner(page);
 
