@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 async function completeDemoLogin(page: import("@playwright/test").Page) {
-  await page.getByLabel("学号或成员账号").fill("demo-member");
+  await page.waitForFunction(() => Boolean(
+    (document.querySelector("form") as Element & { __vueParentComponent?: unknown })?.__vueParentComponent
+  ));
+  await page.getByLabel("学号或成员账号").fill("demo-applicant");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 }
@@ -52,6 +55,7 @@ test.describe("join recruitment application navigation", () => {
     await expect(page.getByRole("button", { name: /填写报名志愿/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /确认并提交/ })).toBeVisible();
     await expect(page.getByText("经历与期待")).toHaveCount(0);
+    await expect(page.getByText(/上传后自动用于公开成员展示/)).toBeVisible();
 
     await page.getByLabel("姓名", { exact: true }).fill("报名同学");
     await page.locator('[data-field="contact"] input').fill("applicant@example.com");
@@ -65,7 +69,7 @@ test.describe("join recruitment application navigation", () => {
     await baizeDirection.selectOption("鸿蒙开发");
     await firstChoice.selectOption("新媒体中心");
     await expect(baizeDirection).toHaveCount(0);
-    await page.getByRole("radio", { name: "接受调剂" }).check();
+    await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
     await page.getByRole("button", { name: "下一步" }).click();
 
     await expect(page.getByRole("heading", { name: "确认并提交" })).toBeVisible();
@@ -79,9 +83,17 @@ test.describe("join recruitment application navigation", () => {
     await page.getByRole("link", { name: "进入个人中心" }).click();
     await expect(page.getByRole("heading", { name: "你好，报名同学" })).toBeVisible();
     await expect(page.getByText("已提交", { exact: true })).toBeVisible();
-    await expect(page.getByText("预备成员", { exact: true })).toBeVisible();
-    await expect(page.getByText("待确定", { exact: true })).toBeVisible();
+    await expect(page.locator("#application").getByText("预备成员", { exact: true })).toBeVisible();
+    await expect(page.locator("#application").getByText("待确定", { exact: true })).toBeVisible();
     await expect(page.getByText("applicant@example.com", { exact: false })).toHaveCount(0);
+
+    await page.getByRole("navigation", { name: "成员空间导航" }).getByRole("link", { name: "结果中心" }).click();
+    await expect(page.getByRole("heading", { name: "录取结果待公布" })).toBeVisible();
+    await expect(page.getByText("你已正式加入白泽开发中心")).toHaveCount(0);
+
+    await page.goto("/people/core");
+    await expect(page.getByRole("heading", { level: 2, name: "林同学" })).toBeVisible();
+    await expect(page.getByText("报名同学", { exact: true })).toHaveCount(0);
   });
 
   test("future steps cannot bypass the required first-step contact field", async ({ page }) => {

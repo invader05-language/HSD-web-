@@ -15,6 +15,7 @@ export type AdmissionStatus =
 export type MemberIdentity = "预备成员" | "正式成员" | "未录取";
 
 export type AssessmentStage =
+  | "尚未开始"
   | "面试"
   | "第一轮考核"
   | "第二轮考核"
@@ -76,6 +77,37 @@ export const DEMO_MEMBER_RESULT: MemberResultRecord = {
   }
 };
 
+export function getDemoMemberResult(
+  memberId: string,
+  application?: SubmittedRecruitmentApplication,
+): MemberResultRecord {
+  if (memberId === DEMO_MEMBER_PROFILE.id) return DEMO_MEMBER_RESULT;
+  if (memberId !== DEMO_APPLICANT_PROFILE.id) {
+    throw new Error(`结果数据不存在：${memberId}`);
+  }
+
+  const preferences: MemberPreference[] = application
+    ? [application.firstChoice, application.secondChoice, application.thirdChoice]
+        .filter((center): center is CenterName => Boolean(center))
+        .map((center, index) => ({ rank: (index + 1) as 1 | 2 | 3, center }))
+    : [];
+
+  return {
+    batchLabel: "2026 秋季招新",
+    status: application ? "pending" : "no-application",
+    identity: "预备成员",
+    preferences,
+    acceptsTransfer: application?.acceptsAdjustment ?? false,
+    baizeInterestDirection: application?.baizeDirection,
+    currentStage: application
+      ? application.firstChoice === "白泽开发中心"
+        ? "第一轮考核"
+        : "面试"
+      : "尚未开始",
+    currentConclusion: "待公布",
+  };
+}
+
 export function describeAdmission(record: MemberResultRecord): ResultPresentation {
   switch (record.status) {
     case "admitted":
@@ -114,6 +146,13 @@ export function describeAdmission(record: MemberResultRecord): ResultPresentatio
 }
 
 export function describeAssessment(record: MemberResultRecord): ResultPresentation {
+  if (record.currentStage === "尚未开始") {
+    return {
+      badge: "尚未开始",
+      headline: "当前没有进行中的考核",
+      description: "提交报名并进入考核流程后，本页会展示当前有效阶段与结论。",
+    };
+  }
   if (record.currentStage === "考核已结束") {
     return {
       badge: "考核已结束",
@@ -137,3 +176,5 @@ export function describeAssessment(record: MemberResultRecord): ResultPresentati
     description: "本页只呈现当前有效状态，后续阶段以负责人最终发布为准。"
   };
 }
+import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "./member-profile";
+import type { SubmittedRecruitmentApplication } from "./recruitment-application";

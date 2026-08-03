@@ -18,7 +18,6 @@ export interface AdminMember {
   role: string;
   publicState: AdminPublicState;
   avatarUrl: string | null;
-  avatarVisible: boolean;
   profileSummary: string;
   updatedAt: string;
 }
@@ -42,7 +41,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "应用开发成员",
     publicState: "已公开",
     avatarUrl: "/images/members/member-lin.webp",
-    avatarVisible: true,
     profileSummary: "参与 HarmonyOS 原生应用开发与项目联调。",
     updatedAt: "07-30 15:20"
   },
@@ -57,7 +55,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "AI 应用成员",
     publicState: "已公开",
     avatarUrl: null,
-    avatarVisible: false,
     profileSummary: "负责大模型应用验证和公开演示内容。",
     updatedAt: "07-30 14:42"
   },
@@ -72,7 +69,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "预备成员",
     publicState: "未公开",
     avatarUrl: "/private/avatars/member-wang-original.jpg",
-    avatarVisible: false,
     profileSummary: "报名资料尚未转为公开成员资料。",
     updatedAt: "07-30 12:16"
   },
@@ -87,7 +83,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "内容编辑",
     publicState: "资料待审核",
     avatarUrl: null,
-    avatarVisible: false,
     profileSummary: "参与推文写作、视觉内容整理和媒体运营。",
     updatedAt: "07-30 10:34"
   },
@@ -102,7 +97,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "中心负责人",
     publicState: "已公开",
     avatarUrl: null,
-    avatarVisible: false,
     profileSummary: "负责赛事活动策划与跨中心协作。",
     updatedAt: "07-29 20:18"
   },
@@ -117,7 +111,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "预备成员",
     publicState: "未公开",
     avatarUrl: null,
-    avatarVisible: false,
     profileSummary: "等待线下最终结果录入。",
     updatedAt: "07-29 22:08"
   },
@@ -132,7 +125,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "中心负责人",
     publicState: "已公开",
     avatarUrl: "/images/members/member-zhao.webp",
-    avatarVisible: true,
     profileSummary: "负责新人培养、训练营与成长反馈。",
     updatedAt: "07-29 18:36"
   },
@@ -147,7 +139,6 @@ export const ADMIN_MEMBERS: AdminMember[] = [
     role: "成长伙伴",
     publicState: "已公开",
     avatarUrl: null,
-    avatarVisible: false,
     profileSummary: "参与新人学习支持和活动组织。",
     updatedAt: "07-29 17:20"
   }
@@ -195,7 +186,7 @@ export function filterAdminMembers(
 }
 
 export function getPublicProfilePreview(member: AdminMember) {
-  const canExposeAvatar = member.avatarVisible && Boolean(member.avatarUrl);
+  const canExposeAvatar = member.identity !== "预备成员" && Boolean(member.avatarUrl);
   return {
     name: member.name,
     center: member.center,

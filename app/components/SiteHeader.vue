@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { SITE_CONFIG } from "~/data/site";
 import { useSessionStore } from "~/stores/session";
+import { useCurrentMember } from "~/composables/useCurrentMember";
 
 const route = useRoute();
 const session = useSessionStore();
+const { profile: currentMember } = useCurrentMember();
 const mobileOpen = ref(false);
 const memberMenuOpen = ref(false);
 const memberControl = ref<HTMLElement | null>(null);
@@ -74,11 +76,11 @@ onBeforeUnmount(() => {
             type="button"
             :aria-expanded="memberMenuOpen"
             aria-haspopup="menu"
-            :aria-label="`${session.memberName}的成员菜单`"
+            :aria-label="`${currentMember.name}的成员菜单`"
             @click.stop="memberMenuOpen = !memberMenuOpen"
           >
-            <HsdAvatar :name="session.memberName" :src="session.memberAvatarUrl" size="sm" />
-            <strong>{{ session.memberName }}</strong>
+            <HsdAvatar :name="currentMember.name" :src="currentMember.avatarUrl" size="sm" />
+            <strong>{{ currentMember.name }}</strong>
             <span aria-hidden="true">⌄</span>
           </button>
           <nav v-if="memberMenuOpen" class="site-nav__member-menu" aria-label="成员账户菜单" role="menu">

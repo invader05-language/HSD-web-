@@ -1,43 +1,45 @@
 import { computed } from "vue";
-import { ADMIN_MEMBERS } from "~/data/admin-members";
+import { ADMIN_MEMBERS } from "../data/admin-members";
 import {
   CORE_PEOPLE,
   PUBLIC_MEMBERS,
   type PublicPerson,
-} from "~/data/people";
+} from "../data/people";
 import {
+  isFormalMemberProfile,
   projectMemberToAdmin,
   projectMemberToPublic,
-} from "~/data/member-profile";
-import { useMemberProfileStore } from "~/stores/member-profile";
+} from "../data/member-profile";
+import { useCurrentMember } from "./useCurrentMember";
+import { useMemberProfileStore } from "../stores/member-profile";
 
 export function useMemberRepository() {
+  const { profile: currentProfile } = useCurrentMember();
   const profileStore = useMemberProfileStore();
-  const currentProfile = computed(() => profileStore.currentMember);
+  const formalProfiles = computed(() =>
+    Object.values(profileStore.profiles).filter(isFormalMemberProfile)
+  );
   const publicCorePeople = computed(() =>
-    CORE_PEOPLE.map((person) =>
-      person.id === currentProfile.value.publicId
-        ? projectMemberToPublic(currentProfile.value, person)
-        : person
-    )
+    CORE_PEOPLE.map((person) => {
+      const profile = formalProfiles.value.find((item) => item.publicId === person.id);
+      return profile ? projectMemberToPublic(profile, person) : person;
+    })
   );
   const publicMembers = computed(() =>
-    PUBLIC_MEMBERS.map((person) =>
-      person.id === currentProfile.value.publicId
-        ? projectMemberToPublic(currentProfile.value, person)
-        : person
-    )
+    PUBLIC_MEMBERS.map((person) => {
+      const profile = formalProfiles.value.find((item) => item.publicId === person.id);
+      return profile ? projectMemberToPublic(profile, person) : person;
+    })
   );
   const allPublicPeople = computed<readonly PublicPerson[]>(() => [
     ...publicCorePeople.value,
     ...publicMembers.value,
   ]);
   const adminMembers = computed(() =>
-    ADMIN_MEMBERS.map((member) =>
-      member.id === currentProfile.value.id
-        ? projectMemberToAdmin(currentProfile.value, member)
-        : member
-    )
+    ADMIN_MEMBERS.map((member) => {
+      const profile = formalProfiles.value.find((item) => item.id === member.id);
+      return profile ? projectMemberToAdmin(profile, member) : member;
+    })
   );
 
   function findPublicPerson(id: string) {

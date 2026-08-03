@@ -68,12 +68,12 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
         </div>
 
         <div v-else-if="activeTab === 'public'" class="admin-detail-form">
-          <header><span>Public Profile</span><h2>公开页面展示内容</h2><p>头像不公开时只输出白底 HSD 默认头像。</p></header>
+          <header><span>Public Profile</span><h2>公开页面展示内容</h2><p>上传头像后自动公开；未上传或移除头像时输出白底 HSD 默认头像。</p></header>
           <div class="admin-form-grid">
             <label>公开名称<input :value="member.name"></label>
             <label>公开职责<input :value="member.role"></label>
             <label class="is-wide">个人介绍<textarea rows="5" :value="member.profileSummary"></textarea></label>
-            <label>头像公开<select :value="member.avatarVisible ? '公开' : '使用默认头像'"><option>公开</option><option>使用默认头像</option></select></label>
+            <label>头像展示<input :value="preview.usesDefaultAvatar ? '未上传，使用默认 HSD 头像' : '已上传，自动公开'" readonly></label>
             <label>资料状态<select :value="member.publicState"><option>已公开</option><option>未公开</option><option>资料待审核</option></select></label>
           </div>
         </div>

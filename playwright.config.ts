@@ -10,7 +10,7 @@ export default defineConfig({
     screenshot: "only-on-failure"
   },
   webServer: {
-    command: "node_modules/.bin/nuxt dev --host 127.0.0.1 --port 49852",
+    command: "pnpm exec nuxt dev --host 127.0.0.1 --port 49852",
     url: "http://127.0.0.1:49852",
     reuseExistingServer: true,
     timeout: 120_000
@@ -20,7 +20,7 @@ export default defineConfig({
       name: "desktop-chromium",
       use: {
         ...devices["Desktop Chrome"],
-        channel: "chrome",
+        channel: process.env.CI ? undefined : "chrome",
         viewport: { width: 1440, height: 1000 }
       }
     }

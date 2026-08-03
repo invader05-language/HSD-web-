@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { useMemberProfileStore } from "~/stores/member-profile";
-import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import { useSessionStore } from "~/stores/session";
+import { useCurrentMember } from "~/composables/useCurrentMember";
 import {
   isSupportedAvatar,
   validateMemberProfileDraft,
@@ -12,10 +11,9 @@ definePageMeta({ middleware: "member" });
 useHead({ title: "编辑个人资料｜白云 HSD 开发者部落" });
 
 const session = useSessionStore();
-const memberStore = useMemberProfileStore();
-const applicationStore = useRecruitmentApplicationStore();
-const memberStatus = computed(() => applicationStore.memberStatus);
-const draft = reactive(memberStore.createDraft());
+const currentMember = useCurrentMember();
+const currentProfile = currentMember.profile;
+const draft = reactive(currentMember.createDraft());
 const errors = reactive<MemberProfileFormErrors & { avatar?: string }>({});
 const status = ref<"idle" | "saving" | "success" | "error">("idle");
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -30,7 +28,7 @@ function clearErrors() {
 }
 
 function releaseDraftObjectUrl() {
-  if (draftObjectUrl && draftObjectUrl !== memberStore.currentMember.avatarUrl) {
+  if (draftObjectUrl && draftObjectUrl !== currentProfile.value.avatarUrl) {
     URL.revokeObjectURL(draftObjectUrl);
   }
   draftObjectUrl = undefined;
@@ -38,7 +36,7 @@ function releaseDraftObjectUrl() {
 
 function resetDraft() {
   releaseDraftObjectUrl();
-  Object.assign(draft, memberStore.createDraft());
+  Object.assign(draft, currentMember.createDraft());
   clearErrors();
   status.value = "idle";
 }
@@ -79,8 +77,8 @@ async function saveProfile() {
 
   status.value = "saving";
   await new Promise((resolve) => window.setTimeout(resolve, 180));
-  const previousAvatarUrl = memberStore.currentMember.avatarUrl;
-  memberStore.updateOwnProfile({
+  const previousAvatarUrl = currentProfile.value.avatarUrl;
+  currentMember.updateProfile({
     direction: draft.direction.trim(),
     bio: draft.bio.trim(),
     avatarUrl: draft.avatarUrl,
@@ -102,8 +100,8 @@ onBeforeUnmount(() => {
   <div class="member-profile-page">
     <div class="member-profile-mobile-identity">
       <div>
-        <HsdAvatar :name="session.memberName" :src="session.memberAvatarUrl" size="sm" />
-        <span><strong>{{ session.memberName }}</strong><small>{{ memberStatus?.identityLabel || "HSD 成员" }}</small></span>
+        <HsdAvatar :name="currentProfile.name" :src="currentProfile.avatarUrl" size="sm" />
+        <span><strong>{{ currentProfile.name }}</strong><small>{{ currentProfile.identity }}</small></span>
       </div>
       <span>成员空间 / 个人资料</span>
     </div>
@@ -111,8 +109,8 @@ onBeforeUnmount(() => {
     <div class="member-profile-layout">
       <aside class="member-profile-aside">
         <div class="member-space__identity">
-          <HsdAvatar :name="session.memberName" :src="session.memberAvatarUrl" size="md" />
-          <div><strong>{{ session.memberName }}</strong><span>{{ memberStatus?.identityLabel || "HSD 成员" }}</span></div>
+          <HsdAvatar :name="currentProfile.name" :src="currentProfile.avatarUrl" size="md" />
+          <div><strong>{{ currentProfile.name }}</strong><span>{{ currentProfile.identity }}</span></div>
         </div>
         <nav aria-label="成员空间导航">
           <NuxtLink to="/member">个人概览</NuxtLink>
@@ -132,7 +130,8 @@ onBeforeUnmount(() => {
 
         <div class="member-profile-note">
           <strong>前端演示预览</strong>
-          <span>保存后会同步当前前端会话内的成员页面、官网展示和管理端展示；不会上传或写入数据库。</span>
+          <span v-if="currentProfile.identity === '预备成员'">保存后只同步当前预备成员的个人资料与招新记录，不进入官网正式成员目录；不会上传或写入数据库。</span>
+          <span v-else>保存后会同步当前前端会话内的成员页面、官网展示和管理端展示；不会上传或写入数据库。</span>
         </div>
 
         <p v-if="status === 'saving'" class="member-profile-status" role="status"><strong>正在保存资料…</strong> 请不要重复提交。</p>
@@ -150,8 +149,8 @@ onBeforeUnmount(() => {
               <div><span>学号</span><strong>{{ draft.studentId }}</strong></div>
               <div><span>年级</span><strong>{{ draft.grade }}</strong></div>
               <div><span>班级</span><strong>{{ draft.className }}</strong></div>
-              <div><span>所属中心</span><strong>{{ memberStatus ? "待确定" : draft.center }}</strong></div>
-              <div><span>组织职务</span><strong>{{ memberStatus ? "暂无组织职务" : draft.role }}</strong></div>
+              <div><span>所属中心</span><strong>{{ currentProfile.identity === "预备成员" ? "待确定" : draft.center }}</strong></div>
+              <div><span>组织职务</span><strong>{{ currentProfile.identity === "预备成员" ? "暂无组织职务" : draft.role }}</strong></div>
             </div>
           </section>
 
@@ -177,13 +176,13 @@ onBeforeUnmount(() => {
 
           <section class="member-profile-section">
             <div class="member-profile-section__head">
-              <div><span class="member-profile-number">03</span><div><h2>头像</h2><p>未上传头像时，成员展示页面统一使用白底 HSD 默认头像。</p></div></div>
+              <div><span class="member-profile-number">03</span><div><h2>头像</h2><p>上传后自动用于公开成员展示；未上传或移除头像时统一使用白底 HSD 默认头像。</p></div></div>
             </div>
             <div class="member-profile-avatar-panel">
               <HsdAvatar :name="draft.name" :src="avatarSource" size="lg" />
               <div class="member-profile-upload-box">
                 <strong>选择头像图片</strong>
-                <span>当前仅进行浏览器本地预览，不会上传服务器。</span>
+                <span>当前仅进行浏览器本地预览，不会上传服务器；正式接入后，上传即视为同意在成员页面公开展示。</span>
                 <input ref="fileInput" class="member-profile-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar">
                 <button class="text-link" type="button" @click="fileInput?.click()">选择图片</button>
                 <button v-if="draft.avatarUrl" class="text-link member-profile-remove-avatar" type="button" @click="removeAvatar">移除当前预览</button>
@@ -192,7 +191,7 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section class="member-profile-section">
+          <section v-if="draft.publicId" class="member-profile-section">
             <div class="member-profile-section__head">
               <div><span class="member-profile-number">04</span><div><h2>关联记录</h2><p>荣誉和成长记录在各自页面维护，不与基础资料混合编辑。</p></div></div>
             </div>

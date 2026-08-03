@@ -28,10 +28,21 @@ describe("administration member directory", () => {
     ).toEqual(["王同学"]);
   });
 
-  it("never exposes a private avatar through public preview", () => {
-    const privateMember = ADMIN_MEMBERS.find((member) => member.name === "王同学");
-    expect(privateMember).toBeTruthy();
-    expect(getPublicProfilePreview(privateMember!).avatarUrl).toBeNull();
-    expect(getPublicProfilePreview(privateMember!).usesDefaultAvatar).toBe(true);
+  it("never exposes a preparatory member through the formal public preview", () => {
+    const applicant = ADMIN_MEMBERS.find((member) => member.name === "王同学");
+    expect(applicant).toBeTruthy();
+    expect(getPublicProfilePreview(applicant!).avatarUrl).toBeNull();
+    expect(getPublicProfilePreview(applicant!).usesDefaultAvatar).toBe(true);
+  });
+
+  it("derives formal-member avatar visibility from the uploaded avatar", () => {
+    const formalMember = ADMIN_MEMBERS.find((member) => member.name === "林同学")!;
+    const preview = getPublicProfilePreview({
+      ...formalMember,
+      avatarUrl: "/images/members/new-avatar.webp",
+    });
+
+    expect(preview.avatarUrl).toBe("/images/members/new-avatar.webp");
+    expect(preview.usesDefaultAvatar).toBe(false);
   });
 });

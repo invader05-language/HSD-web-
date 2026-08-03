@@ -13,6 +13,14 @@ import {
 } from "../../app/utils/recruitment-application-form";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useRecruitmentApplicationStore } from "../../app/stores/recruitment-application";
+import { useSessionStore } from "../../app/stores/session";
+import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
+
+function signInApplicant() {
+  const session = useSessionStore();
+  session.signIn("demo-applicant");
+  return session;
+}
 
 function validApplicationDraft(): RecruitmentApplicationDraft {
   return {
@@ -32,15 +40,17 @@ describe("recruitment application domain", () => {
   });
 
   it("creates a registration draft without experience-and-expectation fields", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
-    const profileDraft = createRegistrationProfileDraft(profileStore.currentMember);
+    const currentProfile = profileStore.getProfile(session.currentMemberId);
+    const profileDraft = createRegistrationProfileDraft(currentProfile);
     const applicationDraft = createRecruitmentApplicationDraft();
 
     expect(profileDraft).toMatchObject({
-      name: profileStore.currentMember.name,
-      studentId: profileStore.currentMember.studentId,
-      grade: profileStore.currentMember.grade,
-      className: profileStore.currentMember.className,
+      name: currentProfile.name,
+      studentId: currentProfile.studentId,
+      grade: currentProfile.grade,
+      className: currentProfile.className,
     });
     expect(profileDraft).not.toHaveProperty("experience");
     expect(profileDraft).not.toHaveProperty("expectation");
@@ -49,21 +59,25 @@ describe("recruitment application domain", () => {
   });
 
   it("keeps registration drafts separate from the saved member profile until final submission", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
-    const draft = createRegistrationProfileDraft(profileStore.currentMember);
+    const originalProfile = profileStore.getProfile(session.currentMemberId);
+    const draft = createRegistrationProfileDraft(originalProfile);
 
     draft.name = "报名同学";
     draft.direction = "校园产品开发";
 
-    expect(profileStore.currentMember.name).not.toBe("报名同学");
-    expect(profileStore.currentMember.direction).not.toBe("校园产品开发");
+    expect(profileStore.getProfile(session.currentMemberId).name).not.toBe("报名同学");
+    expect(profileStore.getProfile(session.currentMemberId).direction).not.toBe("校园产品开发");
   });
 
-  it("updates the saved profile only when a valid application is submitted", () => {
+  it("updates only the preparatory profile when a valid application is submitted", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
+    const formalProfileBefore = { ...profileStore.getProfile(DEMO_MEMBER_PROFILE.id) };
     const profileDraft = {
-      ...createRegistrationProfileDraft(profileStore.currentMember),
+      ...createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       name: "报名同学",
       direction: "校园产品开发",
       bio: "我希望通过完整的项目协作，持续积累可展示的产品开发实践成果。",
@@ -71,43 +85,60 @@ describe("recruitment application domain", () => {
 
     applicationStore.submitApplication(profileDraft, validApplicationDraft(), true);
 
-    expect(profileStore.currentMember.name).toBe("报名同学");
-    expect(profileStore.currentMember.direction).toBe("校园产品开发");
+    expect(profileStore.getProfile(session.currentMemberId).name).toBe("报名同学");
+    expect(profileStore.getProfile(session.currentMemberId).direction).toBe("校园产品开发");
+    expect(profileStore.getProfile(DEMO_MEMBER_PROFILE.id)).toEqual(formalProfileBefore);
     expect(applicationStore.isSubmitted).toBe(true);
   });
 
+  it("does not allow a formal member account to create a preparatory application", () => {
+    const session = useSessionStore();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+
+    session.signIn("demo-member");
+
+    expect(() => applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+    )).toThrow("仅预备成员账号可提交招新报名");
+  });
+
   it("stores contact only in the recruitment application state", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
 
     applicationStore.submitApplication(
-      createRegistrationProfileDraft(profileStore.currentMember),
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       validApplicationDraft(),
       true,
     );
 
     expect(applicationStore.submittedApplication?.contact).toBe("demo@example.com");
-    expect(profileStore.currentMember).not.toHaveProperty("contact");
+    expect(profileStore.getProfile(session.currentMemberId)).not.toHaveProperty("contact");
   });
 
   it("rejects invalid submissions in the state layer before changing saved profile data", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
-    const originalName = profileStore.currentMember.name;
+    const originalName = profileStore.getProfile(session.currentMemberId).name;
 
     expect(() => applicationStore.submitApplication(
-      { ...createRegistrationProfileDraft(profileStore.currentMember), name: " " },
+      { ...createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)), name: " " },
       { ...validApplicationDraft(), baizeDirection: undefined },
       true,
     )).toThrow("报名信息校验失败");
 
     expect(() => applicationStore.submitApplication(
-      createRegistrationProfileDraft(profileStore.currentMember),
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       validApplicationDraft(),
       false,
     )).toThrow("报名信息校验失败");
 
-    expect(profileStore.currentMember.name).toBe(originalName);
+    expect(profileStore.getProfile(session.currentMemberId).name).toBe(originalName);
     expect(applicationStore.isSubmitted).toBe(false);
   });
 
@@ -130,10 +161,11 @@ describe("recruitment application domain", () => {
   });
 
   it("keeps the private contact validation with the first registration step", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
 
     expect(validateRegistrationStep(
-      createRegistrationProfileDraft(profileStore.currentMember),
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       { ...createRecruitmentApplicationDraft(), contact: " " },
     )).toMatchObject({ contact: expect.any(String) });
   });
@@ -177,19 +209,20 @@ describe("recruitment application domain", () => {
   });
 
   it("requires the truthfulness confirmation and prevents duplicate in-session submissions", () => {
+    const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
 
     expect(validateConfirmation(false)).toEqual({ confirmation: "请确认资料真实后再提交。" });
 
     applicationStore.submitApplication(
-      createRegistrationProfileDraft(profileStore.currentMember),
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       validApplicationDraft(),
       true,
     );
 
     expect(() => applicationStore.submitApplication(
-      createRegistrationProfileDraft(profileStore.currentMember),
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       validApplicationDraft(),
       true,
     )).toThrow("当前账号已提交报名");

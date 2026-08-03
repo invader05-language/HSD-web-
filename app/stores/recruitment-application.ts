@@ -9,6 +9,7 @@ import {
   type SubmittedRecruitmentApplication,
 } from "../data/recruitment-application";
 import { useMemberProfileStore } from "./member-profile";
+import { useSessionStore } from "./session";
 import {
   validateApplicationDraft,
   validateConfirmation,
@@ -17,12 +18,17 @@ import {
 
 export const useRecruitmentApplicationStore = defineStore("recruitment-application", {
   state: () => ({
-    submittedApplication: undefined as SubmittedRecruitmentApplication | undefined,
+    applicationsByMemberId: {} as Record<string, SubmittedRecruitmentApplication>,
   }),
   getters: {
-    isSubmitted: (state) => Boolean(state.submittedApplication),
+    submittedApplication(state): SubmittedRecruitmentApplication | undefined {
+      return state.applicationsByMemberId[useSessionStore().currentMemberId];
+    },
+    isSubmitted(): boolean {
+      return Boolean(this.submittedApplication);
+    },
     memberStatus(state) {
-      return state.submittedApplication
+      return state.applicationsByMemberId[useSessionStore().currentMemberId]
         ? PREPARATORY_MEMBER_STATUS
         : undefined;
     },
@@ -43,7 +49,15 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       applicationDraft: RecruitmentApplicationDraft,
       confirmed: boolean,
     ) {
-      if (this.submittedApplication) throw new Error("当前账号已提交报名，请勿重复提交。");
+      const session = useSessionStore();
+      if (this.applicationsByMemberId[session.currentMemberId]) {
+        throw new Error("当前账号已提交报名，请勿重复提交。");
+      }
+      const profileStore = useMemberProfileStore();
+      const currentProfile = profileStore.getProfile(session.currentMemberId);
+      if (currentProfile.identity !== "预备成员") {
+        throw new Error("仅预备成员账号可提交招新报名。");
+      }
       const errors = {
         ...validateRegistrationStep(profileDraft, applicationDraft),
         ...validateApplicationDraft(applicationDraft),
@@ -58,10 +72,9 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         throw new Error("报名信息校验失败，请检查后重试。");
       }
 
-      const profileStore = useMemberProfileStore();
-      profileStore.registerOwnProfile(profileDraft);
-      this.submittedApplication = {
-        memberId: profileStore.currentMember.id,
+      profileStore.registerProfile(session.currentMemberId, profileDraft);
+      this.applicationsByMemberId[session.currentMemberId] = {
+        memberId: session.currentMemberId,
         contact: applicationDraft.contact.trim(),
         firstChoice,
         secondChoice: applicationDraft.secondChoice,

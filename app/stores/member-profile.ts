@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import {
   cloneMemberProfile,
+  DEMO_APPLICANT_PROFILE,
   DEMO_MEMBER_PROFILE,
   type MemberProfile,
   type MemberProfilePatch,
@@ -9,29 +10,29 @@ import {
 
 export const useMemberProfileStore = defineStore("member-profile", {
   state: () => ({
-    currentMemberId: DEMO_MEMBER_PROFILE.id,
     profiles: {
       [DEMO_MEMBER_PROFILE.id]: cloneMemberProfile(DEMO_MEMBER_PROFILE),
+      [DEMO_APPLICANT_PROFILE.id]: cloneMemberProfile(DEMO_APPLICANT_PROFILE),
     } as Record<string, MemberProfile>,
   }),
-  getters: {
-    currentMember(state): MemberProfile {
-      return state.profiles[state.currentMemberId] ?? DEMO_MEMBER_PROFILE;
-    },
-  },
   actions: {
-    createDraft(): MemberProfile {
-      return cloneMemberProfile(this.currentMember);
+    getProfile(memberId: string): MemberProfile {
+      const profile = this.profiles[memberId];
+      if (!profile) throw new Error(`成员档案不存在：${memberId}`);
+      return profile;
     },
-    updateOwnProfile(patch: MemberProfilePatch) {
-      this.profiles[this.currentMemberId] = {
-        ...this.currentMember,
+    createDraft(memberId: string): MemberProfile {
+      return cloneMemberProfile(this.getProfile(memberId));
+    },
+    updateProfile(memberId: string, patch: MemberProfilePatch) {
+      this.profiles[memberId] = {
+        ...this.getProfile(memberId),
         ...patch,
       };
     },
-    registerOwnProfile(patch: MemberRegistrationProfilePatch) {
-      this.profiles[this.currentMemberId] = {
-        ...this.currentMember,
+    registerProfile(memberId: string, patch: MemberRegistrationProfilePatch) {
+      this.profiles[memberId] = {
+        ...this.getProfile(memberId),
         ...patch,
       };
     },

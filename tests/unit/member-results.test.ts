@@ -1,11 +1,48 @@
 import { describe, expect, it } from "vitest";
 import {
   DEMO_MEMBER_RESULT,
+  getDemoMemberResult,
   describeAdmission,
   describeAssessment
 } from "../../app/data/member-results";
+import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
 
 describe("member result presentation", () => {
+  it("selects result data by the single current member id", () => {
+    expect(getDemoMemberResult(DEMO_MEMBER_PROFILE.id).status).toBe("admitted");
+
+    const applicantWithoutApplication = getDemoMemberResult(DEMO_APPLICANT_PROFILE.id);
+    expect(applicantWithoutApplication).toMatchObject({
+      status: "no-application",
+      identity: "预备成员",
+      preferences: [],
+      currentStage: "尚未开始",
+    });
+
+    const applicantWithApplication = getDemoMemberResult(DEMO_APPLICANT_PROFILE.id, {
+      memberId: DEMO_APPLICANT_PROFILE.id,
+      contact: "demo@example.com",
+      firstChoice: "新媒体中心",
+      secondChoice: "拓维策划中心",
+      thirdChoice: "人才发展中心",
+      acceptsAdjustment: true,
+      status: "submitted",
+      submittedAt: "2026-08-02T00:00:00.000Z",
+    });
+
+    expect(applicantWithApplication).toMatchObject({
+      status: "pending",
+      identity: "预备成员",
+      currentStage: "面试",
+      currentConclusion: "待公布",
+      preferences: [
+        { rank: 1, center: "新媒体中心" },
+        { rank: 2, center: "拓维策划中心" },
+        { rank: 3, center: "人才发展中心" },
+      ],
+    });
+  });
+
   it("presents the current admitted destination without exposing history", () => {
     expect(describeAdmission(DEMO_MEMBER_RESULT)).toEqual({
       badge: "已录取",

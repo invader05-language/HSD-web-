@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import {
-  DEMO_MEMBER_RESULT,
+  getDemoMemberResult,
   describeAdmission,
   describeAssessment
 } from "~/data/member-results";
-import { useSessionStore } from "~/stores/session";
+import { useCurrentMember } from "~/composables/useCurrentMember";
+import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 
 type ResultTab = "admission" | "assessment";
 
 useHead({ title: "结果中心｜白云 HSD 开发者部落" });
 
-const session = useSessionStore();
-const result = DEMO_MEMBER_RESULT;
-const admission = describeAdmission(result);
-const assessment = describeAssessment(result);
+const { profile: currentMember } = useCurrentMember();
+const applicationStore = useRecruitmentApplicationStore();
+const result = computed(() =>
+  getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication)
+);
+const admission = computed(() => describeAdmission(result.value));
+const assessment = computed(() => describeAssessment(result.value));
 const activeTab = ref<ResultTab>("admission");
 const copied = ref(false);
 
@@ -31,9 +35,9 @@ async function moveTab(event: KeyboardEvent, current: ResultTab) {
 }
 
 async function copyContact() {
-  if (!result.responsibleContact) return;
+  if (!result.value.responsibleContact) return;
   try {
-    await navigator.clipboard?.writeText(result.responsibleContact.contact);
+    await navigator.clipboard?.writeText(result.value.responsibleContact.contact);
   } finally {
     copied.value = true;
     window.setTimeout(() => {
@@ -57,7 +61,7 @@ async function copyContact() {
           <span>Current Recruitment</span>
           <h2>{{ result.batchLabel }}</h2>
           <dl>
-            <div><dt>当前账号</dt><dd>{{ session.memberName }}</dd></div>
+            <div><dt>当前账号</dt><dd>{{ currentMember.name }}</dd></div>
             <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
           </dl>
         </aside>
@@ -186,7 +190,7 @@ async function copyContact() {
               </div>
 
               <dl class="member-result-facts">
-                <div><dt>考核中心</dt><dd>{{ result.finalCenter ?? result.preferences[0]?.center }}</dd></div>
+                <div><dt>考核中心</dt><dd>{{ result.finalCenter ?? result.preferences[0]?.center ?? "尚未确定" }}</dd></div>
                 <div><dt>当前阶段</dt><dd>{{ result.currentStage }}</dd></div>
                 <div><dt>当前结论</dt><dd>{{ result.currentConclusion }}</dd></div>
                 <div><dt>数据范围</dt><dd>仅当前有效结果</dd></div>

@@ -5,9 +5,11 @@ import {
   getAdminTopbarLabel
 } from "~/data/admin-platform";
 import { useSessionStore } from "~/stores/session";
+import { useCurrentMember } from "~/composables/useCurrentMember";
 
 const route = useRoute();
 const session = useSessionStore();
+const { profile: currentMember } = useCurrentMember();
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
@@ -89,7 +91,7 @@ function toggleGroup(groupId: string) {
         </div>
         <div class="admin-topbar__actions">
           <NuxtLink to="/">返回官网</NuxtLink>
-          <span>{{ session.memberName }}</span>
+          <span>{{ currentMember.name }}</span>
           <button type="button" @click="session.signOut(); navigateTo('/')">退出</button>
         </div>
       </header>

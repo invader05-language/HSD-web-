@@ -22,11 +22,11 @@ const rules = {
   password: (value: unknown) => z.string().min(6, "密码至少 6 位").safeParse(value).success || "密码至少 6 位"
 };
 
-async function signIn() {
+async function signIn(values: Record<string, unknown>) {
   submitting.value = true;
   serverError.value = "";
   await new Promise((resolve) => setTimeout(resolve, 450));
-  session.signIn();
+  session.signIn(String(values.account ?? ""));
   submitting.value = false;
   await navigateTo(redirectTarget.value);
 }
@@ -53,7 +53,7 @@ async function signIn() {
           <p v-if="serverError" class="form-error" role="alert">{{ serverError }}</p>
           <button class="button" type="submit" :disabled="submitting">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
         </Form>
-        <p class="login-page__hint">原型演示：填写任意 4 位以上账号和 6 位以上密码即可进入，不连接真实成员数据库。</p>
+        <p class="login-page__hint">原型演示：使用 <code>demo-member</code> 查看正式成员资料，使用 <code>demo-applicant</code> 体验预备成员报名；密码填写任意 6 位以上内容。</p>
         <NuxtLink class="text-link" to="/help#login">无法登录？查看帮助 →</NuxtLink>
       </div>
     </div>

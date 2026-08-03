@@ -14,7 +14,7 @@ const memberStatus = computed(() => applicationStore.memberStatus);
 <template>
   <div class="member-space">
     <aside>
-      <div class="member-space__identity"><HsdAvatar :name="profile.name" :src="profile.avatarUrl" size="md" /><div><strong>{{ profile.name }}</strong><span>{{ memberStatus?.identityLabel || "HSD 成员" }}</span></div></div>
+      <div class="member-space__identity"><HsdAvatar :name="profile.name" :src="profile.avatarUrl" size="md" /><div><strong>{{ profile.name }}</strong><span>{{ profile.identity }}</span></div></div>
       <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><a href="#activities">活动与比赛</a><NuxtLink to="/member/profile">编辑个人资料</NuxtLink></nav>
       <button type="button" @click="session.signOut(); navigateTo('/')">退出登录</button>
     </aside>
@@ -25,7 +25,7 @@ const memberStatus = computed(() => applicationStore.memberStatus);
         <section id="assessment"><span>结果中心</span><h2>招新录取与阶段考核</h2><NuxtLink class="text-link" to="/member/results">查看当前结果 →</NuxtLink><p>结果仅本人登录后可见。</p></section>
         <section id="activities"><span>活动与比赛</span><h2>2 个待参加事项</h2><strong>查看日程</strong><p>可在这里取消个人报名。</p></section>
       </div>
-      <section class="profile-panel"><div><h2>个人资料与头像</h2><p>资料保存后会同步到当前前端会话中的成员展示页面；没有头像时使用白底 HSD 默认图。</p></div><NuxtLink class="button" to="/member/profile">编辑个人资料</NuxtLink></section>
+      <section class="profile-panel"><div><h2>个人资料与头像</h2><p v-if="profile.identity === '预备成员'">资料保存后只同步个人中心与招新记录；录取转正前不会进入官网正式成员目录。</p><p v-else>资料保存后会同步到当前前端会话中的成员展示页面；上传头像后自动公开，没有头像时使用白底 HSD 默认图。</p></div><NuxtLink class="button" to="/member/profile">编辑个人资料</NuxtLink></section>
     </main>
   </div>
 </template>

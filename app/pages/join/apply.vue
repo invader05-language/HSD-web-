@@ -6,7 +6,7 @@ import {
   type RecruitmentApplicationDraft,
   type RecruitmentCenter,
 } from "~/data/recruitment-application";
-import { useMemberProfileStore } from "~/stores/member-profile";
+import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import {
   validateApplicationDraft,
@@ -26,10 +26,11 @@ const STEPS: ReadonlyArray<{ id: Step; label: string }> = [
 useHead({ title: "成员注册与招新报名｜白云 HSD 开发者部落" });
 definePageMeta({ middleware: "member" });
 
-const memberStore = useMemberProfileStore();
+const currentMember = useCurrentMember();
+const currentProfile = currentMember.profile;
 const applicationStore = useRecruitmentApplicationStore();
 const step = ref<Step>(1);
-const profileDraft = reactive(createRegistrationProfileDraft(memberStore.currentMember));
+const profileDraft = reactive(createRegistrationProfileDraft(currentProfile.value));
 const applicationDraft = reactive<RecruitmentApplicationDraft>(applicationStore.createDraft());
 const errors = reactive<Record<string, string>>({});
 const confirmation = ref(false);
@@ -104,7 +105,7 @@ function updateFirstChoice(event: Event) {
 }
 
 function releaseDraftObjectUrl() {
-  if (draftObjectUrl && draftObjectUrl !== memberStore.currentMember.avatarUrl) {
+  if (draftObjectUrl && draftObjectUrl !== currentProfile.value.avatarUrl) {
     URL.revokeObjectURL(draftObjectUrl);
   }
   draftObjectUrl = undefined;
@@ -206,7 +207,7 @@ onBeforeUnmount(() => {
           <details>
             <summary>查看已提交报名摘要</summary>
             <div class="recruitment-summary-grid">
-              <section><h3>成员资料</h3><p>姓名：{{ memberStore.currentMember.name }}</p><p>实践方向：{{ memberStore.currentMember.direction }}</p><p>联系方式：{{ submittedApplication.contact }}（仅招新联系）</p></section>
+              <section><h3>成员资料</h3><p>姓名：{{ currentProfile.name }}</p><p>实践方向：{{ currentProfile.direction }}</p><p>联系方式：{{ submittedApplication.contact }}（仅招新联系）</p></section>
               <section><h3>报名志愿</h3><p>第一志愿：{{ submittedApplication.firstChoice }}</p><p>第二志愿：{{ submittedApplication.secondChoice || "未填写" }}</p><p>第三志愿：{{ submittedApplication.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ submittedApplication.baizeDirection || "不适用" }}</p></section>
             </div>
           </details>
@@ -225,7 +226,7 @@ onBeforeUnmount(() => {
                 <header class="recruitment-section-heading"><span>01</span><div><h2 id="registration-profile-heading">完善个人资料</h2><p>这些资料会在最终提交后建立当前账号的初始成员档案。</p></div></header>
                 <div class="registration-avatar" data-field="avatarUrl">
                   <HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="lg" />
-                  <div><strong>头像（可选）</strong><p>仅本地预览，不会上传服务器。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
+                  <div><strong>头像（可选）</strong><p>上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
                 </div>
                 <div class="registration-fields">
                   <label data-field="name"><span>姓名</span><input v-model="profileDraft.name" autocomplete="name" maxlength="20" :aria-invalid="Boolean(errors.name)" :aria-describedby="errors.name ? 'name-error' : undefined"><small v-if="errors.name" id="name-error" class="form-error">{{ errors.name }}</small></label>

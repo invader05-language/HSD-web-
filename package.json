@@ -9,6 +9,7 @@
     "vercel:materialize": "node scripts/materialize-vercel-functions.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test": "pnpm run test:unit"
