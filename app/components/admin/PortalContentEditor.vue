@@ -1,0 +1,114 @@
+<script setup lang="ts">
+import type { ContentBlock, PortalContentDraftInput, PortalContentKind, PortalContentRecord } from "~/types/portal-content";
+import { PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS } from "~/data/admin-content";
+import { usePortalContentStore } from "~/stores/portal-content";
+import { useSessionStore } from "~/stores/session";
+
+const props = defineProps<{ record?: PortalContentRecord; initialKind?: PortalContentKind }>();
+const emit = defineEmits<{ saved: [id: string] }>();
+const content = usePortalContentStore();
+const session = useSessionStore();
+const kind = ref<PortalContentKind>(props.record?.kind ?? props.initialKind ?? "article");
+const title = ref(props.record?.title ?? "");
+const summary = ref(props.record?.summary ?? "");
+const target = ref(props.record?.target.value ?? "/activities");
+const expiresAt = ref(props.record?.expiresAt?.slice(0, 16) ?? "");
+const blocks = ref<ContentBlock[]>(structuredClone(props.record?.blocks ?? [{ type: "paragraph", text: "" }]));
+const error = ref("");
+const notice = ref("");
+const unpublishReason = ref("");
+const actionPending = ref(false);
+
+const isOwner = computed(() => session.adminLevel === "owner");
+const currentStatus = computed(() => props.record ? PORTAL_CONTENT_STATUS_LABELS[props.record.status] : "草稿");
+const isReadOnly = computed(() => Boolean(props.record && ["in-review", "pending-publication"].includes(props.record.status)));
+
+function buildInput(): PortalContentDraftInput {
+  return {
+    kind: kind.value,
+    title: title.value,
+    summary: summary.value,
+    target: { type: "internal-route", value: target.value },
+    blocks: blocks.value.filter((block) => block.type === "image" || block.text.trim()),
+    ...(expiresAt.value ? { expiresAt: new Date(expiresAt.value).toISOString() } : {})
+  };
+}
+
+function validate() {
+  if (!title.value.trim() || !summary.value.trim() || !target.value.trim()) {
+    error.value = "请填写标题、摘要和站内目标。";
+    return false;
+  }
+  if ((kind.value === "article" || kind.value === "notice") && !blocks.value.some((block) => block.type !== "image" && block.text.trim())) {
+    error.value = "新闻和公告至少需要一个标题或正文内容块。";
+    return false;
+  }
+  return true;
+}
+
+function saveDraft() {
+  error.value = "";
+  notice.value = "";
+  if (!validate()) return;
+  try {
+    const saved = props.record
+      ? content.updateDraft(props.record.id, buildInput())
+      : content.createDraft(buildInput());
+    notice.value = content.persistenceError ? "草稿暂存于当前会话，本地存储不可用。" : "草稿已保存。";
+    emit("saved", saved.id);
+  } catch (caught) {
+    error.value = caught instanceof Error ? "当前状态不能保存草稿。" : "保存草稿失败。";
+  }
+}
+
+function submitForReview() {
+  saveDraft();
+  if (error.value || !props.record) return;
+  try {
+    content.submitForReview(props.record.id);
+    notice.value = "已提交审核。";
+  } catch {
+    error.value = "当前内容无法提交审核。";
+  }
+}
+
+function completeAction(action: "approve" | "publish" | "unpublish") {
+  if (!props.record) return;
+  error.value = "";
+  try {
+    if (action === "approve") content.approve(props.record.id);
+    if (action === "publish") content.publish(props.record.id, true);
+    if (action === "unpublish") content.unpublish(props.record.id, unpublishReason.value);
+    actionPending.value = false;
+    notice.value = action === "approve" ? "审核通过，内容进入待发布。" : action === "publish" ? "已发布到官网。" : "内容已下架。";
+  } catch (caught) {
+    error.value = caught instanceof Error && caught.message === "PORTAL_CONTENT_PERMISSION_REQUIRED" ? "只有联盟总负责人可以执行此操作。" : "操作未完成，请检查状态和原因。";
+  }
+}
+
+function addBlock(type: ContentBlock["type"]) {
+  if (type === "image") blocks.value.push({ type, assetId: "", alt: "" });
+  else blocks.value.push({ type, text: "" });
+}
+
+function removeBlock(index: number) {
+  blocks.value.splice(index, 1);
+}
+</script>
+
+<template>
+  <section class="admin-content-editor" :aria-label="record ? '官网内容编辑器' : '新建官网内容'">
+    <p v-if="error" class="admin-content-editor__message is-error" role="alert">{{ error }}</p>
+    <p v-if="notice" class="admin-content-editor__message" role="status">{{ notice }}</p>
+    <div class="admin-content-editor__layout">
+      <div class="admin-content-editor__form">
+        <section><header><span>01</span><h2>基础信息</h2><AdminStatusPill :status="currentStatus" /></header><div class="admin-editor-grid"><label>内容类型<select v-model="kind" :disabled="Boolean(record)"><option v-for="(label, value) in PORTAL_CONTENT_KIND_LABELS" :key="value" :value="value">{{ label }}</option></select></label><label>站内目标<input v-model="target" :disabled="isReadOnly" placeholder="/activities"></label><label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label><label class="is-wide">摘要<textarea v-model="summary" :disabled="isReadOnly" rows="4"></textarea></label><label v-if="kind === 'flash'">失效时间（可选）<input v-model="expiresAt" :disabled="isReadOnly" type="datetime-local"></label></div></section>
+        <section v-if="kind !== 'flash'"><header><span>02</span><h2>结构化正文</h2></header><div class="admin-content-blocks"><article v-for="(block, index) in blocks" :key="index"><label>{{ block.type === 'heading' ? '小标题' : block.type === 'paragraph' ? '正文段落' : '媒体库素材' }}<template v-if="block.type === 'image'"><input v-model="block.assetId" :disabled="isReadOnly" placeholder="已审核素材 ID"><input v-model="block.alt" :disabled="isReadOnly" placeholder="替代文本"></template><textarea v-else v-model="block.text" :disabled="isReadOnly" rows="block.type === 'heading' ? 2 : 4"></textarea></label><button v-if="!isReadOnly" type="button" :aria-label="`移除第 ${index + 1} 个内容块`" @click="removeBlock(index)">移除</button></article></div><div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" @click="addBlock('heading')">添加标题</button><button type="button" @click="addBlock('paragraph')">添加段落</button><button type="button" @click="addBlock('image')">添加图片</button></div></section>
+        <section v-if="record"><header><span>03</span><h2>审核与发布</h2></header><p v-if="!isOwner" class="admin-inline-note">普通管理员可保存草稿、提交审核和预览；审核、发布与下架由联盟总负责人执行。</p><div v-else class="admin-content-editor__review-actions"><button v-if="record.status === 'in-review'" type="button" @click="actionPending = true">审核通过</button><button v-if="record.status === 'pending-publication'" type="button" class="button" @click="actionPending = true">发布内容</button><label v-if="record.publishedState === 'published'">下架原因<input v-model="unpublishReason" placeholder="说明下架原因"></label><button v-if="record.publishedState === 'published'" type="button" @click="completeAction('unpublish')">确认下架</button></div></section>
+      </div>
+      <aside class="admin-content-editor__sidebar"><span>Public Projection</span><h2>{{ title || '未命名内容' }}</h2><p>{{ summary || '摘要将在这里显示。' }}</p><small>{{ PORTAL_CONTENT_KIND_LABELS[kind] }} · {{ currentStatus }}</small><NuxtLink v-if="record" :to="`/admin/content/${record.id}/preview`">打开预览</NuxtLink></aside>
+    </div>
+    <footer class="admin-content-editor__footer"><NuxtLink class="button button--ghost" to="/admin/content">返回列表</NuxtLink><button v-if="!isReadOnly" type="button" class="button button--ghost" @click="saveDraft">保存草稿</button><button v-if="record?.status === 'draft'" type="button" class="button" @click="submitForReview">提交审核</button></footer>
+    <div v-if="actionPending" class="admin-confirm-backdrop"><section role="alertdialog" aria-label="发布确认"><span>Publication Confirmation</span><h2>{{ record?.status === 'in-review' ? '确认审核通过？' : '确认发布内容？' }}</h2><p>此操作会记录操作者、实际时间与内容版本。</p><div><button type="button" class="button button--ghost" @click="actionPending = false">返回检查</button><button type="button" class="button" @click="completeAction(record?.status === 'in-review' ? 'approve' : 'publish')">确认操作</button></div></section></div>
+  </section>
+</template>

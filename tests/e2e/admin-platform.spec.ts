@@ -201,8 +201,10 @@ test("project activity and portal content share a clear draft review publish wor
 
   await page.getByRole("button", { name: /内容与门户/ }).click();
   await page.getByRole("link", { name: "内容管理", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "内容管理" })).toBeVisible();
-  await expect(page.getByText("保存草稿")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "官网内容" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "新建内容" })).toHaveAttribute("href", "/admin/content/new");
+  await expect(page.getByRole("option", { name: "待发布" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "官网内容列表" })).toBeVisible();
 
   await page.getByRole("link", { name: "首页配置", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "首页内容配置" })).toBeVisible();

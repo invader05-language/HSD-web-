@@ -1,4 +1,6 @@
-export type AdminContentStatus = "草稿" | "待审核" | "已发布" | "已下架";
+import type { PortalContentKind, PortalContentRecord, PortalContentStatus } from "~/types/portal-content";
+
+export type AdminContentStatus = "草稿" | "待审核" | "待发布" | "已发布" | "已下架";
 
 export interface AdminContentRecord {
   id: string;
@@ -29,6 +31,57 @@ export interface AdminRecordFilters {
   query: string;
   status: string;
   category: string;
+}
+
+export interface AdminContentOverview {
+  total: number;
+  draft: number;
+  inReview: number;
+  pendingPublication: number;
+  published: number;
+  unpublished: number;
+}
+
+export const PORTAL_CONTENT_KIND_LABELS: Record<PortalContentKind, string> = {
+  flash: "HSD 快讯",
+  article: "新闻动态",
+  notice: "通知公告"
+};
+
+export const PORTAL_CONTENT_STATUS_LABELS: Record<PortalContentStatus, AdminContentStatus> = {
+  draft: "草稿",
+  "in-review": "待审核",
+  "pending-publication": "待发布",
+  published: "已发布",
+  unpublished: "已下架"
+};
+
+export function toAdminContentRecord(record: PortalContentRecord): AdminContentRecord {
+  return {
+    id: record.id,
+    title: record.title,
+    category: PORTAL_CONTENT_KIND_LABELS[record.kind],
+    status: PORTAL_CONTENT_STATUS_LABELS[record.status],
+    owner: record.createdBy,
+    updatedAt: new Intl.DateTimeFormat("zh-CN", {
+      dateStyle: "short",
+      timeStyle: "short",
+      hour12: false
+    }).format(new Date(record.updatedAt)),
+    summary: record.summary
+  };
+}
+
+export function getContentOverview(records: PortalContentRecord[]): AdminContentOverview {
+  return records.reduce<AdminContentOverview>((overview, record) => {
+    overview.total += 1;
+    if (record.status === "draft") overview.draft += 1;
+    if (record.status === "in-review") overview.inReview += 1;
+    if (record.status === "pending-publication") overview.pendingPublication += 1;
+    if (record.status === "published") overview.published += 1;
+    if (record.status === "unpublished") overview.unpublished += 1;
+    return overview;
+  }, { total: 0, draft: 0, inReview: 0, pendingPublication: 0, published: 0, unpublished: 0 });
 }
 
 export interface HomepageSlot {
@@ -218,7 +271,8 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
 
 const CONTENT_TRANSITIONS: Record<AdminContentStatus, AdminContentStatus[]> = {
   草稿: ["待审核"],
-  待审核: ["草稿", "已发布"],
+  待审核: ["草稿", "待发布"],
+  待发布: ["已发布"],
   已发布: ["已下架"],
   已下架: ["草稿"]
 };

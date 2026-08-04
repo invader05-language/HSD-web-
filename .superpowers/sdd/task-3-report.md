@@ -1,28 +1,46 @@
-# Task 3 Report: 管理端考核台与结果发布页面
-
-## Status
-
-Completed and committed separately from the assessment Store work.
+# Task 3 Report: Admin Official-Content Workflow
 
 ## Delivered
 
-- Canonical and legacy assessment routes now share a batch-scoped Store-driven workbench.
-- The workbench displays batch name, batchId, global assessment round and status; it restricts phase filters to rounds 1-3.
-- White Ze exposes three locked/unlocked round controls; regular centers expose only round 1.
-- Draft values use `v-model`; save and offline adjustment actions call the assessment Store. Drawer Escape, focus return, filters and cancel/reset behaviour are retained.
-- Global round advancement is owner-only and confirmed. Publication is batch-wide, owner-only, confirmed and reports Store feedback.
-- Member results prefer the latest published assessment projection across all batches and intentionally omit internal notes and round history.
-- Added focused E2E contracts for batch context, round locking, saved result feedback, batch-wide publication UI and published member projection.
+- Replaced `/admin/content`'s fixture-backed generic drawer with a Store-backed official-content list, status/category/search filters, live counts, and `?create=flash|article|notice` routing.
+- Added dedicated create, edit, and work-version preview pages. The editor uses only structured `heading`, `paragraph`, and `image` blocks and retains an in-memory draft if local storage fails.
+- Bound save, submit, approve, publish, and unpublish actions to `usePortalContentStore`; ordinary administrators see the owner boundary and the Store independently denies owner-only commands.
+- Updated the published workflow projection to include the required `待发布` state and changed dashboard content metrics and activity rows to derive from the content Store.
+- Updated quick-create links for flash, article, and notice. `AdminRecordWorkspace` remains in place for projects and activities, and Help Center routes/data were not reactivated.
 
-## Validation
+## Files
 
-- `pnpm exec vitest run tests/unit/member-results.test.ts`: passed, 9 tests.
-- `pnpm run typecheck`: passed.
-- `pnpm run build`: passed.
-- Focused E2E was run before and after implementation but Chrome exited with `SIGABRT` before opening any test page. This environment failure affects existing tests as well, so page assertions and viewport QA could not run.
-- The parallel Store review fixes are now committed in `542b7f2`; the expanded assessment suite and the full unit suite pass.
+- Added `app/components/admin/PortalContentEditor.vue`.
+- Added `app/pages/admin/content/new.vue`, `app/pages/admin/content/[id].vue`, and `app/pages/admin/content/[id]/preview.vue`.
+- Updated `app/pages/admin/content/index.vue`, `app/pages/admin/index.vue`, `app/data/admin-content.ts`, `app/data/admin-dashboard.ts`, and `app/assets/css/main.css`.
+- Updated `tests/unit/admin-content.test.ts` and `tests/e2e/admin-platform.spec.ts`.
+
+## Interfaces
+
+- Pages call `usePortalContentStore().createDraft`, `updateDraft`, `submitForReview`, `approve`, `publish`, and `unpublish`; they do not mutate fixtures.
+- `PORTAL_CONTENT_STATUS_LABELS`, `PORTAL_CONTENT_KIND_LABELS`, `toAdminContentRecord`, and `getContentOverview` adapt Task 1 Store records for the list and dashboard.
+- `?create=flash|article|notice` redirects to `/admin/content/new?kind=<kind>`.
+
+## TDD Evidence
+
+- Red: `pnpm exec vitest run tests/unit/admin-content.test.ts` failed as expected because `待审核 -> 待发布` was not permitted.
+- Green: `pnpm exec vitest run tests/unit/admin-content.test.ts tests/unit/portal-content.test.ts` passed: 2 files, 15 tests.
+
+## Verification
+
+- `pnpm run typecheck` passed.
+- `pnpm run test:unit` passed: 35 files, 250 tests.
+- `pnpm run build` passed: Nuxt client and server production build completed.
+- `git diff --check` passed.
+- Focused Playwright test was attempted twice. System Chrome exited with `SIGABRT` before navigating; CI mode could not run because the bundled Chromium executable is absent. The gstack browser harness also confirmed port `49852` served a stale different worktree; this worktree could not keep a separate Nuxt dev server open in this environment. No browser assertions ran against this change.
+
+## Self-review
+
+- No Help Center category or active content page was reintroduced.
+- The old generic workspace was not reused as the official-content editor.
+- Owner operations use Store authorization and confirmation; no hard deletion was added.
+- Dashboard publishing counts read the same Store as the official-content list.
 
 ## Concerns
 
-- Browser visual checks at 1440px and 390px remain blocked by the local Chrome startup failure.
-- Full unit, typecheck and production build validation are green. Browser visual checks remain blocked by the local Chrome startup failure described above.
+- Browser-level visual and interaction validation remains blocked by the local browser/runtime environment, despite typecheck, unit, and production build success.
