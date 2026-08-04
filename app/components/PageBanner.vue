@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { resolvePortalAssetSource } from "~/data/admin-assets";
+import { resolvePortalAssetSource } from "~/data/portal-assets";
 import type { PortalVisualConfig } from "~/types/portal-config";
 
 const props = withDefaults(defineProps<{

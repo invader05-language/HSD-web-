@@ -2,16 +2,11 @@ import { readFileSync } from "node:fs";
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import MediaPlaceholder from "../../app/components/MediaPlaceholder.vue";
-import * as adminAssets from "../../app/data/admin-assets";
+import { resolvePortalAssetSource } from "../../app/data/portal-assets";
 
 describe("published portal visuals", () => {
   it("renders the approved asset URL and falls back after an image error", async () => {
-    const resolveSource = (adminAssets as typeof adminAssets & {
-      resolvePortalAssetSource?: (assetId?: string) => string | undefined;
-    }).resolvePortalAssetSource;
-
-    expect(resolveSource).toBeTypeOf("function");
-    const source = resolveSource?.("asset-recruitment-hero");
+    const source = resolvePortalAssetSource("asset-recruitment-hero");
     expect(source).toMatch(/\.png(?:\?|$)/);
 
     const wrapper = mount(MediaPlaceholder, {

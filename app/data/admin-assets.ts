@@ -1,3 +1,5 @@
+import { resolvePortalAssetSource } from "./portal-assets";
+
 export type AssetProcessingStatus =
   | "waiting"
   | "uploading"
@@ -69,7 +71,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     usages: ["官网首页 Banner", "加入我们入口"],
     alt: "白云 HSD 开发者部落 2026 秋季招新主视觉",
     accent: "#9e1b26",
-    imageUrl: recruitmentHeroSource
+    imageUrl: resolvePortalAssetSource("asset-recruitment-hero")
   },
   {
     id: "asset-salon",
@@ -208,13 +210,6 @@ export function canUseAssetForPortalContent(assetId: string) {
   return Boolean(asset?.imageUrl && asset.type === "图片" && canSelectAsset(asset));
 }
 
-export function resolvePortalAssetSource(assetId?: string) {
-  if (!assetId) return undefined;
-  const asset = ADMIN_ASSETS.find((item) => item.id === assetId);
-  if (!asset || asset.type !== "图片" || !canSelectAsset(asset)) return undefined;
-  return asset.imageUrl;
-}
-
 export function filterAdminAssets(
   assets: AdminAsset[],
   filters: { query: string; type: string; state: string }
@@ -244,4 +239,3 @@ export function getResourceAccessLabel(access: ResourceAccess) {
     center: "指定中心"
   }[access];
 }
-import recruitmentHeroSource from "../../设计稿/页面Banner/01-首页Banner.png?url";

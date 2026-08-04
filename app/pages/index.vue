@@ -7,7 +7,7 @@ import {
 import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
-import { resolvePortalAssetSource } from "~/data/admin-assets";
+import { resolvePortalAssetSource } from "~/data/portal-assets";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
