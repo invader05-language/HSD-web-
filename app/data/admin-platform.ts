@@ -10,6 +10,10 @@ export interface AdminNavigationGroup {
   items: AdminNavigationItem[];
 }
 
+export interface AdminNavigationAccess {
+  canManageAdminAccounts: boolean;
+}
+
 export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
   {
     id: "dashboard",
@@ -67,10 +71,9 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
   },
   {
     id: "system",
-    label: "系统与权限",
+    label: "系统管理",
     items: [
-      { id: "accounts", label: "管理员账号", to: "/admin/accounts" },
-      { id: "roles", label: "角色权限", to: "/admin/roles" },
+      { id: "accounts", label: "管理员资格配置", to: "/admin/accounts" },
       { id: "logs", label: "操作日志", to: "/admin/logs" },
       { id: "recycle-bin", label: "回收站", to: "/admin/recycle-bin" }
     ]
@@ -80,6 +83,15 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
 export const ADMIN_ROUTES = ADMIN_NAVIGATION.flatMap((group) =>
   group.items.map((item) => item.to)
 );
+
+export function getAdminNavigationForAccess(access: AdminNavigationAccess) {
+  return ADMIN_NAVIGATION.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => item.id !== "accounts" || access.canManageAdminAccounts
+    )
+  })).filter((group) => group.items.length > 0);
+}
 
 export function getAdminNavigationState(path: string) {
   const matches = ADMIN_NAVIGATION.flatMap((group) =>

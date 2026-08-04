@@ -79,7 +79,7 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "结果中心" }).click();
   await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
-  await page.getByLabel("成员账号").fill("demo-member");
+  await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
   await expect(page).toHaveURL(/\/member\/results$/);

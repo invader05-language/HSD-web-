@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   ADMIN_NAVIGATION,
   ADMIN_ROUTES,
+  getAdminNavigationForAccess,
   getAdminNavigationState
 } from "../../app/data/admin-platform";
 import {
@@ -10,7 +12,7 @@ import {
 } from "../../app/data/admin-dashboard";
 
 describe("administration platform navigation", () => {
-  it("exposes the seven confirmed business domains", () => {
+  it("exposes the seven confirmed business domains with a system management group", () => {
     expect(ADMIN_NAVIGATION.map((group) => group.label)).toEqual([
       "工作台",
       "招新与考核",
@@ -18,8 +20,22 @@ describe("administration platform navigation", () => {
       "项目与活动",
       "内容与门户",
       "媒体与资源",
-      "系统与权限"
+      "系统管理"
     ]);
+  });
+
+  it("removes the role matrix from navigation and keeps account configuration owner-only", () => {
+    expect(ADMIN_ROUTES).not.toContain("/admin/roles");
+    expect(
+      getAdminNavigationForAccess({ canManageAdminAccounts: false })
+        .flatMap((group) => group.items)
+        .map((item) => item.to)
+    ).not.toContain("/admin/accounts");
+    expect(
+      getAdminNavigationForAccess({ canManageAdminAccounts: true })
+        .flatMap((group) => group.items)
+        .map((item) => item.to)
+    ).toContain("/admin/accounts");
   });
 
   it("resolves nested routes to the correct navigation item", () => {
@@ -36,6 +52,14 @@ describe("administration platform navigation", () => {
   it("publishes a unique route for every administration entry", () => {
     expect(new Set(ADMIN_ROUTES).size).toBe(ADMIN_ROUTES.length);
     expect(ADMIN_ROUTES.every((route) => route.startsWith("/admin"))).toBe(true);
+  });
+
+  it("does not retain the retired role matrix implementation surface", () => {
+    const systemData = readFileSync("app/data/admin-system.ts", "utf8");
+    const styles = readFileSync("app/assets/css/main.css", "utf8");
+
+    expect(systemData).not.toContain("ADMIN_ROLES");
+    expect(styles).not.toContain(".admin-role-layout");
   });
 });
 
