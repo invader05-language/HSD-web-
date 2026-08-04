@@ -72,10 +72,11 @@ export function projectMemberToPublic(
   profile: MemberProfile,
   base?: PublicPerson,
   centerLeadership?: AdminMember["centerLeadership"],
+  coreOverride?: boolean,
 ): PublicPerson {
   const centerSlug = profile.centerSlug ?? base?.centerSlug;
   if (!centerSlug) throw new Error(`正式成员缺少中心标识：${profile.id}`);
-  const isCore = profile.memberDuty === "核心人员" || Boolean(centerLeadership);
+  const isCore = coreOverride ?? (profile.memberDuty === "核心人员" || Boolean(centerLeadership));
 
   const projected = {
     id: profile.publicId ?? base?.id ?? profile.id,

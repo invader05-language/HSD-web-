@@ -107,7 +107,7 @@ describe("member profile domain", () => {
     expect(publicPerson).not.toHaveProperty("baizeDirection");
   });
 
-  it("derives core membership from member duty or the current center-lead qualification", () => {
+  it("preserves a static core relationship while reflecting center-lead qualification", () => {
     const profileStore = useMemberProfileStore();
     const accessStore = useAdminAccessStore();
     const repository = useMemberRepository();
@@ -119,7 +119,7 @@ describe("member profile domain", () => {
       ...profileStore.getProfile(memberId),
       memberDuty: "普通成员",
     };
-    expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
+    expect(repository.findPublicPerson(publicId)?.isCore).toBe(true);
 
     expect(accessStore.assignAdminCenterRole(
       "demo-member",
@@ -129,7 +129,7 @@ describe("member profile domain", () => {
     expect(repository.findPublicPerson(publicId)?.isCore).toBe(true);
 
     expect(accessStore.revokeAdmin("demo-member", owner)).toBe(true);
-    expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
+    expect(repository.findPublicPerson(publicId)?.isCore).toBe(true);
   });
 
   it("keeps static public core mappings out of the admin core candidates", () => {
@@ -148,6 +148,26 @@ describe("member profile domain", () => {
 
     expect(repository.publicCorePeople.value.find((person) => person.name === "李同学"))
       .toMatchObject({ memberDuty: "核心人员", isCore: true });
+  });
+
+  it("keeps a stored static-core profile aligned with the public core projection", () => {
+    const profileStore = useMemberProfileStore();
+    profileStore.profiles["member-wu"] = {
+      id: "member-wu",
+      publicId: "wu-talent",
+      name: "吴同学",
+      studentId: "20250021",
+      grade: "2025 级",
+      className: "软件工程 1 班",
+      center: "人才发展中心",
+      centerSlug: "talent-development",
+      memberDuty: "普通成员",
+      identity: "正式成员",
+      bio: "存储档案中的吴同学",
+    };
+
+    const person = useMemberRepository().findPublicPerson("wu-talent");
+    expect(person).toMatchObject({ memberDuty: "核心人员", isCore: true });
   });
 
   it("ignores a disabled center-lead qualification when deriving core membership", () => {

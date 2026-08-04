@@ -108,6 +108,7 @@ export function useMemberRepository() {
         { ...storedProfile, publicId: person.id },
         person,
         adminMember?.centerLeadership,
+        adminMember?.isCore,
       )];
     });
     const staticIds = new Set(staticPeople.map((person) => person.id));
@@ -118,7 +119,12 @@ export function useMemberRepository() {
       ))
       .map((profile) => {
         const adminMember = adminMembers.value.find((item) => item.id === profile.id);
-        return projectMemberToPublic(profile, undefined, adminMember?.centerLeadership);
+        return projectMemberToPublic(
+          profile,
+          undefined,
+          adminMember?.centerLeadership,
+          adminMember?.isCore,
+        );
       });
 
     const representedMemberIds = new Set([
