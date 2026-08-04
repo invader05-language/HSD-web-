@@ -43,6 +43,16 @@ function getStorage(): Storage | undefined {
   try { return typeof localStorage === "undefined" ? undefined : localStorage; } catch { return undefined; }
 }
 
+function writePersistedConfigs(draftConfig: PortalConfig, publishedConfig: PortalConfig) {
+  const storage = getStorage();
+  if (!storage) throw new Error("PORTAL_CONFIG_PERSISTENCE_FAILED");
+  storage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify({
+    version: PORTAL_CONFIG_STORAGE_VERSION,
+    draftConfig,
+    publishedConfig,
+  }));
+}
+
 function isConfig(value: unknown): value is PortalConfig {
   if (typeof value !== "object" || value === null) return false;
   const config = value as Record<string, unknown>;
@@ -122,13 +132,7 @@ export const usePortalConfigStore = defineStore("portal-config", {
   actions: {
     persist() {
       try {
-        const storage = getStorage();
-        if (!storage) throw new Error("storage unavailable");
-        storage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify({
-          version: PORTAL_CONFIG_STORAGE_VERSION,
-          draftConfig: this.draftConfig,
-          publishedConfig: this.publishedConfig,
-        }));
+        writePersistedConfigs(this.draftConfig, this.publishedConfig);
         this.persistenceError = undefined;
       } catch {
         this.persistenceError = "PORTAL_CONFIG_STORAGE_UNAVAILABLE";
@@ -207,8 +211,14 @@ export const usePortalConfigStore = defineStore("portal-config", {
       next.revision = this.publishedConfig.revision + 1;
       next.updatedAt = now.toISOString();
       next.updatedBy = actor;
+      try {
+        writePersistedConfigs(this.draftConfig, next);
+        this.persistenceError = undefined;
+      } catch {
+        this.persistenceError = "PORTAL_CONFIG_PERSISTENCE_FAILED";
+        throw new Error("PORTAL_CONFIG_PERSISTENCE_FAILED");
+      }
       this.publishedConfig = next;
-      this.persist();
       return clone(next);
     },
   },

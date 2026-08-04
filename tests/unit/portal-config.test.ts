@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { readFileSync } from "node:fs";
 import { usePortalConfigStore } from "../../app/stores/portal-config";
@@ -38,6 +38,7 @@ function clearDefaultSlots(store: ReturnType<typeof usePortalConfigStore>) {
 
 describe("portal configuration store", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     localStorage.clear();
     setActivePinia(createPinia());
   });
@@ -54,6 +55,24 @@ describe("portal configuration store", () => {
     store.saveDraft({ slots: { flash: [{ entityType: "flash", sourceId: "missing" }] } });
     expect(() => store.publish(catalog, true)).toThrow("PORTAL_CONFIG_INVALID_REFERENCE");
     expect(store.publishedConfig.slots.flash[0]?.sourceId).toBe(publishedId);
+  });
+
+  it("keeps the published configuration intact when persistence fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalConfigStore();
+    clearDefaultSlots(store);
+    const previousPublished = JSON.parse(JSON.stringify(store.publishedConfig));
+
+    store.saveDraft({ slots: { flash: [{ entityType: "flash", sourceId: "replacement" }] } });
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.publish(catalog, true)).toThrow("PORTAL_CONFIG_PERSISTENCE_FAILED");
+    expect(store.publishedConfig).toEqual(previousPublished);
+    expect(store.persistenceError).toBe("PORTAL_CONFIG_PERSISTENCE_FAILED");
+    setItem.mockRestore();
   });
 
   it("replaces, removes, and reorders draft references without mutating the published configuration", () => {
@@ -268,5 +287,28 @@ describe("portal configuration surfaces", () => {
     expect(homeSource).toContain("config.visuals.home");
     expect(joinSource).toContain("config.visuals.join");
     expect(bannerSource).toContain("visual");
+  });
+
+  it("provides keyboard-complete tabs and focus-managed publication dialogs", () => {
+    const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
+
+    expect(source).toContain('aria-controls="portal-panel-recommendations"');
+    expect(source).toContain('aria-controls="portal-panel-visuals"');
+    expect(source).toContain('role="tabpanel"');
+    expect(source).toContain("handleTabKeydown");
+    expect(source).toContain('aria-labelledby="portal-preview-title"');
+    expect(source).toContain('aria-labelledby="portal-publish-title"');
+    expect(source).toContain("handleDialogKeydown");
+    expect(source).toContain("restoreDialogFocus");
+  });
+
+  it("shows invalid current references and distinguishes publication failures", () => {
+    const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
+
+    expect(source).toContain("currentReferenceIssue");
+    expect(source).toContain("无效当前项");
+    expect(source).toContain("PORTAL_CONFIG_PERSISTENCE_FAILED");
+    expect(source).toContain("PORTAL_CONFIG_INVALID_VISUAL");
+    expect(source).toContain("当前公开版本保持不变");
   });
 });

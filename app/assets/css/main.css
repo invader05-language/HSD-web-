@@ -336,7 +336,9 @@ a {
 }
 
 .media-placeholder {
+  position: relative;
   display: grid;
+  overflow: hidden;
   min-height: 220px;
   place-content: center;
   padding: 32px;
@@ -346,6 +348,14 @@ a {
     var(--placeholder);
   color: #625d58;
   text-align: center;
+}
+
+.media-placeholder__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .media-placeholder__mark {

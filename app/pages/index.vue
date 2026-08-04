@@ -7,6 +7,7 @@ import {
 import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
+import { resolvePortalAssetSource } from "~/data/admin-assets";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
@@ -32,6 +33,7 @@ const publishedResources = homepageSlots.resources;
 const emptyProjectionWarnings = warnings.filter((warning) => warning.code === "empty");
 const homeVisualLabel = config.visuals.home.alt || "官网主视觉素材位";
 const homeVisualDetail = config.visuals.home.supportingText || (config.visuals.home.assetId ? "已发布门户主视觉" : "后续使用单独设计或授权照片");
+const homeVisualSource = computed(() => resolvePortalAssetSource(config.visuals.home.assetId));
 
 function publicDate(value: string) {
   const date = new Date(value);
@@ -80,7 +82,7 @@ watch(
             <NuxtLink class="button button--ghost" to="/join">查看招新</NuxtLink>
           </div>
         </div>
-        <MediaPlaceholder :label="homeVisualLabel" :detail="homeVisualDetail" :data-asset-id="config.visuals.home.assetId" dark />
+        <MediaPlaceholder :label="homeVisualLabel" :detail="homeVisualDetail" :src="homeVisualSource" :alt="config.visuals.home.alt" :data-asset-id="config.visuals.home.assetId" dark />
       </div>
     </section>
 

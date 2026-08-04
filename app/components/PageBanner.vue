@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { resolvePortalAssetSource } from "~/data/admin-assets";
 import type { PortalVisualConfig } from "~/types/portal-config";
 
 const props = withDefaults(defineProps<{
@@ -15,6 +17,7 @@ const props = withDefaults(defineProps<{
 
 const visualLabel = computed(() => props.visual?.alt || props.mediaLabel);
 const visualDetail = computed(() => props.visual?.supportingText || (props.visual?.assetId ? "已发布门户主视觉" : "等待正式授权素材"));
+const visualSource = computed(() => resolvePortalAssetSource(props.visual?.assetId));
 </script>
 
 <template>
@@ -28,7 +31,7 @@ const visualDetail = computed(() => props.visual?.supportingText || (props.visua
           <slot name="actions" />
         </div>
       </div>
-      <MediaPlaceholder :label="visualLabel" :detail="visualDetail" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
+      <MediaPlaceholder :label="visualLabel" :detail="visualDetail" :src="visualSource" :alt="visual?.alt" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
     </div>
   </section>
 </template>
