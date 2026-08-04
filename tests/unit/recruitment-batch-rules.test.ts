@@ -116,6 +116,19 @@ describe("recruitment batch lifecycle commands", () => {
     });
   });
 
+  it("creates a versioned portal flash when publishing a draft batch already within its open window", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ lifecycleStatus: "draft" })]);
+
+    store.publishBatch("batch-current", NOW);
+
+    expect(usePortalContentStore().records.find((record) => (
+      record.sourceId === "batch-current" && record.sourceVersion === 2
+    ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
+  });
+
   it("allows only an owner to mutate lifecycle state", () => {
     const session = useSessionStore();
     session.signIn("media-admin", { requireAdmin: true });

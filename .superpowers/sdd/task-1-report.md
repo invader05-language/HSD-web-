@@ -56,6 +56,34 @@ sh scripts/with-hsd-node.sh corepack pnpm run typecheck
 > nuxt typecheck
 ```
 
+## Final Review Fix
+
+- `publishBatch()` now computes the resulting effective status after committing its version increment and emits `recruitment.batch.opened` through the shared non-rollback automation path when that state is `open`.
+
+### Final Review Test Evidence
+
+The new already-started draft-batch regression first failed because no source-version 2 flash existed after publication.
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-config.test.ts tests/unit/portal-automation.test.ts tests/unit/recruitment-batch-rules.test.ts
+
+Test Files  4 passed (4)
+Tests  37 passed (37)
+```
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run
+
+Test Files  35 passed (35)
+Tests  246 passed (246)
+```
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm run typecheck
+
+> nuxt typecheck
+```
+
 ## Self-review
 
 - Publication requires the exact review path and owner authorization; ordinary administrators can create, edit, and submit only.

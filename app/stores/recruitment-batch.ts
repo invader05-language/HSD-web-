@@ -142,7 +142,9 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.publishedAt = timestamp;
       batch.updatedAt = timestamp;
       batch.version += 1;
-      this.appendAudit(batch, "publish", actor, beforeStatus, getEffectiveRecruitmentBatchStatus(batch, now).status, timestamp, reason, { lifecycleStatus: "draft" });
+      const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
+      this.appendAudit(batch, "publish", actor, beforeStatus, afterStatus, timestamp, reason, { lifecycleStatus: "draft" });
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     publish(batchId: string, now: Date = new Date(), reason?: string) {
