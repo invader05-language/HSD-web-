@@ -26,7 +26,10 @@ function seedActivities(): ManagedActivity[] {
 }
 
 export const useActivitiesStore = defineStore("activities", {
-  state: () => ({ activities: seedActivities(), automationFailures: [] as Array<{ activityId: string; errorCode: string }> }),
+  state: () => ({
+    activities: seedActivities(),
+    automationFailures: [] as Array<{ activityId: string; errorCode: string; automationKey: string }>,
+  }),
   actions: {
     openRegistration(activityId: string, now: Date = new Date()): ManagedActivity {
       const session = useSessionStore();
@@ -55,8 +58,21 @@ export const useActivitiesStore = defineStore("activities", {
         sourceVersion: activity.version,
         payload,
       });
-      if (result.status === "failed") this.automationFailures.unshift({ activityId, errorCode: result.errorCode });
+      if (result.status === "failed") {
+        this.automationFailures.unshift({
+          activityId,
+          errorCode: result.errorCode,
+          automationKey: result.automationKey,
+        });
+      }
       return activity;
+    },
+    retryAutomationDraft(automationKey: string) {
+      const result = usePortalContentStore().retryAutomationDraft(automationKey);
+      if (result.status !== "failed") {
+        this.automationFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+      }
+      return result;
     },
     closeRegistration(activityId: string, now: Date = new Date()): ManagedActivity {
       const session = useSessionStore();

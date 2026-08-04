@@ -13,7 +13,7 @@ import { canUseAssetForPortalContent } from "../data/admin-assets";
 import { isSafeInternalPath } from "../utils/internal-route";
 
 export const PORTAL_CONTENT_STORAGE_KEY = "baiyun-hsd.portal-content";
-export const PORTAL_CONTENT_STORAGE_VERSION = 2;
+export const PORTAL_CONTENT_STORAGE_VERSION = 3;
 
 interface PersistedPortalContentState {
   version: typeof PORTAL_CONTENT_STORAGE_VERSION;
@@ -66,8 +66,12 @@ function isAuditRecord(value: unknown): value is PortalContentAuditRecord {
   return typeof value.id === "string"
     && typeof value.action === "string"
     && typeof value.actorId === "string"
+    && typeof value.targetId === "string"
+    && typeof value.beforeRevision === "number"
+    && typeof value.afterRevision === "number"
     && typeof value.actualAt === "string"
-    && typeof value.revision === "number";
+    && (value.reason === undefined || typeof value.reason === "string")
+    && (value.sourceEventId === undefined || typeof value.sourceEventId === "string");
 }
 
 function isPortalEvent(value: unknown): value is PortalSourceEvent {
@@ -88,7 +92,9 @@ function isTarget(value: unknown): boolean {
 function isBlocks(value: unknown): boolean {
   return Array.isArray(value) && value.every((block) => {
     if (!isRecord(block) || typeof block.type !== "string") return false;
-    if (block.type === "heading" || block.type === "paragraph") return typeof block.text === "string";
+    if (block.type === "heading" || block.type === "paragraph") {
+      return typeof block.text === "string" && block.text.trim().length > 0;
+    }
     return block.type === "image"
       && typeof block.assetId === "string" && block.assetId.trim().length > 0
       && canUseAssetForPortalContent(block.assetId)
@@ -97,9 +103,30 @@ function isBlocks(value: unknown): boolean {
   });
 }
 
-function assertValidContentShape(target: unknown, blocks: unknown) {
+function hasMeaningfulStructuredText(kind: unknown, blocks: unknown): boolean {
+  if (kind === "flash") return true;
+  return Array.isArray(blocks) && blocks.some((block) => (
+    isRecord(block)
+    && (block.type === "heading" || block.type === "paragraph")
+    && typeof block.text === "string"
+    && block.text.trim().length > 0
+  ));
+}
+
+function assertValidContentShape(kind: unknown, title: unknown, summary: unknown, target: unknown, blocks: unknown) {
+  if (typeof title !== "string" || !title.trim()) throw new Error("PORTAL_CONTENT_INVALID_TITLE");
+  if (typeof summary !== "string" || !summary.trim()) throw new Error("PORTAL_CONTENT_INVALID_SUMMARY");
   if (!isTarget(target)) throw new Error("PORTAL_CONTENT_INVALID_TARGET");
-  if (!isBlocks(blocks)) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
+  if (!isBlocks(blocks) || !hasMeaningfulStructuredText(kind, blocks)) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
+}
+
+function isValidContentShape(kind: unknown, title: unknown, summary: unknown, target: unknown, blocks: unknown): boolean {
+  try {
+    assertValidContentShape(kind, title, summary, target, blocks);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isPublishedSnapshot(value: unknown): value is PortalContentSnapshot {
@@ -107,11 +134,8 @@ function isPublishedSnapshot(value: unknown): value is PortalContentSnapshot {
   return typeof value.id === "string"
     && ["flash", "article", "notice"].includes(value.kind as string)
     && typeof value.slug === "string"
-    && typeof value.title === "string"
-    && typeof value.summary === "string"
-    && isTarget(value.target)
+    && isValidContentShape(value.kind, value.title, value.summary, value.target, value.blocks)
     && typeof value.revision === "number"
-    && isBlocks(value.blocks)
     && ["manual", "system-event", "wechat"].includes(value.originType as string)
     && ["valid", "invalid", "expired"].includes(value.sourceValidity as string)
     && typeof value.publishedAt === "string"
@@ -123,13 +147,10 @@ function isPortalContentRecord(value: unknown): value is PortalContentRecord {
   return typeof value.id === "string"
     && ["flash", "article", "notice"].includes(value.kind as string)
     && typeof value.slug === "string"
-    && typeof value.title === "string"
-    && typeof value.summary === "string"
-    && isTarget(value.target)
+    && isValidContentShape(value.kind, value.title, value.summary, value.target, value.blocks)
     && ["draft", "in-review", "pending-publication", "published", "unpublished"].includes(value.status as string)
     && ["published", "unpublished"].includes(value.publishedState as string)
     && typeof value.revision === "number"
-    && isBlocks(value.blocks)
     && ["manual", "system-event", "wechat"].includes(value.originType as string)
     && ["valid", "invalid", "expired"].includes(value.sourceValidity as string)
     && typeof value.createdAt === "string"
@@ -172,6 +193,20 @@ function readPersistedState(): PersistedPortalContentState | undefined {
   }
 }
 
+function writePersistedState(records: readonly PortalContentRecord[], automationFailures: readonly PortalAutomationFailure[]) {
+  try {
+    const storage = getStorage();
+    if (!storage) throw new Error("storage unavailable");
+    storage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({
+      version: PORTAL_CONTENT_STORAGE_VERSION,
+      records: [...records],
+      automationFailures: [...automationFailures],
+    } satisfies PersistedPortalContentState));
+  } catch {
+    throw new Error("PORTAL_CONTENT_PERSISTENCE_FAILED");
+  }
+}
+
 function seedRecords(): PortalContentRecord[] {
   const createdAt = "2026-07-24T08:00:00.000Z";
   const published = (input: PortalContentDraftInput, id: string, publishedAt: string): PortalContentRecord => {
@@ -183,7 +218,7 @@ function seedRecords(): PortalContentRecord[] {
       summary: input.summary,
       target: input.target ?? { type: "internal-route", value: "/activities" },
       revision: 1,
-      blocks: input.blocks ?? [],
+      blocks: input.blocks ?? (input.kind === "flash" ? [] : [{ type: "paragraph", text: input.summary }]),
       originType: "manual",
       sourceValidity: "valid",
       publishedAt,
@@ -224,15 +259,46 @@ function ownerActorId(): string {
   return session.currentAccount.account;
 }
 
-function addAudit(record: PortalContentRecord, action: PortalContentAuditRecord["action"], actor: string, now: Date, reason?: string) {
+function addAudit(
+  record: PortalContentRecord,
+  action: PortalContentAuditRecord["action"],
+  actor: string,
+  now: Date,
+  beforeRevision: number,
+  reason?: string,
+  sourceEventId?: string,
+) {
   record.audit.unshift({
     id: `portal-content-${record.id}-${record.revision}-${action}-${now.getTime()}`,
     action,
     actorId: actor,
+    targetId: record.id,
+    beforeRevision,
+    afterRevision: record.revision,
     actualAt: now.toISOString(),
     ...(reason ? { reason } : {}),
-    revision: record.revision,
+    ...(sourceEventId ? { sourceEventId } : {}),
   });
+}
+
+function automationAudit(
+  event: PortalSourceEvent,
+  automationKey: string,
+  action: "automation-failed" | "automation-duplicate",
+  reason?: string,
+): PortalContentAuditRecord {
+  const now = new Date(event.occurredAt);
+  return {
+    id: `portal-automation-${eventIdPart(automationKey)}-${action}-${now.getTime()}`,
+    action,
+    actorId: "system",
+    targetId: automationKey,
+    beforeRevision: 0,
+    afterRevision: 0,
+    actualAt: now.toISOString(),
+    ...(reason ? { reason } : {}),
+    sourceEventId: event.eventId,
+  };
 }
 
 function snapshot(record: PortalContentRecord, publishedAt: string): PortalContentSnapshot {
@@ -289,16 +355,32 @@ export const usePortalContentStore = defineStore("portal-content", {
   actions: {
     persist() {
       try {
-        const storage = getStorage();
-        if (!storage) throw new Error("storage unavailable");
-        storage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({
-          version: PORTAL_CONTENT_STORAGE_VERSION,
-          records: this.records,
-          automationFailures: this.automationFailures,
-        } satisfies PersistedPortalContentState));
+        writePersistedState(this.records, this.automationFailures);
         this.persistenceError = undefined;
       } catch {
-        this.persistenceError = "PORTAL_CONTENT_STORAGE_UNAVAILABLE";
+        this.persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        throw new Error("PORTAL_CONTENT_PERSISTENCE_FAILED");
+      }
+    },
+    persistProposed(records: readonly PortalContentRecord[], automationFailures: readonly PortalAutomationFailure[]) {
+      try {
+        writePersistedState(records, automationFailures);
+        this.persistenceError = undefined;
+      } catch {
+        this.persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        throw new Error("PORTAL_CONTENT_PERSISTENCE_FAILED");
+      }
+    },
+    applyRecord(next: PortalContentRecord) {
+      const current = this.getById(next.id);
+      if (!current) throw new Error("PORTAL_CONTENT_NOT_FOUND");
+      Object.assign(current, clone(next));
+      return current;
+    },
+    applyRecords(nextRecords: readonly PortalContentRecord[]) {
+      for (const next of nextRecords) {
+        const current = this.getById(next.id);
+        if (current) Object.assign(current, clone(next));
       }
     },
     createDraft(input: PortalContentDraftInput, now: Date = new Date()) {
@@ -306,7 +388,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const slug = slugify(input.slug ?? input.title);
       const authoredTarget = input.target ?? { type: "internal-route" as const, value: "/activities" };
       const blocks = input.blocks ?? [];
-      assertValidContentShape(authoredTarget, blocks);
+      assertValidContentShape(input.kind, input.title, input.summary, authoredTarget, blocks);
       assertUniqueSlug(this.records, slug);
       const id = `portal-${input.kind}-${now.getTime()}-${this.records.length + 1}`;
       const record: PortalContentRecord = {
@@ -328,10 +410,10 @@ export const usePortalContentStore = defineStore("portal-content", {
         ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
         audit: [],
       };
-      addAudit(record, "create", actor, now);
+      addAudit(record, "create", actor, now, 0);
+      this.persistProposed([record, ...this.records], this.automationFailures);
       this.records.unshift(record);
-      this.persist();
-      return record;
+      return this.getById(record.id)!;
     },
     updateDraft(id: string, patch: Partial<PortalContentDraftInput>, now: Date = new Date()) {
       const actor = actorId();
@@ -343,61 +425,68 @@ export const usePortalContentStore = defineStore("portal-content", {
       const slug = patch.slug === undefined ? record.slug : slugify(patch.slug);
       const authoredTarget = patch.target === undefined ? record.target : patch.target;
       const blocks = patch.blocks === undefined ? record.blocks : patch.blocks;
-      assertValidContentShape(authoredTarget, blocks);
+      const title = patch.title === undefined ? record.title : patch.title;
+      const summary = patch.summary === undefined ? record.summary : patch.summary;
+      assertValidContentShape(record.kind, title, summary, authoredTarget, blocks);
       assertUniqueSlug(this.records, slug, record.id);
-      if (record.status !== "draft") {
-        record.status = "draft";
-        record.revision += 1;
+      const next = clone(record);
+      const beforeRevision = next.revision;
+      if (next.status !== "draft") {
+        next.status = "draft";
+        next.revision += 1;
       }
-      if (patch.title !== undefined) record.title = patch.title.trim();
-      if (patch.summary !== undefined) record.summary = patch.summary.trim();
-      record.slug = slug;
-      record.target = publicTarget(record.kind, slug, authoredTarget);
-      if (patch.blocks !== undefined) record.blocks = clone(blocks);
-      if (patch.expiresAt !== undefined) record.expiresAt = patch.expiresAt;
-      record.updatedAt = now.toISOString();
-      addAudit(record, "update", actor, now);
-      this.persist();
-      return record;
+      next.title = title.trim();
+      next.summary = summary.trim();
+      next.slug = slug;
+      next.target = publicTarget(next.kind, slug, authoredTarget);
+      next.blocks = clone(blocks);
+      if (patch.expiresAt !== undefined) next.expiresAt = patch.expiresAt;
+      next.updatedAt = now.toISOString();
+      addAudit(next, "update", actor, now, beforeRevision);
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     submitForReview(id: string, now: Date = new Date()) {
       const actor = actorId();
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
-      assertValidContentShape(record.target, record.blocks);
+      assertValidContentShape(record.kind, record.title, record.summary, record.target, record.blocks);
       const slug = slugify(record.slug);
       assertUniqueSlug(this.records, slug, record.id);
-      record.slug = slug;
-      record.target = publicTarget(record.kind, slug, record.target);
       this.assertSourcePublic(record, now);
-      record.status = "in-review";
-      record.updatedAt = now.toISOString();
-      addAudit(record, "submit", actor, now);
-      this.persist();
-      return record;
+      const next = clone(record);
+      next.slug = slug;
+      next.target = publicTarget(next.kind, slug, next.target);
+      next.status = "in-review";
+      next.updatedAt = now.toISOString();
+      addAudit(next, "submit", actor, now, record.revision);
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     returnToDraft(id: string, reason: string, now: Date = new Date()) {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || record.status !== "in-review" || !reason.trim()) throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
-      record.status = "draft";
-      record.updatedAt = now.toISOString();
-      addAudit(record, "return", actor, now, reason);
-      this.persist();
-      return record;
+      const next = clone(record);
+      next.status = "draft";
+      next.updatedAt = now.toISOString();
+      addAudit(next, "return", actor, now, record.revision, reason.trim());
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     approve(id: string, now: Date = new Date()) {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || record.status !== "in-review") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
-      assertValidContentShape(record.target, record.blocks);
-      record.target = publicTarget(record.kind, record.slug, record.target);
+      assertValidContentShape(record.kind, record.title, record.summary, record.target, record.blocks);
       this.assertSourcePublic(record, now);
-      record.status = "pending-publication";
-      record.updatedAt = now.toISOString();
-      addAudit(record, "approve", actor, now);
-      this.persist();
-      return record;
+      const next = clone(record);
+      next.target = publicTarget(next.kind, next.slug, next.target);
+      next.status = "pending-publication";
+      next.updatedAt = now.toISOString();
+      addAudit(next, "approve", actor, now, record.revision);
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     publish(id: string, confirmed: boolean, now: Date = new Date()) {
       const actor = ownerActorId();
@@ -406,32 +495,34 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (!record || record.status !== "pending-publication" || record.sourceValidity !== "valid") {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
-      assertValidContentShape(record.target, record.blocks);
+      assertValidContentShape(record.kind, record.title, record.summary, record.target, record.blocks);
       const slug = slugify(record.slug);
       assertUniqueSlug(this.records, slug, record.id);
-      record.slug = slug;
-      record.target = publicTarget(record.kind, slug, record.target);
       this.assertSourcePublic(record, now);
       const publishedAt = now.toISOString();
-      record.status = "published";
-      record.publishedState = "published";
-      record.publishedAt = publishedAt;
-      record.updatedAt = publishedAt;
-      record.publishedRevision = snapshot(record, publishedAt);
-      addAudit(record, "publish", actor, now);
-      this.persist();
-      return record;
+      const next = clone(record);
+      next.slug = slug;
+      next.target = publicTarget(next.kind, slug, next.target);
+      next.status = "published";
+      next.publishedState = "published";
+      next.publishedAt = publishedAt;
+      next.updatedAt = publishedAt;
+      next.publishedRevision = snapshot(next, publishedAt);
+      addAudit(next, "publish", actor, now, record.revision);
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     unpublish(id: string, reason: string, now: Date = new Date()) {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || !record.publishedRevision || !reason.trim()) throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
-      record.publishedState = "unpublished";
-      if (record.status === "published") record.status = "unpublished";
-      record.updatedAt = now.toISOString();
-      addAudit(record, "unpublish", actor, now, reason);
-      this.persist();
-      return record;
+      const next = clone(record);
+      next.publishedState = "unpublished";
+      if (next.status === "published") next.status = "unpublished";
+      next.updatedAt = now.toISOString();
+      addAudit(next, "unpublish", actor, now, record.revision, reason.trim());
+      this.persistProposed(this.records.map((item) => item.id === id ? next : item), this.automationFailures);
+      return this.applyRecord(next);
     },
     getPublicRecords(now: Date = new Date()) {
       this.syncSourceEligibility(now);
@@ -459,9 +550,15 @@ export const usePortalContentStore = defineStore("portal-content", {
       const automationKey = eventKey(event);
       const existing = this.records.find((record) => record.automationKey === automationKey);
       if (existing) {
-        addAudit(existing, "automation-duplicate", "system", new Date(event.occurredAt));
-        this.persist();
-        return { status: "duplicate" };
+        const next = clone(existing);
+        addAudit(next, "automation-duplicate", "system", new Date(event.occurredAt), existing.revision, undefined, event.eventId);
+        try {
+          this.persistProposed(this.records.map((record) => record.id === existing.id ? next : record), this.automationFailures);
+          this.applyRecord(next);
+          return { status: "duplicate" };
+        } catch {
+          return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED");
+        }
       }
       const payload = event.payload as Record<string, unknown>;
       if (payload.isOpen !== true) return this.recordAutomationFailure(event, automationKey, "PORTAL_SOURCE_NOT_PUBLIC");
@@ -499,28 +596,28 @@ export const usePortalContentStore = defineStore("portal-content", {
         generatedReason: event.eventType,
         audit: [],
       };
-      addAudit(record, "create", "system", now);
+      addAudit(record, "create", "system", now, 0, event.eventType, event.eventId);
+      const nextFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+      try {
+        this.persistProposed([record, ...this.records], nextFailures);
+      } catch {
+        return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED");
+      }
       this.records.unshift(record);
-      this.automationFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
-      this.persist();
+      this.automationFailures = nextFailures;
       return { status: "created", contentId: id };
     },
     recordAutomationFailure(event: PortalSourceEvent, automationKey: string, errorCode: string): PortalAutomationResult {
       const now = new Date(event.occurredAt);
-      const existing = this.automationFailures.find((failure) => failure.automationKey === automationKey);
-      const audit: PortalContentAuditRecord = {
-        id: `portal-automation-${eventIdPart(automationKey)}-${now.getTime()}`,
-        action: "automation-failed",
-        actorId: "system",
-        actualAt: now.toISOString(),
-        revision: 0,
-      };
+      const nextFailures = clone(this.automationFailures);
+      const existing = nextFailures.find((failure) => failure.automationKey === automationKey);
+      const audit = automationAudit(event, automationKey, "automation-failed", errorCode);
       if (existing) {
         existing.errorCode = errorCode;
         existing.updatedAt = now.toISOString();
         existing.audit.unshift(audit);
       } else {
-        this.automationFailures.unshift({
+        nextFailures.unshift({
           automationKey,
           event: clone(event),
           errorCode,
@@ -529,36 +626,57 @@ export const usePortalContentStore = defineStore("portal-content", {
           audit: [audit],
         });
       }
-      this.persist();
-      return { status: "failed", errorCode };
+      try {
+        this.persistProposed(this.records, nextFailures);
+        this.automationFailures = nextFailures;
+        return { status: "failed", errorCode, automationKey };
+      } catch {
+        const persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        const retained = nextFailures.find((failure) => failure.automationKey === automationKey)!;
+        retained.errorCode = persistenceError;
+        retained.updatedAt = now.toISOString();
+        retained.audit[0] = automationAudit(event, automationKey, "automation-failed", persistenceError);
+        this.automationFailures = nextFailures;
+        return { status: "failed", errorCode: persistenceError, automationKey };
+      }
     },
     retryAutomationDraft(automationKey: string) {
       const failure = this.automationFailures.find((item) => item.automationKey === automationKey);
-      if (!failure) return { status: "failed", errorCode: "PORTAL_AUTOMATION_FAILED" } as PortalAutomationResult;
+      if (!failure) return { status: "failed", errorCode: "PORTAL_AUTOMATION_FAILED", automationKey } as PortalAutomationResult;
       return this.createSystemDraft(clone(failure.event));
     },
     syncSourceEligibility(now: Date = new Date()) {
+      const nextRecords = clone(this.records);
       let changed = false;
-      for (const record of this.records) {
+      for (const record of nextRecords) {
         if (record.sourceValidity !== "valid" || !record.expiresAt || Date.parse(record.expiresAt) > now.getTime()) continue;
+        const beforeRevision = record.revision;
         record.sourceValidity = "expired";
         if (record.publishedRevision) record.publishedRevision.sourceValidity = "expired";
-        addAudit(record, "source-expired", "system", now);
+        addAudit(record, "source-expired", "system", now, beforeRevision);
         changed = true;
       }
-      if (changed) this.persist();
+      if (changed) {
+        this.persistProposed(nextRecords, this.automationFailures);
+        this.applyRecords(nextRecords);
+      }
       return changed;
     },
     invalidateSource(sourceDomain: "recruitment-batch" | "activity", sourceId: string, now: Date = new Date()) {
+      const nextRecords = clone(this.records);
       let changed = false;
-      for (const record of this.records) {
+      for (const record of nextRecords) {
         if (record.sourceDomain !== sourceDomain || record.sourceId !== sourceId || record.sourceValidity !== "valid") continue;
+        const beforeRevision = record.revision;
         record.sourceValidity = "invalid";
         if (record.publishedRevision) record.publishedRevision.sourceValidity = "invalid";
-        addAudit(record, "source-invalidated", "system", now);
+        addAudit(record, "source-invalidated", "system", now, beforeRevision);
         changed = true;
       }
-      if (changed) this.persist();
+      if (changed) {
+        this.persistProposed(nextRecords, this.automationFailures);
+        this.applyRecords(nextRecords);
+      }
       return changed;
     },
     assertSourcePublic(record: PortalContentRecord, now: Date = new Date()) {

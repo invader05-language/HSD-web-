@@ -75,6 +75,22 @@ describe("portal configuration store", () => {
     setItem.mockRestore();
   });
 
+  it("does not mutate the portal draft when draft persistence fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalConfigStore();
+    const before = JSON.parse(JSON.stringify(store.draftConfig));
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.saveDraft({ slots: { flash: [{ entityType: "flash", sourceId: "replacement" }] } }))
+      .toThrow("PORTAL_CONFIG_PERSISTENCE_FAILED");
+    expect(store.draftConfig).toEqual(before);
+    expect(store.persistenceError).toBe("PORTAL_CONFIG_PERSISTENCE_FAILED");
+    setItem.mockRestore();
+  });
+
   it("replaces, removes, and reorders draft references without mutating the published configuration", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -147,6 +163,33 @@ describe("portal configuration store", () => {
     expect(() => store.publish(catalog, false)).toThrow("CONFIRMATION_REQUIRED");
     expect(store.publishedConfig.slots.news[0]?.sourceId).toBe("news-a");
     expect(store.publish(catalog, true).slots.news[0]?.sourceId).toBe("news-b");
+  });
+
+  it("records and restores a complete portal publication audit entry", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalConfigStore();
+    clearDefaultSlots(store);
+    const beforeVersion = store.publishedConfig.revision;
+    const publishedAt = new Date("2026-08-04T10:00:00.000Z");
+
+    store.publish(catalog, true, publishedAt);
+
+    expect(store.auditRecords[0]).toMatchObject({
+      action: "publish",
+      actorId: "admin-alliance",
+      targetId: "portal-config",
+      beforeVersion,
+      afterVersion: beforeVersion + 1,
+      actualAt: publishedAt.toISOString(),
+    });
+
+    setActivePinia(createPinia());
+    expect(usePortalConfigStore().auditRecords[0]).toMatchObject({
+      beforeVersion,
+      afterVersion: beforeVersion + 1,
+      actorId: "admin-alliance",
+    });
   });
 
   it("rejects an invalid visual asset without partially publishing the draft", () => {
@@ -308,8 +351,12 @@ describe("portal configuration surfaces", () => {
 
     expect(configSource).toContain('"/": { ssr: false }');
     expect(configSource).toContain('"/join/**": { ssr: false }');
+    expect(configSource).toContain('"/activities/**": { ssr: false }');
+    expect(configSource).toContain('"/updates/**": { ssr: false }');
     expect(configSource).not.toContain('"/": { ssr: true }');
     expect(configSource).not.toContain('"/join/**": { ssr: true }');
+    expect(configSource).not.toContain('"/activities/**": { ssr: true }');
+    expect(configSource).not.toContain('"/updates/**": { ssr: true }');
   });
 
   it("shows invalid current references and distinguishes publication failures", () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { PortalAutomationServiceMock } from "../../app/services/portal-automation.mock";
 import { usePortalContentStore } from "../../app/stores/portal-content";
@@ -44,11 +44,11 @@ describe("portal automation mock", () => {
       payload: { batchName: "秋季招新", publicRoute: "/join", publicEndAt: "2026-09-01T00:00:00.000Z", isOpen: false },
     };
     const store = usePortalContentStore();
-    expect(service.createFromEvent(failedEvent)).toEqual({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
+    expect(service.createFromEvent(failedEvent)).toMatchObject({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
     const failure = store.automationFailures[0]!;
     expect(failure.event).toMatchObject({ eventId: "event-failed" });
     expect(failure.audit[0]?.action).toBe("automation-failed");
-    expect(store.retryAutomationDraft(failure.automationKey)).toEqual({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
+    expect(store.retryAutomationDraft(failure.automationKey)).toMatchObject({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
 
     const recruitment = { ...failedEvent, payload: { ...failedEvent.payload, isOpen: true } };
     const activity = {
@@ -76,5 +76,56 @@ describe("portal automation mock", () => {
       .filter((record) => record.originType === "system-event")
       .map((record) => record.id);
     expect(new Set(ids).size).toBe(2);
+  });
+
+  it("retains a retryable semantic-key failure when system-draft persistence fails", () => {
+    const event = {
+      eventId: "event-persistence-failed",
+      eventType: "activity.registration.opened" as const,
+      occurredAt: "2026-08-04T09:00:00.000Z",
+      actorId: "admin-alliance",
+      sourceDomain: "activity" as const,
+      sourceId: "activity-retry",
+      sourceVersion: 8,
+      payload: {
+        activityTitle: "重试活动",
+        slug: "activity-retry",
+        publicRoute: "/activities/activity-retry",
+        publicEndAt: "2026-09-01T00:00:00.000Z",
+        isOpen: true,
+      },
+    };
+    const store = usePortalContentStore();
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    const result = new PortalAutomationServiceMock().createFromEvent(event);
+
+    expect(result).toMatchObject({
+      status: "failed",
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      automationKey: "activity:activity-retry:activity.registration.opened:8",
+    });
+    expect(store.records.some((record) => record.sourceId === "activity-retry")).toBe(false);
+    expect(store.automationFailures[0]).toMatchObject({
+      automationKey: "activity:activity-retry:activity.registration.opened:8",
+      event: { eventId: "event-persistence-failed" },
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+    });
+    expect(store.automationFailures[0]?.audit[0]).toMatchObject({
+      action: "automation-failed",
+      actorId: "system",
+      targetId: "activity:activity-retry:activity.registration.opened:8",
+      beforeRevision: 0,
+      afterRevision: 0,
+      reason: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      sourceEventId: "event-persistence-failed",
+    });
+
+    setItem.mockRestore();
+    expect(store.retryAutomationDraft("activity:activity-retry:activity.registration.opened:8"))
+      .toMatchObject({ status: "created" });
+    expect(store.automationFailures).toEqual([]);
   });
 });

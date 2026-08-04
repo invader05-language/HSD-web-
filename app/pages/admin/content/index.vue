@@ -10,6 +10,7 @@ const content = usePortalContentStore();
 const query = ref(typeof route.query.query === "string" ? route.query.query : "");
 const status = ref(typeof route.query.status === "string" ? route.query.status : "全部状态");
 const kind = ref(typeof route.query.kind === "string" ? route.query.kind : "全部分类");
+const automationNotice = ref("");
 const overview = computed(() => getContentOverview(content.records));
 const rows = computed(() => content.records
   .map(toAdminContentRecord)
@@ -23,6 +24,15 @@ watchEffect(() => {
     navigateTo({ path: "/admin/content/new", query: { kind: create } }, { replace: true });
   }
 });
+
+function retryAutomationDraft(automationKey: string) {
+  const result = content.retryAutomationDraft(automationKey);
+  automationNotice.value = result.status === "created"
+    ? "快讯草稿已重新生成。"
+    : result.status === "duplicate"
+      ? "该事件已有快讯草稿，无需重复生成。"
+      : `重试失败：${result.errorCode}`;
+}
 </script>
 
 <template>
@@ -38,6 +48,11 @@ watchEffect(() => {
       <div><span>待审核</span><strong>{{ overview.inReview }}</strong><small>等待负责人审核</small></div>
       <div><span>待发布</span><strong>{{ overview.pendingPublication }}</strong><small>审核通过，未公开</small></div>
       <div><span>已发布</span><strong>{{ overview.published }}</strong><small>当前官网可见</small></div>
+    </section>
+    <section v-if="content.automationFailures.length" class="admin-list-card" aria-labelledby="portal-automation-failures-title">
+      <header><div><span>Automation Retry</span><h2 id="portal-automation-failures-title">快讯草稿生成失败</h2></div><p>业务操作已成功，按原事件语义键重试即可，不会重复创建草稿。</p></header>
+      <p v-if="automationNotice" role="status">{{ automationNotice }}</p>
+      <div class="admin-table-scroll"><table aria-label="快讯自动化失败列表"><thead><tr><th>语义键</th><th>错误码</th><th>时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="failure in content.automationFailures" :key="failure.automationKey"><td><code>{{ failure.automationKey }}</code></td><td>{{ failure.errorCode }}</td><td>{{ failure.updatedAt.slice(0, 16).replace('T', ' ') }}</td><td><button type="button" @click="retryAutomationDraft(failure.automationKey)">按语义键重试</button></td></tr></tbody></table></div>
     </section>
     <section class="admin-list-card admin-content-list">
       <header><div><span>Official Content</span><h2>官网内容列表</h2></div><p>刷新后继续读取版本化本地 Mock 存储</p></header>

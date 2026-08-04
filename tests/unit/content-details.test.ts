@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { createPinia, setActivePinia } from "pinia";
 import { ACTIVITY_DETAILS, findActivity } from "../../app/data/activities";
 import { usePortalCatalog } from "../../app/composables/usePortalCatalog";
@@ -86,6 +87,7 @@ describe("published activity and update details", () => {
       summary: "不应出现在用户端。",
       slug: "draft-news",
       target: { type: "internal-route", value: "/updates/draft-news" },
+      blocks: [{ type: "paragraph", text: "草稿正文。" }],
     }, new Date("2026-08-04T08:00:00.000Z"));
     const unpublished = store.createDraft({
       kind: "notice",
@@ -93,6 +95,7 @@ describe("published activity and update details", () => {
       summary: "不应出现在用户端。",
       slug: "withdrawn-notice",
       target: { type: "internal-route", value: "/updates/withdrawn-notice" },
+      blocks: [{ type: "paragraph", text: "公告正文。" }],
     }, new Date("2026-08-04T08:10:00.000Z"));
     store.submitForReview(unpublished.id);
     store.approve(unpublished.id);
@@ -120,5 +123,19 @@ describe("published activity and update details", () => {
     expect(updates.map((record) => `/updates/${record.slug}`)).toEqual(
       updates.map((record) => record.target.value),
     );
+  });
+
+  it("renders structured image blocks through the safe portal asset resolver with a fallback", () => {
+    const source = readFileSync("app/pages/updates/[slug].vue", "utf8");
+    const styles = readFileSync("app/assets/css/main.css", "utf8");
+
+    expect(source).toContain('import { resolvePortalAssetSource } from "~/data/portal-assets"');
+    expect(source).toContain("resolvePortalAssetSource(block.assetId)");
+    expect(source).toContain(":alt=\"block.alt\"");
+    expect(source).toContain("MediaPlaceholder");
+    expect(source).toContain("block.caption");
+    expect(source).toContain('class="public-update-detail__image"');
+    expect(styles).toContain(".public-update-detail__image");
+    expect(styles).toContain("max-width: 100%");
   });
 });

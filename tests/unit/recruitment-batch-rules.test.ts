@@ -129,6 +129,72 @@ describe("recruitment batch lifecycle commands", () => {
     ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
   });
 
+  it("rejects publishing an already-started draft when another batch is open without mutating state", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch(),
+      batch({ id: "batch-draft", lifecycleStatus: "draft", version: 7 }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-draft")));
+
+    expect(() => store.publishBatch("batch-draft", NOW)).toThrow("BATCH_ALREADY_OPEN");
+
+    expect(store.getBatch("batch-draft")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+    expect(usePortalContentStore().records.some((record) => record.sourceId === "batch-draft")).toBe(false);
+  });
+
+  it("rejects moving a published batch into the open window when another batch is open without mutating state", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch(),
+      batch({
+        id: "batch-upcoming",
+        startAt: "2026-08-10T00:00:00.000Z",
+        endAt: "2026-09-30T00:00:00.000Z",
+        version: 4,
+      }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-upcoming")));
+
+    expect(() => store.updateBatch(
+      "batch-upcoming",
+      { startAt: "2026-08-01T00:00:00.000Z" },
+      "move into current window",
+      NOW,
+    )).toThrow("BATCH_ALREADY_OPEN");
+
+    expect(store.getBatch("batch-upcoming")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+  });
+
+  it("emits the opened event only after a successful time-window update", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({
+      id: "batch-upcoming",
+      startAt: "2026-08-10T00:00:00.000Z",
+      endAt: "2026-09-30T00:00:00.000Z",
+      version: 4,
+    })]);
+
+    store.updateBatch(
+      "batch-upcoming",
+      { startAt: "2026-08-01T00:00:00.000Z" },
+      "open current window",
+      NOW,
+    );
+
+    expect(usePortalContentStore().records.find((record) => (
+      record.sourceId === "batch-upcoming" && record.sourceVersion === 5
+    ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
+  });
+
   it("allows only an owner to mutate lifecycle state", () => {
     const session = useSessionStore();
     session.signIn("media-admin", { requireAdmin: true });

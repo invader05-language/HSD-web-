@@ -30,3 +30,13 @@ export interface PortalConfigPatch {
   slots?: Partial<PortalSlots>;
   visuals?: Partial<PortalConfig["visuals"]>;
 }
+
+export interface PortalConfigAuditRecord {
+  id: string;
+  action: "publish";
+  actorId: string;
+  targetId: "portal-config";
+  beforeVersion: number;
+  afterVersion: number;
+  actualAt: string;
+}

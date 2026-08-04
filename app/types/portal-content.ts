@@ -20,9 +20,12 @@ export interface PortalContentAuditRecord {
   id: string;
   action: "create" | "update" | "submit" | "return" | "approve" | "publish" | "unpublish" | "automation-failed" | "automation-duplicate" | "source-expired" | "source-invalidated";
   actorId: string;
+  targetId: string;
+  beforeRevision: number;
+  afterRevision: number;
   actualAt: string;
   reason?: string;
-  revision: number;
+  sourceEventId?: string;
 }
 
 export interface PortalContentSnapshot {
@@ -119,7 +122,7 @@ export interface ActivityRegistrationOpenedPayload {
 export type PortalAutomationResult =
   | { status: "created"; contentId: string }
   | { status: "duplicate" }
-  | { status: "failed"; errorCode: string };
+  | { status: "failed"; errorCode: string; automationKey: string };
 
 export interface PortalContentDraftInput {
   kind: PortalContentKind;

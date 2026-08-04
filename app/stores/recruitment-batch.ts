@@ -44,7 +44,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
   state: () => ({
     batches: cloneRecruitmentBatches(RECRUITMENT_BATCHES),
     auditRecords: [] as RecruitmentBatchAuditRecord[],
-    automationFailures: [] as Array<{ batchId: string; errorCode: string }>,
+    automationFailures: [] as Array<{ batchId: string; errorCode: string; automationKey: string }>,
   }),
   getters: {
     getBatch: (state) => (batchId: string) => state.batches.find((batch) => batch.id === batchId),
@@ -112,7 +112,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (open) throw new Error("BATCH_ALREADY_OPEN");
     },
     emitOpenedFlash(batch: RecruitmentBatch, actor: { id: string; name: string }, timestamp: string) {
-      const automation = new PortalAutomationServiceMock().createFromEvent({
+      const event = {
         eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
         eventType: "recruitment.batch.opened",
         occurredAt: timestamp,
@@ -126,10 +126,22 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
           publicEndAt: batch.endAt,
           isOpen: true,
         },
-      });
+      } as const;
+      const automation = new PortalAutomationServiceMock().createFromEvent(event);
       if (automation.status === "failed") {
-        this.automationFailures.unshift({ batchId: batch.id, errorCode: automation.errorCode });
+        this.automationFailures.unshift({
+          batchId: batch.id,
+          errorCode: automation.errorCode,
+          automationKey: automation.automationKey,
+        });
       }
+    },
+    retryAutomationDraft(automationKey: string) {
+      const result = usePortalContentStore().retryAutomationDraft(automationKey);
+      if (result.status !== "failed") {
+        this.automationFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+      }
+      return result;
     },
     publishBatch(batchId: string, now: Date = new Date(), reason = "publish batch") {
       const actor = this.resolveOwnerActor();
@@ -137,12 +149,15 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (batch.lifecycleStatus !== "draft") throw new Error("BATCH_ALREADY_PUBLISHED");
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       const timestamp = now.toISOString();
-      batch.lifecycleStatus = "published";
-      batch.manualOverride = "none";
-      batch.publishedAt = timestamp;
-      batch.updatedAt = timestamp;
-      batch.version += 1;
-      const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
+      const next = cloneBatch(batch);
+      next.lifecycleStatus = "published";
+      next.manualOverride = "none";
+      next.publishedAt = timestamp;
+      next.updatedAt = timestamp;
+      next.version += 1;
+      const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
+      if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      Object.assign(batch, next);
       this.appendAudit(batch, "publish", actor, beforeStatus, afterStatus, timestamp, reason, { lifecycleStatus: "draft" });
       if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
@@ -270,19 +285,22 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const batch = this.getBatchOrThrow(batchId);
       const before = cloneBatch(batch);
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
-      Object.assign(batch, patch);
-      if (patch.openCenterIds) batch.openCenterIds = [...patch.openCenterIds];
+      const next = cloneBatch(batch);
+      Object.assign(next, patch);
+      if (patch.openCenterIds) next.openCenterIds = [...patch.openCenterIds];
       const timestamp = now.toISOString();
-      if (batch.lifecycleStatus === "published"
-        && batch.manualOverride === "none"
-        && Date.parse(batch.endAt) <= now.getTime()) {
-        batch.lifecycleStatus = "closed";
-        batch.manualOverride = "force-closed";
-        batch.closedAt = timestamp;
+      if (next.lifecycleStatus === "published"
+        && next.manualOverride === "none"
+        && Date.parse(next.endAt) <= now.getTime()) {
+        next.lifecycleStatus = "closed";
+        next.manualOverride = "force-closed";
+        next.closedAt = timestamp;
       }
-      batch.updatedAt = timestamp;
-      batch.version += 1;
-      const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
+      next.updatedAt = timestamp;
+      next.version += 1;
+      const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
+      if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      Object.assign(batch, next);
       this.appendAudit(batch, "update", actor, beforeStatus, afterStatus, timestamp, reason, before);
       if (patch.openCenterIds) {
         useRecruitmentApplicationStore().markCenterAvailability(batch.id, patch.openCenterIds);
@@ -290,6 +308,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (batch.lifecycleStatus === "closed") {
         useRecruitmentApplicationStore().lockExpiredApplications(now);
       }
+      if (beforeStatus !== "open" && afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
   },

@@ -9,6 +9,7 @@ import {
 } from "../../app/data/admin-content";
 import { usePortalContentStore } from "../../app/stores/portal-content";
 import { useSessionStore } from "../../app/stores/session";
+import { readFileSync } from "node:fs";
 
 describe("administration content workflow", () => {
   beforeEach(() => {
@@ -84,5 +85,21 @@ describe("administration content workflow", () => {
     expect(overview.inReview).toBe(1);
     expect(overview.pendingPublication).toBe(0);
     expect(overview.published).toBe(3);
+  });
+
+  it("exposes owner rejection, semantic-key automation retry, and activity registration opening in reachable admin pages", () => {
+    const editor = readFileSync("app/components/admin/PortalContentEditor.vue", "utf8");
+    const contentList = readFileSync("app/pages/admin/content/index.vue", "utf8");
+    const activities = readFileSync("app/pages/admin/activities.vue", "utf8");
+
+    expect(editor).toContain("returnToDraft");
+    expect(editor).toContain("rejectionReason");
+    expect(editor).toContain("退回草稿");
+    expect(contentList).toContain("automationFailures");
+    expect(contentList).toContain("retryAutomationDraft");
+    expect(contentList).toContain("automationKey");
+    expect(activities).toContain("useActivitiesStore");
+    expect(activities).toContain("openRegistration");
+    expect(activities).toContain("activity.registration.opened");
   });
 });

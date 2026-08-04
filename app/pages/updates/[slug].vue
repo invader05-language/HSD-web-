@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { usePortalContentStore } from "~/stores/portal-content";
+import { resolvePortalAssetSource } from "~/data/portal-assets";
 
 const route = useRoute();
 const contentStore = usePortalContentStore();
@@ -13,6 +14,10 @@ if (!update.value) {
 }
 
 useHead(() => ({ title: `${update.value?.title}｜动态与活动` }));
+
+function resolveContentImage(assetId: string) {
+  return resolvePortalAssetSource(assetId);
+}
 </script>
 
 <template>
@@ -34,7 +39,8 @@ useHead(() => ({ title: `${update.value?.title}｜动态与活动` }));
               <h3 v-if="block.type === 'heading'">{{ block.text }}</h3>
               <p v-else-if="block.type === 'paragraph'">{{ block.text }}</p>
               <figure v-else>
-                <MediaPlaceholder :label="block.alt" detail="已发布内容配图" />
+                <img v-if="resolveContentImage(block.assetId)" class="public-update-detail__image" :src="resolvePortalAssetSource(block.assetId)" :alt="block.alt">
+                <MediaPlaceholder v-else :label="block.alt" detail="已发布内容配图暂不可用" />
                 <figcaption v-if="block.caption">{{ block.caption }}</figcaption>
               </figure>
             </template>

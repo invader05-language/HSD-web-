@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
 import type { PortalCatalogItem } from "../types/portal-content";
-import type { PortalConfig, PortalConfigPatch, PortalReference, PortalSlots } from "../types/portal-config";
+import type { PortalConfig, PortalConfigAuditRecord, PortalConfigPatch, PortalReference, PortalSlots } from "../types/portal-config";
 import { canUseAssetForPortalContent } from "../data/admin-assets";
 import { useSessionStore } from "./session";
 
 export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
-export const PORTAL_CONFIG_STORAGE_VERSION = 1;
+export const PORTAL_CONFIG_STORAGE_VERSION = 2;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
 export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 1, resources: 3 } as const;
@@ -43,13 +43,18 @@ function getStorage(): Storage | undefined {
   try { return typeof localStorage === "undefined" ? undefined : localStorage; } catch { return undefined; }
 }
 
-function writePersistedConfigs(draftConfig: PortalConfig, publishedConfig: PortalConfig) {
+function writePersistedConfigs(
+  draftConfig: PortalConfig,
+  publishedConfig: PortalConfig,
+  auditRecords: readonly PortalConfigAuditRecord[],
+) {
   const storage = getStorage();
   if (!storage) throw new Error("PORTAL_CONFIG_PERSISTENCE_FAILED");
   storage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify({
     version: PORTAL_CONFIG_STORAGE_VERSION,
     draftConfig,
     publishedConfig,
+    auditRecords,
   }));
 }
 
@@ -70,15 +75,35 @@ function isConfig(value: unknown): value is PortalConfig {
     && PORTAL_SLOT_IDS.every((slot) => Array.isArray(slots[slot]) && slots[slot].every(validReference));
 }
 
-function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig: PortalConfig } | undefined {
+function isAuditRecord(value: unknown): value is PortalConfigAuditRecord {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === "string"
+    && record.action === "publish"
+    && typeof record.actorId === "string"
+    && record.targetId === "portal-config"
+    && typeof record.beforeVersion === "number"
+    && typeof record.afterVersion === "number"
+    && typeof record.actualAt === "string";
+}
+
+function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig: PortalConfig; auditRecords: PortalConfigAuditRecord[] } | undefined {
   const serialized = getStorage()?.getItem(PORTAL_CONFIG_STORAGE_KEY);
   if (!serialized) return undefined;
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (typeof parsed !== "object" || parsed === null) return undefined;
     const state = parsed as Record<string, unknown>;
-    if (state.version !== PORTAL_CONFIG_STORAGE_VERSION || !isConfig(state.draftConfig) || !isConfig(state.publishedConfig)) return undefined;
-    return { draftConfig: clone(state.draftConfig), publishedConfig: clone(state.publishedConfig) };
+    if (state.version !== PORTAL_CONFIG_STORAGE_VERSION
+      || !isConfig(state.draftConfig)
+      || !isConfig(state.publishedConfig)
+      || !Array.isArray(state.auditRecords)
+      || !state.auditRecords.every(isAuditRecord)) return undefined;
+    return {
+      draftConfig: clone(state.draftConfig),
+      publishedConfig: clone(state.publishedConfig),
+      auditRecords: clone(state.auditRecords),
+    };
   } catch {
     return undefined;
   }
@@ -126,13 +151,14 @@ export const usePortalConfigStore = defineStore("portal-config", {
     return {
       draftConfig: persisted?.draftConfig ?? initialConfig(),
       publishedConfig: persisted?.publishedConfig ?? initialConfig(),
+      auditRecords: persisted?.auditRecords ?? [] as PortalConfigAuditRecord[],
       persistenceError: undefined as string | undefined,
     };
   },
   actions: {
     persist() {
       try {
-        writePersistedConfigs(this.draftConfig, this.publishedConfig);
+        writePersistedConfigs(this.draftConfig, this.publishedConfig, this.auditRecords);
         this.persistenceError = undefined;
       } catch {
         this.persistenceError = "PORTAL_CONFIG_STORAGE_UNAVAILABLE";
@@ -150,8 +176,14 @@ export const usePortalConfigStore = defineStore("portal-config", {
       draft.revision += 1;
       draft.updatedAt = now.toISOString();
       draft.updatedBy = actor;
+      try {
+        writePersistedConfigs(draft, this.publishedConfig, this.auditRecords);
+        this.persistenceError = undefined;
+      } catch {
+        this.persistenceError = "PORTAL_CONFIG_PERSISTENCE_FAILED";
+        throw new Error("PORTAL_CONFIG_PERSISTENCE_FAILED");
+      }
       this.draftConfig = draft;
-      this.persist();
       return this.preview();
     },
     replaceReference(
@@ -211,14 +243,25 @@ export const usePortalConfigStore = defineStore("portal-config", {
       next.revision = this.publishedConfig.revision + 1;
       next.updatedAt = now.toISOString();
       next.updatedBy = actor;
+      const audit: PortalConfigAuditRecord = {
+        id: `portal-config-publish-${next.revision}-${now.getTime()}`,
+        action: "publish",
+        actorId: actor,
+        targetId: "portal-config",
+        beforeVersion: this.publishedConfig.revision,
+        afterVersion: next.revision,
+        actualAt: now.toISOString(),
+      };
+      const nextAuditRecords = [audit, ...this.auditRecords];
       try {
-        writePersistedConfigs(this.draftConfig, next);
+        writePersistedConfigs(this.draftConfig, next, nextAuditRecords);
         this.persistenceError = undefined;
       } catch {
         this.persistenceError = "PORTAL_CONFIG_PERSISTENCE_FAILED";
         throw new Error("PORTAL_CONFIG_PERSISTENCE_FAILED");
       }
       this.publishedConfig = next;
+      this.auditRecords = nextAuditRecords;
       return clone(next);
     },
   },
