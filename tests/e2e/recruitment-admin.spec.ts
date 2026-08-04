@@ -12,7 +12,8 @@ async function completeAdminDemoLogin(
 
 test("administration workbench uses a dedicated shell inside the same Web app", async ({ page }) => {
   await page.goto("/admin/recruitment");
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fadmin%2Frecruitment$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/admin/recruitment");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mode")).toBe("admin");
   await completeAdminDemoLogin(page);
 
   await expect(page).toHaveURL(/\/admin\/recruitment$/);
@@ -94,22 +95,17 @@ test("application roster filters, sorts, and opens a read-only application recor
   await page.getByLabel("排序").selectOption("submittedAt.asc");
   await page.getByRole("link", { name: "查看报名 林同学" }).click();
 
-  await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/candidate-lin$/);
+  await expect.poll(() => new URL(page.url()).pathname)
+    .toBe("/admin/recruitment/applications/candidate-lin");
   await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
   await expect(page.getByLabel("联系方式")).toHaveValue("lin@example.com");
   await expect(page.getByText("2026-07-30 14:28 提交")).toBeVisible();
-  await expect(page.getByText("考核处理")).toHaveCount(0);
-  await expect(page.getByText("内部备注")).toHaveCount(0);
+  const applicationRecord = page.locator("#admin-main-content");
+  await expect(applicationRecord.getByRole("heading", { name: "考核处理", exact: true })).toHaveCount(0);
+  await expect(applicationRecord.getByRole("heading", { name: "内部备注", exact: true })).toHaveCount(0);
 
-  await page.evaluate(async () => {
-    const nuxt = (window as Window & {
-      $nuxt?: { $router?: { push: (path: string) => Promise<unknown> } };
-    }).$nuxt;
-
-    if (!nuxt?.$router) throw new Error("Nuxt client router is unavailable");
-    await nuxt.$router.push("/admin/recruitment/applications/missing");
-  });
+  await page.goto("/admin/recruitment/applications/missing");
 
   await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/missing$/);
-  await expect(page.getByText("报名记录不存在")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报名记录不存在", exact: true })).toBeVisible();
 });

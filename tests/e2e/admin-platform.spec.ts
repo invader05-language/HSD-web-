@@ -9,7 +9,7 @@ async function signInToAdmin(
   await page.getByLabel("学号或成员账号").fill(account);
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
-  await expect(page).toHaveURL(new RegExp(`${target.replace("/", "\\/")}$`));
+  await expect.poll(() => new URL(page.url()).pathname).toBe(target);
 }
 
 test("administration shell exposes all domains and fills the full desktop height", async ({ page }) => {
@@ -43,7 +43,8 @@ test("administrator denial identifies the owner-only destination", async ({ page
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 
-  await expect(page).toHaveURL(/\/admin\/forbidden\?from=%2Fadmin%2Faccounts$/);
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/forbidden");
+  await expect.poll(() => new URL(page.url()).searchParams.get("from")).toBe("/admin/accounts");
   await expect(page.getByText("联盟总负责人资格", { exact: true })).toBeVisible();
 });
 
@@ -88,7 +89,7 @@ test("owner qualification changes are confirmed without an audit-log entry point
 
   await memberRow.getByRole("button", { name: "撤销资格" }).click();
   await confirm.getByRole("button", { name: "确认变更" }).click();
-  await expect(memberRow).toContainText("普通成员");
+  await expect(memberRow).toHaveCount(0);
 
   await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
 });
@@ -110,9 +111,8 @@ test("a newly qualified account can start an admin session but cannot manage acc
   await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
-  await expect(page).toHaveURL(/\/admin$/);
-
-  await page.getByRole("button", { name: /系统管理/ }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin");
+  await expect(page.getByRole("button", { name: /系统管理/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "管理员资格配置", exact: true })).toHaveCount(0);
 });
 
@@ -200,13 +200,53 @@ test("project activity and portal content share a clear draft review publish wor
   await expect(page.getByText("报名名单", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: /内容与门户/ }).click();
-  await page.getByRole("link", { name: "内容管理", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "内容管理" })).toBeVisible();
-  await expect(page.getByText("保存草稿")).toBeVisible();
+  await page.getByRole("link", { name: "官网内容", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "官网内容" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "新建内容" })).toHaveAttribute("href", "/admin/content/new");
+  await expect(page.getByRole("option", { name: "待发布" })).toHaveCount(1);
+  await expect(page.getByRole("table", { name: "官网内容列表" })).toBeVisible();
 
-  await page.getByRole("link", { name: "首页配置", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "首页内容配置" })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "管理端导航" })
+    .getByRole("link", { name: "门户配置", exact: true })
+    .click();
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
   await expect(page.getByText("固定模块，不允许删除")).toBeVisible();
+});
+
+test("portal draft preview stays isolated until an owner publishes the full configuration", async ({ page }) => {
+  await signInToAdmin(page, "/admin/content/home");
+
+  await page.getByRole("button", { name: "下移 智巡先锋" }).click();
+  await page.getByRole("button", { name: "预览门户草稿" }).click();
+  const preview = page.getByRole("dialog", { name: "门户草稿预览" });
+  await expect(preview.getByRole("list", { name: "精选项目预览" }).getByRole("listitem").first()).toContainText("智学领航");
+  await preview.getByRole("button", { name: "关闭预览" }).click();
+
+  await page.goto("/");
+  await expect(page.locator(".featured-project h3")).toHaveText("智巡先锋");
+
+  await page.goto("/admin/content/home");
+  await page.getByRole("button", { name: "发布门户配置" }).click();
+  const confirmation = page.getByRole("dialog", { name: /确认整份发布门户配置/ });
+  await confirmation.getByRole("button", { name: "确认整份发布" }).click();
+  await expect(page.getByRole("status")).toContainText("门户配置已整份发布");
+
+  await page.goto("/");
+  await expect(page.locator(".featured-project h3")).toHaveText("智学领航");
+});
+
+test("portal visuals are merged and the legacy banner route redirects to them", async ({ page }) => {
+  await signInToAdmin(page, "/admin/content/home");
+  await page.goto("/admin/content/banners");
+
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/content/home");
+  await expect.poll(() => new URL(page.url()).searchParams.get("view")).toBe("visuals");
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "页面主视觉" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("官网首页主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("加入我们主视觉素材")).toBeVisible();
+  await expect(page.getByText("招新按钮是否可用仍由招新批次控制")).toBeVisible();
 });
 
 test("media uploads and learning resources expose honest storage states", async ({ page }) => {
@@ -219,6 +259,7 @@ test("media uploads and learning resources expose honest storage states", async 
   await page.getByRole("button", { name: "关闭上传面板" }).click();
   await page.locator(".admin-asset-card").first().click();
   await expect(page.getByRole("button", { name: "移入回收站" })).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭素材详情" }).click();
 
   await page.getByRole("link", { name: "学习资料", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "学习资料" })).toBeVisible();

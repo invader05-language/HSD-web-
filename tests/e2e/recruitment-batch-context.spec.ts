@@ -24,6 +24,7 @@ test("batch links preserve batchId context across roster, assessment and publica
   await expect(page.getByRole("table", { name: "批次报名人员" })).toBeVisible();
   await expect(page.getByText("林同学")).toBeVisible();
 
+  await page.getByRole("link", { name: "返回批次概览" }).click();
   await page.getByRole("link", { name: "考核台" }).click();
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/assessment$/);
   await expect(page.getByText("全局当前轮次：第一轮考核")).toBeVisible();
@@ -50,7 +51,11 @@ test("batch links preserve batchId context across roster, assessment and publica
   await expect(page.getByRole("row", { name: /周同学/ })).toContainText("通过");
   await candidateDrawer.getByRole("button", { name: "关闭详情" }).click();
 
-  await page.getByRole("link", { name: "结果发布" }).click();
+  await page.getByRole("link", { name: "返回批次概览" }).click();
+  await page
+    .getByRole("navigation", { name: "当前批次工作区" })
+    .getByRole("link", { name: "结果发布" })
+    .click();
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/publish$/);
   await expect(page.getByRole("button", { name: "整批发布结果" })).toBeDisabled();
   await expect(page.getByText("发布范围：当前批次全部候选人")).toBeVisible();
@@ -63,6 +68,24 @@ test("ordinary admins can inspect a batch but cannot mutate its lifecycle", asyn
   const pauseButton = page.getByRole("button", { name: "暂停报名" });
   await expect(pauseButton).toBeDisabled();
   await expect(page.getByText("普通管理员不会显示可执行的批次变更权限")).toBeVisible();
+});
+
+test("an owner can record a not-admitted adjustment without choosing a destination center", async ({ page }) => {
+  await page.goto("/admin/recruitment/batches/batch-current/assessment");
+  await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches/batch-current/assessment");
+
+  await page.getByRole("button", { name: "查看处理 陈同学" }).click();
+  const drawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await drawer.getByLabel("第一轮结果").selectOption("failed");
+  await drawer.getByRole("button", { name: "保存结果" }).click();
+  await drawer.getByRole("button", { name: "确认保存" }).click();
+  await drawer.getByLabel("线下决定").selectOption({ label: "不录取" });
+  await expect(drawer.getByLabel("最终中心")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "保存结果" }).click();
+  await drawer.getByRole("button", { name: "确认保存" }).click();
+
+  await expect(page.getByRole("status")).toContainText("结果已保存");
+  await expect(page.getByRole("row", { name: /陈同学/ })).toContainText("未通过");
 });
 
 test("early open always asks for confirmation and competing open batch remains protected", async ({ page }) => {

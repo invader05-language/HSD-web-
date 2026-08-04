@@ -13,6 +13,7 @@ import { buildPasswordChangeTarget } from "~/utils/password-change";
 const route = useRoute();
 const session = useSessionStore();
 const submitting = ref(false);
+const hydrated = ref(false);
 const serverError = ref("");
 const continuation = computed(() => resolveLoginContinuation(route.query));
 const mode = ref<LoginMode>(continuation.value.mode);
@@ -34,7 +35,9 @@ const modeCopy = computed(() => isAdminMode.value
 
 useHead({ title: computed(() => `${modeCopy.value.title}｜白云 HSD 开发者部落`) });
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick();
+  hydrated.value = true;
   if (route.query.mode || continuation.value.mode !== "admin") return;
   window.history.replaceState(
     { ...window.history.state },
@@ -85,16 +88,16 @@ async function signIn(values: Record<string, unknown>) {
       <div>
         <NuxtLink class="brand-lockup" to="/"><span class="brand-lockup__mark">&lt; HSD &gt;</span><span class="brand-lockup__name">白云 HSD 开发者部落</span></NuxtLink>
         <h2>{{ modeCopy.title }}</h2>
-        <fieldset class="login-mode">
+        <fieldset class="login-mode" :disabled="!hydrated">
           <legend>选择登录身份</legend>
           <label :class="{ 'is-selected': !isAdminMode }"><input v-model="mode" type="radio" name="login-mode" value="member" /><span>成员登录</span></label>
           <label :class="{ 'is-selected': isAdminMode }"><input v-model="mode" type="radio" name="login-mode" value="admin" /><span>管理员登录</span></label>
         </fieldset>
-        <Form v-slot="{ errors }" @submit="signIn">
-          <label>学号或成员账号<Field name="account" autocomplete="username" :rules="rules.account" /><small>{{ errors.account }}</small></label>
-          <label>密码<Field name="password" type="password" autocomplete="current-password" :rules="rules.password" /><small>{{ errors.password }}</small></label>
+        <Form v-slot="{ errors }" method="post" @submit="signIn">
+          <label>学号或成员账号<Field name="account" autocomplete="username" :rules="rules.account" :disabled="!hydrated" /><small>{{ errors.account }}</small></label>
+          <label>密码<Field name="password" type="password" autocomplete="current-password" :rules="rules.password" :disabled="!hydrated" /><small>{{ errors.password }}</small></label>
           <p v-if="serverError" class="form-error" role="alert">{{ serverError }}</p>
-          <button class="button" type="submit" :disabled="submitting">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
+          <button class="button" type="submit" :disabled="submitting || !hydrated">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
         </Form>
         <p class="login-page__hint">无法登录或忘记账号时，请联系联盟总负责人核验身份并处理账号问题。</p>
       </div>

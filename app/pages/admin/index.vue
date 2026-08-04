@@ -1,17 +1,29 @@
 <script setup lang="ts">
 import {
-  ADMIN_CONTENT_ACTIVITY,
   ADMIN_DASHBOARD_METRICS,
   ADMIN_QUICK_CREATE,
   ADMIN_RECRUITMENT_PROGRESS,
   ADMIN_STORAGE_OVERVIEW,
   ADMIN_TODOS
 } from "~/data/admin-dashboard";
+import { getContentOverview, PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS } from "~/data/admin-content";
+import { usePortalContentStore } from "~/stores/portal-content";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "管理工作台｜白云 HSD 开发者部落" });
 
 const quickCreateOpen = ref(false);
+const content = usePortalContentStore();
+const contentOverview = computed(() => getContentOverview(content.records));
+const dashboardMetrics = computed(() => ADMIN_DASHBOARD_METRICS.map((metric) => {
+  if (metric.label === "待审核内容") return { ...metric, value: String(contentOverview.value.inReview), description: "官网内容等待负责人审核" };
+  if (metric.label === "待发布内容") return { ...metric, value: String(contentOverview.value.pendingPublication), description: "审核通过，等待最终发布" };
+  return metric;
+}));
+const contentActivity = computed(() => content.records.slice(0, 4).map((record) => ({
+  type: PORTAL_CONTENT_KIND_LABELS[record.kind], title: record.title,
+  status: PORTAL_CONTENT_STATUS_LABELS[record.status], time: new Intl.DateTimeFormat("zh-CN", { dateStyle: "short", timeStyle: "short", hour12: false }).format(new Date(record.updatedAt))
+})));
 </script>
 
 <template>
@@ -49,7 +61,7 @@ const quickCreateOpen = ref(false);
 
     <section class="admin-dashboard-metrics" aria-label="核心管理指标">
       <NuxtLink
-        v-for="metric in ADMIN_DASHBOARD_METRICS"
+        v-for="metric in dashboardMetrics"
         :key="metric.label"
         :to="metric.to"
         :data-tone="metric.tone"
@@ -100,7 +112,7 @@ const quickCreateOpen = ref(false);
           <NuxtLink to="/admin/content">查看全部 →</NuxtLink>
         </header>
         <div>
-          <article v-for="item in ADMIN_CONTENT_ACTIVITY" :key="item.title">
+          <article v-for="item in contentActivity" :key="item.title">
             <span>{{ item.type }}</span>
             <strong>{{ item.title }}</strong>
             <AdminStatusPill :status="item.status" />

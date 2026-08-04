@@ -57,6 +57,14 @@ describe("resolveLoginContinuation", () => {
     expect(resolveLoginContinuation({ mode: "admin", redirect: "/\\\\evil.example/admin" }))
       .toEqual({ mode: "admin", memberTarget: "/member", adminTarget: "/admin" });
   });
+
+  it("rejects redirects containing decoded whitespace or control characters", () => {
+    for (const target of ["/\t/evil.example", "/\n/evil.example", "/member/ results"]) {
+      expect(normalizeRedirectTarget(target)).toBe("/member");
+      expect(resolveLoginContinuation({ mode: "member", redirect: target }))
+        .toEqual({ mode: "member", memberTarget: "/member", adminTarget: "/admin" });
+    }
+  });
 });
 
 describe("resolveLoginAwareTarget", () => {

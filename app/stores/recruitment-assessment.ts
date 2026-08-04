@@ -467,7 +467,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     recordAdjustmentDecision(input: {
       batchId: string;
       candidateId: string;
-      finalCenter: RecruitmentCenter;
+      finalCenter?: RecruitmentCenter;
       admitted: boolean;
       now: Date;
     }) {
@@ -480,7 +480,8 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (getAssessmentProcessingStatus(record) !== "offline-adjustment-pending") {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_PENDING");
       }
-      if (!record.acceptsAdjustment || input.finalCenter === "白泽开发中心") {
+      if (!record.acceptsAdjustment
+        || (input.admitted && (!input.finalCenter || input.finalCenter === "白泽开发中心"))) {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
       record.finalDecision = input.admitted ? "admitted" : "not-admitted";

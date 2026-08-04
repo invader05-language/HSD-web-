@@ -177,7 +177,8 @@ function requestSave() {
     showSaveConfirmation.value = true;
     return;
   }
-  if (candidate.processingStatus === "offline-adjustment-pending" && adjustmentCenter.value) {
+  if (candidate.processingStatus === "offline-adjustment-pending"
+    && (!adjustmentAdmitted.value || adjustmentCenter.value)) {
     showSaveConfirmation.value = true;
     return;
   }
@@ -202,11 +203,12 @@ function confirmSave() {
         internalNote: internalNote.value,
         now: new Date(),
       });
-    } else if (candidate.processingStatus === "offline-adjustment-pending" && adjustmentCenter.value) {
+    } else if (candidate.processingStatus === "offline-adjustment-pending"
+      && (!adjustmentAdmitted.value || adjustmentCenter.value)) {
       assessmentStore.recordAdjustmentDecision({
         batchId: props.batchId,
         candidateId: candidate.candidateId,
-        finalCenter: adjustmentCenter.value,
+        finalCenter: adjustmentAdmitted.value ? adjustmentCenter.value || undefined : undefined,
         admitted: adjustmentAdmitted.value,
         now: new Date(),
       });
@@ -317,7 +319,7 @@ function confirmAdvance() {
         <div class="admin-drawer__body">
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
           <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
-          <section v-if="selectedCandidate.processingStatus === 'offline-adjustment-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>线下调剂结果</h3></header><p class="admin-inline-note">调剂去向仅可选择普通中心；此决定仍属于内部结果，需整批发布后才对成员生效。</p><label>最终中心<select v-model="adjustmentCenter" aria-label="最终中心"><option value="">请选择最终中心</option><option v-for="center in regularCenters" :key="center" :value="center">{{ center }}</option></select></label><label>线下决定<select v-model="adjustmentAdmitted" aria-label="线下决定"><option :value="true">录取至最终中心</option><option :value="false">不录取</option></select></label></section>
+          <section v-if="selectedCandidate.processingStatus === 'offline-adjustment-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>线下调剂结果</h3></header><p class="admin-inline-note">录取时需选择普通中心；不录取时无需填写去向。此决定仍属于内部结果，需整批发布后才对成员生效。</p><label>线下决定<select v-model="adjustmentAdmitted" aria-label="线下决定"><option :value="true">录取至最终中心</option><option :value="false">不录取</option></select></label><label v-if="adjustmentAdmitted">最终中心<select v-model="adjustmentCenter" aria-label="最终中心"><option value="">请选择最终中心</option><option v-for="center in regularCenters" :key="center" :value="center">{{ center }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'offline-adjustment-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明"></textarea></label></section>
           <section class="admin-sync-preview"><strong>保存与发布边界</strong><p>保存只更新当前批次的内部考核状态；整批发布才会更新成员结果中心、正式成员关系和公开投影。真实后端接入后必须在同一事务中完成。</p></section>
         </div>

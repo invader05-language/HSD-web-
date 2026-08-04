@@ -12,6 +12,8 @@ import {
 } from "../utils/recruitment-batch-rules";
 import { useSessionStore } from "./session";
 import { useRecruitmentApplicationStore } from "./recruitment-application";
+import { PortalAutomationServiceMock } from "../services/portal-automation.mock";
+import { usePortalContentStore } from "./portal-content";
 
 type RecruitmentBatchPatch = Partial<Pick<
   RecruitmentBatch,
@@ -38,10 +40,26 @@ function cloneAuditRecord(record: RecruitmentBatchAuditRecord): RecruitmentBatch
   };
 }
 
+function hasOverlappingWindow(left: RecruitmentBatch, right: RecruitmentBatch): boolean {
+  const leftStart = Date.parse(left.manualOverride === "force-open" && left.actualOpenedAt ? left.actualOpenedAt : left.startAt);
+  const leftEnd = Date.parse(left.endAt);
+  const rightStart = Date.parse(right.manualOverride === "force-open" && right.actualOpenedAt ? right.actualOpenedAt : right.startAt);
+  const rightEnd = Date.parse(right.endAt);
+  return Number.isFinite(leftStart)
+    && Number.isFinite(leftEnd)
+    && Number.isFinite(rightStart)
+    && Number.isFinite(rightEnd)
+    && leftEnd > leftStart
+    && rightEnd > rightStart
+    && leftStart < rightEnd
+    && rightStart < leftEnd;
+}
+
 export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
   state: () => ({
     batches: cloneRecruitmentBatches(RECRUITMENT_BATCHES),
     auditRecords: [] as RecruitmentBatchAuditRecord[],
+    automationFailures: [] as Array<{ batchId: string; errorCode: string; automationKey: string }>,
   }),
   getters: {
     getBatch: (state) => (batchId: string) => state.batches.find((batch) => batch.id === batchId),
@@ -63,6 +81,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
     replaceBatches(batches: readonly RecruitmentBatch[]) {
       this.batches = batches.map(cloneBatch);
       this.auditRecords = [];
+      this.automationFailures = [];
     },
     getBatchOrThrow(batchId: string): RecruitmentBatch {
       const batch = this.batches.find((item) => item.id === batchId);
@@ -107,18 +126,65 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const open = getCurrentOpenBatch(this.batches.filter((batch) => batch.id !== batchId), now);
       if (open) throw new Error("BATCH_ALREADY_OPEN");
     },
+    assertNoOverlappingPublishedWindow(batchId: string, candidate: RecruitmentBatch) {
+      if (candidate.lifecycleStatus !== "published") return;
+      const conflict = this.batches.find((batch) => (
+        batch.id !== batchId
+        && batch.lifecycleStatus === "published"
+        && hasOverlappingWindow(batch, candidate)
+      ));
+      if (conflict) throw new Error("BATCH_SCHEDULE_OVERLAP");
+    },
+    emitOpenedFlash(batch: RecruitmentBatch, actor: { id: string; name: string }, timestamp: string) {
+      const event = {
+        eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
+        eventType: "recruitment.batch.opened",
+        occurredAt: timestamp,
+        actorId: actor.id,
+        sourceDomain: "recruitment-batch",
+        sourceId: batch.id,
+        sourceVersion: batch.version,
+        payload: {
+          batchName: batch.name,
+          publicRoute: "/join",
+          publicEndAt: batch.endAt,
+          isOpen: true,
+        },
+      } as const;
+      const automation = new PortalAutomationServiceMock().createFromEvent(event);
+      if (automation.status === "failed") {
+        this.automationFailures.unshift({
+          batchId: batch.id,
+          errorCode: automation.errorCode,
+          automationKey: automation.automationKey,
+        });
+      }
+    },
+    retryAutomationDraft(automationKey: string) {
+      const result = usePortalContentStore().retryAutomationDraft(automationKey);
+      if (result.status !== "failed") {
+        this.automationFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+      }
+      return result;
+    },
     publishBatch(batchId: string, now: Date = new Date(), reason = "publish batch") {
       const actor = this.resolveOwnerActor();
       const batch = this.getBatchOrThrow(batchId);
       if (batch.lifecycleStatus !== "draft") throw new Error("BATCH_ALREADY_PUBLISHED");
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       const timestamp = now.toISOString();
-      batch.lifecycleStatus = "published";
-      batch.manualOverride = "none";
-      batch.publishedAt = timestamp;
-      batch.updatedAt = timestamp;
-      batch.version += 1;
-      this.appendAudit(batch, "publish", actor, beforeStatus, getEffectiveRecruitmentBatchStatus(batch, now).status, timestamp, reason, { lifecycleStatus: "draft" });
+      const next = cloneBatch(batch);
+      next.lifecycleStatus = "published";
+      next.manualOverride = "none";
+      next.publishedAt = timestamp;
+      next.updatedAt = timestamp;
+      next.version += 1;
+      const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
+      if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, next);
+      Object.assign(batch, next);
+      this.appendAudit(batch, "publish", actor, beforeStatus, afterStatus, timestamp, reason, { lifecycleStatus: "draft" });
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     publish(batchId: string, now: Date = new Date(), reason?: string) {
@@ -138,11 +204,17 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOtherOpen(batchId, now);
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       const timestamp = now.toISOString();
+      this.assertNoOverlappingPublishedWindow(batchId, {
+        ...batch,
+        startAt: timestamp,
+        manualOverride: "force-open",
+      });
       batch.manualOverride = "force-open";
       batch.actualOpenedAt = timestamp;
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "open-now", actor, beforeStatus, "open", timestamp, reason, { manualOverride: "none" });
+      this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     pause(batchId: string, now: Date = new Date(), reason = "pause recruitment batch") {
@@ -157,6 +229,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "pause", actor, beforeStatus, "paused", timestamp, reason);
+      usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
       return batch;
     },
     resume(batchId: string, now: Date = new Date(), reason = "resume recruitment batch") {
@@ -164,13 +237,17 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const batch = this.getBatchOrThrow(batchId);
       if (batch.manualOverride !== "paused") throw new Error("BATCH_NOT_PAUSED");
       this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, batch);
       const beforeStatus = "paused" as const;
       const timestamp = now.toISOString();
-      batch.manualOverride = "none";
+      batch.manualOverride = batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+        ? "force-open"
+        : "none";
       batch.updatedAt = timestamp;
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "resume", actor, beforeStatus, afterStatus, timestamp, reason);
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     close(
@@ -190,6 +267,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "close", actor, beforeStatus, "closed", timestamp, reason);
+      usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
       return batch;
     },
     reopen(
@@ -204,15 +282,25 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (batch.lifecycleStatus !== "closed") throw new Error("BATCH_NOT_CLOSED");
       if (Date.parse(batch.endAt) <= now.getTime()) throw new Error("BATCH_END_PASSED");
       this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, {
+        ...batch,
+        lifecycleStatus: "published",
+        manualOverride: batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+          ? "force-open"
+          : "none",
+      });
       const beforeStatus = "closed" as const;
       const timestamp = now.toISOString();
       batch.lifecycleStatus = "published";
-      batch.manualOverride = "none";
+      batch.manualOverride = batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+        ? "force-open"
+        : "none";
       batch.closedAt = undefined;
       batch.updatedAt = timestamp;
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "reopen", actor, beforeStatus, afterStatus, timestamp, reason);
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     archive(batchId: string, now: Date = new Date(), reason = "archive recruitment batch") {
@@ -239,19 +327,23 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const batch = this.getBatchOrThrow(batchId);
       const before = cloneBatch(batch);
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
-      Object.assign(batch, patch);
-      if (patch.openCenterIds) batch.openCenterIds = [...patch.openCenterIds];
+      const next = cloneBatch(batch);
+      Object.assign(next, patch);
+      if (patch.openCenterIds) next.openCenterIds = [...patch.openCenterIds];
       const timestamp = now.toISOString();
-      if (batch.lifecycleStatus === "published"
-        && batch.manualOverride === "none"
-        && Date.parse(batch.endAt) <= now.getTime()) {
-        batch.lifecycleStatus = "closed";
-        batch.manualOverride = "force-closed";
-        batch.closedAt = timestamp;
+      if (next.lifecycleStatus === "published"
+        && next.manualOverride === "none"
+        && Date.parse(next.endAt) <= now.getTime()) {
+        next.lifecycleStatus = "closed";
+        next.manualOverride = "force-closed";
+        next.closedAt = timestamp;
       }
-      batch.updatedAt = timestamp;
-      batch.version += 1;
-      const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
+      next.updatedAt = timestamp;
+      next.version += 1;
+      const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
+      if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, next);
+      Object.assign(batch, next);
       this.appendAudit(batch, "update", actor, beforeStatus, afterStatus, timestamp, reason, before);
       if (patch.openCenterIds) {
         useRecruitmentApplicationStore().markCenterAvailability(batch.id, patch.openCenterIds);
@@ -259,6 +351,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (batch.lifecycleStatus === "closed") {
         useRecruitmentApplicationStore().lockExpiredApplications(now);
       }
+      if (beforeStatus !== "open" && afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
   },

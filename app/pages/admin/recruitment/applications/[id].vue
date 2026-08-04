@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import {
-  formatRecruitmentApplicationSubmittedAt,
-  requireRecruitmentApplication
+  formatRecruitmentApplicationSubmittedAt
 } from "~/data/recruitment-admin";
+import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
-const application = computed(() => requireRecruitmentApplication(
-  String(route.params.id),
-  () => createError({ statusCode: 404, statusMessage: "报名记录不存在" })
-));
+const assessmentStore = useRecruitmentAssessmentStore();
+const batchId = computed(() => typeof route.query.batchId === "string" ? route.query.batchId : "batch-current");
+const application = computed(() => {
+  const candidate = assessmentStore
+    .getCandidates(batchId.value)
+    .map((record) => record.candidate)
+    .find((item) => item?.id === String(route.params.id));
+  if (!candidate) throw createError({ statusCode: 404, statusMessage: "报名记录不存在" });
+  return candidate;
+});
 
 useHead({ title: `${application.value.name}｜报名资料｜HSD 管理台` });
 </script>

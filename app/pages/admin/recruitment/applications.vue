@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import {
-  ADMIN_CANDIDATES,
   filterAndSortRecruitmentApplications,
   formatRecruitmentApplicationSubmittedAt,
+  type AdminCandidate,
   type RecruitmentCenter,
   type RecruitmentApplicationSort
 } from "~/data/recruitment-admin";
-import { filterAdminCandidatesByBatch } from "~/data/recruitment-admin-context";
 import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
+import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
@@ -20,9 +20,13 @@ const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
 const route = useRoute();
+const assessmentStore = useRecruitmentAssessmentStore();
 const batchId = computed(() => typeof route.query.batchId === "string" ? route.query.batchId : "batch-current");
 const batchName = computed(() => RECRUITMENT_BATCHES.find((batch) => batch.id === batchId.value)?.name ?? batchId.value);
-const scopedCandidates = computed(() => filterAdminCandidatesByBatch(ADMIN_CANDIDATES, batchId.value));
+const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
+  .getCandidates(batchId.value)
+  .map((record) => record.candidate)
+  .filter((candidate): candidate is AdminCandidate => Boolean(candidate)));
 const visible = computed(() => filterAndSortRecruitmentApplications(scopedCandidates.value, {
   query: query.value,
   firstChoice: center.value,
@@ -80,7 +84,7 @@ function exportRecruitmentCsv() {
               <td>{{ candidate.baizeDirection || "—" }}</td>
               <td>{{ candidate.acceptsAdjustment ? "接受" : "不接受" }}</td>
               <td>{{ formatRecruitmentApplicationSubmittedAt(candidate) }}</td>
-              <td><NuxtLink :to="`/admin/recruitment/applications/${candidate.id}`" :aria-label="`查看报名 ${candidate.name}`">查看报名</NuxtLink></td>
+              <td><NuxtLink :to="{ path: `/admin/recruitment/applications/${candidate.id}`, query: { batchId } }" :aria-label="`查看报名 ${candidate.name}`">查看报名</NuxtLink></td>
             </tr>
           </tbody>
         </table>

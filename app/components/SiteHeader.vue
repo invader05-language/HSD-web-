@@ -12,6 +12,7 @@ const currentMemberAvatar = computed(() => currentMember.value?.avatarUrl);
 const mobileOpen = ref(false);
 const memberMenuOpen = ref(false);
 const memberControl = ref<HTMLElement | null>(null);
+const sessionReady = ref(false);
 
 watch(() => route.fullPath, () => {
   mobileOpen.value = false;
@@ -35,6 +36,7 @@ function signOut() {
 }
 
 onMounted(() => {
+  sessionReady.value = true;
   document.addEventListener("click", closeMemberMenuOnOutsideClick);
   document.addEventListener("keydown", handleMemberMenuKeydown);
 });
@@ -72,7 +74,7 @@ onBeforeUnmount(() => {
         >
           {{ item.label }}
         </NuxtLink>
-        <NuxtLink v-if="!session.isAuthenticated" class="site-nav__login" to="/login">登录</NuxtLink>
+        <NuxtLink v-if="!sessionReady || !session.isAuthenticated" class="site-nav__login" to="/login">登录</NuxtLink>
         <div v-else ref="memberControl" class="site-nav__member">
           <button
             class="site-nav__member-trigger"

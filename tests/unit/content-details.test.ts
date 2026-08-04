@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { createPinia, setActivePinia } from "pinia";
+import { ACTIVITY_DETAILS, findActivity } from "../../app/data/activities";
+import { usePortalCatalog } from "../../app/composables/usePortalCatalog";
+import { usePortalContentStore } from "../../app/stores/portal-content";
+import { useSessionStore } from "../../app/stores/session";
 import {
   GALLERY_ALBUMS,
   findGalleryAlbum,
@@ -45,5 +51,91 @@ describe("gallery album details", () => {
     expect(album?.assets).toHaveLength(18);
     expect(getGalleryBatch(album!, 12)).toHaveLength(12);
     expect(findGalleryAlbum("missing")).toBeUndefined();
+  });
+});
+
+describe("published activity and update details", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+  });
+
+  it("exposes stable public detail links from the read-only activity adapter", () => {
+    expect(ACTIVITY_DETAILS.map((activity) => activity.to)).toEqual(
+      ACTIVITY_DETAILS.map((activity) => `/activities/${activity.slug}`),
+    );
+    expect(ACTIVITY_DETAILS.every((activity) => activity.available)).toBe(true);
+  });
+
+  it("does not resolve an unavailable activity detail", () => {
+    const unavailable = ACTIVITY_DETAILS.map((activity) => ({
+      ...activity,
+      available: activity.slug === "harmonyos-salon" ? false : activity.available,
+    }));
+
+    expect(findActivity("harmonyos-salon", unavailable)).toBeUndefined();
+    expect(findActivity("project-camp", unavailable)?.slug).toBe("project-camp");
+  });
+
+  it("projects published articles and notices without draft or unpublished records", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const draft = store.createDraft({
+      kind: "article",
+      title: "仍在编辑的新闻",
+      summary: "不应出现在用户端。",
+      slug: "draft-news",
+      target: { type: "internal-route", value: "/updates/draft-news" },
+      blocks: [{ type: "paragraph", text: "草稿正文。" }],
+    }, new Date("2026-08-04T08:00:00.000Z"));
+    const unpublished = store.createDraft({
+      kind: "notice",
+      title: "已经下架的公告",
+      summary: "不应出现在用户端。",
+      slug: "withdrawn-notice",
+      target: { type: "internal-route", value: "/updates/withdrawn-notice" },
+      blocks: [{ type: "paragraph", text: "公告正文。" }],
+    }, new Date("2026-08-04T08:10:00.000Z"));
+    store.submitForReview(unpublished.id);
+    store.approve(unpublished.id);
+    store.publish(unpublished.id, true);
+    store.unpublish(unpublished.id, "公告已结束");
+
+    const publicUpdates = usePortalCatalog().filter((item) =>
+      item.entityType === "article" || item.entityType === "notice"
+    );
+
+    expect(publicUpdates.map((item) => item.to)).toEqual([
+      "/updates/project-team",
+      "/updates/studio-hours",
+    ]);
+    expect(publicUpdates.some((item) => item.sourceId === draft.id)).toBe(false);
+    expect(publicUpdates.some((item) => item.sourceId === unpublished.id)).toBe(false);
+    expect(publicUpdates.every((item) => item.available)).toBe(true);
+  });
+
+  it("keeps each seeded update slug aligned with its public detail target", () => {
+    const updates = usePortalContentStore().getPublicRecords().filter((record) =>
+      record.kind === "article" || record.kind === "notice"
+    );
+
+    expect(updates.map((record) => `/updates/${record.slug}`)).toEqual(
+      updates.map((record) => record.target.value),
+    );
+  });
+
+  it("renders structured image blocks through the safe portal asset resolver with a fallback", () => {
+    const source = readFileSync("app/pages/updates/[slug].vue", "utf8");
+    const styles = readFileSync("app/assets/css/main.css", "utf8");
+
+    expect(source).toContain('import { resolvePortalAssetSource } from "~/data/portal-assets"');
+    expect(source).toContain("resolvePortalAssetSource(block.assetId)");
+    expect(source).toContain(":alt=\"block.alt\"");
+    expect(source).toContain("MediaPlaceholder");
+    expect(source).toContain("block.caption");
+    expect(source).toContain('class="public-update-detail__image"');
+    expect(styles).toContain(".public-update-detail__image");
+    expect(styles).toContain("max-width: 100%");
   });
 });

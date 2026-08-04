@@ -1,3 +1,5 @@
+import { isSafeInternalPath } from "./internal-route";
+
 export type LoginMode = "member" | "admin";
 
 export interface LoginContinuation {
@@ -10,7 +12,7 @@ const MEMBER_HOME = "/member";
 const ADMIN_HOME = "/admin";
 
 function isSafeInternalTarget(value: unknown): value is string {
-  return typeof value === "string" && /^\/(?![\\/])/.test(value);
+  return isSafeInternalPath(value);
 }
 
 function isAdminTarget(value: string): boolean {

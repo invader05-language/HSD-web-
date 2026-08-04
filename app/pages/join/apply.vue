@@ -41,14 +41,29 @@ const errors = reactive<Record<string, string>>({});
 const confirmation = ref(false);
 const submitting = ref(false);
 const submitError = ref("");
+const editingApplication = ref(false);
+const showWithdrawConfirmation = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 let draftObjectUrl: string | undefined;
 
 const isBaizeFirstChoice = computed(() => applicationDraft.firstChoice === "白泽开发中心");
 const avatarSource = computed(() => profileDraft.avatarUrl || undefined);
-const submittedApplication = computed(() => activeBatch.value
+const currentBatchApplication = computed(() => activeBatch.value
   ? applicationStore.getApplication(activeBatch.value.id, currentProfile.value.id)
   : undefined);
+const submittedApplication = computed(() => {
+  const application = currentBatchApplication.value;
+  return application && application.status !== "withdrawn" && !editingApplication.value
+    ? application
+    : undefined;
+});
+const isResubmitting = computed(() => currentBatchApplication.value?.status === "withdrawn");
+const submitButtonLabel = computed(() => {
+  if (submitting.value) return "正在提交…";
+  if (editingApplication.value) return "确认并保存修改";
+  if (isResubmitting.value) return "确认并重新提交报名";
+  return "确认并提交报名";
+});
 const grades = ["2024 级", "2025 级", "2026 级", "2027 级"];
 
 function clearErrors(...keys: string[]) {
@@ -142,6 +157,38 @@ function removeAvatar() {
   clearErrors("avatarUrl");
 }
 
+function loadApplicationDraft() {
+  const application = currentBatchApplication.value;
+  if (!application) return;
+  Object.assign(profileDraft, createRegistrationProfileDraft(currentProfile.value));
+  Object.assign(applicationDraft, applicationStore.createDraft(), {
+    contact: application.contact,
+    firstChoice: application.firstChoice,
+    secondChoice: application.secondChoice,
+    thirdChoice: application.thirdChoice,
+    baizeDirection: application.baizeDirection,
+    acceptsAdjustment: application.acceptsAdjustment,
+  });
+  confirmation.value = false;
+  clearErrors(...Object.keys(errors));
+  submitError.value = "";
+  step.value = 1;
+}
+
+function startEditingApplication() {
+  loadApplicationDraft();
+  editingApplication.value = true;
+}
+
+function confirmWithdrawApplication() {
+  const batchId = activeBatch.value?.id;
+  if (!batchId) return;
+  applicationStore.withdrawApplication(batchId);
+  showWithdrawConfirmation.value = false;
+  editingApplication.value = false;
+  loadApplicationDraft();
+}
+
 async function submitApplication() {
   submitError.value = "";
   const profileIsValid = await validateStep(1);
@@ -177,9 +224,10 @@ async function submitApplication() {
         contact: applicationDraft.contact.trim(),
       },
       confirmation.value,
-      { batchId },
+      { batchId, allowExistingUpdate: editingApplication.value },
     );
     draftObjectUrl = undefined;
+    editingApplication.value = false;
   } catch (error) {
     submitError.value = error instanceof Error ? error.message : "报名提交失败，请稍后重试。";
   } finally {
@@ -221,6 +269,8 @@ onBeforeUnmount(() => {
           <div class="recruitment-success__actions">
             <NuxtLink class="button" to="/member">进入个人中心</NuxtLink>
             <NuxtLink class="button button--ghost" to="/member/results">查看结果中心</NuxtLink>
+            <button v-if="submittedApplication.status === 'submitted'" class="button button--ghost" type="button" @click="startEditingApplication">修改报名</button>
+            <button v-if="submittedApplication.status === 'submitted'" class="button button--ghost" type="button" @click="showWithdrawConfirmation = true">撤回报名</button>
           </div>
           <details>
             <summary>查看已提交报名摘要</summary>
@@ -229,10 +279,20 @@ onBeforeUnmount(() => {
               <section><h3>报名志愿</h3><p>第一志愿：{{ submittedApplication.firstChoice }}</p><p>第二志愿：{{ submittedApplication.secondChoice || "未填写" }}</p><p>第三志愿：{{ submittedApplication.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ submittedApplication.baizeDirection || "不适用" }}</p></section>
             </div>
           </details>
+          <div v-if="showWithdrawConfirmation" class="admin-modal-backdrop">
+            <section role="alertdialog" aria-modal="true" aria-labelledby="withdraw-application-title">
+              <span>Withdraw Application</span>
+              <h3 id="withdraw-application-title">确认撤回本次报名？</h3>
+              <p>撤回后不会进入管理员报名名单；在本批次截止前仍可修改并重新提交。</p>
+              <div><button type="button" class="button button--ghost" @click="showWithdrawConfirmation = false">返回检查</button><button type="button" class="button" @click="confirmWithdrawApplication">确认撤回</button></div>
+            </section>
+          </div>
         </section>
 
         <div v-else class="recruitment-application-layout">
           <div class="recruitment-application-main">
+            <p v-if="isResubmitting" class="recruitment-batch-context" role="status">报名已撤回，可在截止时间前修改后重新提交。</p>
+            <p v-else-if="editingApplication" class="recruitment-batch-context" role="status">正在修改已提交报名，保存后会更新当前批次的报名快照。</p>
             <nav class="recruitment-steps" aria-label="报名步骤">
               <button v-for="item in STEPS" :key="item.id" type="button" :class="{ 'is-current': step === item.id, 'is-complete': step > item.id }" :aria-current="step === item.id ? 'step' : undefined" @click="goToStep(item.id)">
                 <span>{{ String(item.id).padStart(2, "0") }}</span><strong>{{ item.label }}</strong>
@@ -283,7 +343,7 @@ onBeforeUnmount(() => {
                 <button v-if="step > 1" class="button button--ghost" type="button" @click="previousStep">上一步</button>
                 <span v-else />
                 <button v-if="step < 3" class="button" type="button" @click="nextStep">下一步</button>
-                <button v-else class="button" type="submit" :disabled="submitting">{{ submitting ? "正在提交…" : "确认并提交报名" }}</button>
+                <button v-else class="button" type="submit" :disabled="submitting">{{ submitButtonLabel }}</button>
               </footer>
             </form>
           </div>

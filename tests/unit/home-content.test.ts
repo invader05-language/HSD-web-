@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { HOME_SECTIONS, PROJECTS, RESOURCES } from "../../app/data/home";
 import { findResource } from "../../app/data/resources";
 
@@ -37,5 +38,34 @@ describe("homepage content", () => {
         expect(resource.access).not.toContain("下载");
       }
     }
+  });
+
+  it("reads homepage flash and news from the published portal projection", () => {
+    const source = readFileSync(`${process.cwd()}/app/pages/index.vue`, "utf8");
+    const homeDataSource = readFileSync(`${process.cwd()}/app/data/home.ts`, "utf8");
+
+    expect(source).toContain("usePublishedPortal");
+    expect(source).not.toMatch(/\bFLASH_NEWS\b/);
+    expect(source).not.toMatch(/\bNEWS\b/);
+    expect(homeDataSource).not.toMatch(/export const FLASH_NEWS\b/);
+    expect(homeDataSource).not.toMatch(/export const NEWS\b/);
+  });
+
+  it("keeps public portal visual rendering independent from admin fixtures", () => {
+    const publicSources = [
+      "app/pages/index.vue",
+      "app/components/PageBanner.vue",
+    ].map((path) => readFileSync(`${process.cwd()}/${path}`, "utf8"));
+
+    for (const source of publicSources) {
+      expect(source).not.toMatch(/from ["']~\/data\/admin-/);
+    }
+  });
+
+  it("uses the dynamic and activity name in the public footer", () => {
+    const source = readFileSync(`${process.cwd()}/app/components/SiteFooter.vue`, "utf8");
+
+    expect(source).toContain('<NuxtLink to="/activities">动态与活动</NuxtLink>');
+    expect(source).not.toContain('<NuxtLink to="/activities">活动中心</NuxtLink>');
   });
 });

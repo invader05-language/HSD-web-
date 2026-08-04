@@ -34,6 +34,7 @@ const CENTER_IDS: Record<RecruitmentCenter, string> = {
 type SubmitApplicationOptions = {
   batchId?: string;
   now?: Date;
+  allowExistingUpdate?: boolean;
 };
 
 function applicationKey(batchId: string, memberId: string): string {
@@ -142,10 +143,6 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       draft.firstChoice = firstChoice;
       if (firstChoice !== "白泽开发中心") draft.baizeDirection = undefined;
     },
-    getApplication(batchId: string, memberId: string): SubmittedRecruitmentApplication | undefined {
-      const application = this.applicationsByBatchAndMember[applicationKey(batchId, memberId)];
-      return application ? cloneApplication(application) : undefined;
-    },
     getApplicationsForBatch(batchId: string): SubmittedRecruitmentApplication[] {
       return Object.values(this.applicationsByBatchAndMember)
         .filter((application) => application.batchId === batchId)
@@ -163,8 +160,11 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       const memberId = session.currentMemberId;
       const key = applicationKey(batch.id, memberId);
       const existing = this.applicationsByBatchAndMember[key];
-      if (existing && existing.status !== "withdrawn") {
-        throw new Error(existing.status === "locked" ? "APPLICATION_LOCKED" : "当前账号已提交报名，请勿重复提交。");
+      if (existing?.status === "locked") {
+        throw new Error("APPLICATION_LOCKED");
+      }
+      if (existing && existing.status !== "withdrawn" && !options.allowExistingUpdate) {
+        throw new Error("当前账号已提交报名，请勿重复提交。");
       }
       const profileStore = useMemberProfileStore();
       const currentProfile = profileStore.getProfile(memberId);
@@ -248,7 +248,7 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
     },
     lockExpiredApplications(now: Date = new Date()) {
       Object.values(this.applicationsByBatchAndMember).forEach((application) => {
-        if (application.status !== "submitted" && application.status !== "withdrawn") return;
+        if (application.status !== "submitted") return;
         const batch = useRecruitmentBatchStore().getBatch(application.batchId);
         if (!batch || Date.parse(batch.endAt) > now.getTime()) return;
         application.status = "locked";

@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
 import {
-  ADMIN_CANDIDATES,
   filterAndSortRecruitmentApplications,
   formatRecruitmentApplicationSubmittedAt,
+  type AdminCandidate,
   type RecruitmentCenter,
   type RecruitmentApplicationSort
 } from "~/data/recruitment-admin";
 import {
   buildRecruitmentBatchRoute,
-  filterAdminCandidatesByBatch,
   formatRecruitmentBatchPeriod
 } from "~/data/recruitment-admin-context";
+import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
@@ -20,12 +20,16 @@ import {
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
+const assessmentStore = useRecruitmentAssessmentStore();
 const batchId = computed(() => String(route.params.batchId));
 const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
 const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
-const scopedCandidates = computed(() => filterAdminCandidatesByBatch(ADMIN_CANDIDATES, batchId.value));
+const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
+  .getCandidates(batchId.value)
+  .map((record) => record.candidate)
+  .filter((candidate): candidate is AdminCandidate => Boolean(candidate)));
 const visible = computed(() => filterAndSortRecruitmentApplications(scopedCandidates.value, {
   query: query.value,
   firstChoice: center.value,
