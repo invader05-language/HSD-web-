@@ -52,6 +52,7 @@ describe("recruitment application domain", () => {
       grade: currentProfile.grade,
       className: currentProfile.className,
     });
+    expect(profileDraft).not.toHaveProperty("direction");
     expect(profileDraft).not.toHaveProperty("experience");
     expect(profileDraft).not.toHaveProperty("expectation");
     expect(applicationDraft).not.toHaveProperty("experience");
@@ -65,10 +66,10 @@ describe("recruitment application domain", () => {
     const draft = createRegistrationProfileDraft(originalProfile);
 
     draft.name = "报名同学";
-    draft.direction = "校园产品开发";
+    draft.bio = "仅存在报名草稿中的个人简介";
 
     expect(profileStore.getProfile(session.currentMemberId).name).not.toBe("报名同学");
-    expect(profileStore.getProfile(session.currentMemberId).direction).not.toBe("校园产品开发");
+    expect(profileStore.getProfile(session.currentMemberId).bio).not.toBe("仅存在报名草稿中的个人简介");
   });
 
   it("updates only the preparatory profile when a valid application is submitted", () => {
@@ -79,14 +80,14 @@ describe("recruitment application domain", () => {
     const profileDraft = {
       ...createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
       name: "报名同学",
-      direction: "校园产品开发",
       bio: "我希望通过完整的项目协作，持续积累可展示的产品开发实践成果。",
     };
 
     applicationStore.submitApplication(profileDraft, validApplicationDraft(), true);
 
     expect(profileStore.getProfile(session.currentMemberId).name).toBe("报名同学");
-    expect(profileStore.getProfile(session.currentMemberId).direction).toBe("校园产品开发");
+    expect(profileStore.getProfile(session.currentMemberId).bio)
+      .toBe("我希望通过完整的项目协作，持续积累可展示的产品开发实践成果。");
     expect(profileStore.getProfile(DEMO_MEMBER_PROFILE.id)).toEqual(formalProfileBefore);
     expect(applicationStore.isSubmitted).toBe(true);
   });
@@ -142,22 +143,33 @@ describe("recruitment application domain", () => {
     expect(applicationStore.isSubmitted).toBe(false);
   });
 
-  it("validates required registration profile fields and their lengths", () => {
+  it("validates required registration fields while keeping bio optional", () => {
     expect(validateRegistrationProfileDraft({
       name: " ",
       studentId: "12",
       grade: "",
       className: " ",
-      direction: " ",
-      bio: "太短",
+      bio: "",
     })).toMatchObject({
       name: expect.any(String),
       studentId: expect.any(String),
       grade: expect.any(String),
       className: expect.any(String),
-      direction: expect.any(String),
-      bio: expect.any(String),
     });
+    expect(validateRegistrationProfileDraft({
+      name: "陈同学",
+      studentId: "20260026",
+      grade: "2026 级",
+      className: "软件工程 2 班",
+      bio: "",
+    })).toEqual({});
+    expect(validateRegistrationProfileDraft({
+      name: "陈同学",
+      studentId: "20260026",
+      grade: "2026 级",
+      className: "软件工程 2 班",
+      bio: "超".repeat(181),
+    })).toEqual({ bio: "个人简介最多 180 个字符。" });
   });
 
   it("keeps the private contact validation with the first registration step", () => {
@@ -206,6 +218,26 @@ describe("recruitment application domain", () => {
     applicationStore.setFirstChoice(draft, "新媒体中心");
 
     expect(draft.baizeDirection).toBeUndefined();
+  });
+
+  it("drops a stale Baize direction when a non-Baize application is submitted", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      {
+        ...validApplicationDraft(),
+        firstChoice: "新媒体中心",
+        secondChoice: "人才发展中心",
+        thirdChoice: "拓维策划中心",
+        baizeDirection: "鸿蒙开发",
+      },
+      true,
+    );
+
+    expect(applicationStore.submittedApplication?.baizeDirection).toBeUndefined();
   });
 
   it("requires the truthfulness confirmation and prevents duplicate in-session submissions", () => {

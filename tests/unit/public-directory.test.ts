@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 import { CENTERS as homeCenters } from "../../app/data/home";
 import { CENTER_OPTIONS, CENTERS, getCenterBySlug } from "../../app/data/centers";
 import {
@@ -9,8 +10,16 @@ import {
   PUBLIC_MEMBERS,
   resolvePublicAvatar,
 } from "../../app/data/people";
+import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
+import { useMemberRepository } from "../../app/composables/useMemberRepository";
+import { useMemberProfileStore } from "../../app/stores/member-profile";
+import { useAdminAccessStore } from "../../app/stores/admin-access";
 
 describe("public people and center directory", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   it("publishes the four approved centers in collaboration order", () => {
     expect(CENTERS.map((center) => center.slug)).toEqual([
       "baize-development",
@@ -57,6 +66,68 @@ describe("public people and center directory", () => {
       "tang-planning"
     ]);
     expect(PUBLIC_MEMBERS.every((person) => !person.isCore)).toBe(true);
+  });
+
+  it("publishes only normalized member duties and Baize-only directions", () => {
+    const people = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
+    expect(people.every((person) => ["普通成员", "核心人员"].includes(person.memberDuty))).toBe(true);
+    expect(people.filter((person) => person.centerSlug === "baize-development")
+      .every((person) => person.baizeDirection)).toBe(true);
+    expect(people.filter((person) => person.centerSlug !== "baize-development")
+      .every((person) => person.baizeDirection === undefined)).toBe(true);
+    expect(people.every((person) => !Object.hasOwn(person, "direction"))).toBe(true);
+  });
+
+  it("removes a stored member from the public directory as soon as they become preparatory", () => {
+    const profileStore = useMemberProfileStore();
+    const repository = useMemberRepository();
+    const publicId = DEMO_MEMBER_PROFILE.publicId!;
+
+    expect(repository.findPublicPerson(publicId)).toBeDefined();
+    profileStore.profiles[DEMO_MEMBER_PROFILE.id] = {
+      ...profileStore.getProfile(DEMO_MEMBER_PROFILE.id),
+      identity: "预备成员",
+    };
+
+    expect(repository.findPublicPerson(publicId)).toBeUndefined();
+  });
+
+  it("derives a static public person's core state from member duty instead of legacy isCore", () => {
+    const person = CORE_PEOPLE.find((item) => item.id === "chen-media")!;
+    const originalDuty = person.memberDuty;
+
+    try {
+      person.memberDuty = "普通成员";
+      expect(person.isCore).toBe(true);
+
+      const repository = useMemberRepository();
+
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(false);
+    } finally {
+      person.memberDuty = originalDuty;
+    }
+  });
+
+  it("adds a uniquely matched static center lead to the public core projection", () => {
+    const person = CORE_PEOPLE.find((item) => item.id === "wu-talent")!;
+    const originalDuty = person.memberDuty;
+    const accessStore = useAdminAccessStore();
+    const owner = { account: "admin-alliance", name: "张同学", level: "owner" } as const;
+
+    try {
+      person.memberDuty = "普通成员";
+      const repository = useMemberRepository();
+
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(false);
+      expect(accessStore.assignAdminCenterRole(
+        "member-wu",
+        "人才发展中心负责人",
+        owner,
+      )).toBe(true);
+      expect(repository.findPublicPerson(person.id)?.isCore).toBe(true);
+    } finally {
+      person.memberDuty = originalDuty;
+    }
   });
 
   it("returns the approved public people for each center", () => {

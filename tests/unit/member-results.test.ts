@@ -41,6 +41,13 @@ describe("member result presentation", () => {
         { rank: 3, center: "人才发展中心" },
       ],
     });
+
+    expect(getDemoMemberResult("member-wang")).toMatchObject({
+      status: "no-application",
+      identity: "正式成员",
+      preferences: [],
+      currentStage: "尚未开始",
+    });
   });
 
   it("presents the current admitted destination without exposing history", () => {

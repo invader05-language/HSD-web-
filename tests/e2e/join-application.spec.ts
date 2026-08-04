@@ -56,6 +56,8 @@ test.describe("join recruitment application navigation", () => {
     await expect(page.getByRole("button", { name: /确认并提交/ })).toBeVisible();
     await expect(page.getByText("经历与期待")).toHaveCount(0);
     await expect(page.getByText(/上传后自动用于公开成员展示/)).toBeVisible();
+    await expect(page.locator('[data-field="direction"]')).toHaveCount(0);
+    await expect(page.getByText("20–180 个字符", { exact: false })).toHaveCount(0);
 
     await page.getByLabel("姓名", { exact: true }).fill("报名同学");
     await page.locator('[data-field="contact"] input').fill("applicant@example.com");
@@ -74,6 +76,7 @@ test.describe("join recruitment application navigation", () => {
 
     await expect(page.getByRole("heading", { name: "确认并提交" })).toBeVisible();
     await expect(page.getByText("applicant@example.com（仅招新联系）")).toBeVisible();
+    await expect(page.getByText(/^实践方向：/)).toHaveCount(0);
     await page.getByRole("checkbox", { name: /我确认以上资料真实/ }).check();
     await page.getByRole("button", { name: "确认并提交报名" }).click();
 

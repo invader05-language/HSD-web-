@@ -6,6 +6,7 @@ import {
   validateMemberProfileDraft,
   type MemberProfileFormErrors,
 } from "~/utils/member-profile-form";
+import { BAIZE_DIRECTIONS } from "~/data/recruitment-application";
 
 definePageMeta({ middleware: "member" });
 useHead({ title: "编辑个人资料｜白云 HSD 开发者部落" });
@@ -25,7 +26,7 @@ function clearErrors() {
   delete errors.name;
   delete errors.grade;
   delete errors.className;
-  delete errors.direction;
+  delete errors.baizeDirection;
   delete errors.bio;
   delete errors.avatar;
 }
@@ -85,7 +86,7 @@ async function saveProfile() {
     name: draft.name.trim(),
     grade: draft.grade.trim(),
     className: draft.className.trim(),
-    direction: draft.direction.trim(),
+    baizeDirection: draft.center === "白泽开发中心" ? draft.baizeDirection : undefined,
     bio: draft.bio.trim(),
     avatarUrl: draft.avatarUrl,
   });
@@ -173,7 +174,7 @@ onBeforeUnmount(() => {
             <div class="member-profile-readonly-grid">
               <div><span>学号</span><strong>{{ draft.studentId }}</strong></div>
               <div><span>所属中心</span><strong>{{ currentProfile.identity === "预备成员" ? "待确定" : draft.center }}</strong></div>
-              <div><span>组织职务</span><strong>{{ currentProfile.identity === "预备成员" ? "暂无组织职务" : draft.role }}</strong></div>
+              <div><span>成员职责</span><strong>{{ currentProfile.identity === "预备成员" ? "普通成员" : draft.memberDuty }}</strong></div>
             </div>
           </section>
 
@@ -182,16 +183,19 @@ onBeforeUnmount(() => {
               <div><span class="member-profile-number">02</span><div><h2>成员资料</h2><p>保存后直接同步到当前前端会话中的成员展示页面。</p></div></div>
             </div>
             <div class="member-profile-fields">
-              <label>
+              <label v-if="draft.center === '白泽开发中心'">
                 <span>实践方向</span>
-                <input v-model="draft.direction" maxlength="80" :aria-invalid="Boolean(errors.direction)" aria-describedby="direction-help direction-error">
-                <small id="direction-help">用一句话描述当前主要参与方向。</small>
-                <small v-if="errors.direction" id="direction-error" class="member-profile-error">{{ errors.direction }}</small>
+                <select v-model="draft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" aria-describedby="baize-direction-help baize-direction-error">
+                  <option :value="undefined" disabled>请选择实践方向</option>
+                  <option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option>
+                </select>
+                <small id="baize-direction-help">白泽开发中心统一使用五项实践方向。</small>
+                <small v-if="errors.baizeDirection" id="baize-direction-error" class="member-profile-error">{{ errors.baizeDirection }}</small>
               </label>
               <label class="member-profile-field-wide">
                 <span>个人简介</span>
                 <textarea v-model="draft.bio" maxlength="500" rows="5" :aria-invalid="Boolean(errors.bio)" aria-describedby="bio-help bio-error"></textarea>
-                <small id="bio-help">请介绍当前实践重点、协作经验或正在成长的方向。</small>
+                <small id="bio-help">选填。可介绍当前实践重点、协作经验或正在成长的方向。</small>
                 <small v-if="errors.bio" id="bio-error" class="member-profile-error">{{ errors.bio }}</small>
               </label>
             </div>
@@ -205,7 +209,7 @@ onBeforeUnmount(() => {
               <HsdAvatar :name="draft.name" :src="avatarSource" size="lg" />
               <div class="member-profile-upload-box">
                 <strong>选择头像图片</strong>
-                <span>当前仅进行浏览器本地预览，不会上传服务器；正式接入后，上传即视为同意在成员页面公开展示。</span>
+                <span>当前仅进行浏览器本地预览，不会上传服务器；正式接入后，正式成员头像会作为基础展示资料默认公开。</span>
                 <input ref="fileInput" class="member-profile-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar">
                 <button class="text-link" type="button" @click="fileInput?.click()">选择图片</button>
                 <button v-if="draft.avatarUrl" class="text-link member-profile-remove-avatar" type="button" @click="removeAvatar">移除当前预览</button>

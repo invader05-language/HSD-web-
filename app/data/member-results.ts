@@ -85,7 +85,15 @@ export function getDemoMemberResult(
 ): MemberResultRecord {
   if (memberId === DEMO_MEMBER_PROFILE.id) return DEMO_MEMBER_RESULT;
   if (memberId !== DEMO_APPLICANT_PROFILE.id) {
-    throw new Error(`结果数据不存在：${memberId}`);
+    return {
+      batchLabel: "2026 秋季招新",
+      status: "no-application",
+      identity: "正式成员",
+      preferences: [],
+      acceptsTransfer: false,
+      currentStage: "尚未开始",
+      currentConclusion: "待公布",
+    };
   }
 
   const preferences: MemberPreference[] = application

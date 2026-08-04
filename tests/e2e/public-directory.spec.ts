@@ -27,8 +27,10 @@ test("core people directory publishes the approved people without login", async 
   await expect(page).toHaveURL(/\/people\/core$/);
   await expect(page.getByRole("heading", { level: 1, name: "核心人员名录" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "林同学" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "李同学" })).toBeVisible();
   await expect(page.getByRole("img", { name: "林同学的默认 HSD 头像" })).toBeVisible();
-  await expect(page.getByText("共 6 位核心人员")).toBeVisible();
+  await expect(page.getByText("共 7 位核心人员")).toBeVisible();
+  await expect(page.getByText("主动公开", { exact: false })).toHaveCount(0);
 });
 
 test("core search, center filter, and empty state stay local to the directory", async ({ page }) => {
@@ -43,7 +45,8 @@ test("core search, center filter, and empty state stay local to the directory", 
   await page.getByLabel("搜索核心人员").fill("");
   await page.getByLabel("按中心筛选").selectOption("new-media");
   await expect(page.getByRole("heading", { level: 2, name: "陈同学" })).toBeVisible();
-  await expect(page.getByText("共 1 位核心人员")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "李同学" })).toBeVisible();
+  await expect(page.getByText("共 2 位核心人员")).toBeVisible();
   await expect(page).toHaveURL(/\/people\/core$/);
 
   await page.getByLabel("搜索核心人员").fill("不存在");
@@ -55,8 +58,8 @@ test("core search, center filter, and empty state stay local to the directory", 
   await clearButton.click();
   await expect(page.getByLabel("搜索核心人员")).toHaveValue("");
   await expect(page.getByLabel("按中心筛选")).toHaveValue("all");
-  await expect(page.getByText("共 6 位核心人员")).toBeVisible();
-  await expect(page.locator(".people-core-grid > a")).toHaveCount(6);
+  await expect(page.getByText("共 7 位核心人员")).toBeVisible();
+  await expect(page.locator(".people-core-grid > a")).toHaveCount(7);
   await expect(page).toHaveURL(/\/people\/core$/);
 });
 
@@ -78,6 +81,7 @@ test("member search and center filter stay local to the public directory", async
   await expect(page.getByRole("heading", { level: 2, name: "何同学" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "郭同学" })).toHaveCount(0);
   await expect(page.getByText("共 2 位成员")).toBeVisible();
+  await expect(page.getByRole("link", { name: /何同学/ }).locator(".people-member-card__content > strong")).toHaveCount(0);
   await expect(page).toHaveURL(/\/people\/members$/);
 
   await page.getByLabel("搜索成员").fill("不存在");
@@ -94,12 +98,25 @@ test("member search and center filter stay local to the public directory", async
   await expect(page).toHaveURL(/\/people\/members$/);
 });
 
+test("only Baize public profiles render a practice direction and empty public fields leave no placeholder", async ({ page }) => {
+  await page.goto("/people/guo-development");
+  await expect(page.getByText("实践方向", { exact: true })).toBeVisible();
+  await expect(page.getByText("后端架构", { exact: true })).toBeVisible();
+
+  await page.goto("/people/he-media");
+  await expect(page.getByText("实践方向", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".member-detail__profile dd:empty")).toHaveCount(0);
+
+  await page.goto("/centers/new-media");
+  await expect(page.locator(".center-people__list article > p:empty")).toHaveCount(0);
+});
+
 test("1440px directories retain their approved three- and two-column grids", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.goto("/people/core");
   const coreBoxes = await cardBoxes(page, ".people-core-grid > a");
-  expect(coreBoxes).toHaveLength(6);
+  expect(coreBoxes).toHaveLength(7);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[1]?.y ?? 0, 0);
   expect(coreBoxes[0]?.y).toBeCloseTo(coreBoxes[2]?.y ?? 0, 0);
   expect(coreBoxes[3]?.y).toBeGreaterThan((coreBoxes[0]?.y ?? 0) + 100);

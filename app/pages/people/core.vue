@@ -25,7 +25,7 @@ const visiblePeople = computed(() => {
 
   return corePeople.value.filter((person) => {
     const matchesCenter = center.value === "all" || person.centerSlug === center.value;
-    const searchableText = [person.name, person.role, person.centerName, person.direction, person.bio]
+    const searchableText = [person.name, person.memberDuty, person.centerName, person.baizeDirection, person.bio]
       .join(" ")
       .toLocaleLowerCase();
 
@@ -49,7 +49,7 @@ const visiblePeople = computed(() => {
         <div class="directory-toolbar">
           <label>
             <span>搜索核心人员</span>
-            <input v-model="query" type="search" placeholder="姓名、职责或方向">
+            <input v-model="query" type="search" placeholder="姓名、中心或白泽实践方向">
           </label>
           <label>
             <span>按中心筛选</span>
@@ -74,9 +74,9 @@ const visiblePeople = computed(() => {
               <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="lg" />
               <span>{{ person.centerName }}</span>
             </div>
-            <p class="people-core-grid__role">{{ person.role }}</p>
+            <p class="people-core-grid__role">{{ person.memberDuty }}</p>
             <h2>{{ person.name }}</h2>
-            <strong>{{ person.direction }}</strong>
+            <strong v-if="person.baizeDirection">{{ person.baizeDirection }}</strong>
             <ul v-if="getFeaturedHonors(person).length" class="featured-honors">
               <li
                 v-for="honor in getFeaturedHonors(person)"
@@ -86,7 +86,7 @@ const visiblePeople = computed(() => {
                 重点荣誉 · {{ honor.title }}
               </li>
             </ul>
-            <p>{{ person.bio }}</p>
+            <p v-if="person.bio">{{ person.bio }}</p>
             <span class="directory-card__action">查看成员详情 →</span>
           </NuxtLink>
         </div>

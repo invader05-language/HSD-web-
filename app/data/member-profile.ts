@@ -1,5 +1,9 @@
 import type { AdminMember } from "./admin-members";
 import type { PublicPerson } from "./people";
+import type { BaizeDirection } from "./recruitment-application";
+
+export const MEMBER_DUTIES = ["普通成员", "核心人员"] as const;
+export type MemberDuty = (typeof MEMBER_DUTIES)[number];
 
 export interface MemberProfile {
   id: string;
@@ -10,20 +14,20 @@ export interface MemberProfile {
   className: string;
   center: string;
   centerSlug?: PublicPerson["centerSlug"];
-  role: string;
+  memberDuty: MemberDuty;
   identity: string;
-  direction: string;
+  baizeDirection?: BaizeDirection;
   bio: string;
   avatarUrl?: string;
 }
 
 export type MemberProfilePatch = Partial<Pick<
   MemberProfile,
-  "name" | "grade" | "className" | "direction" | "bio" | "avatarUrl"
+  "name" | "grade" | "className" | "baizeDirection" | "bio" | "avatarUrl"
 >>;
 export type MemberRegistrationProfilePatch = Pick<
   MemberProfile,
-  "name" | "studentId" | "grade" | "className" | "direction" | "bio" | "avatarUrl"
+  "name" | "studentId" | "grade" | "className" | "bio" | "avatarUrl"
 >;
 
 export const DEMO_MEMBER_PROFILE: MemberProfile = {
@@ -35,9 +39,9 @@ export const DEMO_MEMBER_PROFILE: MemberProfile = {
   className: "软件工程 1 班",
   center: "白泽开发中心",
   centerSlug: "baize-development",
-  role: "应用开发成员",
+  memberDuty: "核心人员",
   identity: "正式成员",
-  direction: "HarmonyOS 与项目工程化",
+  baizeDirection: "鸿蒙开发",
   bio: "关注原生应用开发与团队协作，希望把每次练习沉淀为可演示的项目成果。",
 };
 
@@ -48,30 +52,53 @@ export const DEMO_APPLICANT_PROFILE: MemberProfile = {
   grade: "2026 级",
   className: "软件工程 2 班",
   center: "待确定",
-  role: "暂无组织职务",
+  memberDuty: "普通成员",
   identity: "预备成员",
-  direction: "校园产品与技术实践",
   bio: "希望通过真实项目协作持续积累技术、沟通与交付经验。",
 };
 
-export function isFormalMemberProfile(profile: MemberProfile): boolean {
-  return profile.identity !== "预备成员" && Boolean(profile.publicId);
+export function isFormalMemberProfile(
+  profile: MemberProfile,
+): profile is MemberProfile & Required<Pick<MemberProfile, "publicId" | "centerSlug">> {
+  return profile.identity === "正式成员"
+    && Boolean(profile.publicId)
+    && Boolean(profile.centerSlug);
 }
 
 export function cloneMemberProfile(profile: MemberProfile): MemberProfile {
-  return { ...profile };
+  const clone = { ...profile };
+  if (clone.center !== "白泽开发中心") delete clone.baizeDirection;
+  return clone;
 }
 
 export function projectMemberToPublic(
   profile: MemberProfile,
-  base: PublicPerson
+  base?: PublicPerson,
+  centerLeadership?: AdminMember["centerLeadership"],
+  coreOverride?: boolean,
 ): PublicPerson {
+  const centerSlug = profile.centerSlug ?? base?.centerSlug;
+  if (!centerSlug) throw new Error(`正式成员缺少中心标识：${profile.id}`);
+  const isCore = coreOverride ?? (profile.memberDuty === "核心人员" || Boolean(centerLeadership));
+
   const projected = {
-    ...base,
+    id: profile.publicId ?? base?.id ?? profile.id,
     name: profile.name,
-    direction: profile.direction,
+    memberDuty: isCore ? "核心人员" : profile.memberDuty,
+    centerSlug,
+    centerName: profile.center,
     bio: profile.bio,
+    isCore,
+    order: base?.order ?? Number.MAX_SAFE_INTEGER,
+    honors: base?.honors ?? [],
+    baizeDirection: base?.baizeDirection,
   };
+
+  if (profile.center === "白泽开发中心" && profile.baizeDirection) {
+    projected.baizeDirection = profile.baizeDirection;
+  } else {
+    delete projected.baizeDirection;
+  }
 
   if (profile.avatarUrl) {
     return {
@@ -81,9 +108,8 @@ export function projectMemberToPublic(
     };
   }
 
-  const { avatarUrl: _baseAvatarUrl, ...withoutAvatarUrl } = projected;
   return {
-    ...withoutAvatarUrl,
+    ...projected,
     avatarVisible: false,
   };
 }
@@ -97,8 +123,12 @@ export function projectMemberToAdmin(
     name: profile.name,
     studentId: profile.studentId,
     center: profile.center as AdminMember["center"],
+    identity: profile.identity as AdminMember["identity"],
     grade: profile.grade,
-    direction: profile.direction,
+    memberDuty: profile.memberDuty,
+    baizeDirection: profile.center === "白泽开发中心"
+      ? profile.baizeDirection
+      : undefined,
     profileSummary: profile.bio,
     avatarUrl: profile.avatarUrl ?? null,
   };

@@ -104,13 +104,6 @@ export const ADMIN_STORAGE_OVERVIEW = [
   { label: "处理失败", value: "02", meta: "需要关注" }
 ];
 
-export const ADMIN_RECENT_ACTIVITY = [
-  { actor: "联盟总负责人", action: "发布了“2026 秋季招新通知”", time: "10 分钟前" },
-  { actor: "新媒体负责人", action: "上传了 12 张活动照片", time: "35 分钟前" },
-  { actor: "白泽负责人", action: "更新了林同学第二轮结果", time: "1 小时前" },
-  { actor: "内容管理员", action: "提交了首页快讯更新", time: "2 小时前" }
-];
-
 export const ADMIN_QUICK_CREATE = [
   { label: "发布 HSD 快讯", to: "/admin/content?create=flash" },
   { label: "新建新闻公告", to: "/admin/content?create=news" },

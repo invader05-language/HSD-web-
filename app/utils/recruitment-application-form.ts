@@ -23,8 +23,7 @@ export function validateRegistrationProfileDraft(
   if (!/^\d{8,14}$/.test(draft.studentId.trim())) errors.studentId = "请输入 8–14 位数字学号。";
   if (isBlank(draft.grade)) errors.grade = "请选择年级。";
   if (!hasLengthBetween(draft.className, 2, 30)) errors.className = "班级应为 2–30 个字符。";
-  if (!hasLengthBetween(draft.direction, 1, 80)) errors.direction = "实践方向为必填项，最多 80 个字符。";
-  if (!hasLengthBetween(draft.bio, 20, 180)) errors.bio = "个人简介应为 20–180 个字符。";
+  if ((draft.bio?.trim().length ?? 0) > 180) errors.bio = "个人简介最多 180 个字符。";
 
   return errors;
 }

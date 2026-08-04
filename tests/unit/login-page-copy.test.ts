@@ -9,4 +9,9 @@ describe("login page copy", () => {
     expect(loginPage).not.toContain("登录后将继续前往");
     expect(loginPage).not.toContain("原型演示：使用");
   });
+
+  it("does not promise disabled audit or recycle-bin features to administrators", () => {
+    expect(loginPage).not.toContain("操作日志");
+    expect(loginPage).not.toContain("回收站");
+  });
 });
