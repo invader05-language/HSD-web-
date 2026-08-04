@@ -2,6 +2,7 @@
 .worktrees/
 
 # Project-local runtime
+.tools
 .tools/
 
 # Private association records are local-only
@@ -15,6 +16,8 @@
 .output/
 dist/
 .vercel/
+.pnpm-store/
+node_modules
 node_modules/
 test-results/
 playwright-report/

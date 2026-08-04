@@ -30,7 +30,7 @@
 
 ## 本地运行
 
-要求 Node.js 20+ 与 pnpm 10+。
+要求 Node.js 22.19.0 与 pnpm 10.33.0。
 
 ```bash
 pnpm install
