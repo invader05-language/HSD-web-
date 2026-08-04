@@ -84,7 +84,7 @@ export function getDemoMemberResult(
   if (memberId === DEMO_MEMBER_PROFILE.id) return DEMO_MEMBER_RESULT;
   if (memberId !== DEMO_APPLICANT_PROFILE.id) {
     return {
-      batchLabel: "2026 秋季招新",
+      batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
       status: "no-application",
       identity: "正式成员",
       preferences: [],
@@ -101,7 +101,7 @@ export function getDemoMemberResult(
     : [];
 
   return {
-    batchLabel: "2026 秋季招新",
+    batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
     status: application ? "pending" : "no-application",
     identity: "预备成员",
     preferences,

@@ -10,6 +10,14 @@ async function completeDemoLogin(page: import("@playwright/test").Page) {
 }
 
 test.describe("join recruitment application navigation", () => {
+  test("shows the current batch and explains automatic batch linkage", async ({ page }) => {
+    await page.goto("/join");
+
+    await expect(page.getByRole("heading", { name: "2026 秋季招新" })).toBeVisible();
+    await expect(page.getByText("系统会自动将本次报名关联到当前批次")).toBeVisible();
+    await expect(page.getByRole("link", { name: "登录后填写报名表" }).first()).toBeVisible();
+  });
+
   test("guest recruitment CTAs both continue through login", async ({ page }) => {
     await page.goto("/join");
 
@@ -97,6 +105,21 @@ test.describe("join recruitment application navigation", () => {
     await page.goto("/people/core");
     await expect(page.getByRole("heading", { level: 2, name: "林同学" })).toBeVisible();
     await expect(page.getByText("报名同学", { exact: true })).toHaveCount(0);
+  });
+
+  test("application page identifies the captured batch before submission", async ({ page }) => {
+    await page.goto("/login?redirect=%2Fjoin%2Fapply");
+    await completeDemoLogin(page);
+
+    await page.getByLabel("姓名", { exact: true }).fill("批次测试同学");
+    await page.locator('[data-field="contact"] input').fill("batch@example.com");
+    await page.getByRole("button", { name: "下一步" }).click();
+    await page.locator('[data-field="firstChoice"] select').selectOption("新媒体中心");
+    await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
+    await page.getByRole("button", { name: "下一步" }).click();
+
+    await expect(page.getByText("当前批次：2026 秋季招新")).toBeVisible();
+    await expect(page.getByText("系统将自动关联本批次，不支持手动切换")).toBeVisible();
   });
 
   test("future steps cannot bypass the required first-step contact field", async ({ page }) => {
