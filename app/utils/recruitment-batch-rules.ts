@@ -27,18 +27,17 @@ export function getEffectiveRecruitmentBatchStatus(
     return { status: "closed", reason: "after-end" };
   }
 
-  if (batch.manualOverride === "force-open") {
-    return { status: "open", reason: "force-open" };
-  }
-
   const timestamp = now.getTime();
   const start = Date.parse(batch.startAt);
   const end = Date.parse(batch.endAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
     return { status: "closed", reason: "after-end" };
   }
-  if (timestamp < start) return { status: "upcoming", reason: "before-start" };
   if (timestamp >= end) return { status: "closed", reason: "after-end" };
+  if (batch.manualOverride === "force-open") {
+    return { status: "open", reason: "force-open" };
+  }
+  if (timestamp < start) return { status: "upcoming", reason: "before-start" };
   return { status: "open", reason: "within-window" };
 }
 

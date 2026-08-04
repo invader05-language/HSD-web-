@@ -106,7 +106,8 @@ export const ADMIN_STORAGE_OVERVIEW = [
 
 export const ADMIN_QUICK_CREATE = [
   { label: "发布 HSD 快讯", to: "/admin/content?create=flash" },
-  { label: "新建新闻公告", to: "/admin/content?create=news" },
+  { label: "新建新闻", to: "/admin/content?create=article" },
+  { label: "新建公告", to: "/admin/content?create=notice" },
   { label: "新建项目", to: "/admin/projects?create=project" },
   { label: "新建活动", to: "/admin/activities?create=activity" },
   { label: "上传媒体作品", to: "/admin/media?upload=1" },

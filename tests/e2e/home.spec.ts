@@ -10,7 +10,41 @@ test("desktop homepage exposes the approved content sequence", async ({ page }) 
   await expect(page.getByRole("heading", { name: "由成员记录，也由成员创作" })).toBeVisible();
 });
 
-test("public detail continues through login without exposing the raw user redirect", async ({ page }) => {
+test("homepage renders explicit published-projection empty states without static flash or news", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByText("暂无已发布快讯", { exact: true })).toBeVisible();
+  await expect(page.getByText("暂无已发布动态", { exact: true })).toBeVisible();
+  await expect(page.getByText("2026 秋季招新通道开放，四大中心均可报名", { exact: true })).toHaveCount(0);
+});
+
+test("homepage renders every curated domain through the published portal projection", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator(".featured-project h3")).toHaveText("智巡先锋");
+  await expect(page.locator(".activities-list .activity-row")).toHaveCount(3);
+  await expect(page.locator(".resource-list > a")).toHaveCount(3);
+  await expect(page.getByRole("link", { name: /年度活动影像记录/ })).toHaveAttribute("href", "/gallery/annual-activity-record");
+});
+
+test("legacy Help Center routes redirect once to their enabled fallback", async ({ page }) => {
+  await page.goto("/help");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
+  await expect(page.getByRole("link", { name: /帮助/ })).toHaveCount(0);
+
+  await page.goto("/admin/content");
+  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/admin\/content$/);
+
+  await page.goto("/admin/content/help");
+  await expect(page).toHaveURL(/\/admin\/content$/);
+  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
+});
+
+test("public detail remains open and personal signup continues through login", async ({ page }) => {
   await page.goto("/activities/harmonyos-salon");
   await expect(page.getByRole("heading", { name: "HarmonyOS 原生应用入门" })).toBeVisible();
 
@@ -68,8 +102,7 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
     "/resources",
     "/resources/project-requirement-template",
     "/people/lin-development",
-    "/join",
-    "/help"
+    "/join"
   ]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);

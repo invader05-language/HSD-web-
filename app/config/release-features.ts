@@ -3,11 +3,13 @@ export interface ReleaseFeatures {
   recycleBin: boolean;
   uploadTasks: boolean;
   recruitmentBatches: boolean;
+  helpCenter: boolean;
 }
 
 export const RELEASE_FEATURES: ReleaseFeatures = {
   auditLog: false,
   recycleBin: false,
   uploadTasks: false,
-  recruitmentBatches: true
+  recruitmentBatches: true,
+  helpCenter: false
 };

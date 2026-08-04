@@ -1,3 +1,5 @@
+import { resolvePortalAssetSource } from "./portal-assets";
+
 export type AssetProcessingStatus =
   | "waiting"
   | "uploading"
@@ -20,6 +22,7 @@ export interface AdminAsset {
   usages: string[];
   alt: string;
   accent: string;
+  imageUrl?: string;
 }
 
 export interface AdminUploadTask {
@@ -67,7 +70,8 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     reviewStatus: "approved",
     usages: ["官网首页 Banner", "加入我们入口"],
     alt: "白云 HSD 开发者部落 2026 秋季招新主视觉",
-    accent: "#9e1b26"
+    accent: "#9e1b26",
+    imageUrl: resolvePortalAssetSource("asset-recruitment-hero")
   },
   {
     id: "asset-salon",
@@ -199,6 +203,11 @@ export function canSelectAsset(
   asset: Pick<AdminAsset, "processingStatus" | "reviewStatus">
 ) {
   return asset.processingStatus === "ready" && asset.reviewStatus === "approved";
+}
+
+export function canUseAssetForPortalContent(assetId: string) {
+  const asset = ADMIN_ASSETS.find((item) => item.id === assetId);
+  return Boolean(asset?.imageUrl && asset.type === "图片" && canSelectAsset(asset));
 }
 
 export function filterAdminAssets(

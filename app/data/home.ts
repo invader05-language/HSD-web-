@@ -19,36 +19,6 @@ export const STATS = [
   { value: "10+", label: "项目与赛事成果" }
 ] as const;
 
-export const FLASH_NEWS = [
-  { tag: "招新", title: "2026 秋季招新通道开放，四大中心均可报名", date: "07.28", to: "/join" },
-  { tag: "活动", title: "HarmonyOS 技术沙龙开始接受预约", date: "08.06", to: "/activities/harmonyos-salon" },
-  { tag: "赛事", title: "科创赛事项目组队信息已更新", date: "08.12", to: "/activities" }
-] as const;
-
-export const NEWS = [
-  {
-    category: "部落动态",
-    date: "2026.07.24",
-    title: "从一次分享会，到一支真正协作的项目团队",
-    summary: "记录成员从技术交流、需求梳理到原型落地的完整过程。",
-    to: "/activities/project-camp"
-  },
-  {
-    category: "赛事进展",
-    date: "2026.07.18",
-    title: "智巡先锋进入新一轮场景验证",
-    summary: "围绕校园巡检场景继续完善识别、告警与协同处置链路。",
-    to: "/projects/zhixun-xianfeng"
-  },
-  {
-    category: "媒体作品",
-    date: "2026.07.12",
-    title: "新媒体中心完成年度活动影像归档",
-    summary: "摄影、剪辑与推文作品将逐步开放浏览。",
-    to: "/gallery"
-  }
-] as const;
-
 export { CENTERS } from "./centers";
 
 export const PROJECTS = [

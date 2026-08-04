@@ -200,13 +200,49 @@ test("project activity and portal content share a clear draft review publish wor
   await expect(page.getByText("报名名单", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: /内容与门户/ }).click();
-  await page.getByRole("link", { name: "内容管理", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "内容管理" })).toBeVisible();
-  await expect(page.getByText("保存草稿")).toBeVisible();
+  await page.getByRole("link", { name: "官网内容", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "官网内容" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "新建内容" })).toHaveAttribute("href", "/admin/content/new");
+  await expect(page.getByRole("option", { name: "待发布" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "官网内容列表" })).toBeVisible();
 
-  await page.getByRole("link", { name: "首页配置", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "首页内容配置" })).toBeVisible();
+  await page.getByRole("link", { name: "门户配置", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
   await expect(page.getByText("固定模块，不允许删除")).toBeVisible();
+});
+
+test("portal draft preview stays isolated until an owner publishes the full configuration", async ({ page }) => {
+  await signInToAdmin(page, "/admin/content/home");
+
+  await page.getByRole("button", { name: "下移 智巡先锋" }).click();
+  await page.getByRole("button", { name: "预览门户草稿" }).click();
+  const preview = page.getByRole("dialog", { name: "门户草稿预览" });
+  await expect(preview.getByRole("list", { name: "精选项目预览" }).getByRole("listitem").first()).toContainText("智学领航");
+  await preview.getByRole("button", { name: "关闭预览" }).click();
+
+  await page.goto("/");
+  await expect(page.locator(".featured-project h3")).toHaveText("智巡先锋");
+
+  await page.goto("/admin/content/home");
+  await page.getByRole("button", { name: "发布门户配置" }).click();
+  const confirmation = page.getByRole("alertdialog", { name: "门户配置发布确认" });
+  await confirmation.getByRole("button", { name: "确认整份发布" }).click();
+  await expect(page.getByRole("status")).toContainText("门户配置已整份发布");
+
+  await page.goto("/");
+  await expect(page.locator(".featured-project h3")).toHaveText("智学领航");
+});
+
+test("portal visuals are merged and the legacy banner route redirects to them", async ({ page }) => {
+  await signInToAdmin(page, "/admin/content/home");
+  await page.goto("/admin/content/banners");
+
+  await expect(page).toHaveURL(/\/admin\/content\/home\?view=visuals$/);
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "页面主视觉" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("官网首页主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("加入我们主视觉素材")).toBeVisible();
+  await expect(page.getByText("招新按钮是否可用仍由招新批次控制")).toBeVisible();
 });
 
 test("media uploads and learning resources expose honest storage states", async ({ page }) => {

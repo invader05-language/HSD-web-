@@ -4,6 +4,7 @@ export interface AdminNavigationItem {
   id: string;
   label: string;
   to: string;
+  feature?: keyof ReleaseFeatures;
 }
 
 export interface AdminNavigationGroup {
@@ -26,7 +27,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     id: "recruitment",
     label: "招新与考核",
     items: [
-      { id: "batches", label: "招新批次", to: "/admin/recruitment/batches" },
+      { id: "batches", label: "招新批次", to: "/admin/recruitment/batches", feature: "recruitmentBatches" },
       { id: "applications", label: "报名人员", to: "/admin/recruitment/applications" },
       { id: "assessment", label: "预备成员考核", to: "/admin/recruitment" },
       { id: "publication", label: "结果发布", to: "/admin/recruitment/publish" }
@@ -55,10 +56,9 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     id: "content-portal",
     label: "内容与门户",
     items: [
-      { id: "content", label: "内容管理", to: "/admin/content" },
-      { id: "homepage", label: "首页配置", to: "/admin/content/home" },
-      { id: "banners", label: "Banner 配置", to: "/admin/content/banners" },
-      { id: "help", label: "帮助中心", to: "/admin/content/help" }
+      { id: "content", label: "官网内容", to: "/admin/content" },
+      { id: "homepage", label: "门户配置", to: "/admin/content/home" },
+      { id: "help", label: "帮助中心", to: "/admin/content/help", feature: "helpCenter" }
     ]
   },
   {
@@ -68,7 +68,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
       { id: "media", label: "媒体素材库", to: "/admin/media" },
       { id: "gallery", label: "画廊专题", to: "/admin/gallery" },
       { id: "resources", label: "学习资料", to: "/admin/resources" },
-      { id: "uploads", label: "上传任务", to: "/admin/uploads" }
+      { id: "uploads", label: "上传任务", to: "/admin/uploads", feature: "uploadTasks" }
     ]
   },
   {
@@ -76,8 +76,8 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     label: "系统管理",
     items: [
       { id: "accounts", label: "管理员资格配置", to: "/admin/accounts" },
-      { id: "logs", label: "操作日志", to: "/admin/logs" },
-      { id: "recycle-bin", label: "回收站", to: "/admin/recycle-bin" }
+      { id: "logs", label: "操作日志", to: "/admin/logs", feature: "auditLog" },
+      { id: "recycle-bin", label: "回收站", to: "/admin/recycle-bin", feature: "recycleBin" }
     ]
   }
 ];
@@ -94,10 +94,7 @@ export function getAdminNavigationForAccess(
     ...group,
     items: group.items.filter(
       (item) => (item.id !== "accounts" || access.canManageAdminAccounts)
-        && (item.id !== "logs" || features.auditLog)
-        && (item.id !== "recycle-bin" || features.recycleBin)
-        && (item.id !== "uploads" || features.uploadTasks)
-        && (item.id !== "batches" || features.recruitmentBatches)
+        && (item.feature === undefined || features[item.feature])
     )
   })).filter((group) => group.items.length > 0);
 }
