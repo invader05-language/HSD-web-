@@ -96,7 +96,7 @@ async function signIn(values: Record<string, unknown>) {
           <p v-if="serverError" class="form-error" role="alert">{{ serverError }}</p>
           <button class="button" type="submit" :disabled="submitting">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
         </Form>
-        <p class="login-page__hint">登录遇到问题，请联系联盟总负责人核验账号与权限。</p>
+        <p class="login-page__hint">无法登录或忘记账号时，请联系联盟总负责人核验身份并处理账号问题。</p>
       </div>
     </div>
   </div>
