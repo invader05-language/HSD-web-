@@ -162,4 +162,32 @@ describe("recruitment batch lifecycle commands", () => {
     expect(content.getPublicById(flash.id, NOW)).toBeUndefined();
     expect(content.getById(flash.id)?.sourceValidity).toBe("invalid");
   });
+
+  it("creates a new source-versioned flash when a paused batch resumes open", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.pause("batch-current", NOW);
+
+    store.resume("batch-current", NOW);
+
+    expect(usePortalContentStore().records.find((record) => (
+      record.sourceId === "batch-current" && record.sourceVersion === 3
+    ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
+  });
+
+  it("creates a new source-versioned flash when a closed batch reopens", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.close("batch-current", true, NOW);
+
+    store.reopen("batch-current", true, NOW);
+
+    expect(usePortalContentStore().records.find((record) => (
+      record.sourceId === "batch-current" && record.sourceVersion === 3
+    ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
+  });
 });

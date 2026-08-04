@@ -102,3 +102,26 @@ sh scripts/with-hsd-node.sh corepack pnpm exec vitest run
 Test Files  35 passed (35)
 Tests  240 passed (240)
 ```
+
+## Second Review Fixes
+
+- `resume` and `reopen` now emit a new `recruitment.batch.opened` event after their authoritative command reaches effective `open`, using the incremented batch version. Automation failure remains non-transactional and does not roll back the successful batch command.
+- Normal unpublish now moves a currently published work revision to `status: "unpublished"`. When a later draft/review/pending revision owns the active work, unpublish preserves that active status and only disables its older public snapshot.
+- Content persistence validation now recursively checks published snapshots, including nested targets and structured blocks. It rejects a published work status paired with an unpublished projection state, so malformed restored data cannot reach catalog reads.
+
+### Second Review Test Evidence
+
+The new regressions were run red before implementation. They failed because resume/reopen did not generate version 3 flashes, normal unpublish left `status: "published"`, malformed nested snapshots restored, and inconsistent published-state records restored.
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-config.test.ts tests/unit/portal-automation.test.ts tests/unit/recruitment-batch-rules.test.ts
+
+Test Files  4 passed (4)
+Tests  36 passed (36)
+```
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm run typecheck
+
+> nuxt typecheck
+```

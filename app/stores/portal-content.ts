@@ -60,6 +60,37 @@ function isPortalEvent(value: unknown): value is PortalSourceEvent {
     && typeof value.sourceVersion === "number";
 }
 
+function isTarget(value: unknown): boolean {
+  return isRecord(value) && value.type === "internal-route" && typeof value.value === "string";
+}
+
+function isBlocks(value: unknown): boolean {
+  return Array.isArray(value) && value.every((block) => {
+    if (!isRecord(block) || typeof block.type !== "string") return false;
+    if (block.type === "heading" || block.type === "paragraph") return typeof block.text === "string";
+    return block.type === "image"
+      && typeof block.assetId === "string"
+      && typeof block.alt === "string"
+      && (block.caption === undefined || typeof block.caption === "string");
+  });
+}
+
+function isPublishedSnapshot(value: unknown): value is PortalContentSnapshot {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string"
+    && ["flash", "article", "notice"].includes(value.kind as string)
+    && typeof value.slug === "string"
+    && typeof value.title === "string"
+    && typeof value.summary === "string"
+    && isTarget(value.target)
+    && typeof value.revision === "number"
+    && isBlocks(value.blocks)
+    && ["manual", "system-event", "wechat"].includes(value.originType as string)
+    && ["valid", "invalid", "expired"].includes(value.sourceValidity as string)
+    && typeof value.publishedAt === "string"
+    && (value.expiresAt === undefined || typeof value.expiresAt === "string");
+}
+
 function isPortalContentRecord(value: unknown): value is PortalContentRecord {
   if (!isRecord(value)) return false;
   return typeof value.id === "string"
@@ -67,20 +98,21 @@ function isPortalContentRecord(value: unknown): value is PortalContentRecord {
     && typeof value.slug === "string"
     && typeof value.title === "string"
     && typeof value.summary === "string"
-    && isRecord(value.target)
-    && value.target.type === "internal-route"
-    && typeof value.target.value === "string"
+    && isTarget(value.target)
     && ["draft", "in-review", "pending-publication", "published", "unpublished"].includes(value.status as string)
     && ["published", "unpublished"].includes(value.publishedState as string)
     && typeof value.revision === "number"
-    && Array.isArray(value.blocks)
+    && isBlocks(value.blocks)
     && ["manual", "system-event", "wechat"].includes(value.originType as string)
     && ["valid", "invalid", "expired"].includes(value.sourceValidity as string)
     && typeof value.createdAt === "string"
     && typeof value.updatedAt === "string"
     && typeof value.createdBy === "string"
     && Array.isArray(value.audit)
-    && value.audit.every(isAuditRecord);
+    && value.audit.every(isAuditRecord)
+    && (value.publishedRevision === undefined || isPublishedSnapshot(value.publishedRevision))
+    && (value.publishedState !== "published" || isPublishedSnapshot(value.publishedRevision))
+    && !(value.status === "published" && value.publishedState !== "published");
 }
 
 function isAutomationFailure(value: unknown): value is PortalAutomationFailure {
@@ -346,6 +378,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const record = this.getById(id);
       if (!record || !record.publishedRevision || !reason.trim()) throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       record.publishedState = "unpublished";
+      if (record.status === "published") record.status = "unpublished";
       record.updatedAt = now.toISOString();
       addAudit(record, "unpublish", actor, now, reason);
       this.persist();

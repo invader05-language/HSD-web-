@@ -111,6 +111,26 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const open = getCurrentOpenBatch(this.batches.filter((batch) => batch.id !== batchId), now);
       if (open) throw new Error("BATCH_ALREADY_OPEN");
     },
+    emitOpenedFlash(batch: RecruitmentBatch, actor: { id: string; name: string }, timestamp: string) {
+      const automation = new PortalAutomationServiceMock().createFromEvent({
+        eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
+        eventType: "recruitment.batch.opened",
+        occurredAt: timestamp,
+        actorId: actor.id,
+        sourceDomain: "recruitment-batch",
+        sourceId: batch.id,
+        sourceVersion: batch.version,
+        payload: {
+          batchName: batch.name,
+          publicRoute: "/join",
+          publicEndAt: batch.endAt,
+          isOpen: true,
+        },
+      });
+      if (automation.status === "failed") {
+        this.automationFailures.unshift({ batchId: batch.id, errorCode: automation.errorCode });
+      }
+    },
     publishBatch(batchId: string, now: Date = new Date(), reason = "publish batch") {
       const actor = this.resolveOwnerActor();
       const batch = this.getBatchOrThrow(batchId);
@@ -147,24 +167,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "open-now", actor, beforeStatus, "open", timestamp, reason, { manualOverride: "none" });
-      const automation = new PortalAutomationServiceMock().createFromEvent({
-        eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
-        eventType: "recruitment.batch.opened",
-        occurredAt: timestamp,
-        actorId: actor.id,
-        sourceDomain: "recruitment-batch",
-        sourceId: batch.id,
-        sourceVersion: batch.version,
-        payload: {
-          batchName: batch.name,
-          publicRoute: "/join",
-          publicEndAt: batch.endAt,
-          isOpen: true,
-        },
-      });
-      if (automation.status === "failed") {
-        this.automationFailures.unshift({ batchId: batch.id, errorCode: automation.errorCode });
-      }
+      this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     pause(batchId: string, now: Date = new Date(), reason = "pause recruitment batch") {
@@ -194,6 +197,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "resume", actor, beforeStatus, afterStatus, timestamp, reason);
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     close(
@@ -237,6 +241,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "reopen", actor, beforeStatus, afterStatus, timestamp, reason);
+      if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
       return batch;
     },
     archive(batchId: string, now: Date = new Date(), reason = "archive recruitment batch") {

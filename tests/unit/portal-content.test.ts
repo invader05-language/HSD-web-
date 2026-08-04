@@ -4,6 +4,7 @@ import {
   PORTAL_CONTENT_STORAGE_KEY,
   usePortalContentStore,
 } from "../../app/stores/portal-content";
+import { usePortalCatalog } from "../../app/composables/usePortalCatalog";
 import { useSessionStore } from "../../app/stores/session";
 
 const now = new Date("2026-08-04T09:00:00.000Z");
@@ -74,6 +75,20 @@ describe("portal content store", () => {
     expect(store.getById(record.id)).toMatchObject({ status: "draft", revision: 2, publishedState: "unpublished" });
   });
 
+  it("marks a normally published work revision as unpublished", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({ kind: "notice", title: "设备维护", summary: "维护通知。" }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+
+    store.unpublish(record.id, "通知结束", now);
+
+    expect(store.getById(record.id)).toMatchObject({ status: "unpublished", publishedState: "unpublished" });
+  });
+
   it("expires public flash projections and records expiry without exposing them", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -112,6 +127,42 @@ describe("portal content store", () => {
     localStorage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({ version: 0, records: [] }));
     setActivePinia(createPinia());
     expect(usePortalContentStore().records).toHaveLength(3);
+  });
+
+  it("rejects malformed nested published revisions before catalog reads", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({ kind: "article", title: "坏快照", summary: "不应恢复。" }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+    const persisted = JSON.parse(localStorage.getItem(PORTAL_CONTENT_STORAGE_KEY)!);
+    persisted.records.find((item: { id: string }) => item.id === record.id).publishedRevision.target = { type: "internal-route" };
+    localStorage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify(persisted));
+
+    setActivePinia(createPinia());
+    const restored = usePortalContentStore();
+
+    expect(restored.getById(record.id)).toBeUndefined();
+    expect(() => usePortalCatalog()).not.toThrow();
+  });
+
+  it("rejects inconsistent published-state records before public reads", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({ kind: "article", title: "状态不一致", summary: "不应恢复。" }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+    const persisted = JSON.parse(localStorage.getItem(PORTAL_CONTENT_STORAGE_KEY)!);
+    persisted.records.find((item: { id: string }) => item.id === record.id).publishedState = "unpublished";
+    localStorage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify(persisted));
+
+    setActivePinia(createPinia());
+
+    expect(usePortalContentStore().getById(record.id)).toBeUndefined();
   });
 
   it("retains an in-memory draft when versioned storage is unavailable", () => {
