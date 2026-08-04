@@ -7,6 +7,7 @@ import {
   type RecruitmentCenter,
 } from "~/data/recruitment-application";
 import { useCurrentMember } from "~/composables/useCurrentMember";
+import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import {
   validateApplicationDraft,
@@ -28,7 +29,11 @@ definePageMeta({ middleware: "member" });
 
 const currentMember = useCurrentMember();
 const currentProfile = currentMember.profile;
+const batchStore = useRecruitmentBatchStore();
 const applicationStore = useRecruitmentApplicationStore();
+const capturedBatchId = ref(batchStore.currentOpenBatch?.id);
+const activeBatch = computed(() => capturedBatchId.value ? batchStore.getBatch(capturedBatchId.value) : undefined);
+const hasOpenBatch = computed(() => Boolean(activeBatch.value && batchStore.effectiveStatus(activeBatch.value.id) === "open"));
 const step = ref<Step>(1);
 const profileDraft = reactive(createRegistrationProfileDraft(currentProfile.value));
 const applicationDraft = reactive<RecruitmentApplicationDraft>(applicationStore.createDraft());
@@ -41,7 +46,9 @@ let draftObjectUrl: string | undefined;
 
 const isBaizeFirstChoice = computed(() => applicationDraft.firstChoice === "白泽开发中心");
 const avatarSource = computed(() => profileDraft.avatarUrl || undefined);
-const submittedApplication = computed(() => applicationStore.submittedApplication);
+const submittedApplication = computed(() => activeBatch.value
+  ? applicationStore.getApplication(activeBatch.value.id, currentProfile.value.id)
+  : undefined);
 const grades = ["2024 级", "2025 级", "2026 级", "2027 级"];
 
 function clearErrors(...keys: string[]) {
@@ -152,6 +159,10 @@ async function submitApplication() {
 
   submitting.value = true;
   try {
+    const batchId = activeBatch.value?.id;
+    if (!batchId || !hasOpenBatch.value) {
+      throw new Error("当前批次已暂停或关闭，暂不能提交报名。请保留页面草稿并返回加入我们查看最新安排。");
+    }
     applicationStore.submitApplication(
       {
         ...profileDraft,
@@ -166,6 +177,7 @@ async function submitApplication() {
         contact: applicationDraft.contact.trim(),
       },
       confirmation.value,
+      { batchId },
     );
     draftObjectUrl = undefined;
   } catch (error) {
@@ -190,11 +202,18 @@ onBeforeUnmount(() => {
 
     <section class="task-page__body">
       <div class="shell">
-        <section v-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
+        <section v-if="!hasOpenBatch" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
+          <p class="eyebrow">Recruitment Unavailable</p>
+          <h2>当前暂无开放报名</h2>
+          <p>{{ batchStore.upcomingBatch ? `下一批次“${batchStore.upcomingBatch.name}”计划于 ${new Date(batchStore.upcomingBatch.startAt).toLocaleDateString("zh-CN")} 开放。` : "当前没有已开放的招新批次。" }}</p>
+          <div class="recruitment-success__actions"><NuxtLink class="button" to="/join">返回加入我们</NuxtLink></div>
+        </section>
+        <section v-else-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
           <p class="eyebrow">Submitted</p>
           <h2>成员注册与招新报名已提交</h2>
-          <p>你的成员资料已在当前前端会话内同步更新。报名将以预备成员身份进入后续流程。</p>
+          <p>你的报名已关联到“{{ submittedApplication.batchNameSnapshot }}”，并以预备成员身份进入后续流程。</p>
           <dl>
+            <div><dt>招新批次</dt><dd>{{ submittedApplication.batchNameSnapshot }}</dd></div>
             <div><dt>成员身份</dt><dd>预备成员</dd></div>
             <div><dt>所属中心</dt><dd>待确定</dd></div>
             <div><dt>报名状态</dt><dd>已提交</dd></div>
@@ -251,6 +270,7 @@ onBeforeUnmount(() => {
 
               <section v-show="step === 3" aria-labelledby="application-confirmation-heading">
                 <header class="recruitment-section-heading"><span>03</span><div><h2 id="application-confirmation-heading">确认并提交</h2><p>请核对全部资料；提交后会同步已保存成员资料与本次招新申请。</p></div></header>
+                <p class="recruitment-batch-context">当前批次：<strong>{{ activeBatch?.name }}</strong> · 系统将自动关联本批次，不支持手动切换。</p>
                 <div class="recruitment-confirmation-grid">
                   <section><header><h3>成员资料</h3><button type="button" class="text-link" @click="goToStep(1)">修改</button></header><div class="recruitment-confirmation-profile"><HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="sm" /><div><p>姓名：{{ profileDraft.name }}</p><p>学号：{{ profileDraft.studentId }}</p><p>年级：{{ profileDraft.grade }}</p><p>班级：{{ profileDraft.className }}</p></div></div><p v-if="profileDraft.bio">个人简介：{{ profileDraft.bio }}</p><p>联系方式：{{ applicationDraft.contact }}（仅招新联系）</p></section>
                   <section><header><h3>报名志愿</h3><button type="button" class="text-link" @click="goToStep(2)">修改</button></header><p>第一志愿：{{ applicationDraft.firstChoice }}</p><p>第二志愿：{{ applicationDraft.secondChoice || "未填写" }}</p><p>第三志愿：{{ applicationDraft.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ applicationDraft.baizeDirection || "不适用" }}</p><p>调剂意愿：{{ applicationDraft.acceptsAdjustment ? "接受调剂" : "不接受调剂" }}</p></section>

@@ -1,10 +1,50 @@
 <script setup lang="ts">
-import { RECRUITMENT_BATCHES } from "~/data/recruitment-admin";
+import { RECRUITMENT_BATCHES as LEGACY_BATCHES } from "~/data/recruitment-admin";
+import { RECRUITMENT_BATCHES as DOMAIN_BATCHES } from "~/data/recruitment-batches";
+import {
+  buildRecruitmentBatchRoute,
+  formatRecruitmentBatchPeriod,
+  getAdminBatchStatus,
+  getRecruitmentBatchStatusLabel,
+  type AdminRecruitmentBatchLike
+} from "~/data/recruitment-admin-context";
+import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "招新批次｜HSD 管理台" });
 
+interface AdminBatchListItem extends AdminRecruitmentBatchLike {
+  id: string;
+  name: string;
+  owner?: string;
+  applicants?: number;
+  openCenterIds?: readonly string[];
+  centers?: number;
+}
+
 const showCreate = ref(false);
+const batchStore = useRecruitmentBatchStore();
+const batches = computed<AdminBatchListItem[]>(() => {
+  const storeBatches = (batchStore as unknown as { batches?: unknown }).batches;
+  const source = Array.isArray(storeBatches) && storeBatches.length > 0
+    ? storeBatches
+    : DOMAIN_BATCHES.length > 0 ? DOMAIN_BATCHES : LEGACY_BATCHES;
+  return source as AdminBatchListItem[];
+});
+const visibleBatches = computed(() => batches.value.map((batch) => ({
+  ...batch,
+  statusLabel: getRecruitmentBatchStatusLabel(
+    getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id) })
+  ),
+  statusKey: getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id) }),
+  periodLabel: formatRecruitmentBatchPeriod(batch),
+  centerCount: batch.openCenterIds?.length ?? batch.centers ?? 0,
+  applicantCount: batch.applicants ?? 0
+})));
+const openBatchCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "open").length);
+const applicantTotal = computed(() => visibleBatches.value.reduce((total, batch) => total + batch.applicantCount, 0));
+const openCenterTotal = computed(() => visibleBatches.value.find((batch) => batch.statusKey === "open")?.centerCount ?? 0);
+const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "draft").length);
 </script>
 
 <template>
@@ -20,31 +60,33 @@ const showCreate = ref(false);
     </AdminPageHeading>
 
     <section class="admin-summary-strip" aria-label="批次概览">
-      <div><span>当前批次</span><strong>01</strong><small>正在进行</small></div>
-      <div><span>报名人数</span><strong>80</strong><small>2026 秋季招新</small></div>
-      <div><span>开放中心</span><strong>04</strong><small>全部中心</small></div>
-      <div><span>待配置</span><strong>01</strong><small>草稿批次</small></div>
+      <div><span>开放批次</span><strong>{{ String(openBatchCount).padStart(2, "0") }}</strong><small>全站同一时间最多一个</small></div>
+      <div><span>报名人数</span><strong>{{ applicantTotal }}</strong><small>按批次汇总</small></div>
+      <div><span>开放中心</span><strong>{{ String(openCenterTotal).padStart(2, "0") }}</strong><small>当前开放批次</small></div>
+      <div><span>待配置</span><strong>{{ String(draftCount).padStart(2, "0") }}</strong><small>草稿批次</small></div>
     </section>
 
     <section class="admin-list-card">
       <header>
         <div><span>Recruitment Batch List</span><h2>全部招新批次</h2></div>
-        <p>Mock 数据 · 共 {{ RECRUITMENT_BATCHES.length }} 个批次</p>
+        <p>Mock 数据 · 共 {{ visibleBatches.length }} 个批次</p>
       </header>
       <div class="admin-batch-list">
-        <article v-for="batch in RECRUITMENT_BATCHES" :key="batch.id">
-          <div class="admin-batch-list__index">{{ batch.id === "2026-autumn" ? "CURRENT" : batch.id.slice(0, 4) }}</div>
+        <article v-for="batch in visibleBatches" :key="batch.id">
+          <div class="admin-batch-list__index">{{ batch.statusKey === "open" ? "OPEN" : batch.id.slice(0, 4) }}</div>
           <div>
-            <AdminStatusPill :status="batch.status" />
+            <AdminStatusPill :status="batch.statusLabel" />
             <h3>{{ batch.name }}</h3>
-            <p>{{ batch.period }}</p>
+            <p>{{ batch.periodLabel }}</p>
           </div>
           <dl>
-            <div><dt>开放中心</dt><dd>{{ batch.centers }} 个</dd></div>
-            <div><dt>报名人数</dt><dd>{{ batch.applicants }} 人</dd></div>
-            <div><dt>负责人</dt><dd>{{ batch.owner }}</dd></div>
+            <div><dt>开放中心</dt><dd>{{ batch.centerCount }} 个</dd></div>
+            <div><dt>报名人数</dt><dd>{{ batch.applicantCount }} 人</dd></div>
+            <div><dt>负责人</dt><dd>{{ batch.owner || "联盟总负责人" }}</dd></div>
           </dl>
-          <button type="button">{{ batch.status === "已结束" ? "查看归档" : "配置批次" }} →</button>
+          <NuxtLink class="admin-text-action" :to="buildRecruitmentBatchRoute(batch.id)">
+            {{ batch.statusKey === "closed" || batch.statusKey === "archived" ? "查看归档" : "进入批次" }} →
+          </NuxtLink>
         </article>
       </div>
     </section>
