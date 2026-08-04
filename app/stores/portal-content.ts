@@ -37,7 +37,14 @@ function publicTarget(kind: PortalContentRecord["kind"], slug: string, target: P
 }
 
 function assertUniqueSlug(records: readonly PortalContentRecord[], slug: string, excludedId?: string) {
-  if (records.some((record) => record.id !== excludedId && slugify(record.slug) === slug)) {
+  const duplicate = records.some((record) => {
+    if (record.id === excludedId) return false;
+    if (slugify(record.slug) === slug) return true;
+    return record.publishedState === "published"
+      && Boolean(record.publishedRevision)
+      && slugify(record.publishedRevision!.slug) === slug;
+  });
+  if (duplicate) {
     throw new Error("PORTAL_CONTENT_DUPLICATE_SLUG");
   }
 }
@@ -358,7 +365,10 @@ export const usePortalContentStore = defineStore("portal-content", {
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       assertValidContentShape(record.target, record.blocks);
-      record.target = publicTarget(record.kind, record.slug, record.target);
+      const slug = slugify(record.slug);
+      assertUniqueSlug(this.records, slug, record.id);
+      record.slug = slug;
+      record.target = publicTarget(record.kind, slug, record.target);
       this.assertSourcePublic(record, now);
       record.status = "in-review";
       record.updatedAt = now.toISOString();
@@ -397,7 +407,10 @@ export const usePortalContentStore = defineStore("portal-content", {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
       assertValidContentShape(record.target, record.blocks);
-      record.target = publicTarget(record.kind, record.slug, record.target);
+      const slug = slugify(record.slug);
+      assertUniqueSlug(this.records, slug, record.id);
+      record.slug = slug;
+      record.target = publicTarget(record.kind, slug, record.target);
       this.assertSourcePublic(record, now);
       const publishedAt = now.toISOString();
       record.status = "published";

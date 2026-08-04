@@ -246,6 +246,55 @@ describe("portal content store", () => {
     expect(store.getById(first.id)?.slug).toBe("first-slug");
   });
 
+  it("reserves the live published slug while a newer working revision changes slug", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const first = store.createDraft({
+      kind: "article", slug: "published-route", title: "已发布新闻", summary: "公开版本。",
+      blocks: [{ type: "paragraph", text: "公开正文。" }],
+    }, now);
+    store.submitForReview(first.id, now);
+    store.approve(first.id, now);
+    store.publish(first.id, true, now);
+    store.updateDraft(first.id, { slug: "working-route", title: "编辑中的新闻" }, now);
+
+    expect(store.getPublicBySlug("published-route")?.id).toBe(first.id);
+    expect(store.getPublicBySlug("working-route")).toBeUndefined();
+    expect(() => store.createDraft({
+      kind: "notice", slug: " PUBLISHED-ROUTE ", title: "冲突公告", summary: "不应创建。",
+    }, now)).toThrow("PORTAL_CONTENT_DUPLICATE_SLUG");
+    expect(store.getPublicBySlug("published-route")?.title).toBe("已发布新闻");
+  });
+
+  it("rechecks live published slug reservations before submit and publish", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const first = store.createDraft({
+      kind: "article", slug: "reserved-route", title: "保留路由新闻", summary: "公开版本。",
+      blocks: [{ type: "paragraph", text: "公开正文。" }],
+    }, now);
+    store.submitForReview(first.id, now);
+    store.approve(first.id, now);
+    store.publish(first.id, true, now);
+    store.updateDraft(first.id, { slug: "next-route" }, now);
+
+    const second = store.createDraft({
+      kind: "notice", slug: "candidate-route", title: "候选公告", summary: "候选版本。",
+      blocks: [{ type: "paragraph", text: "候选正文。" }],
+    }, now);
+    second.slug = "reserved-route";
+    expect(() => store.submitForReview(second.id, now)).toThrow("PORTAL_CONTENT_DUPLICATE_SLUG");
+
+    second.slug = "candidate-route";
+    store.submitForReview(second.id, now);
+    store.approve(second.id, now);
+    second.slug = "reserved-route";
+    expect(() => store.publish(second.id, true, now)).toThrow("PORTAL_CONTENT_DUPLICATE_SLUG");
+    expect(store.getPublicBySlug("reserved-route")?.id).toBe(first.id);
+  });
+
   it("does not resolve an ambiguous public slug from corrupted duplicate state", () => {
     const store = usePortalContentStore();
     const duplicate = JSON.parse(JSON.stringify(
