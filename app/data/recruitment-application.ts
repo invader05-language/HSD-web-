@@ -38,15 +38,54 @@ export interface RecruitmentApplicationDraft {
   acceptsAdjustment?: boolean;
 }
 
-export interface SubmittedRecruitmentApplication extends Required<
-  Omit<RecruitmentApplicationDraft, "secondChoice" | "thirdChoice" | "baizeDirection">
-> {
+export type RecruitmentApplicationStatus =
+  | "draft"
+  | "submitted"
+  | "withdrawn"
+  | "locked"
+  | "processing"
+  | "completed";
+
+export interface ApplicantProfileSnapshot {
+  name: string;
+  studentId: string;
+  grade: string;
+  className: string;
+  bio?: string;
+  avatarUrl?: string;
+}
+
+export interface RecruitmentPreference {
+  rank: 1 | 2 | 3;
+  center: RecruitmentCenter;
+}
+
+export interface CenterConfigurationSnapshot {
+  center: RecruitmentCenter;
+  availableAtSubmission: boolean;
+  currentlyAvailable: boolean;
+}
+
+export interface SubmittedRecruitmentApplication {
+  id: string;
+  batchId: string;
   memberId: string;
+  batchVersionAtSubmission: number;
+  batchNameSnapshot: string;
+  applicantProfileSnapshot: ApplicantProfileSnapshot;
   secondChoice?: LaterChoice;
   thirdChoice?: LaterChoice;
   baizeDirection?: BaizeDirection;
-  status: "submitted";
-  submittedAt: string;
+  contact: string;
+  firstChoice: RecruitmentCenter;
+  preferences: RecruitmentPreference[];
+  centerConfigurationSnapshot: CenterConfigurationSnapshot[];
+  acceptsAdjustment: boolean;
+  status: RecruitmentApplicationStatus;
+  submittedAt?: string;
+  updatedAt: string;
+  withdrawnAt?: string;
+  lockedAt?: string;
 }
 
 export const PREPARATORY_MEMBER_STATUS = {
