@@ -1,10 +1,14 @@
-import type { BaizeDirection } from "./recruitment-application";
+import type {
+  BaizeDirection,
+  RecruitmentCenter as ApplicationRecruitmentCenter,
+} from "./recruitment-application";
+import type {
+  AssessmentOutcome,
+  AssessmentRoundNumber,
+  RecruitmentAssessmentRecord,
+} from "../types/recruitment-assessment";
 
-export type RecruitmentCenter =
-  | "白泽开发中心"
-  | "新媒体中心"
-  | "拓维策划中心"
-  | "人才发展中心";
+export type RecruitmentCenter = ApplicationRecruitmentCenter;
 
 export type RecruitmentStage =
   | "面试"
@@ -25,6 +29,8 @@ export interface AssessmentRound {
 
 export interface AdminCandidate {
   id: string;
+  batchId?: string;
+  memberId?: string;
   name: string;
   studentId: string;
   grade: string;
@@ -109,6 +115,8 @@ export const REGULAR_CENTERS = [
 export const ADMIN_CANDIDATES: AdminCandidate[] = [
   {
     id: "candidate-lin",
+    batchId: "batch-current",
+    memberId: "member-lin",
     name: "林同学",
     studentId: "20260001",
     grade: "2026 级",
@@ -131,6 +139,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-zhou",
+    batchId: "batch-current",
+    memberId: "applicant-zhou",
     name: "周同学",
     studentId: "20260002",
     grade: "2026 级",
@@ -152,6 +162,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-gao",
+    batchId: "batch-current",
+    memberId: "member-gao",
     name: "高同学",
     studentId: "20260003",
     grade: "2026 级",
@@ -175,6 +187,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-wang",
+    batchId: "batch-current",
+    memberId: "applicant-wang",
     name: "王同学",
     studentId: "20260004",
     grade: "2026 级",
@@ -190,6 +204,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-li",
+    batchId: "batch-current",
+    memberId: "member-li",
     name: "李同学",
     studentId: "20260005",
     grade: "2026 级",
@@ -207,6 +223,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-zhang",
+    batchId: "batch-current",
+    memberId: "applicant-zhang",
     name: "张同学",
     studentId: "20260006",
     grade: "2026 级",
@@ -222,6 +240,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-chen",
+    batchId: "batch-current",
+    memberId: "applicant-chen",
     name: "陈同学",
     studentId: "20260007",
     grade: "2026 级",
@@ -239,6 +259,8 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
   },
   {
     id: "candidate-wu",
+    batchId: "batch-current",
+    memberId: "applicant-wu",
     name: "吴同学",
     studentId: "20260008",
     grade: "2026 级",
@@ -253,6 +275,78 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     updatedAt: "07-29 20:40"
   }
 ];
+
+const LEGACY_ROUND_LABELS: Record<AssessmentRoundNumber, AssessmentRound["label"]> = {
+  1: "第一轮考核",
+  2: "第二轮考核",
+  3: "第三轮考核",
+};
+
+function toAssessmentOutcome(result: AssessmentRound["result"]): AssessmentOutcome {
+  if (result === "通过") return "passed";
+  if (result === "未通过") return "failed";
+  return "pending";
+}
+
+function legacyRoundOutcomes(candidate: AdminCandidate): RecruitmentAssessmentRecord["roundOutcomes"] {
+  const outcomes: RecruitmentAssessmentRecord["roundOutcomes"] = {};
+
+  candidate.rounds?.forEach((round) => {
+    const roundNumber = ([1, 2, 3] as AssessmentRoundNumber[]).find((value) => (
+      LEGACY_ROUND_LABELS[value] === round.label
+    ));
+    if (roundNumber) outcomes[roundNumber] = toAssessmentOutcome(round.result);
+  });
+
+  if (candidate.stage === "第二轮考核" && !outcomes[1]) outcomes[1] = "passed";
+  if (candidate.stage === "第三轮考核") {
+    if (!outcomes[1]) outcomes[1] = "passed";
+    if (!outcomes[2]) outcomes[2] = "passed";
+  }
+  if (candidate.stage === "线下结果待录入" && !outcomes[1]) outcomes[1] = "failed";
+  if (candidate.stage === "已结束" && candidate.identity === "正式成员") {
+    const roundCount = candidate.preferences[0] === "白泽开发中心" ? 3 : 1;
+    ([1, 2, 3] as AssessmentRoundNumber[])
+      .slice(0, roundCount)
+      .forEach((round) => {
+        if (!outcomes[round]) outcomes[round] = "passed";
+      });
+  }
+  if (candidate.stage === "已结束" && candidate.identity === "未录取" && !outcomes[1]) {
+    outcomes[1] = "failed";
+  }
+
+  return outcomes;
+}
+
+/**
+ * Bridges legacy roster fixtures to the batch-scoped assessment model until
+ * the assessment store becomes the authority for candidate records.
+ */
+export function getAdminCandidateAssessmentRecord(
+  candidate: AdminCandidate,
+  fallbackBatchId = "batch-current",
+): RecruitmentAssessmentRecord {
+  const isCompletedLegacyRecord = candidate.stage === "已结束";
+
+  return {
+    batchId: candidate.batchId ?? fallbackBatchId,
+    candidateId: candidate.id,
+    memberId: candidate.memberId ?? candidate.id,
+    center: candidate.preferences[0],
+    acceptsAdjustment: candidate.acceptsAdjustment,
+    roundOutcomes: legacyRoundOutcomes(candidate),
+    finalDecision: candidate.identity === "正式成员"
+      ? "admitted"
+      : candidate.identity === "未录取"
+        ? "not-admitted"
+        : undefined,
+    finalCenter: candidate.finalCenter,
+    internalNote: candidate.internalNote,
+    updatedAt: candidate.updatedAt,
+    publishedAt: isCompletedLegacyRecord ? candidate.submittedAt : undefined,
+  };
+}
 
 export function filterAndSortRecruitmentApplications(
   candidates: AdminCandidate[],

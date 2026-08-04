@@ -56,6 +56,19 @@ export interface ResultPresentation {
   description: string;
 }
 
+/**
+ * The member center consumes only the final, published assessment fields.
+ * Internal notes and per-round history deliberately do not cross this boundary.
+ */
+export interface PublishedAssessmentProjection {
+  memberId: string;
+  center: CenterName;
+  finalDecision?: "admitted" | "not-admitted";
+  finalCenter?: CenterName;
+  publishedAt?: string;
+  batchName?: string;
+}
+
 export const DEMO_MEMBER_RESULT: MemberResultRecord = {
   batchLabel: "2026 秋季招新",
   status: "admitted",
@@ -86,7 +99,7 @@ export function getDemoMemberResult(
   if (memberId === DEMO_MEMBER_PROFILE.id) return DEMO_MEMBER_RESULT;
   if (memberId !== DEMO_APPLICANT_PROFILE.id) {
     return {
-      batchLabel: "2026 秋季招新",
+      batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
       status: "no-application",
       identity: "正式成员",
       preferences: [],
@@ -103,7 +116,7 @@ export function getDemoMemberResult(
     : [];
 
   return {
-    batchLabel: "2026 秋季招新",
+    batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
     status: application ? "pending" : "no-application",
     identity: "预备成员",
     preferences,
@@ -115,6 +128,24 @@ export function getDemoMemberResult(
         : "面试"
       : "尚未开始",
     currentConclusion: "待公布",
+  };
+}
+
+export function applyPublishedAssessmentProjection(
+  fallback: MemberResultRecord,
+  projection?: PublishedAssessmentProjection,
+): MemberResultRecord {
+  if (!projection?.publishedAt || !projection.finalDecision) return fallback;
+
+  const admitted = projection.finalDecision === "admitted";
+  return {
+    ...fallback,
+    batchLabel: projection.batchName ?? fallback.batchLabel,
+    status: admitted ? "admitted" : "not-admitted",
+    identity: admitted ? "正式成员" : "预备成员",
+    currentStage: "考核已结束",
+    currentConclusion: admitted ? "通过" : "未通过",
+    finalCenter: admitted ? projection.finalCenter ?? projection.center : undefined,
   };
 }
 

@@ -13,8 +13,11 @@ import {
 } from "../../app/utils/recruitment-application-form";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useRecruitmentApplicationStore } from "../../app/stores/recruitment-application";
+import { useRecruitmentBatchStore } from "../../app/stores/recruitment-batch";
 import { useSessionStore } from "../../app/stores/session";
 import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
+
+const CURRENT_BATCH_ID = "batch-current";
 
 function signInApplicant() {
   const session = useSessionStore();
@@ -258,5 +261,122 @@ describe("recruitment application domain", () => {
       validApplicationDraft(),
       true,
     )).toThrow("当前账号已提交报名");
+  });
+
+  it("keys applications by batch and member while keeping a compatibility submitted getter", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+      { batchId: CURRENT_BATCH_ID },
+    );
+
+    expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)).toMatchObject({
+      batchId: CURRENT_BATCH_ID,
+      memberId: session.currentMemberId,
+      batchVersionAtSubmission: 1,
+      batchNameSnapshot: "2026 秋季招新",
+      status: "submitted",
+      applicantProfileSnapshot: expect.objectContaining({ name: expect.any(String) }),
+      preferences: [
+        { rank: 1, center: "白泽开发中心" },
+        { rank: 2, center: "新媒体中心" },
+        { rank: 3, center: "人才发展中心" },
+      ],
+    });
+    expect(applicationStore.currentApplication?.batchId).toBe(CURRENT_BATCH_ID);
+    expect(applicationStore.latestApplication?.batchId).toBe(CURRENT_BATCH_ID);
+    expect(applicationStore.submittedApplication?.batchId).toBe(CURRENT_BATCH_ID);
+  });
+
+  it("allows a withdrawn application to resubmit in the same batch without creating a duplicate", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const profileDraft = createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId));
+
+    applicationStore.submitApplication(profileDraft, validApplicationDraft(), true, { batchId: CURRENT_BATCH_ID });
+    const original = applicationStore.currentApplication!;
+    applicationStore.withdrawApplication(CURRENT_BATCH_ID);
+    expect(applicationStore.currentApplication?.status).toBe("withdrawn");
+
+    applicationStore.submitApplication(profileDraft, {
+      ...validApplicationDraft(),
+      firstChoice: "新媒体中心",
+      secondChoice: "拓维策划中心",
+      thirdChoice: "人才发展中心",
+      baizeDirection: undefined,
+    }, true, { batchId: CURRENT_BATCH_ID });
+
+    expect(applicationStore.currentApplication?.id).toBe(original.id);
+    expect(applicationStore.currentApplication?.status).toBe("submitted");
+    expect(applicationStore.currentApplication?.firstChoice).toBe("新媒体中心");
+  });
+
+  it("retains an unavailable center flag on existing snapshots after batch configuration changes", () => {
+    const session = signInApplicant();
+    const applicantId = session.currentMemberId;
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const batchStore = useRecruitmentBatchStore();
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+      { batchId: CURRENT_BATCH_ID },
+    );
+
+    useSessionStore().signIn("admin-alliance", { requireAdmin: true });
+    batchStore.updateBatch(CURRENT_BATCH_ID, {
+      openCenterIds: ["new-media", "tuowei-planning", "talent-development"],
+    });
+
+    const application = applicationStore.getApplication(CURRENT_BATCH_ID, applicantId)!;
+    expect(application.centerConfigurationSnapshot.find((item) => item.center === "白泽开发中心"))
+      .toMatchObject({ availableAtSubmission: true, currentlyAvailable: false });
+  });
+
+  it("locks a submitted application when the batch deadline has passed", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const beforeDeadline = new Date("2026-09-17T23:00:00.000Z");
+    const afterDeadline = new Date("2026-09-18T00:00:00.000Z");
+
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+      { batchId: CURRENT_BATCH_ID, now: beforeDeadline },
+    );
+    applicationStore.lockExpiredApplications(afterDeadline);
+
+    expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)?.status)
+      .toBe("locked");
+  });
+
+  it("rejects explicit submission when batch fixtures contain more than one open batch", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const batchStore = useRecruitmentBatchStore();
+    batchStore.replaceBatches([
+      batchStore.getBatch("batch-current")!,
+      {
+        ...batchStore.getBatch("batch-current")!,
+        id: "batch-conflict",
+      },
+    ]);
+
+    expect(() => applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+      { batchId: CURRENT_BATCH_ID },
+    )).toThrow("BATCH_ALREADY_OPEN");
   });
 });

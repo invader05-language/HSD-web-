@@ -16,7 +16,7 @@ test("administration workbench uses a dedicated shell inside the same Web app", 
   await completeAdminDemoLogin(page);
 
   await expect(page).toHaveURL(/\/admin\/recruitment$/);
-  await expect(page.getByRole("heading", { level: 1, name: "预备成员考核台" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "2026 秋季招新 · 预备成员考核" })).toBeVisible();
   await expect(page.getByRole("link", { name: "HSD 管理台" })).toBeVisible();
   await expect(page.getByRole("link", { name: "返回官网" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
@@ -30,7 +30,7 @@ test("administration workbench uses a dedicated shell inside the same Web app", 
   expect(hasOverflow).toBe(false);
 });
 
-test("candidate details show sequential White Ze rounds", async ({ page }) => {
+test("candidate details follow the global round and center-specific round count", async ({ page }) => {
   await page.goto("/admin/recruitment");
   await completeAdminDemoLogin(page);
 
@@ -38,8 +38,9 @@ test("candidate details show sequential White Ze rounds", async ({ page }) => {
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
 
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByLabel("第一轮结果")).toBeDisabled();
-  await expect(drawer.getByLabel("第二轮结果")).toBeEnabled();
+  await expect(drawer.getByText("全局当前轮次：第一轮考核")).toBeVisible();
+  await expect(drawer.getByLabel("第一轮结果")).toBeEnabled();
+  await expect(drawer.getByLabel("第二轮结果")).toBeDisabled();
   await expect(drawer.getByLabel("第三轮结果")).toBeDisabled();
   await drawer.getByRole("button", { name: "关闭详情" }).click();
   await expect(drawer).toHaveCount(0);
@@ -51,6 +52,11 @@ test("offline adjustment records only regular-center destinations", async ({ pag
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
+
+  await drawer.getByLabel("第一轮结果").selectOption("failed");
+  await drawer.getByRole("button", { name: "保存结果" }).click();
+  await drawer.getByRole("button", { name: "确认保存" }).click();
+
   const finalCenter = drawer.getByLabel("最终中心");
 
   await expect(finalCenter).toBeVisible();
@@ -75,7 +81,7 @@ test("recruitment batches and publication complete the administration workflow",
 
   await page.getByRole("link", { name: "结果发布", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "结果发布" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "发布所选结果" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "整批发布结果" })).toBeVisible();
   await expect(page.getByText("内部保存不等于对成员公开")).toBeVisible();
 });
 
