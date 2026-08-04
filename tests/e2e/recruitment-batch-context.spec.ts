@@ -26,11 +26,34 @@ test("batch links preserve batchId context across roster, assessment and publica
 
   await page.getByRole("link", { name: "考核台" }).click();
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/assessment$/);
-  await expect(page.getByText("本批次考核名单")).toBeVisible();
+  await expect(page.getByText("全局当前轮次：第一轮考核")).toBeVisible();
+  await expect(page.getByRole("button", { name: "推进至第二轮考核" })).toBeVisible();
+
+  await page.getByRole("button", { name: "查看处理 王同学" }).click();
+  const regularDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await expect(regularDrawer.getByLabel("第一轮结果")).toBeEnabled();
+  await expect(regularDrawer.getByLabel("第二轮结果")).toHaveCount(0);
+  await regularDrawer.getByRole("button", { name: "关闭详情" }).click();
+
+  await page.getByRole("button", { name: "查看处理 林同学" }).click();
+  const baizeDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await expect(baizeDrawer.getByLabel("第二轮结果")).toBeDisabled();
+  await baizeDrawer.getByRole("button", { name: "关闭详情" }).click();
+
+  await page.getByRole("button", { name: "查看处理 周同学" }).click();
+  const candidateDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await candidateDrawer.getByLabel("第一轮结果").selectOption("passed");
+  await candidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
+  await candidateDrawer.getByRole("button", { name: "保存结果" }).click();
+  await candidateDrawer.getByRole("button", { name: "确认保存" }).click();
+  await expect(page.getByRole("status")).toContainText("结果已保存");
+  await expect(page.getByRole("row", { name: /周同学/ })).toContainText("通过");
+  await candidateDrawer.getByRole("button", { name: "关闭详情" }).click();
 
   await page.getByRole("link", { name: "结果发布" }).click();
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/publish$/);
-  await expect(page.getByRole("button", { name: "发布所选结果" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "整批发布结果" })).toBeDisabled();
+  await expect(page.getByText("发布范围：当前批次全部候选人")).toBeVisible();
 });
 
 test("ordinary admins can inspect a batch but cannot mutate its lifecycle", async ({ page }) => {

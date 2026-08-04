@@ -43,3 +43,40 @@ test("legacy assessment URL continues through login to the integrated results ce
   await expect(page).toHaveURL(/\/member\/results$/);
   await expect(page.getByRole("heading", { level: 1, name: "结果中心" })).toBeVisible();
 });
+
+test("results center uses the most recent published assessment projection", async ({ page }) => {
+  await page.goto("/member/results");
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
+  await completeDemoLogin(page);
+
+  await page.evaluate(() => {
+    localStorage.setItem("baiyun-hsd-recruitment-assessment", JSON.stringify({
+      version: 1,
+      batches: {
+        "batch-current": {
+          batchId: "batch-current",
+          batchVersion: 1,
+          version: 2,
+          currentRound: 3,
+          status: "published",
+          publishedAt: "2026-08-04T10:20:00.000Z",
+          auditRecords: [],
+          records: [{
+            batchId: "batch-current",
+            candidateId: "candidate-lin",
+            memberId: "member-lin",
+            center: "白泽开发中心",
+            acceptsAdjustment: true,
+            roundOutcomes: { 1: "passed", 2: "failed" },
+            finalDecision: "not-admitted",
+            publishedAt: "2026-08-04T10:20:00.000Z",
+          }],
+        },
+      },
+    }));
+  });
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "本期未录取" })).toBeVisible();
+  await expect(page.getByText("内部备注")).toHaveCount(0);
+});

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEMO_MEMBER_RESULT,
   getDemoMemberResult,
+  applyPublishedAssessmentProjection,
   describeAdmission,
   describeAssessment
 } from "../../app/data/member-results";
@@ -87,6 +88,25 @@ describe("member result presentation", () => {
       description:
         "你已完成本期招新考核，当前身份已由预备成员更新为正式成员。后续安排请与对应负责人保持联系。"
     });
+  });
+
+  it("uses a published assessment projection without exposing internal notes", () => {
+    const runtimeProjection = {
+      memberId: DEMO_MEMBER_PROFILE.id,
+      center: "白泽开发中心",
+      finalDecision: "not-admitted",
+      publishedAt: "2026-08-04T10:20:00.000Z",
+      internalNote: "这条内部备注不得进入成员结果中心",
+    };
+    const result = applyPublishedAssessmentProjection(DEMO_MEMBER_RESULT, runtimeProjection);
+
+    expect(result).toMatchObject({
+      status: "not-admitted",
+      identity: "预备成员",
+      currentStage: "考核已结束",
+      currentConclusion: "未通过",
+    });
+    expect(result).not.toHaveProperty("internalNote");
   });
 
   it.each([

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import {
   getDemoMemberResult,
+  applyPublishedAssessmentProjection,
   describeAdmission,
   describeAssessment
 } from "~/data/member-results";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
+import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
+import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 
 type ResultTab = "admission" | "assessment";
 
@@ -13,8 +16,30 @@ useHead({ title: "结果中心｜白云 HSD 开发者部落" });
 
 const { profile: currentMember } = useCurrentMember();
 const applicationStore = useRecruitmentApplicationStore();
+const assessmentStore = useRecruitmentAssessmentStore();
+const batchStore = useRecruitmentBatchStore();
+const publishedAssessment = computed(() => {
+  const published = batchStore.batches.flatMap((batch) => (
+    assessmentStore.getCandidates(batch.id)
+      .filter((candidate) => candidate.memberId === currentMember.value.id && Boolean(candidate.publishedAt))
+      .map((candidate) => ({
+        memberId: candidate.memberId,
+        center: candidate.center,
+        finalDecision: candidate.finalDecision,
+        finalCenter: candidate.finalCenter,
+        publishedAt: candidate.publishedAt,
+        batchName: batch.name,
+      }))
+  ));
+  return published.sort((left, right) => (
+    Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "")
+  ))[0];
+});
 const result = computed(() =>
-  getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication)
+  applyPublishedAssessmentProjection(
+    getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication),
+    publishedAssessment.value,
+  )
 );
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
