@@ -15,6 +15,8 @@ import {
   type CreateFormalMemberInput,
   type CreateFormalMemberResult,
 } from "../utils/member-account-form";
+import type { AdminCenter } from "../data/admin-members";
+import type { BaizeDirection } from "../data/recruitment-application";
 
 export type { CreateFormalMemberInput, CreateFormalMemberResult } from "../utils/member-account-form";
 
@@ -29,6 +31,11 @@ export type PromoteMemberToFormalResult =
   | { status: "already_formal" }
   | { status: "not_eligible" }
   | { status: "storage_unavailable" };
+
+export interface PromoteMemberToFormalOptions {
+  center?: AdminCenter;
+  baizeDirection?: BaizeDirection;
+}
 
 function getRequiredStorage(): Storage {
   try {
@@ -148,7 +155,10 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
-  function promoteMemberToFormal(memberId: string): PromoteMemberToFormalResult {
+  function promoteMemberToFormal(
+    memberId: string,
+    options: PromoteMemberToFormalOptions = {},
+  ): PromoteMemberToFormalResult {
     const profiles = useMemberProfileStore();
     const access = useAdminAccessStore();
     const storedProfile = profiles.profiles[memberId];
@@ -183,6 +193,10 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     ))
       ? requestedPublicId
       : createPublicMemberId(profiles.profiles);
+    const center = options.center ?? staticMember.center;
+    const baizeDirection = options.baizeDirection
+      ?? storedProfile?.baizeDirection
+      ?? staticMember.baizeDirection;
     const profile: MemberProfile = {
       ...(storedProfile ?? {}),
       id: staticMember.id,
@@ -191,13 +205,12 @@ export const useMemberAdministrationStore = defineStore("member-administration",
       studentId: storedProfile?.studentId ?? staticMember.studentId,
       grade: storedProfile?.grade ?? staticMember.grade,
       className: storedProfile?.className ?? "暂未录入",
-      center: staticMember.center,
-      centerSlug: getCenterSlug(staticMember.center),
+      center,
+      centerSlug: getCenterSlug(center),
       memberDuty: storedProfile?.memberDuty ?? staticMember.memberDuty,
       identity: "正式成员",
-      ...((staticMember.center === "白泽开发中心"
-        && (storedProfile?.baizeDirection ?? staticMember.baizeDirection))
-        ? { baizeDirection: storedProfile?.baizeDirection ?? staticMember.baizeDirection }
+      ...((center === "白泽开发中心" && baizeDirection)
+        ? { baizeDirection }
         : {}),
       bio: storedProfile?.bio ?? staticPublicPerson?.bio ?? staticMember.profileSummary,
       ...((staticPublicPerson?.avatarVisible ? staticPublicPerson.avatarUrl : staticMember.avatarUrl)
