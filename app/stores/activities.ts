@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ACTIVITY_DETAILS } from "../data/activities";
 import { PortalAutomationServiceMock } from "../services/portal-automation.mock";
 import { useSessionStore } from "./session";
+import { usePortalContentStore } from "./portal-content";
 import type { ActivityRegistrationOpenedPayload, PortalAutomationResult } from "../types/portal-content";
 
 export interface ManagedActivity {
@@ -55,6 +56,16 @@ export const useActivitiesStore = defineStore("activities", {
         payload,
       });
       if (result.status === "failed") this.automationFailures.unshift({ activityId, errorCode: result.errorCode });
+      return activity;
+    },
+    closeRegistration(activityId: string, now: Date = new Date()): ManagedActivity {
+      const session = useSessionStore();
+      if (!session.isAuthenticated || session.adminLevel !== "owner") throw new Error("OWNER_PERMISSION_REQUIRED");
+      const activity = this.activities.find((item) => item.id === activityId);
+      if (!activity) throw new Error("ACTIVITY_NOT_FOUND");
+      activity.registrationOpen = false;
+      activity.version += 1;
+      usePortalContentStore().invalidateSource("activity", activity.id, now);
       return activity;
     },
   },

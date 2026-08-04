@@ -44,6 +44,21 @@ describe("portal configuration store", () => {
     expect(slots.flash[0]?.fallbackFor).toBe("expired");
   });
 
+  it("reserves later valid configured references before selecting an earlier fallback", () => {
+    const newsCatalog: PortalCatalogItem[] = [
+      { entityType: "article", sourceId: "invalid", title: "失效", summary: "", to: "/updates/invalid", publishedAt: "2026-08-04T00:00:00.000Z", eligibleSlots: ["news"], available: false },
+      { entityType: "article", sourceId: "configured", title: "配置项", summary: "", to: "/updates/configured", publishedAt: "2026-08-03T00:00:00.000Z", eligibleSlots: ["news"], available: true },
+      { entityType: "article", sourceId: "fallback", title: "补位项", summary: "", to: "/updates/fallback", publishedAt: "2026-08-02T00:00:00.000Z", eligibleSlots: ["news"], available: true },
+    ];
+
+    const slots = resolveHomepageSlots({ news: [
+      { entityType: "article", sourceId: "invalid" },
+      { entityType: "article", sourceId: "configured" },
+    ] }, newsCatalog);
+
+    expect(slots.news.map((item) => item.sourceId)).toEqual(["fallback", "configured"]);
+  });
+
   it("restores schema-versioned draft and published configurations", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -56,5 +71,19 @@ describe("portal configuration store", () => {
 
     expect(restored.draftConfig.slots.flash[0]?.sourceId).toBe("replacement");
     expect(restored.publishedConfig.slots.flash[0]?.sourceId).toBe("replacement");
+  });
+
+  it("discards malformed or version-mismatched portal configuration persistence", () => {
+    localStorage.setItem("baiyun-hsd.portal-config", JSON.stringify({ version: 0 }));
+    setActivePinia(createPinia());
+    expect(usePortalConfigStore().draftConfig.slots.flash).toEqual([]);
+
+    localStorage.setItem("baiyun-hsd.portal-config", JSON.stringify({
+      version: 1,
+      draftConfig: { revision: 1, updatedAt: "now", updatedBy: "admin", slots: { flash: [{}], news: [], projects: [], activities: [], gallery: [], resources: [] }, visuals: { home: { alt: "" }, join: { alt: "" } } },
+      publishedConfig: { revision: 1, updatedAt: "now", updatedBy: "admin", slots: { flash: [], news: [], projects: [], activities: [], gallery: [], resources: [] }, visuals: { home: { alt: "" }, join: { alt: "" } } },
+    }));
+    setActivePinia(createPinia());
+    expect(usePortalConfigStore().draftConfig.slots.flash).toEqual([]);
   });
 });

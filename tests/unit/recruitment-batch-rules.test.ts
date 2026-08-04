@@ -11,6 +11,7 @@ import {
 } from "../../app/utils/recruitment-batch-rules";
 import { useRecruitmentBatchStore } from "../../app/stores/recruitment-batch";
 import { useSessionStore } from "../../app/stores/session";
+import { usePortalContentStore } from "../../app/stores/portal-content";
 
 const NOW = new Date("2026-08-04T02:00:00.000Z");
 
@@ -87,7 +88,10 @@ describe("recruitment batch effective status", () => {
 });
 
 describe("recruitment batch lifecycle commands", () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+  });
 
   it("requires owner confirmation for early opening and records the plan and actual time", () => {
     const session = useSessionStore();
@@ -142,5 +146,20 @@ describe("recruitment batch lifecycle commands", () => {
 
     store.close("batch-current", true, NOW, "deadline reached");
     expect(() => store.reopen("batch-current", false, NOW)).toThrow("CONFIRMATION_REQUIRED");
+  });
+
+  it("invalidates the generated portal flash when an open batch is closed", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const flash = content.records.find((record) => record.sourceId === "batch-current")!;
+
+    store.close("batch-current", true, NOW, "招新结束");
+
+    expect(content.getPublicById(flash.id, NOW)).toBeUndefined();
+    expect(content.getById(flash.id)?.sourceValidity).toBe("invalid");
   });
 });

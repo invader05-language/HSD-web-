@@ -68,3 +68,37 @@ sh scripts/with-hsd-node.sh corepack pnpm run typecheck
 
 - The existing activity domain had no Store or management command; `app/stores/activities.ts` introduces only the minimal owner command needed for the automation boundary. Existing activity pages continue reading their fixtures until the later public/admin workflow tasks connect them.
 - Portal persistence uses browser localStorage only as the specified frontend Mock fallback. It is intentionally not cross-device or production-authoritative.
+
+## Review Fixes
+
+- Separated the active working `status` from `publishedState`. Unpublishing now removes only the public projection and leaves a draft, review, or pending-publication revision unchanged.
+- Added source eligibility synchronization. Expired records are removed from all public reads and audited; recruitment pause/close and activity registration close invalidate their system-source records. Submit, approve, and publish reject invalid sources.
+- Reserved every valid configured reference before selecting homepage fallback candidates, so an earlier broken reference cannot consume a later configured item.
+- Added persisted automation-failure envelopes containing the event, semantic key, audit entries, and retry path. Duplicate delivery appends an `automation-duplicate` audit record; failures append `automation-failed`.
+- Replaced normalized generated IDs with an encoded full semantic event tuple, avoiding punctuation-normalization collisions.
+- Hardened content and portal-config persistence restoration by validating record/configuration shapes and schema versions before accepting stored state.
+- The backend requirement remains `BACKEND_REQUIRED`; no browser behavior is treated as production automation.
+
+### Review Fix Test Evidence
+
+The review regressions were first run red. The focused command reported eight failures covering published-state mutation, expiry visibility, invalid-source transition, malformed persistence, fallback reservation, and automation audit/failure state. A final semantic-ID collision regression also failed with `expected 1 to be 2` before the identifier was changed.
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-config.test.ts tests/unit/portal-automation.test.ts tests/unit/recruitment-batch-rules.test.ts
+
+Test Files  4 passed (4)
+Tests  31 passed (31)
+```
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm run typecheck
+
+> nuxt typecheck
+```
+
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run
+
+Test Files  35 passed (35)
+Tests  240 passed (240)
+```

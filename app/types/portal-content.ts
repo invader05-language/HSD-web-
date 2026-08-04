@@ -1,5 +1,6 @@
 export type PortalContentKind = "flash" | "article" | "notice";
 export type PortalContentStatus = "draft" | "in-review" | "pending-publication" | "published" | "unpublished";
+export type PortalPublishedState = "published" | "unpublished";
 export type PortalOriginType = "manual" | "system-event" | "wechat";
 export type PortalSourceValidity = "valid" | "invalid" | "expired";
 export type PortalCatalogEntityType = PortalContentKind | "project" | "activity" | "gallery" | "resource";
@@ -17,7 +18,7 @@ export interface PortalContentTarget {
 
 export interface PortalContentAuditRecord {
   id: string;
-  action: "create" | "update" | "submit" | "return" | "approve" | "publish" | "unpublish" | "automation-failed";
+  action: "create" | "update" | "submit" | "return" | "approve" | "publish" | "unpublish" | "automation-failed" | "automation-duplicate" | "source-expired" | "source-invalidated";
   actorId: string;
   actualAt: string;
   reason?: string;
@@ -47,6 +48,7 @@ export interface PortalContentRecord {
   summary: string;
   target: PortalContentTarget;
   status: PortalContentStatus;
+  publishedState: PortalPublishedState;
   revision: number;
   blocks: ContentBlock[];
   originType: PortalOriginType;
@@ -63,6 +65,15 @@ export interface PortalContentRecord {
   automationKey?: string;
   generatedReason?: string;
   publishedRevision?: PortalContentSnapshot;
+  audit: PortalContentAuditRecord[];
+}
+
+export interface PortalAutomationFailure {
+  automationKey: string;
+  event: PortalSourceEvent;
+  errorCode: string;
+  createdAt: string;
+  updatedAt: string;
   audit: PortalContentAuditRecord[];
 }
 

@@ -13,6 +13,7 @@ import {
 import { useSessionStore } from "./session";
 import { useRecruitmentApplicationStore } from "./recruitment-application";
 import { PortalAutomationServiceMock } from "../services/portal-automation.mock";
+import { usePortalContentStore } from "./portal-content";
 
 type RecruitmentBatchPatch = Partial<Pick<
   RecruitmentBatch,
@@ -178,6 +179,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "pause", actor, beforeStatus, "paused", timestamp, reason);
+      usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
       return batch;
     },
     resume(batchId: string, now: Date = new Date(), reason = "resume recruitment batch") {
@@ -211,6 +213,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "close", actor, beforeStatus, "closed", timestamp, reason);
+      usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
       return batch;
     },
     reopen(

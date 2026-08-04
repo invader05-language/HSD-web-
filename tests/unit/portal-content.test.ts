@@ -71,7 +71,47 @@ describe("portal content store", () => {
     store.unpublish(record.id, "原通知不再适用", now);
 
     expect(store.getPublicById(record.id)).toBeUndefined();
-    expect(store.getById(record.id)).toMatchObject({ status: "unpublished", revision: 2 });
+    expect(store.getById(record.id)).toMatchObject({ status: "draft", revision: 2, publishedState: "unpublished" });
+  });
+
+  it("expires public flash projections and records expiry without exposing them", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({
+      kind: "flash", title: "即将截止", summary: "请及时提交。", expiresAt: "2026-08-04T10:00:00.000Z",
+    }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+
+    expect(store.getPublicById(record.id, new Date("2026-08-04T11:00:00.000Z"))).toBeUndefined();
+    expect(store.getById(record.id)).toMatchObject({ sourceValidity: "expired" });
+    expect(store.getById(record.id)?.audit[0]?.action).toBe("source-expired");
+  });
+
+  it("rejects review transitions after a system source becomes unavailable", () => {
+    const store = usePortalContentStore();
+    const result = store.createSystemDraft({
+      eventId: "source-close-event", eventType: "recruitment.batch.opened", occurredAt: now.toISOString(), actorId: "admin-alliance",
+      sourceDomain: "recruitment-batch", sourceId: "batch-close", sourceVersion: 1,
+      payload: { batchName: "秋季招新", publicRoute: "/join", publicEndAt: "2026-09-01T00:00:00.000Z", isOpen: true },
+    });
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    store.invalidateSource("recruitment-batch", "batch-close", new Date("2026-08-05T00:00:00.000Z"));
+
+    expect(() => store.submitForReview(result.contentId!, now)).toThrow("PORTAL_SOURCE_NOT_PUBLIC");
+  });
+
+  it("falls back to seeded records for malformed or version-mismatched persisted content", () => {
+    localStorage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({ version: 1, records: [{}] }));
+    setActivePinia(createPinia());
+    expect(usePortalContentStore().records).toHaveLength(3);
+
+    localStorage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({ version: 0, records: [] }));
+    setActivePinia(createPinia());
+    expect(usePortalContentStore().records).toHaveLength(3);
   });
 
   it("retains an in-memory draft when versioned storage is unavailable", () => {

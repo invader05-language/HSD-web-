@@ -5,17 +5,18 @@ import type {
   PortalContentDraftInput,
   PortalContentRecord,
   PortalContentSnapshot,
-  PortalContentStatus,
+  PortalAutomationFailure,
   PortalSourceEvent,
 } from "../types/portal-content";
 import { useSessionStore } from "./session";
 
 export const PORTAL_CONTENT_STORAGE_KEY = "baiyun-hsd.portal-content";
-export const PORTAL_CONTENT_STORAGE_VERSION = 1;
+export const PORTAL_CONTENT_STORAGE_VERSION = 2;
 
 interface PersistedPortalContentState {
   version: typeof PORTAL_CONTENT_STORAGE_VERSION;
   records: PortalContentRecord[];
+  automationFailures: PortalAutomationFailure[];
 }
 
 function clone<T>(value: T): T {
@@ -39,15 +40,74 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function readPersistedRecords(): PortalContentRecord[] | undefined {
+function isAuditRecord(value: unknown): value is PortalContentAuditRecord {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string"
+    && typeof value.action === "string"
+    && typeof value.actorId === "string"
+    && typeof value.actualAt === "string"
+    && typeof value.revision === "number";
+}
+
+function isPortalEvent(value: unknown): value is PortalSourceEvent {
+  if (!isRecord(value) || !isRecord(value.payload)) return false;
+  return typeof value.eventId === "string"
+    && (value.eventType === "recruitment.batch.opened" || value.eventType === "activity.registration.opened")
+    && typeof value.occurredAt === "string"
+    && typeof value.actorId === "string"
+    && (value.sourceDomain === "recruitment-batch" || value.sourceDomain === "activity")
+    && typeof value.sourceId === "string"
+    && typeof value.sourceVersion === "number";
+}
+
+function isPortalContentRecord(value: unknown): value is PortalContentRecord {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string"
+    && ["flash", "article", "notice"].includes(value.kind as string)
+    && typeof value.slug === "string"
+    && typeof value.title === "string"
+    && typeof value.summary === "string"
+    && isRecord(value.target)
+    && value.target.type === "internal-route"
+    && typeof value.target.value === "string"
+    && ["draft", "in-review", "pending-publication", "published", "unpublished"].includes(value.status as string)
+    && ["published", "unpublished"].includes(value.publishedState as string)
+    && typeof value.revision === "number"
+    && Array.isArray(value.blocks)
+    && ["manual", "system-event", "wechat"].includes(value.originType as string)
+    && ["valid", "invalid", "expired"].includes(value.sourceValidity as string)
+    && typeof value.createdAt === "string"
+    && typeof value.updatedAt === "string"
+    && typeof value.createdBy === "string"
+    && Array.isArray(value.audit)
+    && value.audit.every(isAuditRecord);
+}
+
+function isAutomationFailure(value: unknown): value is PortalAutomationFailure {
+  return isRecord(value)
+    && typeof value.automationKey === "string"
+    && isPortalEvent(value.event)
+    && typeof value.errorCode === "string"
+    && typeof value.createdAt === "string"
+    && typeof value.updatedAt === "string"
+    && Array.isArray(value.audit)
+    && value.audit.every(isAuditRecord);
+}
+
+function readPersistedState(): PersistedPortalContentState | undefined {
   const serialized = getStorage()?.getItem(PORTAL_CONTENT_STORAGE_KEY);
   if (!serialized) return undefined;
   try {
     const parsed: unknown = JSON.parse(serialized);
-    if (!isRecord(parsed) || parsed.version !== PORTAL_CONTENT_STORAGE_VERSION || !Array.isArray(parsed.records)) {
+    if (!isRecord(parsed)
+      || parsed.version !== PORTAL_CONTENT_STORAGE_VERSION
+      || !Array.isArray(parsed.records)
+      || !parsed.records.every(isPortalContentRecord)
+      || !Array.isArray(parsed.automationFailures)
+      || !parsed.automationFailures.every(isAutomationFailure)) {
       return undefined;
     }
-    return clone(parsed.records as PortalContentRecord[]);
+    return clone(parsed as unknown as PersistedPortalContentState);
   } catch {
     return undefined;
   }
@@ -73,6 +133,7 @@ function seedRecords(): PortalContentRecord[] {
     return {
       ...snapshot,
       status: "published",
+      publishedState: "published",
       createdAt,
       updatedAt: publishedAt,
       createdBy: "admin-alliance",
@@ -132,16 +193,37 @@ function snapshot(record: PortalContentRecord, publishedAt: string): PortalConte
   };
 }
 
+function eventKey(event: PortalSourceEvent): string {
+  return [event.sourceDomain, event.sourceId, event.eventType, event.sourceVersion].join(":");
+}
+
+function eventIdPart(value: string): string {
+  return value.replace(/[^a-z0-9]+/gi, "-").replace(/(^-|-$)/g, "");
+}
+
+function semanticEventId(event: PortalSourceEvent): string {
+  return encodeURIComponent(JSON.stringify([
+    event.sourceDomain,
+    event.sourceId,
+    event.eventType,
+    event.sourceVersion,
+  ]));
+}
+
 export const usePortalContentStore = defineStore("portal-content", {
-  state: () => ({
-    records: readPersistedRecords() ?? seedRecords(),
-    persistenceError: undefined as string | undefined,
-  }),
+  state: () => {
+    const persisted = readPersistedState();
+    return {
+      records: persisted?.records ?? seedRecords(),
+      automationFailures: persisted?.automationFailures ?? [] as PortalAutomationFailure[],
+      persistenceError: undefined as string | undefined,
+    };
+  },
   getters: {
     getById: (state) => (id: string) => state.records.find((record) => record.id === id),
     publicRecords: (state): PortalContentSnapshot[] => state.records
       .map((record) => record.publishedRevision)
-      .filter((record): record is PortalContentSnapshot => Boolean(record))
+      .filter((_record, index): _record is PortalContentSnapshot => Boolean(_record) && state.records[index]?.publishedState === "published")
       .filter((record) => record.sourceValidity === "valid" && (!record.expiresAt || Date.parse(record.expiresAt) > Date.now()))
       .map(clone),
   },
@@ -153,6 +235,7 @@ export const usePortalContentStore = defineStore("portal-content", {
         storage.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify({
           version: PORTAL_CONTENT_STORAGE_VERSION,
           records: this.records,
+          automationFailures: this.automationFailures,
         } satisfies PersistedPortalContentState));
         this.persistenceError = undefined;
       } catch {
@@ -170,6 +253,7 @@ export const usePortalContentStore = defineStore("portal-content", {
         summary: input.summary.trim(),
         target: input.target ?? { type: "internal-route", value: "/activities" },
         status: "draft",
+        publishedState: "unpublished",
         revision: 1,
         blocks: clone(input.blocks ?? []),
         originType: "manual",
@@ -211,6 +295,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = actorId();
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
+      this.assertSourcePublic(record, now);
       record.status = "in-review";
       record.updatedAt = now.toISOString();
       addAudit(record, "submit", actor, now);
@@ -231,6 +316,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || record.status !== "in-review") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
+      this.assertSourcePublic(record, now);
       record.status = "pending-publication";
       record.updatedAt = now.toISOString();
       addAudit(record, "approve", actor, now);
@@ -244,8 +330,10 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (!record || record.status !== "pending-publication" || record.sourceValidity !== "valid") {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
+      this.assertSourcePublic(record, now);
       const publishedAt = now.toISOString();
       record.status = "published";
+      record.publishedState = "published";
       record.publishedAt = publishedAt;
       record.updatedAt = publishedAt;
       record.publishedRevision = snapshot(record, publishedAt);
@@ -257,31 +345,48 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || !record.publishedRevision || !reason.trim()) throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
-      record.status = "unpublished";
-      record.publishedRevision = undefined;
+      record.publishedState = "unpublished";
       record.updatedAt = now.toISOString();
       addAudit(record, "unpublish", actor, now, reason);
       this.persist();
       return record;
     },
-    getPublicById(id: string) {
-      const record = this.getById(id)?.publishedRevision;
-      return record && record.sourceValidity === "valid" ? clone({ ...record, status: "published" as const }) : undefined;
+    getPublicRecords(now: Date = new Date()) {
+      this.syncSourceEligibility(now);
+      return this.records
+        .filter((record) => record.publishedState === "published" && record.publishedRevision)
+        .map((record) => record.publishedRevision!)
+        .filter((record) => record.sourceValidity === "valid" && (!record.expiresAt || Date.parse(record.expiresAt) > now.getTime()))
+        .map(clone);
+    },
+    getPublicById(id: string, now: Date = new Date()) {
+      this.syncSourceEligibility(now);
+      const record = this.getById(id);
+      const published = record?.publishedRevision;
+      return record?.publishedState === "published" && published && published.sourceValidity === "valid"
+        && (!published.expiresAt || Date.parse(published.expiresAt) > now.getTime())
+        ? clone({ ...published, status: "published" as const })
+        : undefined;
     },
     createSystemDraft(event: PortalSourceEvent): PortalAutomationResult {
-      const automationKey = [event.sourceDomain, event.sourceId, event.eventType, event.sourceVersion].join(":");
-      if (this.records.some((record) => record.automationKey === automationKey)) return { status: "duplicate" };
+      const automationKey = eventKey(event);
+      const existing = this.records.find((record) => record.automationKey === automationKey);
+      if (existing) {
+        addAudit(existing, "automation-duplicate", "system", new Date(event.occurredAt));
+        this.persist();
+        return { status: "duplicate" };
+      }
       const payload = event.payload as Record<string, unknown>;
-      if (payload.isOpen !== true) return { status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" };
+      if (payload.isOpen !== true) return this.recordAutomationFailure(event, automationKey, "PORTAL_SOURCE_NOT_PUBLIC");
       const isRecruitment = event.eventType === "recruitment.batch.opened";
       const titlePart = isRecruitment ? payload.batchName : payload.activityTitle;
       const target = isRecruitment ? "/join" : payload.publicRoute;
       const expiresAt = payload.publicEndAt;
       if (typeof titlePart !== "string" || typeof target !== "string" || typeof expiresAt !== "string") {
-        return { status: "failed", errorCode: "PORTAL_AUTOMATION_FAILED" };
+        return this.recordAutomationFailure(event, automationKey, "PORTAL_AUTOMATION_FAILED");
       }
       const now = new Date(event.occurredAt);
-      const id = `portal-flash-${event.sourceId}-${event.sourceVersion}`;
+      const id = `portal-flash-${semanticEventId(event)}`;
       const record: PortalContentRecord = {
         id,
         kind: "flash",
@@ -290,6 +395,7 @@ export const usePortalContentStore = defineStore("portal-content", {
         summary: isRecruitment ? "系统根据招新批次开放事件生成。" : "系统根据活动报名开放事件生成。",
         target: { type: "internal-route", value: target },
         status: "draft",
+        publishedState: "unpublished",
         revision: 1,
         blocks: [],
         originType: "system-event",
@@ -308,11 +414,69 @@ export const usePortalContentStore = defineStore("portal-content", {
       };
       addAudit(record, "create", "system", now);
       this.records.unshift(record);
+      this.automationFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
       this.persist();
       return { status: "created", contentId: id };
     },
-    retryAutomationDraft(event: PortalSourceEvent) {
-      return this.createSystemDraft(event);
+    recordAutomationFailure(event: PortalSourceEvent, automationKey: string, errorCode: string): PortalAutomationResult {
+      const now = new Date(event.occurredAt);
+      const existing = this.automationFailures.find((failure) => failure.automationKey === automationKey);
+      const audit: PortalContentAuditRecord = {
+        id: `portal-automation-${eventIdPart(automationKey)}-${now.getTime()}`,
+        action: "automation-failed",
+        actorId: "system",
+        actualAt: now.toISOString(),
+        revision: 0,
+      };
+      if (existing) {
+        existing.errorCode = errorCode;
+        existing.updatedAt = now.toISOString();
+        existing.audit.unshift(audit);
+      } else {
+        this.automationFailures.unshift({
+          automationKey,
+          event: clone(event),
+          errorCode,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          audit: [audit],
+        });
+      }
+      this.persist();
+      return { status: "failed", errorCode };
+    },
+    retryAutomationDraft(automationKey: string) {
+      const failure = this.automationFailures.find((item) => item.automationKey === automationKey);
+      if (!failure) return { status: "failed", errorCode: "PORTAL_AUTOMATION_FAILED" } as PortalAutomationResult;
+      return this.createSystemDraft(clone(failure.event));
+    },
+    syncSourceEligibility(now: Date = new Date()) {
+      let changed = false;
+      for (const record of this.records) {
+        if (record.sourceValidity !== "valid" || !record.expiresAt || Date.parse(record.expiresAt) > now.getTime()) continue;
+        record.sourceValidity = "expired";
+        if (record.publishedRevision) record.publishedRevision.sourceValidity = "expired";
+        addAudit(record, "source-expired", "system", now);
+        changed = true;
+      }
+      if (changed) this.persist();
+      return changed;
+    },
+    invalidateSource(sourceDomain: "recruitment-batch" | "activity", sourceId: string, now: Date = new Date()) {
+      let changed = false;
+      for (const record of this.records) {
+        if (record.sourceDomain !== sourceDomain || record.sourceId !== sourceId || record.sourceValidity !== "valid") continue;
+        record.sourceValidity = "invalid";
+        if (record.publishedRevision) record.publishedRevision.sourceValidity = "invalid";
+        addAudit(record, "source-invalidated", "system", now);
+        changed = true;
+      }
+      if (changed) this.persist();
+      return changed;
+    },
+    assertSourcePublic(record: PortalContentRecord, now: Date = new Date()) {
+      this.syncSourceEligibility(now);
+      if (record.sourceValidity !== "valid") throw new Error("PORTAL_SOURCE_NOT_PUBLIC");
     },
   },
 });

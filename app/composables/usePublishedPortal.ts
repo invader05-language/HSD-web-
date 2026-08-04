@@ -19,6 +19,15 @@ export function resolveHomepageSlots(
   catalog: readonly PortalCatalogItem[],
 ): Record<PortalSlotId, ResolvedPortalCatalogItem[]> {
   const used = new Set<string>();
+  const reserved = new Set<string>();
+  for (const slot of slotIds) {
+    for (const reference of configuredSlots[slot] ?? []) {
+      const configured = match(reference, catalog);
+      if (configured?.available && configured.eligibleSlots.includes(slot)) {
+        reserved.add(`${reference.entityType}:${reference.sourceId}`);
+      }
+    }
+  }
   const resolved: Record<PortalSlotId, ResolvedPortalCatalogItem[]> = {
     flash: [], news: [], projects: [], activities: [], gallery: [], resources: [],
   };
@@ -35,6 +44,7 @@ export function resolveHomepageSlots(
       const replacement = catalog
         .filter((item) => item.entityType === reference.entityType && item.available && item.eligibleSlots.includes(slot))
         .filter((item) => !used.has(`${item.entityType}:${item.sourceId}`))
+        .filter((item) => !reserved.has(`${item.entityType}:${item.sourceId}`))
         .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))[0];
       if (replacement) {
         resolved[slot].push({ ...replacement, fallbackFor: reference.sourceId });

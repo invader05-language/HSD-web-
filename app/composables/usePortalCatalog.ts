@@ -8,7 +8,7 @@ import { usePortalContentStore } from "../stores/portal-content";
 const toIso = (date: string) => `${date}T00:00:00.000Z`;
 
 export function usePortalCatalog(): PortalCatalogItem[] {
-  const content = usePortalContentStore().publicRecords.map((record): PortalCatalogItem => ({
+  const content = usePortalContentStore().getPublicRecords().map((record): PortalCatalogItem => ({
     entityType: record.kind,
     sourceId: record.id,
     title: record.title,

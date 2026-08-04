@@ -35,7 +35,15 @@ function isConfig(value: unknown): value is PortalConfig {
   if (typeof config.revision !== "number" || typeof config.updatedAt !== "string" || typeof config.updatedBy !== "string") return false;
   if (typeof config.slots !== "object" || config.slots === null || typeof config.visuals !== "object" || config.visuals === null) return false;
   const slots = config.slots as Record<string, unknown>;
-  return slotIds.every((slot) => Array.isArray(slots[slot]));
+  const visuals = config.visuals as Record<string, unknown>;
+  const hasVisual = (visual: unknown) => typeof visual === "object" && visual !== null
+    && typeof (visual as Record<string, unknown>).alt === "string";
+  const validReference = (reference: unknown) => typeof reference === "object" && reference !== null
+    && ["flash", "article", "notice", "project", "activity", "gallery", "resource"].includes((reference as Record<string, unknown>).entityType as string)
+    && typeof (reference as Record<string, unknown>).sourceId === "string";
+  return hasVisual(visuals.home)
+    && hasVisual(visuals.join)
+    && slotIds.every((slot) => Array.isArray(slots[slot]) && slots[slot].every(validReference));
 }
 
 function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig: PortalConfig } | undefined {
