@@ -1,6 +1,10 @@
 .superpowers/
 .worktrees/
 
+# Project-local runtime
+.tools
+.tools/
+
 # Private association records are local-only
 社团成立信息表（6.20更新汇总）/
 
@@ -12,10 +16,13 @@
 .output/
 dist/
 .vercel/
+.pnpm-store/
+node_modules
 node_modules/
 test-results/
 playwright-report/
-.env
+.env*
+!.env.example
 
 # OS/editor files
 .DS_Store
