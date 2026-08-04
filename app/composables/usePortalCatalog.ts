@@ -13,7 +13,7 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     sourceId: record.id,
     title: record.title,
     summary: record.summary,
-    to: record.target.value,
+    to: record.kind === "flash" ? record.target.value : `/updates/${encodeURIComponent(record.slug)}`,
     publishedAt: record.publishedAt,
     eligibleSlots: record.kind === "flash" ? ["flash"] : ["news"],
     available: record.sourceValidity === "valid" && (!record.expiresAt || Date.parse(record.expiresAt) > Date.now()),

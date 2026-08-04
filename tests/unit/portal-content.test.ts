@@ -203,6 +203,60 @@ describe("portal content store", () => {
     }
   });
 
+  it("assigns canonical update targets even when an article is authored with another target", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({
+      kind: "article",
+      slug: "new-public-update",
+      title: "新的公开动态",
+      summary: "验证公开详情目标。",
+      target: { type: "internal-route", value: "/activities" },
+      blocks: [{ type: "paragraph", text: "公开正文。" }],
+    }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+
+    expect(store.getPublicById(record.id)?.target.value).toBe("/updates/new-public-update");
+    expect(usePortalCatalog().find((item) => item.sourceId === record.id)?.to).toBe("/updates/new-public-update");
+  });
+
+  it("rejects duplicate slugs on create after trimming and case normalization", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    const store = usePortalContentStore();
+    store.createDraft({ kind: "article", slug: "Shared-Slug", title: "第一篇", summary: "第一篇摘要。" }, now);
+
+    expect(() => store.createDraft({
+      kind: "notice", slug: " shared-slug ", title: "第二篇", summary: "第二篇摘要。",
+    }, now)).toThrow("PORTAL_CONTENT_DUPLICATE_SLUG");
+  });
+
+  it("rejects duplicate slug updates without mutating the existing draft", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const first = store.createDraft({ kind: "article", slug: "first-slug", title: "第一篇", summary: "第一篇摘要。" }, now);
+    const second = store.createDraft({ kind: "notice", slug: "second-slug", title: "第二篇", summary: "第二篇摘要。" }, now);
+
+    expect(() => store.updateDraft(second.id, { slug: " FIRST-SLUG " }, now)).toThrow("PORTAL_CONTENT_DUPLICATE_SLUG");
+    expect(store.getById(second.id)?.slug).toBe("second-slug");
+    expect(store.getById(first.id)?.slug).toBe("first-slug");
+  });
+
+  it("does not resolve an ambiguous public slug from corrupted duplicate state", () => {
+    const store = usePortalContentStore();
+    const duplicate = JSON.parse(JSON.stringify(
+      store.records.find((record) => record.slug === "project-team")!,
+    ));
+    duplicate.id = "corrupted-duplicate";
+    store.records.unshift(duplicate);
+
+    expect(store.getPublicBySlug("project-team")).toBeUndefined();
+  });
+
   it("rejects invalid image blocks before content can be saved, submitted, or published", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });

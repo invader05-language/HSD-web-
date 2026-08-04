@@ -47,4 +47,11 @@ describe("homepage content", () => {
     expect(source).not.toMatch(/\bFLASH_NEWS\b/);
     expect(source).not.toMatch(/\bNEWS\b/);
   });
+
+  it("uses the dynamic and activity name in the public footer", () => {
+    const source = readFileSync(`${process.cwd()}/app/components/SiteFooter.vue`, "utf8");
+
+    expect(source).toContain('<NuxtLink to="/activities">动态与活动</NuxtLink>');
+    expect(source).not.toContain('<NuxtLink to="/activities">活动中心</NuxtLink>');
+  });
 });

@@ -30,6 +30,18 @@ function slugify(value: string): string {
   return slug || `content-${Date.now()}`;
 }
 
+function publicTarget(kind: PortalContentRecord["kind"], slug: string, target: PortalContentRecord["target"]) {
+  return kind === "article" || kind === "notice"
+    ? { type: "internal-route" as const, value: `/updates/${encodeURIComponent(slug)}` }
+    : clone(target);
+}
+
+function assertUniqueSlug(records: readonly PortalContentRecord[], slug: string, excludedId?: string) {
+  if (records.some((record) => record.id !== excludedId && slugify(record.slug) === slug)) {
+    throw new Error("PORTAL_CONTENT_DUPLICATE_SLUG");
+  }
+}
+
 function getStorage(): Storage | undefined {
   try {
     return typeof localStorage === "undefined" ? undefined : localStorage;
@@ -284,17 +296,19 @@ export const usePortalContentStore = defineStore("portal-content", {
     },
     createDraft(input: PortalContentDraftInput, now: Date = new Date()) {
       const actor = actorId();
-      const target = input.target ?? { type: "internal-route" as const, value: "/activities" };
+      const slug = slugify(input.slug ?? input.title);
+      const authoredTarget = input.target ?? { type: "internal-route" as const, value: "/activities" };
       const blocks = input.blocks ?? [];
-      assertValidContentShape(target, blocks);
+      assertValidContentShape(authoredTarget, blocks);
+      assertUniqueSlug(this.records, slug);
       const id = `portal-${input.kind}-${now.getTime()}-${this.records.length + 1}`;
       const record: PortalContentRecord = {
         id,
         kind: input.kind,
-        slug: input.slug ?? slugify(input.title),
+        slug,
         title: input.title.trim(),
         summary: input.summary.trim(),
-        target: clone(target),
+        target: publicTarget(input.kind, slug, authoredTarget),
         status: "draft",
         publishedState: "unpublished",
         revision: 1,
@@ -319,17 +333,19 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (!["draft", "published", "unpublished"].includes(record.status)) {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
-      const target = patch.target === undefined ? record.target : patch.target;
+      const slug = patch.slug === undefined ? record.slug : slugify(patch.slug);
+      const authoredTarget = patch.target === undefined ? record.target : patch.target;
       const blocks = patch.blocks === undefined ? record.blocks : patch.blocks;
-      assertValidContentShape(target, blocks);
+      assertValidContentShape(authoredTarget, blocks);
+      assertUniqueSlug(this.records, slug, record.id);
       if (record.status !== "draft") {
         record.status = "draft";
         record.revision += 1;
       }
       if (patch.title !== undefined) record.title = patch.title.trim();
       if (patch.summary !== undefined) record.summary = patch.summary.trim();
-      if (patch.slug !== undefined) record.slug = patch.slug;
-      if (patch.target !== undefined) record.target = clone(target);
+      record.slug = slug;
+      record.target = publicTarget(record.kind, slug, authoredTarget);
       if (patch.blocks !== undefined) record.blocks = clone(blocks);
       if (patch.expiresAt !== undefined) record.expiresAt = patch.expiresAt;
       record.updatedAt = now.toISOString();
@@ -342,6 +358,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       assertValidContentShape(record.target, record.blocks);
+      record.target = publicTarget(record.kind, record.slug, record.target);
       this.assertSourcePublic(record, now);
       record.status = "in-review";
       record.updatedAt = now.toISOString();
@@ -364,6 +381,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const record = this.getById(id);
       if (!record || record.status !== "in-review") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       assertValidContentShape(record.target, record.blocks);
+      record.target = publicTarget(record.kind, record.slug, record.target);
       this.assertSourcePublic(record, now);
       record.status = "pending-publication";
       record.updatedAt = now.toISOString();
@@ -379,6 +397,7 @@ export const usePortalContentStore = defineStore("portal-content", {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
       assertValidContentShape(record.target, record.blocks);
+      record.target = publicTarget(record.kind, record.slug, record.target);
       this.assertSourcePublic(record, now);
       const publishedAt = now.toISOString();
       record.status = "published";
@@ -417,6 +436,11 @@ export const usePortalContentStore = defineStore("portal-content", {
         && (!published.expiresAt || Date.parse(published.expiresAt) > now.getTime())
         ? clone({ ...published, status: "published" as const })
         : undefined;
+    },
+    getPublicBySlug(slug: string, now: Date = new Date()) {
+      const normalized = slugify(slug);
+      const matches = this.getPublicRecords(now).filter((record) => slugify(record.slug) === normalized);
+      return matches.length === 1 ? matches[0] : undefined;
     },
     createSystemDraft(event: PortalSourceEvent): PortalAutomationResult {
       const automationKey = eventKey(event);

@@ -14,7 +14,7 @@ import { SITE_CONFIG } from "~/data/site";
         <h3>快速入口</h3>
         <div class="site-footer__links">
           <NuxtLink to="/projects">项目成果</NuxtLink>
-          <NuxtLink to="/activities">活动中心</NuxtLink>
+          <NuxtLink to="/activities">动态与活动</NuxtLink>
           <NuxtLink to="/resources">资源中心</NuxtLink>
           <NuxtLink to="/join">加入我们</NuxtLink>
         </div>

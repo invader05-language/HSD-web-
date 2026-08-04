@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { ACTIVITY_DETAILS } from "../../app/data/activities";
+import { ACTIVITY_DETAILS, findActivity } from "../../app/data/activities";
 import { usePortalCatalog } from "../../app/composables/usePortalCatalog";
 import { usePortalContentStore } from "../../app/stores/portal-content";
 import { useSessionStore } from "../../app/stores/session";
@@ -64,6 +64,16 @@ describe("published activity and update details", () => {
       ACTIVITY_DETAILS.map((activity) => `/activities/${activity.slug}`),
     );
     expect(ACTIVITY_DETAILS.every((activity) => activity.available)).toBe(true);
+  });
+
+  it("does not resolve an unavailable activity detail", () => {
+    const unavailable = ACTIVITY_DETAILS.map((activity) => ({
+      ...activity,
+      available: activity.slug === "harmonyos-salon" ? false : activity.available,
+    }));
+
+    expect(findActivity("harmonyos-salon", unavailable)).toBeUndefined();
+    expect(findActivity("project-camp", unavailable)?.slug).toBe("project-camp");
   });
 
   it("projects published articles and notices without draft or unpublished records", () => {

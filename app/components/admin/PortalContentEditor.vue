@@ -31,7 +31,7 @@ function buildInput(): PortalContentDraftInput {
     kind: kind.value,
     title: title.value,
     summary: summary.value,
-    target: { type: "internal-route", value: target.value },
+    ...(kind.value === "flash" ? { target: { type: "internal-route" as const, value: target.value } } : {}),
     blocks: blocks.value.filter((block) => block.type === "image" || block.text.trim()),
     ...(expiresAt.value ? { expiresAt: new Date(expiresAt.value).toISOString() } : {})
   };
@@ -42,7 +42,7 @@ function validate() {
     error.value = "请填写标题和摘要。";
     return false;
   }
-  if (!isSafeInternalPath(target.value)) {
+  if (kind.value === "flash" && !isSafeInternalPath(target.value)) {
     error.value = "站内目标必须是以 / 开头的规范站内路径，例如 /join 或 /activities/foo。";
     return false;
   }
@@ -75,7 +75,9 @@ function saveDraft() {
     notice.value = content.persistenceError ? "草稿暂存于当前会话，本地存储不可用。" : "草稿已保存。";
     emit("saved", saved.id);
   } catch (caught) {
-    error.value = caught instanceof Error ? "当前状态不能保存草稿。" : "保存草稿失败。";
+    error.value = caught instanceof Error && caught.message === "PORTAL_CONTENT_DUPLICATE_SLUG"
+      ? "标题生成的详情 Slug 已被其他内容使用，请修改标题后重试。"
+      : caught instanceof Error ? "当前状态不能保存草稿。" : "保存草稿失败。";
   }
 }
 
@@ -120,7 +122,7 @@ function removeBlock(index: number) {
     <p v-if="notice" class="admin-content-editor__message" role="status">{{ notice }}</p>
     <div class="admin-content-editor__layout">
       <div class="admin-content-editor__form">
-        <section><header><span>01</span><h2>基础信息</h2><AdminStatusPill :status="currentStatus" /></header><div class="admin-editor-grid"><label>内容类型<select v-model="kind" :disabled="Boolean(record)"><option v-for="(label, value) in PORTAL_CONTENT_KIND_LABELS" :key="value" :value="value">{{ label }}</option></select></label><label>站内目标<input v-model="target" :disabled="isReadOnly" placeholder="/activities"></label><label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label><label class="is-wide">摘要<textarea v-model="summary" :disabled="isReadOnly" rows="4"></textarea></label><label v-if="kind === 'flash'">失效时间（可选）<input v-model="expiresAt" :disabled="isReadOnly" type="datetime-local"></label></div></section>
+        <section><header><span>01</span><h2>基础信息</h2><AdminStatusPill :status="currentStatus" /></header><div class="admin-editor-grid"><label>内容类型<select v-model="kind" :disabled="Boolean(record)"><option v-for="(label, value) in PORTAL_CONTENT_KIND_LABELS" :key="value" :value="value">{{ label }}</option></select></label><label v-if="kind === 'flash'">站内目标<input v-model="target" :disabled="isReadOnly" placeholder="/activities"></label><p v-else class="admin-inline-note">详情地址将在保存后按内容 Slug 自动生成。</p><label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label><label class="is-wide">摘要<textarea v-model="summary" :disabled="isReadOnly" rows="4"></textarea></label><label v-if="kind === 'flash'">失效时间（可选）<input v-model="expiresAt" :disabled="isReadOnly" type="datetime-local"></label></div></section>
         <section v-if="kind !== 'flash'"><header><span>02</span><h2>结构化正文</h2></header><div class="admin-content-blocks"><article v-for="(block, index) in blocks" :key="index"><label>{{ block.type === 'heading' ? '小标题' : block.type === 'paragraph' ? '正文段落' : '媒体库素材' }}<template v-if="block.type === 'image'"><select v-model="block.assetId" :disabled="isReadOnly"><option value="">选择已审核图片素材</option><option v-for="asset in approvedImageAssets" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select><input v-model="block.alt" :disabled="isReadOnly" placeholder="替代文本"></template><textarea v-else v-model="block.text" :disabled="isReadOnly" :rows="block.type === 'heading' ? 2 : 4"></textarea></label><button v-if="!isReadOnly" type="button" :aria-label="`移除第 ${index + 1} 个内容块`" @click="removeBlock(index)">移除</button></article></div><div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" @click="addBlock('heading')">添加标题</button><button type="button" @click="addBlock('paragraph')">添加段落</button><button type="button" @click="addBlock('image')">添加图片</button></div></section>
         <section v-if="record"><header><span>03</span><h2>审核与发布</h2></header><p v-if="!isOwner" class="admin-inline-note">普通管理员可保存草稿、提交审核和预览；审核、发布与下架由联盟总负责人执行。</p><div v-else class="admin-content-editor__review-actions"><button v-if="record.status === 'in-review'" type="button" @click="actionPending = true">审核通过</button><button v-if="record.status === 'pending-publication'" type="button" class="button" @click="actionPending = true">发布内容</button><label v-if="record.publishedState === 'published'">下架原因<input v-model="unpublishReason" placeholder="说明下架原因"></label><button v-if="record.publishedState === 'published'" type="button" @click="completeAction('unpublish')">确认下架</button></div></section>
       </div>

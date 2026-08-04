@@ -51,6 +51,10 @@ export const ACTIVITY_DETAILS = [
   }
 ] as const;
 
-export function findActivity(slug: string) {
-  return ACTIVITY_DETAILS.find((activity) => activity.slug === slug);
+type ActivityRecord = typeof ACTIVITY_DETAILS[number];
+
+export function findActivity(slug: string): ActivityRecord | undefined;
+export function findActivity<T extends { slug: string; available: boolean }>(slug: string, activities: readonly T[]): T | undefined;
+export function findActivity(slug: string, activities: readonly { slug: string; available: boolean }[] = ACTIVITY_DETAILS) {
+  return activities.find((activity) => activity.slug === slug && activity.available);
 }

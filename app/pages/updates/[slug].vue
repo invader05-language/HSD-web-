@@ -3,9 +3,10 @@ import { usePortalContentStore } from "~/stores/portal-content";
 
 const route = useRoute();
 const contentStore = usePortalContentStore();
-const update = computed(() => contentStore.getPublicRecords().find((record) =>
-  record.slug === String(route.params.slug) && (record.kind === "article" || record.kind === "notice")
-));
+const update = computed(() => {
+  const record = contentStore.getPublicBySlug(String(route.params.slug));
+  return record && (record.kind === "article" || record.kind === "notice") ? record : undefined;
+});
 
 if (!update.value) {
   throw createError({ statusCode: 404, statusMessage: "动态不存在" });
