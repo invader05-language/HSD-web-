@@ -11,7 +11,7 @@ async function completeDemoLogin(page: import("@playwright/test").Page) {
 
 test("member profile lets the current user edit personal basics but not organization fields", async ({ page }) => {
   await page.goto("/member/profile");
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fprofile$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/profile");
 
   await completeDemoLogin(page);
   await expect(page).toHaveURL(/\/member\/profile$/);
@@ -96,10 +96,11 @@ test("a newly created account must replace its initial password before entering 
   await page.getByLabel("密码", { exact: true }).fill("hsd1314");
   await page.getByRole("button", { name: "登录并继续" }).click();
 
-  await expect(page).toHaveURL(/\/member\/change-password\?redirect=%2Fmember%2Fprofile$/);
+  await expect(page).toHaveURL(/\/member\/change-password/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/profile");
   await page.reload();
   await expect(page).toHaveURL(/\/member\/change-password/);
-  await page.getByLabel("新密码", { exact: true }).fill("new-pass-2026");
+  await page.getByRole("textbox", { name: /^新密码/ }).fill("new-pass-2026");
   await page.getByLabel("确认新密码", { exact: true }).fill("new-pass-2026");
   await page.getByRole("button", { name: "保存新密码并继续" }).click();
 

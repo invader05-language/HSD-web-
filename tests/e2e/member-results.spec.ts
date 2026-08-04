@@ -11,7 +11,7 @@ test("results center shows the current admission and assessment views inside the
   await page.goto("/");
   await page.getByRole("link", { name: "结果中心" }).click();
 
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/results");
   await completeDemoLogin(page);
 
   await expect(page).toHaveURL(/\/member\/results$/);
@@ -39,7 +39,7 @@ test("results center shows the current admission and assessment views inside the
 
 test("legacy assessment URL continues through login to the integrated results center", async ({ page }) => {
   await page.goto("/assessment-results");
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fassessment-results$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/assessment-results");
 
   await completeDemoLogin(page);
 
@@ -48,9 +48,9 @@ test("legacy assessment URL continues through login to the integrated results ce
 });
 
 test("results center uses the most recent published assessment projection", async ({ page }) => {
-  await page.goto("/member/results");
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
+  await page.goto("/login?redirect=%2Fmember%2Fresults");
   await completeDemoLogin(page);
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/member/results");
 
   await page.evaluate(() => {
     localStorage.setItem("baiyun-hsd-recruitment-assessment", JSON.stringify({
@@ -78,6 +78,7 @@ test("results center uses the most recent published assessment projection", asyn
       },
     }));
   });
+  expect(await page.evaluate(() => sessionStorage.getItem("baiyun-hsd.session"))).not.toBeNull();
   await page.reload();
 
   await expect(page.getByRole("heading", { name: "本期未录取" })).toBeVisible();

@@ -1,10 +1,7 @@
 import type { PortalCatalogItem, PortalSlotId } from "../types/portal-content";
 import type { PortalReference, PortalSlots } from "../types/portal-config";
 import { usePortalCatalog } from "./usePortalCatalog";
-import { usePortalConfigStore } from "../stores/portal-config";
-
-const slotIds: PortalSlotId[] = ["flash", "news", "projects", "activities", "gallery", "resources"];
-const slotCapacity: Record<PortalSlotId, number> = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 1, resources: 3 };
+import { PORTAL_SLOT_CAPACITY, PORTAL_SLOT_IDS, usePortalConfigStore } from "../stores/portal-config";
 
 export interface ResolvedPortalCatalogItem extends PortalCatalogItem {
   fallbackFor?: string;
@@ -34,7 +31,7 @@ export function resolveHomepageProjection(
   const used = new Set<string>();
   const reserved = new Set<string>();
   const warnings: PortalProjectionWarning[] = [];
-  for (const slot of slotIds) {
+  for (const slot of PORTAL_SLOT_IDS) {
     for (const reference of configuredSlots[slot] ?? []) {
       const configured = match(reference, catalog);
       if (configured?.available && configured.eligibleSlots.includes(slot)) {
@@ -45,9 +42,9 @@ export function resolveHomepageProjection(
   const resolved: Record<PortalSlotId, ResolvedPortalCatalogItem[]> = {
     flash: [], news: [], projects: [], activities: [], gallery: [], resources: [],
   };
-  for (const slot of slotIds) {
+  for (const slot of PORTAL_SLOT_IDS) {
     const references = configuredSlots[slot] ?? [];
-    for (const reference of references.slice(0, slotCapacity[slot])) {
+    for (const reference of references.slice(0, PORTAL_SLOT_CAPACITY[slot])) {
       const configured = match(reference, catalog);
       const configuredKey = `${reference.entityType}:${reference.sourceId}`;
       if (configured?.available && configured.eligibleSlots.includes(slot) && !used.has(configuredKey)) {

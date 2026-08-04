@@ -5,16 +5,25 @@ HSD_PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 HSD_TOOLS_DIR="$HSD_PROJECT_ROOT/.tools"
 HSD_DOWNLOAD_DIR="$HSD_TOOLS_DIR/downloads"
 HSD_NODE_VERSION="22.19.0"
-HSD_NODE_NAME="node-v${HSD_NODE_VERSION}-darwin-x64"
+HSD_SYSTEM=$(uname -s)
+HSD_MACHINE=$(uname -m)
+
+case "$HSD_SYSTEM:$HSD_MACHINE" in
+  Darwin:x86_64) HSD_PLATFORM="darwin-x64" ;;
+  Darwin:arm64) HSD_PLATFORM="darwin-arm64" ;;
+  Linux:x86_64) HSD_PLATFORM="linux-x64" ;;
+  Linux:aarch64|Linux:arm64) HSD_PLATFORM="linux-arm64" ;;
+  *)
+    echo "Unsupported platform: ${HSD_SYSTEM} ${HSD_MACHINE}. On Windows, use nvs and Node ${HSD_NODE_VERSION}." >&2
+    exit 1
+    ;;
+esac
+
+HSD_NODE_NAME="node-v${HSD_NODE_VERSION}-${HSD_PLATFORM}"
 HSD_NODE_ARCHIVE="${HSD_NODE_NAME}.tar.gz"
 HSD_NODE_HOME="$HSD_TOOLS_DIR/$HSD_NODE_NAME"
 HSD_NODE_URL="https://nodejs.org/dist/v${HSD_NODE_VERSION}/${HSD_NODE_ARCHIVE}"
 HSD_SHASUMS_URL="https://nodejs.org/dist/v${HSD_NODE_VERSION}/SHASUMS256.txt"
-
-if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "x86_64" ]; then
-  echo "Unsupported platform: this installer requires Darwin x86_64." >&2
-  exit 1
-fi
 
 if [ -x "$HSD_NODE_HOME/bin/node" ]; then
   HSD_INSTALLED_VERSION=$("$HSD_NODE_HOME/bin/node" --version)
@@ -52,8 +61,11 @@ if [ -z "$HSD_EXPECTED_HASH" ]; then
   exit 1
 fi
 
-HSD_ACTUAL_HASH=$(shasum -a 256 "$HSD_DOWNLOAD_DIR/$HSD_NODE_ARCHIVE" \
-  | awk '{ print $1 }')
+if command -v shasum >/dev/null 2>&1; then
+  HSD_ACTUAL_HASH=$(shasum -a 256 "$HSD_DOWNLOAD_DIR/$HSD_NODE_ARCHIVE" | awk '{ print $1 }')
+else
+  HSD_ACTUAL_HASH=$(sha256sum "$HSD_DOWNLOAD_DIR/$HSD_NODE_ARCHIVE" | awk '{ print $1 }')
+fi
 
 if [ "$HSD_EXPECTED_HASH" != "$HSD_ACTUAL_HASH" ]; then
   echo "Node archive checksum mismatch." >&2

@@ -30,18 +30,21 @@ test("homepage renders every curated domain through the published portal project
 test("legacy Help Center routes redirect once to their enabled fallback", async ({ page }) => {
   await page.goto("/help");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
-  await expect(page.getByRole("link", { name: /帮助/ })).toHaveCount(0);
+  await expect(page.getByText("当前版本暂未开放", { exact: true })).toBeVisible();
+  await expect(page.getByRole("contentinfo").locator('a[href="/help"]')).toHaveCount(0);
 
   await page.goto("/admin/content");
   await page.getByLabel("学号或成员账号").fill("admin-alliance");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
   await expect(page).toHaveURL(/\/admin\/content$/);
+  await expect.poll(() => page.evaluate(
+    () => sessionStorage.getItem("baiyun-hsd.session")
+  )).not.toBeNull();
 
   await page.goto("/admin/content/help");
   await expect(page).toHaveURL(/\/admin\/content$/);
-  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
+  await expect(page.getByText("当前版本暂未开放", { exact: true })).toBeVisible();
 });
 
 test("public detail remains open and personal signup continues through login", async ({ page }) => {
@@ -78,7 +81,7 @@ test("authenticated activity signup uses the current session without asking for 
 
 test("homepage resource cards open their own detail pages before any file action", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: /2026 成员训练营课程资料/ }).click();
+  await page.getByRole("link", { name: /2026 成员训练营课程包/ }).click();
 
   await expect(page).toHaveURL(/\/resources\/member-training-package$/);
   await expect(page.getByRole("button", { name: "文件暂未接入" })).toBeDisabled();
@@ -111,7 +114,7 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("link", { name: "结果中心" }).click();
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/results");
   await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();

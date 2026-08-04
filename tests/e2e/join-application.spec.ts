@@ -29,7 +29,7 @@ test.describe("join recruitment application navigation", () => {
     for (let index = 0; index < 2; index += 1) {
       await page.goto("/join");
       await page.getByRole("link", { name: "登录后填写报名表" }).nth(index).click();
-      await expect(page).toHaveURL(/\/login\?redirect=%2Fjoin%2Fapply$/);
+      await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/join/apply");
     }
   });
 
@@ -50,7 +50,7 @@ test.describe("join recruitment application navigation", () => {
 
   test("guest direct navigation to the application remains protected", async ({ page }) => {
     await page.goto("/join/apply");
-    await expect(page).toHaveURL(/\/login\?redirect=%2Fjoin%2Fapply$/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/join/apply");
     await expect(page.getByRole("heading", { name: "成员登录" })).toBeVisible();
   });
 
@@ -120,6 +120,52 @@ test.describe("join recruitment application navigation", () => {
 
     await expect(page.getByText("当前批次：2026 秋季招新")).toBeVisible();
     await expect(page.getByText("系统将自动关联本批次，不支持手动切换")).toBeVisible();
+  });
+
+  test("a submitted application can be edited, withdrawn, resubmitted, and seen by administrators", async ({ page }) => {
+    await page.goto("/login?redirect=/join/apply");
+    await completeDemoLogin(page);
+
+    await page.getByLabel("姓名", { exact: true }).fill("管理端联动同学");
+    await page.locator('[data-field="contact"] input').fill("linked@example.com");
+    await page.getByRole("button", { name: "下一步" }).click();
+    await page.locator('[data-field="firstChoice"] select').selectOption("新媒体中心");
+    await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
+    await page.getByRole("button", { name: "下一步" }).click();
+    await page.getByRole("checkbox", { name: /我确认以上资料真实/ }).check();
+    await page.getByRole("button", { name: "确认并提交报名" }).click();
+
+    await page.getByRole("button", { name: "修改报名" }).click();
+    await page.getByRole("button", { name: /填写报名志愿/ }).click();
+    await page.locator('[data-field="firstChoice"] select').selectOption("拓维策划中心");
+    await page.getByRole("button", { name: "下一步" }).click();
+    await page.getByRole("checkbox", { name: /我确认以上资料真实/ }).check();
+    await page.getByRole("button", { name: "确认并保存修改" }).click();
+    await page.getByText("查看已提交报名摘要").click();
+    await expect(page.getByText("第一志愿：拓维策划中心")).toBeVisible();
+
+    await page.getByRole("button", { name: "撤回报名" }).click();
+    await page.getByRole("button", { name: "确认撤回" }).click();
+    await expect(page.getByText("报名已撤回，可在截止时间前修改后重新提交。")).toBeVisible();
+    await page.getByRole("button", { name: /确认并提交/ }).click();
+    await page.getByRole("checkbox", { name: /我确认以上资料真实/ }).check();
+    await page.getByRole("button", { name: "确认并重新提交报名" }).click();
+
+    await page.getByRole("link", { name: "进入个人中心" }).click();
+    await page.getByRole("button", { name: "退出登录" }).click();
+    await page.getByRole("link", { name: "登录" }).click();
+    await page.getByRole("radio", { name: "管理员登录" }).check();
+    await page.getByLabel("学号或成员账号").fill("admin-alliance");
+    await page.getByLabel("密码", { exact: true }).fill("demo-password");
+    await page.getByRole("button", { name: "登录并继续" }).click();
+    await page.getByRole("button", { name: /招新与考核/ }).click();
+    await page.getByRole("link", { name: "报名人员", exact: true }).click();
+
+    const row = page.getByRole("row").filter({ hasText: "管理端联动同学" });
+    await expect(row).toContainText("拓维策划中心");
+    await row.getByRole("link", { name: "查看报名 管理端联动同学" }).click();
+    await expect(page.getByRole("heading", { name: "管理端联动同学" })).toBeVisible();
+    await expect(page.getByLabel("联系方式")).toHaveValue("linked@example.com");
   });
 
   test("future steps cannot bypass the required first-step contact field", async ({ page }) => {

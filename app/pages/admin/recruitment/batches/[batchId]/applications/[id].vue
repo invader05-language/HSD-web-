@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
-import { ADMIN_CANDIDATES, formatRecruitmentApplicationSubmittedAt } from "~/data/recruitment-admin";
-import { filterAdminCandidatesByBatch } from "~/data/recruitment-admin-context";
+import { formatRecruitmentApplicationSubmittedAt } from "~/data/recruitment-admin";
+import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
+const assessmentStore = useRecruitmentAssessmentStore();
 const batchId = computed(() => String(route.params.batchId));
 const applicationId = computed(() => String(route.params.id));
 const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
-const application = computed(() => filterAdminCandidatesByBatch(ADMIN_CANDIDATES, batchId.value).find((item) => item.id === applicationId.value));
+const application = computed(() => assessmentStore
+  .getCandidates(batchId.value)
+  .map((record) => record.candidate)
+  .find((candidate) => candidate?.id === applicationId.value));
 
 useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
 </script>

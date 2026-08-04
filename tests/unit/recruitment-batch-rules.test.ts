@@ -360,6 +360,20 @@ describe("recruitment batch lifecycle commands", () => {
     ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
   });
 
+  it("resumes a force-open batch as open before its planned start", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    store.openNow("batch-current", true, NOW);
+    store.pause("batch-current", NOW);
+
+    store.resume("batch-current", NOW);
+
+    expect(store.getBatch("batch-current")?.manualOverride).toBe("force-open");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+  });
+
   it("creates a new source-versioned flash when a closed batch reopens", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -372,5 +386,19 @@ describe("recruitment batch lifecycle commands", () => {
     expect(usePortalContentStore().records.find((record) => (
       record.sourceId === "batch-current" && record.sourceVersion === 3
     ))).toMatchObject({ sourceEventType: "recruitment.batch.opened", sourceValidity: "valid" });
+  });
+
+  it("reopens a force-open batch as open before its planned start", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    store.openNow("batch-current", true, NOW);
+    store.close("batch-current", true, NOW);
+
+    store.reopen("batch-current", true, NOW);
+
+    expect(store.getBatch("batch-current")?.manualOverride).toBe("force-open");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
   });
 });

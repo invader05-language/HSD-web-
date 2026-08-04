@@ -11,7 +11,7 @@ test("dynamic and activity views expose only their requested public record types
   for (const view of views) {
     await page.goto(`/activities?view=${view.value}`);
     await expect(page.getByRole("heading", { level: 1, name: "动态与活动" })).toBeVisible();
-    await expect(page.getByRole("link", { name: view.label })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: view.label, exact: true })).toHaveAttribute("aria-current", "page");
     for (const title of view.shown) await expect(page.getByRole("heading", { name: title })).toBeVisible();
     for (const title of view.hidden ?? []) await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
   }
@@ -32,14 +32,15 @@ test("all public updates are ordered by descending public time and keep domain d
 test("published news and notices have public details while unknown updates return 404", async ({ page }) => {
   await page.goto("/updates/project-team");
   await expect(page.getByRole("heading", { level: 1, name: "从一次分享会，到一支真正协作的项目团队" })).toBeVisible();
-  await expect(page.getByText("记录成员从技术交流到原型落地。", { exact: true })).toBeVisible();
+  await expect(page.getByRole("article").getByText("记录成员从技术交流到原型落地。", { exact: true })).toBeVisible();
   await expect(page.getByText(/审核|退回|下架原因/)).toHaveCount(0);
 
   await page.goto("/updates/studio-hours");
   await expect(page.getByText("公开公告", { exact: true }).first()).toBeVisible();
 
-  const response = await page.goto("/updates/missing");
-  expect(response?.status()).toBe(404);
+  await page.goto("/updates/missing");
+  await expect(page.getByRole("heading", { level: 1, name: "404" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "动态不存在" })).toBeVisible();
 });
 
 test("resource entries open details before any file action", async ({ page }) => {
@@ -88,7 +89,7 @@ test("member results require login and continue back after demo sign-in", async 
   await page.goto("/");
   await page.getByRole("link", { name: "结果中心" }).click();
 
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fmember%2Fresults$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/results");
   await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();

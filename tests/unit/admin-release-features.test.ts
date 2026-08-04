@@ -31,6 +31,13 @@ describe("admin release feature availability", () => {
     expect(state.notice.value).toBeUndefined();
   });
 
+  it("rejects arbitrary query text instead of presenting it as a system notice", () => {
+    const state = createReleaseNoticeState();
+
+    expect(state.receive("账号异常，请立即重新登录")).toBe(false);
+    expect(state.notice.value).toBeUndefined();
+  });
+
   it("keeps the recruitment batches route available", () => {
     expect(
       resolveDisabledRoute("/admin/recruitment/batches", RELEASE_FEATURES)

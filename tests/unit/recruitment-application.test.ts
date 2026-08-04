@@ -317,6 +317,31 @@ describe("recruitment application domain", () => {
     expect(applicationStore.currentApplication?.firstChoice).toBe("新媒体中心");
   });
 
+  it("updates an existing submitted application in place when the member explicitly edits it", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const profileDraft = createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId));
+
+    applicationStore.submitApplication(profileDraft, validApplicationDraft(), true, { batchId: CURRENT_BATCH_ID });
+    const originalId = applicationStore.currentApplication?.id;
+
+    applicationStore.submitApplication(profileDraft, {
+      ...validApplicationDraft(),
+      firstChoice: "新媒体中心",
+      secondChoice: "拓维策划中心",
+      thirdChoice: "人才发展中心",
+      baizeDirection: undefined,
+    }, true, { batchId: CURRENT_BATCH_ID, allowExistingUpdate: true });
+
+    expect(applicationStore.currentApplication).toMatchObject({
+      id: originalId,
+      status: "submitted",
+      firstChoice: "新媒体中心",
+      submittedAt: expect.any(String),
+    });
+  });
+
   it("retains an unavailable center flag on existing snapshots after batch configuration changes", () => {
     const session = signInApplicant();
     const applicantId = session.currentMemberId;
@@ -357,6 +382,27 @@ describe("recruitment application domain", () => {
 
     expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)?.status)
       .toBe("locked");
+  });
+
+  it("keeps a withdrawn application withdrawn after the batch deadline", () => {
+    const session = signInApplicant();
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    const beforeDeadline = new Date("2026-09-17T23:00:00.000Z");
+    const afterDeadline = new Date("2026-09-18T00:00:00.000Z");
+
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
+      validApplicationDraft(),
+      true,
+      { batchId: CURRENT_BATCH_ID, now: beforeDeadline },
+    );
+    applicationStore.withdrawApplication(CURRENT_BATCH_ID, session.currentMemberId, beforeDeadline);
+    applicationStore.lockExpiredApplications(afterDeadline);
+
+    expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)?.status)
+      .toBe("withdrawn");
+    expect(applicationStore.isSubmitted).toBe(false);
   });
 
   it("rejects explicit submission when batch fixtures contain more than one open batch", () => {

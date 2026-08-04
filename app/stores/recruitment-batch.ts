@@ -240,7 +240,9 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOverlappingPublishedWindow(batchId, batch);
       const beforeStatus = "paused" as const;
       const timestamp = now.toISOString();
-      batch.manualOverride = "none";
+      batch.manualOverride = batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+        ? "force-open"
+        : "none";
       batch.updatedAt = timestamp;
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
@@ -283,12 +285,16 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOverlappingPublishedWindow(batchId, {
         ...batch,
         lifecycleStatus: "published",
-        manualOverride: "none",
+        manualOverride: batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+          ? "force-open"
+          : "none",
       });
       const beforeStatus = "closed" as const;
       const timestamp = now.toISOString();
       batch.lifecycleStatus = "published";
-      batch.manualOverride = "none";
+      batch.manualOverride = batch.actualOpenedAt && now.getTime() < Date.parse(batch.startAt)
+        ? "force-open"
+        : "none";
       batch.closedAt = undefined;
       batch.updatedAt = timestamp;
       batch.version += 1;

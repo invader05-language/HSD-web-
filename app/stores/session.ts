@@ -32,8 +32,7 @@ export type PasswordChangeResult =
   | { status: "storage_unavailable" };
 
 function getSessionStorage(): Storage | undefined {
-  if (typeof window === "undefined") return undefined;
-
+  if (import.meta.server) return undefined;
   try {
     return window.sessionStorage;
   } catch {
