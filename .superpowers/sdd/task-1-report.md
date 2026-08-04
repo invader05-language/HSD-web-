@@ -73,3 +73,49 @@ The initial implementation captured `route.query.notice` only during layout setu
    `sh scripts/with-hsd-node.sh corepack pnpm run typecheck`
 
    Result: blocked by concurrent, unstaged Task 3 work outside this fix. Errors are limited to member/public-directory/recruitment files such as `app/pages/about.vue`, `app/pages/admin/members/[id].vue`, and `app/pages/join/apply.vue`, which reference fields Task 3 is actively renaming (`role`, `direction`, `publicState`). This fix's changed files did not produce a typecheck error.
+
+# Task 1 Report: Assessment Types, Round Rules, and Legacy Adapter
+
+## Scope completed
+
+- Added `app/types/recruitment-assessment.ts` with the batch-scoped assessment
+  record, round, outcome, final-decision, and processing-status contracts.
+- Added pure rules in `app/utils/recruitment-assessment-rules.ts`.
+  - White Ze uses rounds `1`, `2`, and `3`.
+  - New Media, Tuowei Planning, and Talent Development use only round `1`.
+  - A candidate is editable only in the batch's current global round after all
+    preceding applicable rounds have passed.
+  - Failed candidates become `offline-adjustment-pending` only when they accept
+    adjustment; otherwise they are `ready-to-publish`.
+  - `publishedAt` marks the record `completed` and locks all rounds.
+- Extended the legacy `AdminCandidate` compatibility contract with optional
+  `batchId` and `memberId`, populated the static roster, and added
+  `getAdminCandidateAssessmentRecord` to adapt legacy stage/round fields into
+  a `RecruitmentAssessmentRecord`.
+
+## TDD evidence
+
+1. RED: ran `pnpm exec vitest run tests/unit/recruitment-assessment-rules.test.ts`
+   before adding production files. Vitest failed at import analysis because
+   `app/utils/recruitment-assessment-rules` did not exist.
+2. GREEN: after the minimal type, pure-rule, and adapter implementation, the
+   same command passed with `1` file and `6` tests.
+
+## Verification
+
+- `pnpm exec vitest run tests/unit/recruitment-assessment-rules.test.ts tests/unit/recruitment-admin.test.ts tests/unit/admin-recruitment-workflow.test.ts tests/unit/recruitment-applications.test.ts tests/unit/recruitment-batch-context.test.ts tests/unit/recruitment-export.test.ts`
+  - `6` files, `24` tests passed.
+- `pnpm run typecheck`
+  - passed (`nuxt typecheck`, exit code `0`).
+- `git diff --check`
+  - passed with no whitespace errors.
+
+## Follow-up boundary
+
+The adapter is intentionally transitional: new code should make the future
+assessment Store authoritative and key records with the explicit
+`(batchId, memberId)` pair. `AdminCandidate.batchId` and `.memberId` remain
+optional so existing static fixture literals and recruitment-admin tests retain
+their compatibility API. The fixture member IDs beyond existing demo accounts
+are mock identifiers only; Task 2 must obtain live member IDs from the linked
+application and profile stores when saving or publishing.
