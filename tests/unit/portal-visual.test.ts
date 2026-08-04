@@ -5,6 +5,12 @@ import MediaPlaceholder from "../../app/components/MediaPlaceholder.vue";
 import { resolvePortalAssetSource } from "../../app/data/portal-assets";
 
 describe("published portal visuals", () => {
+  it("resolves only explicitly allowlisted asset IDs", () => {
+    expect(resolvePortalAssetSource("missing-asset")).toBeUndefined();
+    expect(resolvePortalAssetSource("__proto__")).toBeUndefined();
+    expect(resolvePortalAssetSource("constructor")).toBeUndefined();
+  });
+
   it("renders the approved asset URL and falls back after an image error", async () => {
     const source = resolvePortalAssetSource("asset-recruitment-hero");
     expect(source).toMatch(/\.png(?:\?|$)/);

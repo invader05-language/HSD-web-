@@ -53,3 +53,14 @@
 1. 在文件监听额度正常且 Chrome 可启动的环境重新运行完整 E2E；只有页面断言实际执行后才能关闭浏览器验证缺口。
 2. 至少复核 390px 首页和 `/admin/content/home` 无横向溢出，并执行 Tab、ArrowLeft/ArrowRight、Home/End、Escape 和焦点恢复流程。
 3. 以普通管理员和联盟总负责人分别执行内容/门户发布权限流程，并复核 Help 与 Banner 旧路由重定向、草稿隔离和发布后公开投影。
+
+## 7. Minor 跟进：严格素材白名单
+
+- **发现**：普通对象索引会沿原型链解析键；`resolvePortalAssetSource("__proto__")` 返回继承对象，而不是 `undefined`。
+- **RED**：`sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-visual.test.ts tests/unit/home-content.test.ts`，2 个文件中 1 个测试失败，明确复现 `"__proto__"` 绕过白名单。
+- **修复**：`app/data/portal-assets.ts` 在读取映射前使用 `Object.hasOwn`；未知 ID、`"__proto__"` 和 `"constructor"` 均返回 `undefined`。
+- **GREEN**：同一 focused 命令通过，2 个文件、9 个测试。
+- **完整单元测试**：`sh scripts/with-hsd-node.sh corepack pnpm run test:unit` 通过，37 个文件、283 个测试，退出码 0。
+- **类型检查**：`sh scripts/with-hsd-node.sh corepack pnpm run typecheck` 通过，退出码 0。
+- **生产构建**：`sh scripts/with-hsd-node.sh corepack pnpm run build` 通过，Nuxt client、SSR 和 Nitro 完成，退出码 0。
+- 本跟进未修改路由、文案或其他领域边界；此前记录的 Playwright `EMFILE` 环境阻塞状态不变，本次未重新运行 E2E。

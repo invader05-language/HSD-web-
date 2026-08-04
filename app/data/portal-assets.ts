@@ -5,5 +5,6 @@ const PUBLISHED_PORTAL_ASSET_SOURCES: Readonly<Record<string, string>> = {
 };
 
 export function resolvePortalAssetSource(assetId?: string) {
-  return assetId ? PUBLISHED_PORTAL_ASSET_SOURCES[assetId] : undefined;
+  if (!assetId || !Object.hasOwn(PUBLISHED_PORTAL_ASSET_SOURCES, assetId)) return undefined;
+  return PUBLISHED_PORTAL_ASSET_SOURCES[assetId];
 }
