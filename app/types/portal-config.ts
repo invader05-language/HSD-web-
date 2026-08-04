@@ -39,4 +39,5 @@ export interface PortalConfigAuditRecord {
   beforeVersion: number;
   afterVersion: number;
   actualAt: string;
+  reason: string;
 }

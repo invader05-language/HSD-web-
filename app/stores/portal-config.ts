@@ -5,7 +5,7 @@ import { canUseAssetForPortalContent } from "../data/admin-assets";
 import { useSessionStore } from "./session";
 
 export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
-export const PORTAL_CONFIG_STORAGE_VERSION = 2;
+export const PORTAL_CONFIG_STORAGE_VERSION = 3;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
 export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 1, resources: 3 } as const;
@@ -75,7 +75,7 @@ function isConfig(value: unknown): value is PortalConfig {
     && PORTAL_SLOT_IDS.every((slot) => Array.isArray(slots[slot]) && slots[slot].every(validReference));
 }
 
-function isAuditRecord(value: unknown): value is PortalConfigAuditRecord {
+function isAuditRecord(value: unknown, allowLegacyReason = false): value is PortalConfigAuditRecord {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   return typeof record.id === "string"
@@ -84,7 +84,8 @@ function isAuditRecord(value: unknown): value is PortalConfigAuditRecord {
     && record.targetId === "portal-config"
     && typeof record.beforeVersion === "number"
     && typeof record.afterVersion === "number"
-    && typeof record.actualAt === "string";
+    && typeof record.actualAt === "string"
+    && (typeof record.reason === "string" || (allowLegacyReason && record.reason === undefined));
 }
 
 function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig: PortalConfig; auditRecords: PortalConfigAuditRecord[] } | undefined {
@@ -94,15 +95,19 @@ function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig
     const parsed: unknown = JSON.parse(serialized);
     if (typeof parsed !== "object" || parsed === null) return undefined;
     const state = parsed as Record<string, unknown>;
-    if (state.version !== PORTAL_CONFIG_STORAGE_VERSION
+    const isLegacyVersion = state.version === 2;
+    if ((state.version !== PORTAL_CONFIG_STORAGE_VERSION && !isLegacyVersion)
       || !isConfig(state.draftConfig)
       || !isConfig(state.publishedConfig)
       || !Array.isArray(state.auditRecords)
-      || !state.auditRecords.every(isAuditRecord)) return undefined;
+      || !state.auditRecords.every((record) => isAuditRecord(record, isLegacyVersion))) return undefined;
     return {
       draftConfig: clone(state.draftConfig),
       publishedConfig: clone(state.publishedConfig),
-      auditRecords: clone(state.auditRecords),
+      auditRecords: clone(state.auditRecords).map((record) => ({
+        ...record,
+        reason: record.reason || "legacy portal publication",
+      })),
     };
   } catch {
     return undefined;
@@ -235,7 +240,12 @@ export const usePortalConfigStore = defineStore("portal-config", {
       return this.saveDraft({ slots: { [slot]: references } }, now);
     },
     preview() { return clone(this.draftConfig); },
-    publish(catalog: readonly PortalCatalogItem[], confirmed: boolean, now: Date = new Date()) {
+    publish(
+      catalog: readonly PortalCatalogItem[],
+      confirmed: boolean,
+      now: Date = new Date(),
+      reason = "publish portal configuration",
+    ) {
       const actor = ownerId();
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       validate(this.draftConfig, catalog);
@@ -251,6 +261,7 @@ export const usePortalConfigStore = defineStore("portal-config", {
         beforeVersion: this.publishedConfig.revision,
         afterVersion: next.revision,
         actualAt: now.toISOString(),
+        reason,
       };
       const nextAuditRecords = [audit, ...this.auditRecords];
       try {

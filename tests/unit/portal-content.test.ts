@@ -107,6 +107,27 @@ describe("portal content store", () => {
     expect(store.getById(record.id)?.audit[0]?.action).toBe("source-expired");
   });
 
+  it("keeps expired public reads available when expiry audit persistence fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const record = store.createDraft({
+      kind: "flash", title: "持久化失败的快讯", summary: "到期后仍不能阻塞首页。", expiresAt: "2026-08-04T10:00:00.000Z",
+    }, now);
+    store.submitForReview(record.id, now);
+    store.approve(record.id, now);
+    store.publish(record.id, true, now);
+
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(store.getPublicById(record.id, new Date("2026-08-04T11:00:00.000Z"))).toBeUndefined();
+    expect(store.persistenceError).toBe("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    expect(store.getById(record.id)).toMatchObject({ sourceValidity: "expired" });
+    setItem.mockRestore();
+  });
+
   it("rejects review transitions after a system source becomes unavailable", () => {
     const store = usePortalContentStore();
     const result = store.createSystemDraft({

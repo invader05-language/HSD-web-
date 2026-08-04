@@ -40,6 +40,21 @@ function cloneAuditRecord(record: RecruitmentBatchAuditRecord): RecruitmentBatch
   };
 }
 
+function hasOverlappingWindow(left: RecruitmentBatch, right: RecruitmentBatch): boolean {
+  const leftStart = Date.parse(left.manualOverride === "force-open" && left.actualOpenedAt ? left.actualOpenedAt : left.startAt);
+  const leftEnd = Date.parse(left.endAt);
+  const rightStart = Date.parse(right.manualOverride === "force-open" && right.actualOpenedAt ? right.actualOpenedAt : right.startAt);
+  const rightEnd = Date.parse(right.endAt);
+  return Number.isFinite(leftStart)
+    && Number.isFinite(leftEnd)
+    && Number.isFinite(rightStart)
+    && Number.isFinite(rightEnd)
+    && leftEnd > leftStart
+    && rightEnd > rightStart
+    && leftStart < rightEnd
+    && rightStart < leftEnd;
+}
+
 export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
   state: () => ({
     batches: cloneRecruitmentBatches(RECRUITMENT_BATCHES),
@@ -111,6 +126,15 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const open = getCurrentOpenBatch(this.batches.filter((batch) => batch.id !== batchId), now);
       if (open) throw new Error("BATCH_ALREADY_OPEN");
     },
+    assertNoOverlappingPublishedWindow(batchId: string, candidate: RecruitmentBatch) {
+      if (candidate.lifecycleStatus !== "published") return;
+      const conflict = this.batches.find((batch) => (
+        batch.id !== batchId
+        && batch.lifecycleStatus === "published"
+        && hasOverlappingWindow(batch, candidate)
+      ));
+      if (conflict) throw new Error("BATCH_SCHEDULE_OVERLAP");
+    },
     emitOpenedFlash(batch: RecruitmentBatch, actor: { id: string; name: string }, timestamp: string) {
       const event = {
         eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
@@ -157,6 +181,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       next.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
       if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, next);
       Object.assign(batch, next);
       this.appendAudit(batch, "publish", actor, beforeStatus, afterStatus, timestamp, reason, { lifecycleStatus: "draft" });
       if (afterStatus === "open") this.emitOpenedFlash(batch, actor, timestamp);
@@ -179,6 +204,11 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOtherOpen(batchId, now);
       const beforeStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       const timestamp = now.toISOString();
+      this.assertNoOverlappingPublishedWindow(batchId, {
+        ...batch,
+        startAt: timestamp,
+        manualOverride: "force-open",
+      });
       batch.manualOverride = "force-open";
       batch.actualOpenedAt = timestamp;
       batch.updatedAt = timestamp;
@@ -207,6 +237,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const batch = this.getBatchOrThrow(batchId);
       if (batch.manualOverride !== "paused") throw new Error("BATCH_NOT_PAUSED");
       this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, batch);
       const beforeStatus = "paused" as const;
       const timestamp = now.toISOString();
       batch.manualOverride = "none";
@@ -249,6 +280,11 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       if (batch.lifecycleStatus !== "closed") throw new Error("BATCH_NOT_CLOSED");
       if (Date.parse(batch.endAt) <= now.getTime()) throw new Error("BATCH_END_PASSED");
       this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, {
+        ...batch,
+        lifecycleStatus: "published",
+        manualOverride: "none",
+      });
       const beforeStatus = "closed" as const;
       const timestamp = now.toISOString();
       batch.lifecycleStatus = "published";
@@ -300,6 +336,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       next.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(next, now).status;
       if (afterStatus === "open") this.assertNoOtherOpen(batchId, now);
+      this.assertNoOverlappingPublishedWindow(batchId, next);
       Object.assign(batch, next);
       this.appendAudit(batch, "update", actor, beforeStatus, afterStatus, timestamp, reason, before);
       if (patch.openCenterIds) {

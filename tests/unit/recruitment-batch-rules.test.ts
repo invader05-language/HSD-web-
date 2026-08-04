@@ -56,6 +56,13 @@ describe("recruitment batch effective status", () => {
     expect(result).toMatchObject({ status: "open", reason: "force-open" });
   });
 
+  it("automatically closes a force-open batch at its planned end", () => {
+    expect(getEffectiveRecruitmentBatchStatus(batch({
+      manualOverride: "force-open",
+      endAt: "2026-08-04T01:00:00.000Z",
+    }), NOW)).toMatchObject({ status: "closed", reason: "after-end" });
+  });
+
   it("does not let manual pause or close get overwritten by time calculations", () => {
     expect(getEffectiveRecruitmentBatchStatus(batch({
       manualOverride: "paused",
@@ -116,6 +123,54 @@ describe("recruitment batch lifecycle commands", () => {
     });
   });
 
+  it("rejects early opening when the actual open interval overlaps another future batch", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-first",
+        startAt: "2026-08-10T00:00:00.000Z",
+        endAt: "2026-08-20T00:00:00.000Z",
+      }),
+      batch({
+        id: "batch-second",
+        startAt: "2026-08-20T00:00:00.000Z",
+        endAt: "2026-08-30T00:00:00.000Z",
+      }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-second")));
+
+    expect(() => store.openNow("batch-second", true, NOW)).toThrow("BATCH_SCHEDULE_OVERLAP");
+    expect(store.getBatch("batch-second")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+  });
+
+  it("blocks a later scheduled batch after an earlier batch was force-opened", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-force-opened",
+        startAt: "2026-08-20T00:00:00.000Z",
+        endAt: "2026-08-30T00:00:00.000Z",
+      }),
+      batch({
+        id: "batch-scheduled",
+        lifecycleStatus: "draft",
+        startAt: "2026-08-10T00:00:00.000Z",
+        endAt: "2026-08-15T00:00:00.000Z",
+      }),
+    ]);
+    store.openNow("batch-force-opened", true, NOW);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-scheduled")));
+
+    expect(() => store.publishBatch("batch-scheduled", NOW)).toThrow("BATCH_SCHEDULE_OVERLAP");
+    expect(store.getBatch("batch-scheduled")).toEqual(before);
+    expect(store.auditRecords).toHaveLength(1);
+  });
+
   it("creates a versioned portal flash when publishing a draft batch already within its open window", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -169,6 +224,55 @@ describe("recruitment batch lifecycle commands", () => {
     )).toThrow("BATCH_ALREADY_OPEN");
 
     expect(store.getBatch("batch-upcoming")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+  });
+
+  it("rejects overlapping future published windows before either becomes open", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-future-a",
+        startAt: "2026-08-10T00:00:00.000Z",
+        endAt: "2026-08-20T00:00:00.000Z",
+      }),
+      batch({
+        id: "batch-future-draft",
+        lifecycleStatus: "draft",
+        startAt: "2026-08-15T00:00:00.000Z",
+        endAt: "2026-08-25T00:00:00.000Z",
+      }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-future-draft")));
+
+    expect(() => store.publishBatch("batch-future-draft", NOW)).toThrow("BATCH_SCHEDULE_OVERLAP");
+    expect(store.getBatch("batch-future-draft")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+  });
+
+  it("rejects reopening a closed batch into an overlapping future window", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-future-a",
+        startAt: "2026-08-10T00:00:00.000Z",
+        endAt: "2026-08-20T00:00:00.000Z",
+      }),
+      batch({
+        id: "batch-closed",
+        lifecycleStatus: "closed",
+        manualOverride: "force-closed",
+        startAt: "2026-08-15T00:00:00.000Z",
+        endAt: "2026-08-25T00:00:00.000Z",
+      }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-closed")));
+
+    expect(() => store.reopen("batch-closed", true, NOW)).toThrow("BATCH_SCHEDULE_OVERLAP");
+    expect(store.getBatch("batch-closed")).toEqual(before);
     expect(store.auditRecords).toEqual([]);
   });
 

@@ -48,7 +48,9 @@ describe("portal automation mock", () => {
     const failure = store.automationFailures[0]!;
     expect(failure.event).toMatchObject({ eventId: "event-failed" });
     expect(failure.audit[0]?.action).toBe("automation-failed");
-    expect(store.retryAutomationDraft(failure.automationKey)).toMatchObject({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
+    const retryAt = new Date("2026-08-04T10:00:00.000Z");
+    expect(store.retryAutomationDraft(failure.automationKey, retryAt)).toMatchObject({ status: "failed", errorCode: "PORTAL_SOURCE_NOT_PUBLIC" });
+    expect(store.automationFailures[0]?.audit[0]).toMatchObject({ actualAt: retryAt.toISOString() });
 
     const recruitment = { ...failedEvent, payload: { ...failedEvent.payload, isOpen: true } };
     const activity = {
@@ -126,6 +128,13 @@ describe("portal automation mock", () => {
     setItem.mockRestore();
     expect(store.retryAutomationDraft("activity:activity-retry:activity.registration.opened:8"))
       .toMatchObject({ status: "created" });
-    expect(store.automationFailures).toEqual([]);
+    expect(store.automationFailures[0]).toMatchObject({
+      automationKey: "activity:activity-retry:activity.registration.opened:8",
+      resolvedAt: expect.any(String),
+    });
+    expect(store.automationFailures[0]?.audit.map((entry) => entry.action)).toEqual([
+      "automation-retried",
+      "automation-failed",
+    ]);
   });
 });

@@ -10,14 +10,16 @@
 ## 2. 已完成修复
 
 1. `/activities/**` 与 `/updates/**` 明确设置 `ssr: false`，与浏览器本地发布状态保持同一渲染边界。
-2. 招新批次 `publishBatch()` 与 `updateBatch()` 先计算候选有效状态；任何会得到 `open` 的命令都先执行单开放校验，冲突时不修改批次、审计或自动化内容。时间修改成功进入开放窗口后才发出版本化事件。
+2. 招新批次 `publishBatch()` 与 `updateBatch()` 先计算候选有效状态；当前开放和未来有效时间窗均执行单开放/不重叠校验，冲突时不修改批次、审计或自动化内容。`force-open` 到达计划结束时间后仍自动关闭；时间修改成功进入开放窗口后才发出版本化事件。
 3. 官网内容命令改为“持久化候选状态成功后再更新内存”。创建、更新、提交、审核、发布、下架失败统一抛出 `PORTAL_CONTENT_PERSISTENCE_FAILED`，旧工作状态与公开快照不变。
-4. 系统草稿持久化失败保留完整事件、语义键、错误码和自动化失败审计；招新与活动 Store 暴露相同语义键并可重试。重复事件继续记录审计且不创建第二条草稿。
+4. 系统草稿持久化失败保留完整事件、语义键、错误码和自动化失败审计；招新与活动 Store 暴露相同语义键并可重试。成功重试保留失败信封与失败审计并记录实际重试时间；重复事件继续记录审计且不创建第二条草稿。
 5. Owner 内容编辑页支持填写必填退回原因并执行 `returnToDraft()`；官网内容列表显示自动化失败并按语义键重试；活动管理页提供 Store 支持的“开放报名”操作，成功后才处理 `activity.registration.opened`。
-6. 内容审计补齐 actor、action、targetId、beforeRevision、afterRevision、reason、actualAt 和适用的 sourceEventId。门户整份发布新增带前后版本和 actor 的持久化审计。
+6. 内容审计补齐 actor、action、targetId、beforeRevision、afterRevision、reason、actualAt 和适用的 sourceEventId。门户整份发布新增带前后版本、actor、reason 和实际时间的持久化审计。
 7. 内容 Store 在创建、更新、提交、审核、发布各边界校验非空标题、非空摘要、安全站内目标、合法图片素材，以及新闻/公告的有意义结构化文本。语义无效的恢复数据被拒绝。
 8. `/updates/[slug]` 使用 `resolvePortalAssetSource()` 渲染已批准图片块，保留 alt/caption；素材无法解析时显示占位回退，图片在移动端受 `max-width: 100%` 约束。
 9. 门户草稿保存也改为持久化成功后再更新内存，避免 localStorage 失败造成草稿状态污染。
+10. 公开读取遇到过期审计持久化失败时仍在内存中标记过期、过滤公开投影，并保留 `persistenceError`，不会阻塞首页、活动或详情读取。
+11. 提前开放按实际开放时间重新计算有效区间并执行未来重叠校验；门户配置 v2 审计恢复时自动补齐历史原因并升级写入 v3。
 
 ## 3. TDD 证据
 
@@ -25,14 +27,15 @@
 - 第一轮新增回归 RED：6 个文件中 13 个行为测试失败，分别覆盖 SSR、单开放、持久化、自动化重试、审计、校验、可达工作流和图片渲染。
 - 响应式图片回归 RED：缺少 `public-update-detail__image` 约束时 1 个测试失败。
 - 门户草稿持久化回归 RED：`saveDraft()` 未抛稳定错误且先污染内存时 1 个测试失败。
-- 最终 focused GREEN：6 个文件、81 个测试通过；门户配置专项 19/19 通过。
+- 第二轮回归 RED：覆盖未来时间窗重叠、重开重叠、提前开放重叠、提前开放后续发布、force-open 到期、过期读取容错、重试审计和配置迁移共 8 个行为失败。
+- 最终 focused GREEN：4 个文件、75 个测试通过；门户配置专项 20/20 通过。
 
 ## 4. 验证
 
 | 检查 | 命令 | 结果 |
 | --- | --- | --- |
-| Focused regressions | `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-automation.test.ts tests/unit/portal-config.test.ts tests/unit/recruitment-batch-rules.test.ts tests/unit/content-details.test.ts tests/unit/admin-content.test.ts` | 6 files / 81 tests passed |
-| Full unit | `sh scripts/with-hsd-node.sh corepack pnpm run test:unit` | 37 files / 296 tests passed |
+| Focused regressions | `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-automation.test.ts tests/unit/portal-config.test.ts tests/unit/recruitment-batch-rules.test.ts` | 4 files / 75 tests passed |
+| Full unit | `sh scripts/with-hsd-node.sh corepack pnpm run test:unit` | 37 files / 303 tests passed |
 | Typecheck | `sh scripts/with-hsd-node.sh corepack pnpm run typecheck` | passed, exit 0 |
 | Production build | `sh scripts/with-hsd-node.sh corepack pnpm run build` | passed, `Build complete!` |
 | E2E | `NUXT_TELEMETRY_DISABLED=1 sh scripts/with-hsd-node.sh corepack pnpm run test:e2e` | blocked before test discovery: repeated `EMFILE: too many open files, watch`; web server timed out after 120000 ms; no Playwright assertion ran |

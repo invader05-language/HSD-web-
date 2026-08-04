@@ -18,7 +18,7 @@ export interface PortalContentTarget {
 
 export interface PortalContentAuditRecord {
   id: string;
-  action: "create" | "update" | "submit" | "return" | "approve" | "publish" | "unpublish" | "automation-failed" | "automation-duplicate" | "source-expired" | "source-invalidated";
+  action: "create" | "update" | "submit" | "return" | "approve" | "publish" | "unpublish" | "automation-failed" | "automation-duplicate" | "automation-retried" | "source-expired" | "source-invalidated";
   actorId: string;
   targetId: string;
   beforeRevision: number;
@@ -77,6 +77,7 @@ export interface PortalAutomationFailure {
   errorCode: string;
   createdAt: string;
   updatedAt: string;
+  resolvedAt?: string;
   audit: PortalContentAuditRecord[];
 }
 

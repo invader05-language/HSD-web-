@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { readFileSync } from "node:fs";
-import { usePortalConfigStore } from "../../app/stores/portal-config";
+import { PORTAL_CONFIG_STORAGE_KEY, usePortalConfigStore } from "../../app/stores/portal-config";
 import { resolveHomepageSlots } from "../../app/composables/usePublishedPortal";
 import * as publishedPortal from "../../app/composables/usePublishedPortal";
 import type { PortalCatalogItem } from "../../app/types/portal-content";
@@ -182,6 +182,7 @@ describe("portal configuration store", () => {
       beforeVersion,
       afterVersion: beforeVersion + 1,
       actualAt: publishedAt.toISOString(),
+      reason: "publish portal configuration",
     });
 
     setActivePinia(createPinia());
@@ -189,7 +190,31 @@ describe("portal configuration store", () => {
       beforeVersion,
       afterVersion: beforeVersion + 1,
       actorId: "admin-alliance",
+      reason: "publish portal configuration",
     });
+  });
+
+  it("backfills the audit reason when restoring a legacy v2 portal config", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalConfigStore();
+    clearDefaultSlots(store);
+    store.publish(catalog, true);
+    const persisted = JSON.parse(localStorage.getItem(PORTAL_CONFIG_STORAGE_KEY)!);
+    persisted.version = 2;
+    delete persisted.auditRecords[0].reason;
+    localStorage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify(persisted));
+
+    setActivePinia(createPinia());
+    const restored = usePortalConfigStore();
+
+    expect(restored.publishedConfig.slots).toEqual(store.publishedConfig.slots);
+    expect(restored.auditRecords[0]?.reason).toBe("legacy portal publication");
+
+    persisted.auditRecords[0].reason = 42;
+    localStorage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify(persisted));
+    setActivePinia(createPinia());
+    expect(usePortalConfigStore().publishedConfig.revision).toBe(1);
   });
 
   it("rejects an invalid visual asset without partially publishing the draft", () => {

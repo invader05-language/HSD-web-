@@ -170,6 +170,7 @@ function isAutomationFailure(value: unknown): value is PortalAutomationFailure {
     && typeof value.errorCode === "string"
     && typeof value.createdAt === "string"
     && typeof value.updatedAt === "string"
+    && (value.resolvedAt === undefined || typeof value.resolvedAt === "string")
     && Array.isArray(value.audit)
     && value.audit.every(isAuditRecord);
 }
@@ -284,18 +285,18 @@ function addAudit(
 function automationAudit(
   event: PortalSourceEvent,
   automationKey: string,
-  action: "automation-failed" | "automation-duplicate",
+  action: "automation-failed" | "automation-duplicate" | "automation-retried",
   reason?: string,
+  actualAt: Date = new Date(),
 ): PortalContentAuditRecord {
-  const now = new Date(event.occurredAt);
   return {
-    id: `portal-automation-${eventIdPart(automationKey)}-${action}-${now.getTime()}`,
+    id: `portal-automation-${eventIdPart(automationKey)}-${action}-${actualAt.getTime()}`,
     action,
     actorId: "system",
     targetId: automationKey,
     beforeRevision: 0,
     afterRevision: 0,
-    actualAt: now.toISOString(),
+    actualAt: actualAt.toISOString(),
     ...(reason ? { reason } : {}),
     sourceEventId: event.eventId,
   };
@@ -546,30 +547,44 @@ export const usePortalContentStore = defineStore("portal-content", {
       const matches = this.getPublicRecords(now).filter((record) => slugify(record.slug) === normalized);
       return matches.length === 1 ? matches[0] : undefined;
     },
-    createSystemDraft(event: PortalSourceEvent): PortalAutomationResult {
+    createSystemDraft(
+      event: PortalSourceEvent,
+      options: { resolvedFailure?: PortalAutomationFailure; actualAt?: Date } = {},
+    ): PortalAutomationResult {
       const automationKey = eventKey(event);
       const existing = this.records.find((record) => record.automationKey === automationKey);
       if (existing) {
         const next = clone(existing);
-        addAudit(next, "automation-duplicate", "system", new Date(event.occurredAt), existing.revision, undefined, event.eventId);
+        addAudit(
+          next,
+          "automation-duplicate",
+          "system",
+          options.actualAt ?? new Date(event.occurredAt),
+          existing.revision,
+          undefined,
+          event.eventId,
+        );
         try {
-          this.persistProposed(this.records.map((record) => record.id === existing.id ? next : record), this.automationFailures);
+          const nextFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+          if (options.resolvedFailure) nextFailures.unshift(clone(options.resolvedFailure));
+          this.persistProposed(this.records.map((record) => record.id === existing.id ? next : record), nextFailures);
           this.applyRecord(next);
+          this.automationFailures = nextFailures;
           return { status: "duplicate" };
         } catch {
-          return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED");
+          return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED", options.actualAt);
         }
       }
       const payload = event.payload as Record<string, unknown>;
-      if (payload.isOpen !== true) return this.recordAutomationFailure(event, automationKey, "PORTAL_SOURCE_NOT_PUBLIC");
+      if (payload.isOpen !== true) return this.recordAutomationFailure(event, automationKey, "PORTAL_SOURCE_NOT_PUBLIC", options.actualAt);
       const isRecruitment = event.eventType === "recruitment.batch.opened";
       const titlePart = isRecruitment ? payload.batchName : payload.activityTitle;
       const target = isRecruitment ? "/join" : payload.publicRoute;
       const expiresAt = payload.publicEndAt;
       if (typeof titlePart !== "string" || !isSafeInternalPath(target) || typeof expiresAt !== "string") {
-        return this.recordAutomationFailure(event, automationKey, "PORTAL_AUTOMATION_FAILED");
+        return this.recordAutomationFailure(event, automationKey, "PORTAL_AUTOMATION_FAILED", options.actualAt);
       }
-      const now = new Date(event.occurredAt);
+      const now = options.actualAt ?? new Date(event.occurredAt);
       const id = `portal-flash-${semanticEventId(event)}`;
       const record: PortalContentRecord = {
         id,
@@ -598,23 +613,30 @@ export const usePortalContentStore = defineStore("portal-content", {
       };
       addAudit(record, "create", "system", now, 0, event.eventType, event.eventId);
       const nextFailures = this.automationFailures.filter((failure) => failure.automationKey !== automationKey);
+      if (options.resolvedFailure) nextFailures.unshift(clone(options.resolvedFailure));
       try {
         this.persistProposed([record, ...this.records], nextFailures);
       } catch {
-        return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED");
+        return this.recordAutomationFailure(event, automationKey, "PORTAL_CONTENT_PERSISTENCE_FAILED", options.actualAt);
       }
       this.records.unshift(record);
       this.automationFailures = nextFailures;
       return { status: "created", contentId: id };
     },
-    recordAutomationFailure(event: PortalSourceEvent, automationKey: string, errorCode: string): PortalAutomationResult {
-      const now = new Date(event.occurredAt);
+    recordAutomationFailure(
+      event: PortalSourceEvent,
+      automationKey: string,
+      errorCode: string,
+      actualAt: Date = new Date(event.occurredAt),
+    ): PortalAutomationResult {
+      const now = actualAt;
       const nextFailures = clone(this.automationFailures);
       const existing = nextFailures.find((failure) => failure.automationKey === automationKey);
-      const audit = automationAudit(event, automationKey, "automation-failed", errorCode);
+      const audit = automationAudit(event, automationKey, "automation-failed", errorCode, now);
       if (existing) {
         existing.errorCode = errorCode;
         existing.updatedAt = now.toISOString();
+        delete existing.resolvedAt;
         existing.audit.unshift(audit);
       } else {
         nextFailures.unshift({
@@ -635,15 +657,25 @@ export const usePortalContentStore = defineStore("portal-content", {
         const retained = nextFailures.find((failure) => failure.automationKey === automationKey)!;
         retained.errorCode = persistenceError;
         retained.updatedAt = now.toISOString();
-        retained.audit[0] = automationAudit(event, automationKey, "automation-failed", persistenceError);
+        retained.audit[0] = automationAudit(event, automationKey, "automation-failed", persistenceError, now);
         this.automationFailures = nextFailures;
         return { status: "failed", errorCode: persistenceError, automationKey };
       }
     },
-    retryAutomationDraft(automationKey: string) {
+    retryAutomationDraft(automationKey: string, now: Date = new Date()) {
       const failure = this.automationFailures.find((item) => item.automationKey === automationKey);
       if (!failure) return { status: "failed", errorCode: "PORTAL_AUTOMATION_FAILED", automationKey } as PortalAutomationResult;
-      return this.createSystemDraft(clone(failure.event));
+      const resolvedFailure = clone(failure);
+      resolvedFailure.updatedAt = now.toISOString();
+      resolvedFailure.resolvedAt = now.toISOString();
+      resolvedFailure.audit.unshift(automationAudit(
+        failure.event,
+        automationKey,
+        "automation-retried",
+        "automation retry succeeded",
+        now,
+      ));
+      return this.createSystemDraft(clone(failure.event), { resolvedFailure, actualAt: now });
     },
     syncSourceEligibility(now: Date = new Date()) {
       const nextRecords = clone(this.records);
@@ -657,7 +689,11 @@ export const usePortalContentStore = defineStore("portal-content", {
         changed = true;
       }
       if (changed) {
-        this.persistProposed(nextRecords, this.automationFailures);
+        try {
+          this.persistProposed(nextRecords, this.automationFailures);
+        } catch {
+          this.persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        }
         this.applyRecords(nextRecords);
       }
       return changed;
