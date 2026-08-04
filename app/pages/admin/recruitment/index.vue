@@ -9,13 +9,18 @@ import {
   type RecruitmentAdminFilters,
   type RecruitmentCenter
 } from "~/data/recruitment-admin";
+import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
+import { filterAdminCandidatesByBatch } from "~/data/recruitment-admin-context";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "预备成员考核台｜白云 HSD 开发者部落" });
 
 const introText = "按第一志愿查看预备成员，录入当前考核状态与线下确认后的最终结果。";
 const introRef = usePretextLayout(introText, 26);
-const candidates = ref(ADMIN_CANDIDATES.map((candidate) => ({
+const route = useRoute();
+const batchId = computed(() => typeof route.query.batchId === "string" ? route.query.batchId : "batch-current");
+const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
+const candidates = ref(filterAdminCandidatesByBatch(ADMIN_CANDIDATES, batchId.value).map((candidate) => ({
   ...candidate,
   preferences: [...candidate.preferences] as AdminCandidate["preferences"],
   rounds: candidate.rounds?.map((round) => ({ ...round }))
@@ -116,13 +121,13 @@ function confirmSave() {
       </div>
       <div class="admin-batch-card">
         <span>当前批次</span>
-        <strong>2026 秋季招新</strong>
+        <strong>{{ batch?.name ?? `批次 ${batchId}` }}</strong>
         <small>Mock 数据 · 不写入数据库</small>
       </div>
     </section>
 
     <section class="admin-metrics" aria-label="招新数据概览">
-      <article><span>预备人员</span><strong>{{ String(counts.preparatory).padStart(2, "0") }}</strong><small>本批次全部人员</small></article>
+      <article><span>预备人员</span><strong>{{ String(counts.preparatory).padStart(2, "0") }}</strong><small>本批次全部人员 · {{ batchId }}</small></article>
       <article><span>考核处理中</span><strong>{{ String(counts.assessing).padStart(2, "0") }}</strong><small>含线下结果待录入</small></article>
       <article><span>已录取</span><strong>{{ String(counts.admitted).padStart(2, "0") }}</strong><small>已形成正式成员关系</small></article>
       <article><span>未录取</span><strong>{{ String(counts.notAdmitted).padStart(2, "0") }}</strong><small>当前批次最终结果</small></article>

@@ -3,16 +3,24 @@ import {
   ADMIN_CANDIDATES,
   getPublicationSummary
 } from "~/data/recruitment-admin";
+import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
+import { filterAdminCandidatesByBatch } from "~/data/recruitment-admin-context";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "结果发布｜HSD 管理台" });
 
-const summary = getPublicationSummary(ADMIN_CANDIDATES);
-const selected = ref(
-  new Set(ADMIN_CANDIDATES.filter((candidate) => candidate.stage === "已结束").map((candidate) => candidate.id))
-);
+const route = useRoute();
+const batchId = computed(() => typeof route.query.batchId === "string" ? route.query.batchId : "batch-current");
+const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
+const candidates = computed(() => filterAdminCandidatesByBatch(ADMIN_CANDIDATES, batchId.value));
+const summary = computed(() => getPublicationSummary(candidates.value));
+const selected = ref(new Set<string>());
 const showConfirmation = ref(false);
 const published = ref(false);
+
+watch(candidates, (items) => {
+  selected.value = new Set(items.filter((candidate) => candidate.stage === "已结束").map((candidate) => candidate.id));
+}, { immediate: true });
 
 function toggleCandidate(id: string) {
   const next = new Set(selected.value);
@@ -26,7 +34,7 @@ function toggleCandidate(id: string) {
     <AdminPageHeading
       eyebrow="Result Publication"
       title="结果发布"
-      description="集中检查已经完成的内部结果，确认后再向成员结果中心公开。"
+      :description="`集中检查${batch?.name ?? batchId}已经完成的内部结果，确认后再向成员结果中心公开。`"
     >
       <template #actions>
         <button type="button" class="button" :disabled="selected.size === 0" @click="showConfirmation = true">
@@ -41,7 +49,7 @@ function toggleCandidate(id: string) {
     </div>
 
     <section class="admin-summary-strip" aria-label="结果发布概览">
-      <div><span>本批次人员</span><strong>{{ summary.total }}</strong><small>全部报名人员</small></div>
+      <div><span>本批次人员</span><strong>{{ summary.total }}</strong><small>{{ batchId }}</small></div>
       <div><span>可发布</span><strong>{{ summary.ready }}</strong><small>内部结果已完成</small></div>
       <div><span>仍在考核</span><strong>{{ summary.pending }}</strong><small>不可提前发布</small></div>
       <div><span>已选择</span><strong>{{ selected.size }}</strong><small>等待本次发布</small></div>
@@ -54,7 +62,7 @@ function toggleCandidate(id: string) {
       </header>
       <div class="admin-publication-list">
         <article
-          v-for="candidate in ADMIN_CANDIDATES"
+          v-for="candidate in candidates"
           :key="candidate.id"
           :class="{ 'is-disabled': candidate.stage !== '已结束' }"
         >

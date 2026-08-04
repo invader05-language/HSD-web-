@@ -64,6 +64,10 @@ describe("recruitment batch effective status", () => {
       manualOverride: "force-closed",
       startAt: "2026-08-05T00:00:00.000Z",
     }), NOW).status).toBe("closed");
+    expect(getEffectiveRecruitmentBatchStatus(batch({
+      lifecycleStatus: "closed",
+      manualOverride: "none",
+    }), NOW)).toEqual({ status: "closed", reason: "after-end" });
   });
 
   it("returns one current open batch and rejects conflicting fixtures", () => {

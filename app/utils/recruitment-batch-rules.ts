@@ -19,8 +19,12 @@ export function getEffectiveRecruitmentBatchStatus(
     return { status: "paused", reason: "paused" };
   }
 
-  if (batch.manualOverride === "force-closed" || batch.lifecycleStatus === "closed") {
+  if (batch.manualOverride === "force-closed") {
     return { status: "closed", reason: "force-closed" };
+  }
+
+  if (batch.lifecycleStatus === "closed") {
+    return { status: "closed", reason: "after-end" };
   }
 
   if (batch.manualOverride === "force-open") {
