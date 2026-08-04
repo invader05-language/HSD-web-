@@ -10,6 +10,23 @@ test("desktop homepage exposes the approved content sequence", async ({ page }) 
   await expect(page.getByRole("heading", { name: "由成员记录，也由成员创作" })).toBeVisible();
 });
 
+test("legacy Help Center routes redirect once to their enabled fallback", async ({ page }) => {
+  await page.goto("/help");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
+  await expect(page.getByRole("link", { name: /帮助/ })).toHaveCount(0);
+
+  await page.goto("/admin/content");
+  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/admin\/content$/);
+
+  await page.goto("/admin/content/help");
+  await expect(page).toHaveURL(/\/admin\/content$/);
+  await expect(page.getByRole("status")).toContainText("当前版本暂未开放");
+});
+
 test("public detail remains open and personal signup continues through login", async ({ page }) => {
   await page.goto("/activities/harmonyos-salon");
   await expect(page.getByRole("heading", { name: "HarmonyOS 原生应用入门" })).toBeVisible();
@@ -45,8 +62,7 @@ test("desktop routes do not overflow horizontally", async ({ page }) => {
     "/resources",
     "/resources/project-requirement-template",
     "/people/lin-development",
-    "/join",
-    "/help"
+    "/join"
   ]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);

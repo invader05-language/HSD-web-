@@ -14,7 +14,7 @@ export const SITE_CONFIG = {
     { label: "部落介绍", to: "/about" },
     { label: "四大中心", to: "/centers" },
     { label: "项目成果", to: "/projects" },
-    { label: "活动中心", to: "/activities" },
+    { label: "动态与活动", to: "/activities" },
     { label: "媒体画廊", to: "/gallery" },
     { label: "资源中心", to: "/resources" },
     { label: "结果中心", to: "/member/results" },

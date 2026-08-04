@@ -10,6 +10,7 @@ import {
   STATS
 } from "~/data/home";
 import { usePretextLayout } from "~/composables/usePretextLayout";
+import { createReleaseNoticeState } from "~/utils/admin-release-access";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
@@ -23,10 +24,36 @@ useHead({
 
 const heroDescription = "技术研发、品牌传播、活动策划与人才成长，在真实项目中协作，在实践中共同成长。";
 const heroText = usePretextLayout(heroDescription, 31);
+const route = useRoute();
+const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
+
+function clearReleaseNoticeQuery() {
+  if (!import.meta.client) return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("notice");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function syncReleaseNotice(value: unknown) {
+  if (receiveReleaseNotice(value)) {
+    clearReleaseNoticeQuery();
+  }
+}
+
+onMounted(() => {
+  syncReleaseNotice(route.query.notice);
+});
+
+watch(
+  () => route.query.notice,
+  (notice) => syncReleaseNotice(notice)
+);
 </script>
 
 <template>
   <div class="home-page">
+    <p v-if="releaseNotice" class="home-release-notice shell" role="status">{{ releaseNotice }}</p>
     <section class="home-hero">
       <div class="home-hero__inner">
         <div class="home-hero__copy">
@@ -260,7 +287,6 @@ const heroText = usePretextLayout(heroDescription, 31);
         </div>
         <div>
           <NuxtLink class="button button--light" to="/join">查看招新与报名</NuxtLink>
-          <NuxtLink class="button button--ghost" to="/help">报名帮助</NuxtLink>
         </div>
       </div>
     </section>

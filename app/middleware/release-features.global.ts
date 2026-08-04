@@ -1,7 +1,7 @@
-import { resolveDisabledAdminRoute } from "~/utils/admin-release-access";
+import { resolveDisabledRoute } from "~/utils/admin-release-access";
 
 export default defineNuxtRouteMiddleware((to) => {
-  const disabled = resolveDisabledAdminRoute(to.path);
+  const disabled = resolveDisabledRoute(to.path);
   if (!disabled) return;
 
   return navigateTo({

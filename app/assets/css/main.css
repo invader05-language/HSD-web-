@@ -306,7 +306,7 @@ a {
 .site-footer__bottom {
   display: grid;
   min-height: 52px;
-  grid-template-columns: minmax(0, 1fr) minmax(480px, 2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(480px, 2fr);
   align-items: center;
   gap: 24px;
   border-top: 1px solid #494542;
@@ -327,6 +327,12 @@ a {
   min-height: 44px;
   align-items: center;
   justify-self: end;
+}
+
+.home-release-notice {
+  margin-block: 16px 0;
+  color: #8f1e26;
+  font-weight: 700;
 }
 
 .media-placeholder {

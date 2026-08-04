@@ -30,7 +30,6 @@ import { SITE_CONFIG } from "~/data/site";
       <p class="site-footer__notice">
         本平台由学生社团自主建设，仅用于社团管理与校园交流，站内内容及图片不作任何商业用途。
       </p>
-      <NuxtLink class="site-footer__help" to="/help">帮助中心</NuxtLink>
     </div>
   </footer>
 </template>

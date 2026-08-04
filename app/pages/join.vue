@@ -29,7 +29,6 @@ const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名�
       <template #actions>
         <NuxtLink v-if="canApply" class="button button--light" :to="applyTarget">{{ applyLabel }}</NuxtLink>
         <button v-else type="button" class="button button--light" disabled>当前暂无开放报名</button>
-        <NuxtLink class="button button--ghost" to="/help#recruitment">查看报名帮助</NuxtLink>
       </template>
     </PageBanner>
     <section class="section section--compact" aria-live="polite">

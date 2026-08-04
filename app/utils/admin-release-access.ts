@@ -6,6 +6,10 @@ export interface DisabledAdminRoute {
   notice: "当前版本暂未开放";
 }
 
+function isRouteOrChild(path: string, route: string) {
+  return path === route || path.startsWith(`${route}/`);
+}
+
 export function createReleaseNoticeState() {
   const notice = ref<string>();
 
@@ -22,10 +26,16 @@ export function createReleaseNoticeState() {
   return { notice, receive };
 }
 
-export function resolveDisabledAdminRoute(
+export function resolveDisabledRoute(
   path: string,
   features: ReleaseFeatures = RELEASE_FEATURES
 ): DisabledAdminRoute | undefined {
+  if (!features.helpCenter && isRouteOrChild(path, "/admin/content/help")) {
+    return { to: "/admin/content", notice: "当前版本暂未开放" };
+  }
+  if (!features.helpCenter && isRouteOrChild(path, "/help")) {
+    return { to: "/", notice: "当前版本暂未开放" };
+  }
   if (!features.auditLog && path.startsWith("/admin/logs")) {
     return { to: "/admin", notice: "当前版本暂未开放" };
   }
@@ -38,3 +48,5 @@ export function resolveDisabledAdminRoute(
 
   return undefined;
 }
+
+export const resolveDisabledAdminRoute = resolveDisabledRoute;
