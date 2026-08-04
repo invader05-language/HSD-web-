@@ -24,6 +24,12 @@ export type PromoteFormalMemberToCoreResult =
   | { status: "not_eligible" }
   | { status: "storage_unavailable" };
 
+export type PromoteMemberToFormalResult =
+  | { status: "success" }
+  | { status: "already_formal" }
+  | { status: "not_eligible" }
+  | { status: "storage_unavailable" };
+
 function getRequiredStorage(): Storage {
   try {
     if (typeof localStorage === "undefined") throw new Error("storage unavailable");
@@ -142,6 +148,76 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
+  function promoteMemberToFormal(memberId: string): PromoteMemberToFormalResult {
+    const profiles = useMemberProfileStore();
+    const storedProfile = profiles.profiles[memberId];
+    const staticMember = ADMIN_MEMBERS.find((member) => member.id === memberId);
+    const identity = storedProfile?.identity ?? staticMember?.identity;
+
+    if (identity === "正式成员") return { status: "already_formal" };
+    if (identity !== "预备成员" || !staticMember) return { status: "not_eligible" };
+
+    let storage: Storage;
+    let previousProfileState: string | null;
+    try {
+      storage = getRequiredStorage();
+      previousProfileState = storage.getItem(MEMBER_PROFILE_STORAGE_KEY);
+    } catch {
+      return { status: "storage_unavailable" };
+    }
+
+    const previousProfiles = Object.fromEntries(
+      Object.entries(profiles.profiles).map(([profileId, profile]) => [
+        profileId,
+        { ...profile },
+      ])
+    );
+    const staticPublicPerson = findStaticPublicPersonForMember(memberId);
+    const publicId = staticPublicPerson?.id ?? createPublicMemberId(profiles.profiles);
+    const profile: MemberProfile = {
+      id: staticMember.id,
+      publicId,
+      name: staticPublicPerson?.name ?? staticMember.name,
+      studentId: staticMember.studentId,
+      grade: staticMember.grade,
+      className: "暂未录入",
+      center: staticPublicPerson?.centerName ?? staticMember.center,
+      centerSlug: staticPublicPerson?.centerSlug ?? getCenterSlug(staticMember.center),
+      memberDuty: staticMember.memberDuty,
+      identity: "正式成员",
+      ...((staticMember.center === "白泽开发中心" && staticMember.baizeDirection)
+        ? { baizeDirection: staticMember.baizeDirection }
+        : {}),
+      bio: staticPublicPerson?.bio ?? staticMember.profileSummary,
+      ...((staticPublicPerson?.avatarVisible ? staticPublicPerson.avatarUrl : staticMember.avatarUrl)
+        ? { avatarUrl: staticPublicPerson?.avatarVisible
+          ? staticPublicPerson.avatarUrl
+          : staticMember.avatarUrl! }
+        : {}),
+    };
+
+    try {
+      if (storedProfile) {
+        profiles.profiles[memberId] = {
+          ...storedProfile,
+          ...profile,
+        };
+      } else if (!profiles.addFormalProfile(profile)) {
+        throw new Error("formal member promotion conflict");
+      }
+      profiles.persistProfileState();
+      return { status: "success" };
+    } catch {
+      profiles.replaceProfiles(previousProfiles);
+      try {
+        restoreStoredValue(storage, MEMBER_PROFILE_STORAGE_KEY, previousProfileState);
+      } catch {
+        // The in-memory profile state has already been restored.
+      }
+      return { status: "storage_unavailable" };
+    }
+  }
+
   function promoteFormalMemberToCore(memberId: string): PromoteFormalMemberToCoreResult {
     const profiles = useMemberProfileStore();
     const access = useAdminAccessStore();
@@ -242,5 +318,5 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
-  return { createFormalMember, promoteFormalMemberToCore };
+  return { createFormalMember, promoteMemberToFormal, promoteFormalMemberToCore };
 });

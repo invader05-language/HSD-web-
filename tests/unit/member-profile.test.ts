@@ -170,6 +170,24 @@ describe("member profile domain", () => {
     expect(person).toMatchObject({ memberDuty: "核心人员", isCore: true });
   });
 
+  it("preserves a stored profile identity in the admin projection", () => {
+    const base = ADMIN_MEMBERS.find((member) => member.id === "member-wang")!;
+    const projected = projectMemberToAdmin({
+      id: "member-wang",
+      name: "王同学",
+      studentId: "20260004",
+      grade: "2026 级",
+      className: "软件工程 1 班",
+      center: "新媒体中心",
+      centerSlug: "new-media",
+      memberDuty: "普通成员",
+      identity: "正式成员",
+      bio: "正式成员资料",
+    }, base);
+
+    expect(projected.identity).toBe("正式成员");
+  });
+
   it("ignores a disabled center-lead qualification when deriving core membership", () => {
     const repository = useMemberRepository();
 

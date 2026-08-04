@@ -198,6 +198,57 @@ describe("formal member account creation", () => {
       .toBe(true);
   });
 
+  it("promotes a preparatory member to formal while reusing the existing account", () => {
+    const administration = useMemberAdministrationStore();
+    const access = useAdminAccessStore();
+    const profiles = useMemberProfileStore();
+    const repository = useMemberRepository();
+    const accountBefore = { ...access.accounts.find((account) => account.memberId === "member-wang")! };
+
+    expect(administration.promoteMemberToFormal("member-wang")).toEqual({
+      status: "success",
+    });
+
+    const profile = profiles.getProfile("member-wang");
+    expect(profile).toMatchObject({
+      identity: "正式成员",
+      center: "新媒体中心",
+      centerSlug: "new-media",
+      memberDuty: "普通成员",
+    });
+    expect(profile.publicId).toBeTruthy();
+    expect(repository.findAdminMember("member-wang")).toMatchObject({
+      identity: "正式成员",
+      memberDuty: "普通成员",
+    });
+    expect(repository.findPublicPerson(profile.publicId!)).toMatchObject({
+      name: "王同学",
+      centerName: "新媒体中心",
+      memberDuty: "普通成员",
+    });
+    expect(access.accounts.find((account) => account.memberId === "member-wang")).toEqual(accountBefore);
+
+    setActivePinia(createPinia());
+    expect(useMemberProfileStore().getProfile("member-wang").identity).toBe("正式成员");
+    expect(useAdminAccessStore().accounts.filter((account) => account.memberId === "member-wang")).toHaveLength(1);
+  });
+
+  it("does not downgrade formal members or create a second account on a repeated promotion", () => {
+    const administration = useMemberAdministrationStore();
+    const access = useAdminAccessStore();
+
+    expect(administration.promoteMemberToFormal("member-gao")).toEqual({
+      status: "already_formal",
+    });
+    expect(administration.promoteMemberToFormal("member-wang")).toEqual({
+      status: "success",
+    });
+    expect(administration.promoteMemberToFormal("member-wang")).toEqual({
+      status: "already_formal",
+    });
+    expect(access.accounts.filter((account) => account.memberId === "member-wang")).toHaveLength(1);
+  });
+
   it("reuses the existing public identity and honors when promoting a static member", () => {
     const administration = useMemberAdministrationStore();
     const profiles = useMemberProfileStore();

@@ -120,6 +120,7 @@ export function projectMemberToAdmin(
     name: profile.name,
     studentId: profile.studentId,
     center: profile.center as AdminMember["center"],
+    identity: profile.identity as AdminMember["identity"],
     grade: profile.grade,
     memberDuty: profile.memberDuty,
     baizeDirection: profile.center === "白泽开发中心"
