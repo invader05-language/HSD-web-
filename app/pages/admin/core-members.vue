@@ -14,7 +14,9 @@ const candidateQuery = ref("");
 const addStatus = ref<"idle" | "storage-error">("idle");
 
 function isDerivedCore(member: AdminMember) {
-  return member.memberDuty === "核心人员" || Boolean(member.centerLeadership);
+  return member.isCore ?? (
+    member.memberDuty === "核心人员" || Boolean(member.centerLeadership)
+  );
 }
 
 const coreMembers = computed(() => memberRepository.adminMembers.value

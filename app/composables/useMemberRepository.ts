@@ -2,6 +2,7 @@ import { computed } from "vue";
 import { ADMIN_MEMBERS, type AdminMember } from "../data/admin-members";
 import {
   CORE_PEOPLE,
+  findStaticPublicPersonForMember,
   getStaticMemberIdForPublicPerson,
   getStaticPublicIdForMember,
   PUBLIC_MEMBERS,
@@ -16,6 +17,19 @@ import { useCurrentMember } from "./useCurrentMember";
 import { useMemberProfileStore } from "../stores/member-profile";
 import { useAdminAccessStore } from "../stores/admin-access";
 import { getCenterSlug } from "../utils/member-account-form";
+
+function deriveAdminMemberCoreState(member: AdminMember): AdminMember {
+  const linkedStaticPerson = findStaticPublicPersonForMember(member.id);
+  const isCore = member.memberDuty === "核心人员"
+    || Boolean(member.centerLeadership)
+    || linkedStaticPerson?.memberDuty === "核心人员";
+
+  return {
+    ...member,
+    memberDuty: isCore ? "核心人员" : "普通成员",
+    isCore,
+  };
+}
 
 export function useMemberRepository() {
   const { profile: currentProfile } = useCurrentMember();
@@ -46,24 +60,26 @@ export function useMemberRepository() {
       const qualifiedMember = addCenterLeadership(member);
 
       const profile = formalProfiles.value.find((item) => item.id === member.id);
-      return profile ? projectMemberToAdmin(profile, qualifiedMember) : qualifiedMember;
+      return deriveAdminMemberCoreState(
+        profile ? projectMemberToAdmin(profile, qualifiedMember) : qualifiedMember,
+      );
     });
     const staticMemberIds = new Set(ADMIN_MEMBERS.map((member) => member.id));
     const createdMembers = formalProfiles.value
       .filter((profile) => !staticMemberIds.has(profile.id))
-      .map((profile) => projectMemberToAdmin(profile, addCenterLeadership({
-        id: profile.id,
-        name: profile.name,
-        studentId: profile.studentId,
-        center: profile.center as AdminMember["center"],
-        identity: "正式成员",
-        grade: profile.grade,
-        memberDuty: profile.memberDuty,
-        ...(profile.baizeDirection ? { baizeDirection: profile.baizeDirection } : {}),
-        avatarUrl: profile.avatarUrl ?? null,
-        profileSummary: profile.bio,
-        updatedAt: "刚刚更新",
-      })));
+      .map((profile) => deriveAdminMemberCoreState(projectMemberToAdmin(profile, addCenterLeadership({
+          id: profile.id,
+          name: profile.name,
+          studentId: profile.studentId,
+          center: profile.center as AdminMember["center"],
+          identity: "正式成员",
+          grade: profile.grade,
+          memberDuty: profile.memberDuty,
+          ...(profile.baizeDirection ? { baizeDirection: profile.baizeDirection } : {}),
+          avatarUrl: profile.avatarUrl ?? null,
+          profileSummary: profile.bio,
+          updatedAt: "刚刚更新",
+        }))));
 
     return [...staticMembers, ...createdMembers];
   });
@@ -79,9 +95,11 @@ export function useMemberRepository() {
           ? adminMembers.value.find((member) => member.id === linkedMemberId)
           : undefined;
 
+        const isCore = linkedAdminMember?.isCore ?? person.memberDuty === "核心人员";
         return [{
           ...person,
-          isCore: person.memberDuty === "核心人员" || Boolean(linkedAdminMember?.centerLeadership),
+          memberDuty: isCore ? ("核心人员" as const) : ("普通成员" as const),
+          isCore,
         }];
       }
       if (!isFormalMemberProfile(storedProfile)) return [];
@@ -119,7 +137,7 @@ export function useMemberRepository() {
         const base = {
           id: `platform-${member.id}`,
           name: member.name,
-          memberDuty: member.memberDuty,
+          memberDuty: "核心人员" as const,
           centerSlug: getCenterSlug(member.center),
           centerName: member.center,
           bio: member.profileSummary,

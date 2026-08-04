@@ -75,15 +75,16 @@ export function projectMemberToPublic(
 ): PublicPerson {
   const centerSlug = profile.centerSlug ?? base?.centerSlug;
   if (!centerSlug) throw new Error(`正式成员缺少中心标识：${profile.id}`);
+  const isCore = profile.memberDuty === "核心人员" || Boolean(centerLeadership);
 
   const projected = {
     id: profile.publicId ?? base?.id ?? profile.id,
     name: profile.name,
-    memberDuty: profile.memberDuty,
+    memberDuty: isCore ? "核心人员" : profile.memberDuty,
     centerSlug,
     centerName: profile.center,
     bio: profile.bio,
-    isCore: profile.memberDuty === "核心人员" || Boolean(centerLeadership),
+    isCore,
     order: base?.order ?? Number.MAX_SAFE_INTEGER,
     honors: base?.honors ?? [],
     baizeDirection: base?.baizeDirection,

@@ -18,6 +18,12 @@ export interface AdminMember {
   identity: AdminMemberIdentity;
   grade: string;
   memberDuty: MemberDuty;
+  /**
+   * Repository projection only: true when manual core duty, a linked static
+   * public-core record, or an enabled centre-lead qualification makes this
+   * formal member a core person.
+   */
+  isCore?: boolean;
   baizeDirection?: BaizeDirection;
   centerLeadership?: AdminCenterLeadership;
   avatarUrl: string | null;

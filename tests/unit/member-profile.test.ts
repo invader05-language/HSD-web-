@@ -132,10 +132,38 @@ describe("member profile domain", () => {
     expect(repository.findPublicPerson(publicId)?.isCore).toBe(false);
   });
 
+  it("keeps static public core mappings out of the admin core candidates", () => {
+    const repository = useMemberRepository();
+
+    expect(repository.findAdminMember("member-wu")).toMatchObject({
+      memberDuty: "核心人员",
+      isCore: true,
+    });
+    expect(repository.publicCorePeople.value.find((person) => person.id === "wu-talent"))
+      .toMatchObject({ memberDuty: "核心人员" });
+  });
+
+  it("shows enabled centre leads as core members in the public directory", () => {
+    const repository = useMemberRepository();
+
+    expect(repository.publicCorePeople.value.find((person) => person.name === "李同学"))
+      .toMatchObject({ memberDuty: "核心人员", isCore: true });
+  });
+
   it("ignores a disabled center-lead qualification when deriving core membership", () => {
     const repository = useMemberRepository();
 
     expect(repository.findAdminMember("member-zhao")?.centerLeadership).toBeUndefined();
+  });
+
+  it("keeps a linked static public core member out of core-member candidates", () => {
+    const repository = useMemberRepository();
+    const eligibleCandidateIds = repository.adminMembers.value
+      .filter((member) => member.identity === "正式成员" && member.memberDuty !== "核心人员")
+      .map((member) => member.id);
+
+    expect(repository.findAdminMember("member-wu")?.memberDuty).toBe("核心人员");
+    expect(eligibleCandidateIds).not.toContain("member-wu");
   });
 
   it("projects an enabled formal center lead without a stored profile into the public core directory", () => {
@@ -146,7 +174,7 @@ describe("member profile domain", () => {
       id: "platform-member-li",
       name: "李同学",
       centerName: "新媒体中心",
-      memberDuty: "普通成员",
+      memberDuty: "核心人员",
       isCore: true,
     });
     expect(centerLead).not.toHaveProperty("studentId");
