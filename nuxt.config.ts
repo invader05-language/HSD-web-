@@ -15,14 +15,14 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
-    "/": { ssr: true },
+    "/": { ssr: false },
     "/about": { ssr: true },
     "/centers": { ssr: true },
     "/projects/**": { ssr: true },
     "/activities/**": { ssr: true },
     "/gallery": { ssr: true },
     "/resources": { ssr: true },
-    "/join/**": { ssr: true },
+    "/join/**": { ssr: false },
     "/member/**": { ssr: false },
     "/admin/**": { ssr: false }
   },

@@ -8,6 +8,7 @@ import { usePortalConfigStore } from "~/stores/portal-config";
 import { useSessionStore } from "~/stores/session";
 import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
+import { resolvePortalTabKey, type PortalConfigView } from "~/utils/portal-tabs";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "门户配置｜HSD 管理台" });
@@ -18,7 +19,7 @@ const configStore = usePortalConfigStore();
 const session = useSessionStore();
 const catalog = computed(() => usePortalCatalog());
 const usableVisualAssets = ADMIN_ASSETS.filter((asset) => asset.type === "图片" && canSelectAsset(asset));
-const activeView = computed<"recommendations" | "visuals">(() => route.query.view === "visuals" ? "visuals" : "recommendations");
+const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
 const showPublishConfirmation = ref(false);
 const statusMessage = ref("");
@@ -38,18 +39,14 @@ const publishDialog = ref<HTMLElement | null>(null);
 const publishCancelButton = ref<HTMLButtonElement | null>(null);
 let dialogTrigger: HTMLElement | null = null;
 
-function setView(view: "recommendations" | "visuals", focus = false) {
+function setView(view: PortalConfigView, focus = false) {
   void router.replace({ query: view === "visuals" ? { ...route.query, view } : { ...route.query, view: undefined } }).then(() => {
     if (focus) void nextTick(() => (view === "visuals" ? visualsTab.value : recommendationsTab.value)?.focus());
   });
 }
 
 function handleTabKeydown(event: KeyboardEvent) {
-  const nextView = event.key === "ArrowRight" || event.key === "End"
-    ? "visuals"
-    : event.key === "ArrowLeft" || event.key === "Home"
-      ? "recommendations"
-      : undefined;
+  const nextView = resolvePortalTabKey(activeView.value, event.key);
   if (!nextView) return;
   event.preventDefault();
   setView(nextView, true);

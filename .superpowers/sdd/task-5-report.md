@@ -36,13 +36,17 @@
 - Made publication transactional across persistence and in-memory public state. The proposed public payload is serialized and written first; storage failure throws `PORTAL_CONFIG_PERSISTENCE_FAILED`, preserves the previous `publishedConfig`, and cannot announce publication success.
 - Connected the approved portal asset to the bundled `01-首页Banner.png` source. Home and join/page banners now render the selected image with configured alt text and retain the existing placeholder fallback for no source or image-load failure.
 - Added explicit invalid-current options for missing, unavailable, ineligible, and duplicate saved references, plus distinct persistence, visual, and reference error messages.
-- Completed tab and overlay accessibility: tab/panel associations, roving tab stops, Arrow/Home/End activation, labelled modal dialogs, initial focus, Escape close, focus containment, and trigger focus restoration.
+- Established an explicit client-rendering boundary for `/` and `/join/**`. Browser-local portal publications are no longer compared with default server HTML or silently exposed as SSR data.
+- Completed tab and overlay accessibility: tab/panel associations, roving tab stops, wrapping ArrowLeft/ArrowRight navigation, explicit Home/End activation, labelled modal dialogs, initial focus, Escape close, focus containment, and trigger focus restoration.
 
 ## Review TDD and verification
 
 1. Persistence regression red: publication returned normally after a mocked quota failure. Green: the store threw `PORTAL_CONFIG_PERSISTENCE_FAILED` and retained the exact previous public config.
 2. Visual rendering red: no approved-source resolver or rendered image existed. Green: approved asset URL rendering, image-error fallback, no-selection fallback, and both public visual consumers are covered.
 3. Accessibility/actionability contracts red: tab associations, dialog focus hooks, invalid-current state, and typed error messages were absent. Green after the admin workspace update.
-4. Focused verification: `pnpm vitest run tests/unit/portal-config.test.ts tests/unit/portal-visual.test.ts` passed 2 files and 19 tests.
-5. Full verification: `pnpm run test:unit` passed 36 files and 278 tests; `pnpm run typecheck` passed; `pnpm run build` passed and emitted the 31.73 kB `01-首页Banner` client asset.
-6. gstack browse against the built server confirmed the published image URL loaded visibly with alt text and `naturalWidth: 1440`; ArrowRight activated and focused the visual tab; preview received initial close-button focus, closed on Escape, and returned focus to its trigger. No horizontal overflow was present. The forced localStorage fixture on the SSR homepage produced the known client/server Mock hydration mismatch; admin routes are client-rendered and the checked admin interactions did not depend on that mismatch.
+4. Hydration-boundary regression red: `/` and `/join/**` still declared `ssr: true`. Green: both routes declare `ssr: false`, so their browser-local publication state has a single rendering owner.
+5. Tab-wrap regression red: ArrowRight on the last tab and ArrowLeft on the first tab stayed in place. Green: the pure resolver wraps both edges, keeps Home/End explicit, and ignores unrelated keys.
+6. Focused verification: `pnpm vitest run tests/unit/portal-tabs.test.ts tests/unit/portal-config.test.ts tests/unit/portal-visual.test.ts` passed 3 files and 22 tests.
+7. Full verification: `pnpm run test:unit` passed 37 files and 281 tests; `pnpm run typecheck` passed; `pnpm run build` passed and emitted the 31.73 kB `01-首页Banner` client asset.
+8. Raw built-server responses for `/` and `/join` contained an empty Nuxt mount point plus `data-ssr="false"`, with no portal publication content in server HTML.
+9. gstack browse loaded non-default persisted home and join visuals with the approved image, configured alt text, and `naturalWidth: 1440`; both pages reported no console errors. ArrowRight wrapped the focused visual tab to recommendations, and ArrowLeft wrapped recommendations back to the focused visual tab.

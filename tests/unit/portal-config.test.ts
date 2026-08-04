@@ -300,6 +300,16 @@ describe("portal configuration surfaces", () => {
     expect(source).toContain('aria-labelledby="portal-publish-title"');
     expect(source).toContain("handleDialogKeydown");
     expect(source).toContain("restoreDialogFocus");
+    expect(source).toContain("resolvePortalTabKey(activeView.value, event.key)");
+  });
+
+  it("keeps browser-local portal publications outside the SSR rendering contract", () => {
+    const configSource = readFileSync("nuxt.config.ts", "utf8");
+
+    expect(configSource).toContain('"/": { ssr: false }');
+    expect(configSource).toContain('"/join/**": { ssr: false }');
+    expect(configSource).not.toContain('"/": { ssr: true }');
+    expect(configSource).not.toContain('"/join/**": { ssr: true }');
   });
 
   it("shows invalid current references and distinguishes publication failures", () => {
