@@ -9,6 +9,8 @@ import type {
   PortalSourceEvent,
 } from "../types/portal-content";
 import { useSessionStore } from "./session";
+import { canUseAssetForPortalContent } from "../data/admin-assets";
+import { isSafeInternalPath } from "../utils/internal-route";
 
 export const PORTAL_CONTENT_STORAGE_KEY = "baiyun-hsd.portal-content";
 export const PORTAL_CONTENT_STORAGE_VERSION = 2;
@@ -61,7 +63,7 @@ function isPortalEvent(value: unknown): value is PortalSourceEvent {
 }
 
 function isTarget(value: unknown): boolean {
-  return isRecord(value) && value.type === "internal-route" && typeof value.value === "string";
+  return isRecord(value) && value.type === "internal-route" && isSafeInternalPath(value.value);
 }
 
 function isBlocks(value: unknown): boolean {
@@ -69,10 +71,16 @@ function isBlocks(value: unknown): boolean {
     if (!isRecord(block) || typeof block.type !== "string") return false;
     if (block.type === "heading" || block.type === "paragraph") return typeof block.text === "string";
     return block.type === "image"
-      && typeof block.assetId === "string"
-      && typeof block.alt === "string"
+      && typeof block.assetId === "string" && block.assetId.trim().length > 0
+      && canUseAssetForPortalContent(block.assetId)
+      && typeof block.alt === "string" && block.alt.trim().length > 0
       && (block.caption === undefined || typeof block.caption === "string");
   });
+}
+
+function assertValidContentShape(target: unknown, blocks: unknown) {
+  if (!isTarget(target)) throw new Error("PORTAL_CONTENT_INVALID_TARGET");
+  if (!isBlocks(blocks)) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
 }
 
 function isPublishedSnapshot(value: unknown): value is PortalContentSnapshot {
@@ -276,6 +284,9 @@ export const usePortalContentStore = defineStore("portal-content", {
     },
     createDraft(input: PortalContentDraftInput, now: Date = new Date()) {
       const actor = actorId();
+      const target = input.target ?? { type: "internal-route" as const, value: "/activities" };
+      const blocks = input.blocks ?? [];
+      assertValidContentShape(target, blocks);
       const id = `portal-${input.kind}-${now.getTime()}-${this.records.length + 1}`;
       const record: PortalContentRecord = {
         id,
@@ -283,11 +294,11 @@ export const usePortalContentStore = defineStore("portal-content", {
         slug: input.slug ?? slugify(input.title),
         title: input.title.trim(),
         summary: input.summary.trim(),
-        target: input.target ?? { type: "internal-route", value: "/activities" },
+        target: clone(target),
         status: "draft",
         publishedState: "unpublished",
         revision: 1,
-        blocks: clone(input.blocks ?? []),
+        blocks: clone(blocks),
         originType: "manual",
         sourceValidity: "valid",
         createdAt: now.toISOString(),
@@ -308,6 +319,9 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (!["draft", "published", "unpublished"].includes(record.status)) {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
+      const target = patch.target === undefined ? record.target : patch.target;
+      const blocks = patch.blocks === undefined ? record.blocks : patch.blocks;
+      assertValidContentShape(target, blocks);
       if (record.status !== "draft") {
         record.status = "draft";
         record.revision += 1;
@@ -315,8 +329,8 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (patch.title !== undefined) record.title = patch.title.trim();
       if (patch.summary !== undefined) record.summary = patch.summary.trim();
       if (patch.slug !== undefined) record.slug = patch.slug;
-      if (patch.target !== undefined) record.target = clone(patch.target);
-      if (patch.blocks !== undefined) record.blocks = clone(patch.blocks);
+      if (patch.target !== undefined) record.target = clone(target);
+      if (patch.blocks !== undefined) record.blocks = clone(blocks);
       if (patch.expiresAt !== undefined) record.expiresAt = patch.expiresAt;
       record.updatedAt = now.toISOString();
       addAudit(record, "update", actor, now);
@@ -327,6 +341,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = actorId();
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
+      assertValidContentShape(record.target, record.blocks);
       this.assertSourcePublic(record, now);
       record.status = "in-review";
       record.updatedAt = now.toISOString();
@@ -348,6 +363,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = ownerActorId();
       const record = this.getById(id);
       if (!record || record.status !== "in-review") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
+      assertValidContentShape(record.target, record.blocks);
       this.assertSourcePublic(record, now);
       record.status = "pending-publication";
       record.updatedAt = now.toISOString();
@@ -362,6 +378,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       if (!record || record.status !== "pending-publication" || record.sourceValidity !== "valid") {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
+      assertValidContentShape(record.target, record.blocks);
       this.assertSourcePublic(record, now);
       const publishedAt = now.toISOString();
       record.status = "published";
@@ -415,7 +432,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const titlePart = isRecruitment ? payload.batchName : payload.activityTitle;
       const target = isRecruitment ? "/join" : payload.publicRoute;
       const expiresAt = payload.publicEndAt;
-      if (typeof titlePart !== "string" || typeof target !== "string" || typeof expiresAt !== "string") {
+      if (typeof titlePart !== "string" || !isSafeInternalPath(target) || typeof expiresAt !== "string") {
         return this.recordAutomationFailure(event, automationKey, "PORTAL_AUTOMATION_FAILED");
       }
       const now = new Date(event.occurredAt);

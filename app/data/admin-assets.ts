@@ -201,6 +201,11 @@ export function canSelectAsset(
   return asset.processingStatus === "ready" && asset.reviewStatus === "approved";
 }
 
+export function canUseAssetForPortalContent(assetId: string) {
+  const asset = ADMIN_ASSETS.find((item) => item.id === assetId);
+  return Boolean(asset && asset.type === "图片" && canSelectAsset(asset));
+}
+
 export function filterAdminAssets(
   assets: AdminAsset[],
   filters: { query: string; type: string; state: string }

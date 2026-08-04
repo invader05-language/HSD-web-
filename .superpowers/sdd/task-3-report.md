@@ -44,3 +44,31 @@
 ## Concerns
 
 - Browser-level visual and interaction validation remains blocked by the local browser/runtime environment, despite typecheck, unit, and production build success.
+
+## Review Fix Evidence (2026-08-04)
+
+### Root Cause
+
+- `isTarget` only checked the target object's shape, while `createDraft` and `updateDraft` copied the target without validating it. The editor only required a non-empty target before rendering it as a `NuxtLink`.
+- `isBlocks` accepted empty image `assetId` and `alt` fields. The editor exposed a free-form asset ID, so incomplete or non-approved assets could enter the persisted record.
+
+### Fixes
+
+- Added `isSafeInternalPath` in `app/utils/internal-route.ts`. It accepts only normalized, app-relative paths beginning with `/`; it rejects `//`, absolute/scheme URLs, whitespace, control characters, backslashes, and URL-normalizing path variants.
+- Store validation now runs at create, update, submit, approve, and publish. Invalid targets throw `PORTAL_CONTENT_INVALID_TARGET`; invalid image blocks throw `PORTAL_CONTENT_INVALID_BLOCK`.
+- Added `canUseAssetForPortalContent`, backed by the existing `ADMIN_ASSETS` and `canSelectAsset` adapter. Only ready, approved image assets are accepted. The editor now presents that approved media list and gives actionable errors for missing asset selection, pending/rejected assets, and missing alt text.
+- Corrected the content-block textarea from a literal `rows` string to `:rows` binding.
+
+### TDD Evidence
+
+- Red: `pnpm exec vitest run tests/unit/portal-content.test.ts` produced 2 expected failures: unsafe targets and invalid image blocks were accepted without throwing.
+- Green: `pnpm exec vitest run tests/unit/admin-content.test.ts tests/unit/portal-content.test.ts tests/unit/admin-assets.test.ts` passed: 3 files, 20 tests.
+- Added Store tests for accepted `/join` and `/activities/foo`, rejected `https://example.com`, `//evil.example`, `javascript:alert(1)`, and `data:` targets; blank/unapproved image asset IDs and blank alt text; validation immediately before submit and publish. Existing Store tests cover save/refresh persistence, ordinary-admin owner denial, unpublish, and published-revision isolation.
+
+### Verification
+
+- `pnpm run typecheck` passed.
+- `pnpm run test:unit` passed: 35 files, 252 tests.
+- `pnpm run build` passed after correcting the explicit image-block type guard in the editor.
+- `git diff --check` passed.
+- Browser E2E was not rerun: the previously observed local Chrome `SIGABRT` and missing CI Chromium executable remain environment blockers. No browser result is claimed as passing.

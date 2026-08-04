@@ -180,4 +180,53 @@ describe("portal content store", () => {
     expect(localStorage.getItem(PORTAL_CONTENT_STORAGE_KEY)).toBeNull();
     setItem.mockRestore();
   });
+
+  it("accepts normalized internal content targets and rejects unsafe target schemes", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    const store = usePortalContentStore();
+
+    expect(store.createDraft({
+      kind: "flash", title: "加入我们", summary: "查看招新信息。",
+      target: { type: "internal-route", value: "/join" }
+    }).target.value).toBe("/join");
+    expect(store.createDraft({
+      kind: "flash", title: "活动详情", summary: "查看活动详情。",
+      target: { type: "internal-route", value: "/activities/foo" }
+    }).target.value).toBe("/activities/foo");
+
+    for (const value of ["https://example.com", "//evil.example", "javascript:alert(1)", "data:text/html,test"]) {
+      expect(() => store.createDraft({
+        kind: "flash", title: "不安全目标", summary: "不应保存。",
+        target: { type: "internal-route", value }
+      })).toThrow("PORTAL_CONTENT_INVALID_TARGET");
+    }
+  });
+
+  it("rejects invalid image blocks before content can be saved, submitted, or published", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const validInput = {
+      kind: "article" as const,
+      title: "媒体报道",
+      summary: "包含已审核媒体素材。",
+      target: { type: "internal-route" as const, value: "/activities/foo" },
+      blocks: [{ type: "image" as const, assetId: "asset-recruitment-hero", alt: "招新主视觉" }]
+    };
+
+    expect(() => store.createDraft({ ...validInput, blocks: [{ type: "image", assetId: "", alt: "替代文本" }] })).toThrow("PORTAL_CONTENT_INVALID_BLOCK");
+    expect(() => store.createDraft({ ...validInput, blocks: [{ type: "image", assetId: "asset-recruitment-hero", alt: "   " }] })).toThrow("PORTAL_CONTENT_INVALID_BLOCK");
+
+    const draft = store.createDraft(validInput, now);
+    expect(() => store.updateDraft(draft.id, { blocks: [{ type: "image", assetId: "asset-salon", alt: "未审核素材" }] }, now)).toThrow("PORTAL_CONTENT_INVALID_BLOCK");
+
+    draft.target.value = "//evil.example";
+    expect(() => store.submitForReview(draft.id, now)).toThrow("PORTAL_CONTENT_INVALID_TARGET");
+    draft.target.value = "/activities/foo";
+    store.submitForReview(draft.id, now);
+    store.approve(draft.id, now);
+    draft.blocks[0] = { type: "image", assetId: "asset-recruitment-hero", alt: "" };
+    expect(() => store.publish(draft.id, true, now)).toThrow("PORTAL_CONTENT_INVALID_BLOCK");
+  });
 });
