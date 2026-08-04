@@ -5,7 +5,11 @@ import {
   getAdminCandidateAssessmentRecord,
   type AdminCandidate,
 } from "../data/recruitment-admin";
-import type { RecruitmentCenter } from "../data/recruitment-application";
+import {
+  RECRUITMENT_CENTERS,
+  type RecruitmentCenter,
+  type SubmittedRecruitmentApplication,
+} from "../data/recruitment-application";
 import type {
   AssessmentFinalDecision,
   AssessmentOutcome,
@@ -19,9 +23,10 @@ import {
   getCurrentAssessmentRound,
   isAssessmentRoundEditable,
 } from "../utils/recruitment-assessment-rules";
-import { getCurrentOpenBatch } from "../utils/recruitment-batch-rules";
+import { useAdminAccessStore } from "./admin-access";
 import { useMemberAdministrationStore } from "./member-administration";
 import { MEMBER_PROFILE_STORAGE_KEY, useMemberProfileStore } from "./member-profile";
+import { useRecruitmentApplicationStore } from "./recruitment-application";
 import { useRecruitmentBatchStore } from "./recruitment-batch";
 import { useSessionStore } from "./session";
 
@@ -95,32 +100,57 @@ function cloneBatchState(state: RecruitmentAssessmentBatchState): RecruitmentAss
   };
 }
 
-function isAssessmentRecord(value: unknown): value is RecruitmentAssessmentRecord {
+function isAssessmentRecord(
+  value: unknown,
+  expectedBatchId: string,
+): value is RecruitmentAssessmentRecord {
   if (!isRecord(value)
-    || typeof value.batchId !== "string"
+    || value.batchId !== expectedBatchId
     || typeof value.candidateId !== "string"
     || typeof value.memberId !== "string"
-    || typeof value.center !== "string"
+    || !RECRUITMENT_CENTERS.includes(value.center as RecruitmentCenter)
     || typeof value.acceptsAdjustment !== "boolean"
     || !isRecord(value.roundOutcomes)) {
     return false;
   }
-  return true;
+  if (!Object.entries(value.roundOutcomes).every(([round, outcome]) => (
+    ["1", "2", "3"].includes(round)
+    && ["pending", "passed", "failed"].includes(outcome as string)
+  ))) {
+    return false;
+  }
+  if (value.finalDecision !== undefined
+    && value.finalDecision !== "admitted"
+    && value.finalDecision !== "not-admitted") {
+    return false;
+  }
+  if (value.finalCenter !== undefined
+    && !RECRUITMENT_CENTERS.includes(value.finalCenter as RecruitmentCenter)) {
+    return false;
+  }
+  return ["internalNote", "updatedAt", "publishedAt"].every((key) => (
+    value[key] === undefined || typeof value[key] === "string"
+  ));
 }
 
-function isBatchState(value: unknown): value is RecruitmentAssessmentBatchState {
+function isBatchState(
+  value: unknown,
+  expectedBatchId: string,
+): value is RecruitmentAssessmentBatchState {
   if (!isRecord(value)
-    || typeof value.batchId !== "string"
+    || value.batchId !== expectedBatchId
     || typeof value.batchVersion !== "number"
+    || !Number.isFinite(value.batchVersion)
     || typeof value.version !== "number"
+    || !Number.isFinite(value.version)
     || ![1, 2, 3].includes(value.currentRound as number)
     || !["assessing", "ready-to-publish", "published"].includes(value.status as string)
     || !Array.isArray(value.records)
-    || !value.records.every(isAssessmentRecord)
+    || !value.records.every((record) => isAssessmentRecord(record, expectedBatchId))
     || !Array.isArray(value.auditRecords)) {
     return false;
   }
-  return true;
+  return value.publishedAt === undefined || typeof value.publishedAt === "string";
 }
 
 function getStorage(): Storage | undefined {
@@ -139,7 +169,9 @@ function restorePersistedBatches(): Record<string, RecruitmentAssessmentBatchSta
     if (!isRecord(parsed)
       || parsed.version !== RECRUITMENT_ASSESSMENT_STORAGE_VERSION
       || !isRecord(parsed.batches)
-      || !Object.values(parsed.batches).every(isBatchState)) {
+      || !Object.entries(parsed.batches).every(([batchId, batch]) => (
+        isBatchState(batch, batchId)
+      ))) {
       return {};
     }
     return Object.fromEntries(
@@ -184,7 +216,63 @@ function initialBatchState(batchId: string, batchVersion: number): RecruitmentAs
   };
 }
 
+function isAssessableApplication(application: SubmittedRecruitmentApplication): boolean {
+  return application.status !== "draft" && application.status !== "withdrawn";
+}
+
+function applicationFor(
+  record: RecruitmentAssessmentRecord,
+): SubmittedRecruitmentApplication | undefined {
+  const application = useRecruitmentApplicationStore().getApplication(
+    record.batchId,
+    record.memberId,
+  );
+  return application && isAssessableApplication(application) ? application : undefined;
+}
+
+function candidateFromApplication(
+  record: RecruitmentAssessmentRecord,
+  application: SubmittedRecruitmentApplication,
+): AdminCandidate {
+  const orderedPreferences = application.preferences
+    .slice()
+    .sort((left, right) => left.rank - right.rank)
+    .map((preference) => preference.center);
+  const preferences = (
+    orderedPreferences.length > 0 ? orderedPreferences : [application.firstChoice]
+  ).slice(0, 3) as AdminCandidate["preferences"];
+  const finalDecision = getFinalDecision(record);
+
+  return {
+    id: record.candidateId,
+    batchId: record.batchId,
+    memberId: record.memberId,
+    name: application.applicantProfileSnapshot.name,
+    studentId: application.applicantProfileSnapshot.studentId,
+    grade: application.applicantProfileSnapshot.grade,
+    className: application.applicantProfileSnapshot.className,
+    contact: application.contact,
+    bio: application.applicantProfileSnapshot.bio,
+    identity: record.publishedAt
+      ? finalDecision === "admitted" ? "正式成员" : "未录取"
+      : "预备成员",
+    preferences,
+    baizeDirection: application.baizeDirection,
+    acceptsAdjustment: application.acceptsAdjustment,
+    stage: record.publishedAt ? "已结束" : "第一轮考核",
+    result: record.publishedAt
+      ? finalDecision === "admitted" ? "已录取" : "未通过"
+      : "待公布",
+    finalCenter: record.finalCenter,
+    submittedAt: application.submittedAt ?? application.updatedAt,
+    updatedAt: application.updatedAt,
+    internalNote: record.internalNote,
+  };
+}
+
 function candidateFor(record: RecruitmentAssessmentRecord): AdminCandidate | undefined {
+  const application = applicationFor(record);
+  if (application) return candidateFromApplication(record, application);
   return ADMIN_CANDIDATES.find((candidate) => candidate.id === record.candidateId);
 }
 
@@ -233,11 +321,42 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (!existing) {
         this.batches[batchId] = initialBatchState(batchId, batch.version);
       } else if (existing.batchVersion !== batch.version) {
-        throw new Error("ASSESSMENT_BATCH_VERSION_CONFLICT");
+        // Batch lifecycle and configuration changes do not invalidate assessment
+        // results. Assessment mutations use their own state version.
+        existing.batchVersion = batch.version;
       }
       const state = this.batches[batchId];
       if (!state) throw new Error("ASSESSMENT_BATCH_STATE_UNAVAILABLE");
+      this.reconcileApplications(state);
       return state;
+    },
+    reconcileApplications(state: RecruitmentAssessmentBatchState) {
+      if (state.status === "published") return;
+      const applications = useRecruitmentApplicationStore()
+        .getApplicationsForBatch(state.batchId)
+        .filter(isAssessableApplication);
+
+      applications.forEach((application) => {
+        const existing = state.records.find((record) => (
+          record.memberId === application.memberId
+          || record.candidateId === application.id
+        ));
+        if (existing) {
+          existing.batchId = state.batchId;
+          existing.memberId = application.memberId;
+          existing.center = application.firstChoice;
+          existing.acceptsAdjustment = application.acceptsAdjustment;
+          return;
+        }
+        state.records.push({
+          batchId: state.batchId,
+          candidateId: application.id,
+          memberId: application.memberId,
+          center: application.firstChoice,
+          acceptsAdjustment: application.acceptsAdjustment,
+          roundOutcomes: {},
+        });
+      });
     },
     getCandidates(batchId: string): RecruitmentAssessmentCandidate[] {
       const state = this.getBatchState(batchId);
@@ -245,7 +364,9 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     },
     getCandidate(batchId: string, candidateId: string): RecruitmentAssessmentCandidate | undefined {
       const state = this.getBatchState(batchId);
-      const record = state.records.find((item) => item.candidateId === candidateId);
+      const record = state.records.find((item) => (
+        item.candidateId === candidateId || applicationFor(item)?.id === candidateId
+      ));
       return record ? this.toCandidate(state, record) : undefined;
     },
     toCandidate(
@@ -260,10 +381,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         candidate: candidateFor(record),
       };
     },
-    assertCurrentBatch(batchId: string, now: Date) {
-      const batchStore = useRecruitmentBatchStore();
-      const active = getCurrentOpenBatch(batchStore.batches, now);
-      if (!active || active.id !== batchId) throw new Error("ASSESSMENT_BATCH_NOT_CURRENT");
+    assertCurrentBatch(batchId: string, _now: Date) {
+      const batch = useRecruitmentBatchStore().getBatchOrThrow(batchId);
+      if (batch.lifecycleStatus === "draft") {
+        throw new Error("ASSESSMENT_BATCH_DRAFT_READ_ONLY");
+      }
+      if (batch.lifecycleStatus === "archived") {
+        throw new Error("ASSESSMENT_BATCH_ARCHIVED_READ_ONLY");
+      }
       this.getBatchState(batchId);
     },
     resolveOwner() {
@@ -335,16 +460,6 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (input.internalNote !== undefined) record.internalNote = input.internalNote.trim();
       record.updatedAt = input.now.toISOString();
       applyDerivedDecision(record);
-      const rounds = getAssessmentRounds(record.center);
-      if (input.outcome === "passed"
-        && input.round === rounds[rounds.length - 1]
-        && !candidateMemberId(record)) {
-        // A publication transaction may only promote an account that already
-        // exists. The legacy roster has one unmatched fixture, which cannot
-        // be admitted even after completing its final assessment round.
-        record.finalDecision = "not-admitted";
-        record.finalCenter = undefined;
-      }
       this.appendAudit(state, "save-round", actor.account, input.now);
       this.touch(state);
       return this.toCandidate(state, record);
@@ -362,6 +477,9 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const record = state.records.find((item) => item.candidateId === input.candidateId);
       if (!record) throw new Error("ASSESSMENT_CANDIDATE_NOT_FOUND");
       const actor = this.assertCanEdit(record);
+      if (getAssessmentProcessingStatus(record) !== "offline-adjustment-pending") {
+        throw new Error("ASSESSMENT_ADJUSTMENT_NOT_PENDING");
+      }
       if (!record.acceptsAdjustment || input.finalCenter === "白泽开发中心") {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
@@ -437,6 +555,19 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         throw new Error("ASSESSMENT_NOT_READY");
       }
 
+      const accessStore = useAdminAccessStore();
+      const promotionTargets = state.records
+        .filter((record) => getFinalDecision(record) === "admitted")
+        .map((record) => {
+          const memberId = candidateMemberId(record);
+          if (!memberId
+            || !record.finalCenter
+            || !accessStore.accounts.some((account) => account.memberId === memberId)) {
+            throw new Error("ASSESSMENT_ACCOUNT_NOT_FOUND");
+          }
+          return { record, memberId };
+        });
+
       const profileStore = useMemberProfileStore();
       const assessmentSnapshot = cloneBatchState(state);
       const profileSnapshot = Object.fromEntries(
@@ -448,12 +579,10 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
 
       try {
         const administration = useMemberAdministrationStore();
-        state.records
-          .filter((record) => getFinalDecision(record) === "admitted")
-          .forEach((record) => {
-            const memberId = candidateMemberId(record);
+        promotionTargets
+          .forEach(({ record, memberId }) => {
             const candidate = candidateFor(record);
-            if (!memberId || !record.finalCenter) throw new Error("ASSESSMENT_ACCOUNT_NOT_FOUND");
+            if (!record.finalCenter) throw new Error("ASSESSMENT_NOT_READY");
             const result = administration.promoteMemberToFormal(memberId, {
               center: record.finalCenter,
               ...(candidate?.baizeDirection ? { baizeDirection: candidate.baizeDirection } : {}),
