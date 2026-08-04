@@ -150,12 +150,16 @@ export const useMemberAdministrationStore = defineStore("member-administration",
 
   function promoteMemberToFormal(memberId: string): PromoteMemberToFormalResult {
     const profiles = useMemberProfileStore();
+    const access = useAdminAccessStore();
     const storedProfile = profiles.profiles[memberId];
     const staticMember = ADMIN_MEMBERS.find((member) => member.id === memberId);
     const identity = storedProfile?.identity ?? staticMember?.identity;
 
     if (identity === "正式成员") return { status: "already_formal" };
     if (identity !== "预备成员" || !staticMember) return { status: "not_eligible" };
+    if (!access.accounts.some((account) => account.memberId === memberId)) {
+      return { status: "not_eligible" };
+    }
 
     let storage: Storage;
     let previousProfileState: string | null;
@@ -173,28 +177,35 @@ export const useMemberAdministrationStore = defineStore("member-administration",
       ])
     );
     const staticPublicPerson = findStaticPublicPersonForMember(memberId);
-    const publicId = staticPublicPerson?.id ?? createPublicMemberId(profiles.profiles);
+    const requestedPublicId = storedProfile?.publicId ?? staticPublicPerson?.id;
+    const publicId = requestedPublicId && !Object.entries(profiles.profiles).some(([profileId, profile]) => (
+      profileId !== memberId && profile.publicId === requestedPublicId
+    ))
+      ? requestedPublicId
+      : createPublicMemberId(profiles.profiles);
     const profile: MemberProfile = {
+      ...(storedProfile ?? {}),
       id: staticMember.id,
       publicId,
-      name: staticPublicPerson?.name ?? staticMember.name,
-      studentId: staticMember.studentId,
-      grade: staticMember.grade,
-      className: "暂未录入",
-      center: staticPublicPerson?.centerName ?? staticMember.center,
-      centerSlug: staticPublicPerson?.centerSlug ?? getCenterSlug(staticMember.center),
-      memberDuty: staticMember.memberDuty,
+      name: storedProfile?.name ?? staticPublicPerson?.name ?? staticMember.name,
+      studentId: storedProfile?.studentId ?? staticMember.studentId,
+      grade: storedProfile?.grade ?? staticMember.grade,
+      className: storedProfile?.className ?? "暂未录入",
+      center: staticMember.center,
+      centerSlug: getCenterSlug(staticMember.center),
+      memberDuty: storedProfile?.memberDuty ?? staticMember.memberDuty,
       identity: "正式成员",
-      ...((staticMember.center === "白泽开发中心" && staticMember.baizeDirection)
-        ? { baizeDirection: staticMember.baizeDirection }
+      ...((staticMember.center === "白泽开发中心"
+        && (storedProfile?.baizeDirection ?? staticMember.baizeDirection))
+        ? { baizeDirection: storedProfile?.baizeDirection ?? staticMember.baizeDirection }
         : {}),
-      bio: staticPublicPerson?.bio ?? staticMember.profileSummary,
+      bio: storedProfile?.bio ?? staticPublicPerson?.bio ?? staticMember.profileSummary,
       ...((staticPublicPerson?.avatarVisible ? staticPublicPerson.avatarUrl : staticMember.avatarUrl)
-        ? { avatarUrl: staticPublicPerson?.avatarVisible
-          ? staticPublicPerson.avatarUrl
-          : staticMember.avatarUrl! }
+        ? { avatarUrl: storedProfile?.avatarUrl
+          ?? (staticPublicPerson?.avatarVisible ? staticPublicPerson.avatarUrl : staticMember.avatarUrl!) }
         : {}),
     };
+    if (profile.center !== "白泽开发中心") delete profile.baizeDirection;
 
     try {
       if (storedProfile) {

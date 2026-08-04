@@ -249,6 +249,40 @@ describe("formal member account creation", () => {
     expect(access.accounts.filter((account) => account.memberId === "member-wang")).toHaveLength(1);
   });
 
+  it("refuses promotion when the existing member account is missing", () => {
+    const administration = useMemberAdministrationStore();
+    const access = useAdminAccessStore();
+    const profiles = useMemberProfileStore();
+    access.accounts.splice(access.accounts.findIndex((account) => account.memberId === "member-wang"), 1);
+
+    expect(administration.promoteMemberToFormal("member-wang")).toEqual({
+      status: "not_eligible",
+    });
+    expect(profiles.profiles["member-wang"]).toBeUndefined();
+  });
+
+  it("rolls back a preparatory promotion when profile storage fails", () => {
+    const administration = useMemberAdministrationStore();
+    const profiles = useMemberProfileStore();
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    let rejectedProfileWrite = false;
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === MEMBER_PROFILE_STORAGE_KEY && !rejectedProfileWrite) {
+        rejectedProfileWrite = true;
+        throw new Error("storage unavailable");
+      }
+      originalSetItem(key, value);
+    });
+
+    expect(administration.promoteMemberToFormal("member-wang")).toEqual({
+      status: "storage_unavailable",
+    });
+    expect(profiles.profiles["member-wang"]).toBeUndefined();
+    expect(localStorage.getItem(MEMBER_PROFILE_STORAGE_KEY)).toBeNull();
+
+    setItem.mockRestore();
+  });
+
   it("reuses the existing public identity and honors when promoting a static member", () => {
     const administration = useMemberAdministrationStore();
     const profiles = useMemberProfileStore();

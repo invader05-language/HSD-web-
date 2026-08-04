@@ -92,7 +92,7 @@ function confirmAdd() {
 
     <Teleport to="body">
       <div v-if="showAddDialog" class="admin-drawer-backdrop admin-modal-center" @click.self="closeAddDialog" @keydown.esc="closeAddDialog">
-        <section class="admin-system-confirm admin-qualification-dialog" role="dialog" aria-modal="true" aria-label="添加核心人员">
+        <section class="admin-system-confirm admin-qualification-dialog admin-core-member-dialog" role="dialog" aria-modal="true" aria-label="添加核心人员">
           <span>CORE MEMBERSHIP</span>
           <h2>添加核心人员</h2>
           <p>从尚未成为核心人员的正式成员中选择。确认后只更新成员职责，不创建帐号，也不修改管理员资格。</p>

@@ -6384,6 +6384,14 @@ label small:not(:empty),
   font-size: 9px;
 }
 
+.admin-member-save-status {
+  color: #35825a !important;
+}
+
+.admin-member-save-status.is-error {
+  color: #b1202b !important;
+}
+
 .admin-timeline-list {
   display: grid;
   gap: 9px;
@@ -8239,6 +8247,11 @@ body.is-admin-drawer-open {
 
 .admin-qualification-dialog {
   width: min(100%, 540px);
+}
+
+.admin-qualification-dialog.admin-core-member-dialog footer {
+  margin-top: 28px;
+  gap: 16px;
 }
 
 .admin-qualification-dialog.is-owner > footer {
