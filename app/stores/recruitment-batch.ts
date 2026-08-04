@@ -12,6 +12,7 @@ import {
 } from "../utils/recruitment-batch-rules";
 import { useSessionStore } from "./session";
 import { useRecruitmentApplicationStore } from "./recruitment-application";
+import { PortalAutomationServiceMock } from "../services/portal-automation.mock";
 
 type RecruitmentBatchPatch = Partial<Pick<
   RecruitmentBatch,
@@ -42,6 +43,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
   state: () => ({
     batches: cloneRecruitmentBatches(RECRUITMENT_BATCHES),
     auditRecords: [] as RecruitmentBatchAuditRecord[],
+    automationFailures: [] as Array<{ batchId: string; errorCode: string }>,
   }),
   getters: {
     getBatch: (state) => (batchId: string) => state.batches.find((batch) => batch.id === batchId),
@@ -63,6 +65,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
     replaceBatches(batches: readonly RecruitmentBatch[]) {
       this.batches = batches.map(cloneBatch);
       this.auditRecords = [];
+      this.automationFailures = [];
     },
     getBatchOrThrow(batchId: string): RecruitmentBatch {
       const batch = this.batches.find((item) => item.id === batchId);
@@ -143,6 +146,24 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "open-now", actor, beforeStatus, "open", timestamp, reason, { manualOverride: "none" });
+      const automation = new PortalAutomationServiceMock().createFromEvent({
+        eventId: `recruitment-batch-opened-${batch.id}-${batch.version}`,
+        eventType: "recruitment.batch.opened",
+        occurredAt: timestamp,
+        actorId: actor.id,
+        sourceDomain: "recruitment-batch",
+        sourceId: batch.id,
+        sourceVersion: batch.version,
+        payload: {
+          batchName: batch.name,
+          publicRoute: "/join",
+          publicEndAt: batch.endAt,
+          isOpen: true,
+        },
+      });
+      if (automation.status === "failed") {
+        this.automationFailures.unshift({ batchId: batch.id, errorCode: automation.errorCode });
+      }
       return batch;
     },
     pause(batchId: string, now: Date = new Date(), reason = "pause recruitment batch") {

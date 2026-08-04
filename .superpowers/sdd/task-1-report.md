@@ -1,121 +1,70 @@
-# Task 1 report: central release feature availability
+# Task 1 Report: Portal content domain and publication Mock
 
-## Status
+## Changed files
 
-Completed and self-reviewed.
+- Added `app/types/portal-content.ts` and `app/types/portal-config.ts` for content, event, catalog, slot, and configuration contracts.
+- Added `app/stores/portal-content.ts` for versioned work/published revisions, state transitions, owner checks, schema-versioned persistence, and system draft creation.
+- Added `app/stores/portal-config.ts` for draft/published portal configurations, schema-versioned persistence, owner-only atomic publication, and candidate validation.
+- Added `app/composables/usePortalCatalog.ts` and `app/composables/usePublishedPortal.ts` for read-only fixture adapters and non-mutating same-slot fallback projection.
+- Added `app/services/portal-automation.mock.ts` as the explicitly frontend-only event-to-draft adapter.
+- Added `app/stores/activities.ts` as the current activity owner state with a successful registration-open hook.
+- Updated `app/stores/recruitment-batch.ts` to trigger automation only after `openNow` completes, retaining a retryable failure record without rolling back the batch.
+- Added focused unit tests in `tests/unit/portal-content.test.ts`, `tests/unit/portal-config.test.ts`, and `tests/unit/portal-automation.test.ts`.
 
-## Changes
+## Interfaces
 
-- Added `ReleaseFeatures` and the release-default feature set. The temporary release keeps recruitment batches enabled and disables audit logs, recycle bin, and standalone upload tasks.
-- Added a pure disabled-admin-route resolver, mapping logs and recycle bin to `/admin`, and upload tasks to `/admin/media`, with the approved one-time notice text.
-- Added global route middleware that redirects disabled routes with `replace: true` and a `notice` query parameter.
-- Updated administrative navigation to accept release features while preserving the existing owner-only accounts rule.
-- Updated the admin layout to hide disabled navigation entries, render the arrival notice once, then remove only the `notice` query key with `history.replaceState`.
-- Added focused unit coverage for redirects, recruitment-batch availability, and navigation filtering.
+- `usePortalContentStore()` exposes draft creation/editing, review transitions, published projection reads, unpublishing, schema-versioned persistence fallback, and `retryAutomationDraft`.
+- `usePortalConfigStore()` maintains draft and published configurations with `saveDraft`, `preview`, and atomic `publish`.
+- `usePortalCatalog()` returns public portal candidates from published content plus read-only project/activity/gallery/resource fixtures.
+- `usePublishedPortal()` and `resolveHomepageSlots()` apply the documented same-slot/same-type fallback without changing saved configuration.
+- `PortalAutomationServiceMock.createFromEvent()` returns `created`, `duplicate`, or `failed`; it only creates drafts and uses the specified semantic idempotency key.
 
-## TDD evidence
+## Tests
 
-1. Before implementation, ran:
+Red phase observed before implementation:
 
-   `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/admin-release-features.test.ts`
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-config.test.ts tests/unit/portal-automation.test.ts
 
-   It failed as expected because `app/config/release-features.ts` did not exist.
+Test Files  3 failed (3)
+Error: Failed to resolve import ... portal-content / portal-config / portal-automation.mock
+```
 
-2. After the minimal implementation, ran:
+Focused green phase:
 
-   `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/admin-release-features.test.ts tests/unit/admin-platform.test.ts`
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/portal-content.test.ts tests/unit/portal-config.test.ts tests/unit/portal-automation.test.ts
 
-   Result: 2 test files passed, 10 tests passed.
+Test Files  3 passed (3)
+Tests  8 passed (8)
+```
 
-3. Ran the type check:
+Full unit suite:
 
-   `sh scripts/with-hsd-node.sh corepack pnpm run typecheck`
+```text
+sh scripts/with-hsd-node.sh corepack pnpm exec vitest run
 
-   Result: passed (Nuxt typecheck completed with exit status 0).
+Test Files  35 passed (35)
+Tests  232 passed (232)
+```
 
-4. Ran `git diff --check`; no whitespace errors.
+Typecheck:
 
-## Scope and risks
+```text
+sh scripts/with-hsd-node.sh corepack pnpm run typecheck
 
-- This task deliberately leaves existing disabled-module page files and cross-links in place. Their removal is assigned to the following task.
-- Middleware uses prefix matching exactly as specified, so nested disabled paths are also redirected.
-- The release notice is intentionally local to the layout instance; it is displayed after redirect and the URL is cleaned without touching other query keys.
-- The implementation remains frontend/Mock-only and does not alter authentication or persisted identity state.
+> nuxt typecheck
+```
 
-## Follow-up fix: layout-reuse release notice
+## Self-review
 
-### Root cause
+- Publication requires the exact review path and owner authorization; ordinary administrators can create, edit, and submit only.
+- Editing a published record creates a new work revision while preserving the old public snapshot. The old snapshot can still be explicitly unpublished.
+- Portal publication validates the complete proposed configuration before replacing the public configuration, preventing partial updates.
+- Automation is command-triggered only from successful recruitment/activity writes. No route, getter, query, computed value, or page-load code invokes it.
+- Production backend ownership remains unchanged: this service is a frontend Mock and does not satisfy `HSD-BE-PORTAL-001`.
 
-The initial implementation captured `route.query.notice` only during layout setup and only removed the URL query parameter in `onMounted`. Nuxt reuses the administrative layout across management routes, so a later redirect to a disabled route could arrive after the layout had mounted without updating the rendered notice. The previously displayed value could also remain after a subsequent route carried no notice.
+## Concerns
 
-### Fix
-
-- Added `createReleaseNoticeState()` to the existing release-access utility. It accepts a newly arrived string notice and clears the displayed state when the route no longer carries one.
-- The admin layout now synchronizes the initial mounted route notice and watches `route.query.notice` for later arrivals. Query cleanup still removes only the `notice` key via `history.replaceState`, preserving all other query keys and the hash.
-- Added focused coverage for the `/admin/recycle-bin` fallback and for a layout-equivalent notice state receiving a notice after initialization, then clearing on a later ordinary route.
-
-### TDD and validation evidence
-
-1. Added the notice-state test before production code and ran:
-
-   `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/admin-release-features.test.ts`
-
-   Result: failed as expected with `expected undefined to be type of 'function'` because `createReleaseNoticeState` did not yet exist.
-
-2. Implemented the minimal state helper and route-query watcher, then ran:
-
-   `sh scripts/with-hsd-node.sh corepack pnpm exec vitest run tests/unit/admin-release-features.test.ts tests/unit/admin-platform.test.ts`
-
-   Result: passed — 2 test files, 11 tests.
-
-3. Ran:
-
-   `sh scripts/with-hsd-node.sh corepack pnpm run typecheck`
-
-   Result: blocked by concurrent, unstaged Task 3 work outside this fix. Errors are limited to member/public-directory/recruitment files such as `app/pages/about.vue`, `app/pages/admin/members/[id].vue`, and `app/pages/join/apply.vue`, which reference fields Task 3 is actively renaming (`role`, `direction`, `publicState`). This fix's changed files did not produce a typecheck error.
-
-# Task 1 Report: Assessment Types, Round Rules, and Legacy Adapter
-
-## Scope completed
-
-- Added `app/types/recruitment-assessment.ts` with the batch-scoped assessment
-  record, round, outcome, final-decision, and processing-status contracts.
-- Added pure rules in `app/utils/recruitment-assessment-rules.ts`.
-  - White Ze uses rounds `1`, `2`, and `3`.
-  - New Media, Tuowei Planning, and Talent Development use only round `1`.
-  - A candidate is editable only in the batch's current global round after all
-    preceding applicable rounds have passed.
-  - Failed candidates become `offline-adjustment-pending` only when they accept
-    adjustment; otherwise they are `ready-to-publish`.
-  - `publishedAt` marks the record `completed` and locks all rounds.
-- Extended the legacy `AdminCandidate` compatibility contract with optional
-  `batchId` and `memberId`, populated the static roster, and added
-  `getAdminCandidateAssessmentRecord` to adapt legacy stage/round fields into
-  a `RecruitmentAssessmentRecord`.
-
-## TDD evidence
-
-1. RED: ran `pnpm exec vitest run tests/unit/recruitment-assessment-rules.test.ts`
-   before adding production files. Vitest failed at import analysis because
-   `app/utils/recruitment-assessment-rules` did not exist.
-2. GREEN: after the minimal type, pure-rule, and adapter implementation, the
-   same command passed with `1` file and `6` tests.
-
-## Verification
-
-- `pnpm exec vitest run tests/unit/recruitment-assessment-rules.test.ts tests/unit/recruitment-admin.test.ts tests/unit/admin-recruitment-workflow.test.ts tests/unit/recruitment-applications.test.ts tests/unit/recruitment-batch-context.test.ts tests/unit/recruitment-export.test.ts`
-  - `6` files, `24` tests passed.
-- `pnpm run typecheck`
-  - passed (`nuxt typecheck`, exit code `0`).
-- `git diff --check`
-  - passed with no whitespace errors.
-
-## Follow-up boundary
-
-The adapter is intentionally transitional: new code should make the future
-assessment Store authoritative and key records with the explicit
-`(batchId, memberId)` pair. `AdminCandidate.batchId` and `.memberId` remain
-optional so existing static fixture literals and recruitment-admin tests retain
-their compatibility API. The fixture member IDs beyond existing demo accounts
-are mock identifiers only; Task 2 must obtain live member IDs from the linked
-application and profile stores when saving or publishing.
+- The existing activity domain had no Store or management command; `app/stores/activities.ts` introduces only the minimal owner command needed for the automation boundary. Existing activity pages continue reading their fixtures until the later public/admin workflow tasks connect them.
+- Portal persistence uses browser localStorage only as the specified frontend Mock fallback. It is intentionally not cross-device or production-authoritative.
