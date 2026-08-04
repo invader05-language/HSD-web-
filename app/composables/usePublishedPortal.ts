@@ -10,16 +10,30 @@ export interface ResolvedPortalCatalogItem extends PortalCatalogItem {
   fallbackFor?: string;
 }
 
+export interface PortalProjectionWarning {
+  slot: PortalSlotId;
+  sourceId: string;
+  entityType: PortalReference["entityType"];
+  fallbackSourceId?: string;
+  code: "fallback" | "empty";
+}
+
+export interface HomepageProjection {
+  slots: Record<PortalSlotId, ResolvedPortalCatalogItem[]>;
+  warnings: PortalProjectionWarning[];
+}
+
 function match(reference: PortalReference, catalog: readonly PortalCatalogItem[]) {
   return catalog.find((item) => item.entityType === reference.entityType && item.sourceId === reference.sourceId);
 }
 
-export function resolveHomepageSlots(
+export function resolveHomepageProjection(
   configuredSlots: Partial<PortalSlots>,
   catalog: readonly PortalCatalogItem[],
-): Record<PortalSlotId, ResolvedPortalCatalogItem[]> {
+): HomepageProjection {
   const used = new Set<string>();
   const reserved = new Set<string>();
+  const warnings: PortalProjectionWarning[] = [];
   for (const slot of slotIds) {
     for (const reference of configuredSlots[slot] ?? []) {
       const configured = match(reference, catalog);
@@ -49,16 +63,39 @@ export function resolveHomepageSlots(
       if (replacement) {
         resolved[slot].push({ ...replacement, fallbackFor: reference.sourceId });
         used.add(`${replacement.entityType}:${replacement.sourceId}`);
+        warnings.push({
+          slot,
+          sourceId: reference.sourceId,
+          entityType: reference.entityType,
+          fallbackSourceId: replacement.sourceId,
+          code: "fallback",
+        });
+      } else {
+        warnings.push({
+          slot,
+          sourceId: reference.sourceId,
+          entityType: reference.entityType,
+          code: "empty",
+        });
       }
     }
   }
-  return resolved;
+  return { slots: resolved, warnings };
+}
+
+export function resolveHomepageSlots(
+  configuredSlots: Partial<PortalSlots>,
+  catalog: readonly PortalCatalogItem[],
+): Record<PortalSlotId, ResolvedPortalCatalogItem[]> {
+  return resolveHomepageProjection(configuredSlots, catalog).slots;
 }
 
 export function usePublishedPortal() {
   const config = usePortalConfigStore();
+  const projection = resolveHomepageProjection(config.publishedConfig.slots, usePortalCatalog());
   return {
     config: config.publishedConfig,
-    homepageSlots: resolveHomepageSlots(config.publishedConfig.slots, usePortalCatalog()),
+    homepageSlots: projection.slots,
+    warnings: projection.warnings,
   };
 }

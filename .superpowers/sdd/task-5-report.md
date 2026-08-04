@@ -1,35 +1,32 @@
-# Task 5 Report: Login session persistence
+# Task 5 Report: Portal configuration publication
 
 ## Implementation
 
-- `app/stores/session.ts`
-  - Adds a versioned `sessionStorage` record containing only `version`, `accountId`, and numeric `issuedAt`.
-  - Persists successful administrator-mode sign-ins and removes stale persisted state when switching to member mode or signing out.
-  - Restores only schema-valid sessions whose account still passes the current `requireAdmin` access validation; corrupt, unknown, disabled, revoked, and version-mismatched records are removed.
-- `app/plugins/pinia.ts`
-  - Names the Pinia plugin so dependent startup plugins can order themselves reliably.
-- `app/plugins/session.client.ts`
-  - Restores the session after Pinia initialization and before initial route middleware access evaluation.
-- `tests/unit/session-persistence.test.ts`
-  - Covers minimal serialization, member-mode non-persistence, restoration, corrupt/version invalidation, disabled/revoked qualification invalidation, and explicit sign-out cleanup.
+- Replaced `/admin/content/home` with the merged portal configuration workspace backed by `usePortalCatalog` and `usePortalConfigStore`.
+- Added fixed-capacity selectors plus add/replace, remove, move-up and move-down draft operations with availability, slot eligibility and duplicate validation.
+- Added draft-only preview, owner-only full publication confirmation, atomic reference and visual validation, and persisted home/join visual drafts.
+- Redirected `/admin/content/banners` to `/admin/content/home?view=visuals` and removed the disconnected Banner array/navigation entry.
+- Connected project, activity, gallery and resource homepage sections to the published projection while preserving the approved initial references.
+- Added same-slot/same-type runtime fallback diagnostics, explicit no-candidate warnings, and published visual rendering for home/join without changing recruitment-batch CTA control.
 
 ## TDD evidence
 
-1. Added the focused session persistence tests before the implementation.
-2. Ran `pnpm vitest run tests/unit/session-persistence.test.ts` red: four failures because storage writes and `restore()` were absent.
-3. Added the restore implementation and reran focused tests green.
-4. Added the qualification-revocation case, reran red, then implemented `requireAdmin` restoration validation and reran green.
+1. Baseline: `vitest run tests/unit/portal-config.test.ts` passed 5 tests.
+2. Draft operations red: 3 failed / 5 passed because `replaceReference`, `moveReference` and `removeReference` did not exist. Green: 8 / 8 passed.
+3. Projection/defaults red: 2 failed / 8 passed because warning projection and initial curated references did not exist. Green after implementation and fixture correction: 10 / 10 passed.
+4. UI/public wiring red: 2 failed / 10 passed because the static admin prototype and static public-domain reads remained. Green: 12 / 12 passed.
+5. Visual transaction red: 1 failed / 12 passed because a pending asset could publish. Green after atomic asset validation: 13 / 13 passed.
 
 ## Verification
 
-- `pnpm vitest run tests/unit/session-persistence.test.ts tests/unit/admin-access.test.ts tests/unit/route-access.test.ts`
-  - Passed: 3 files, 30 tests.
-- `pnpm test`
-  - Unrelated failure in `tests/unit/admin-platform.test.ts`: its legacy-substring assertion rejects concurrently added `ADMIN_CENTER_ADMIN_ROLES`.
-- `pnpm typecheck`
-  - Unrelated concurrent errors in `app/stores/admin-access.ts` at lines 177 and 192, in the qualification-store persistence parser.
+- `pnpm run test:unit`: passed, 35 files and 272 tests.
+- `pnpm run typecheck`: passed.
+- `pnpm run build`: passed; Nuxt client, SSR and Nitro output completed successfully.
+- Focused Playwright with the Nuxt dev server could not start because the environment hit `EMFILE: too many open files, watch`.
+- Focused Playwright against the built server could not launch Google Chrome; all three selected tests terminated at browser startup with `SIGABRT` before page execution.
+- gstack browse against the built Nitro server loaded the homepage with HTTP 200 and no console errors, confirmed all curated domains, draft preview isolation, atomic publication changing the first public project from `智巡先锋` to `智学领航`, the legacy Banner redirect, and no horizontal overflow at 390 px.
 
 ## Concerns
 
-- This is a frontend mock. `sessionStorage` gives refresh-within-tab semantics only and is not a replacement for server-side authentication or authorization.
-- Member-mode sessions intentionally remain non-persistent because the minimal persisted record has no role field; every restored record is therefore treated as an administrator session and must re-pass administrator validation.
+- Portal configuration remains a versioned `localStorage` frontend Mock. Server-side transactions, authorization, audit persistence and cross-device consistency remain `BACKEND_REQUIRED` per `HSD-BE-PORTAL-001`.
+- The repository Playwright suite remains environment-blocked by Chrome `SIGABRT`; browser behavior was independently exercised with gstack browse, but the Playwright cases are not recorded as passing.

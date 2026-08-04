@@ -56,9 +56,8 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     id: "content-portal",
     label: "内容与门户",
     items: [
-      { id: "content", label: "内容管理", to: "/admin/content" },
-      { id: "homepage", label: "首页配置", to: "/admin/content/home" },
-      { id: "banners", label: "Banner 配置", to: "/admin/content/banners" },
+      { id: "content", label: "官网内容", to: "/admin/content" },
+      { id: "homepage", label: "门户配置", to: "/admin/content/home" },
       { id: "help", label: "帮助中心", to: "/admin/content/help", feature: "helpCenter" }
     ]
   },

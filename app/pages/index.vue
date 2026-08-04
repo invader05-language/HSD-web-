@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import {
-  ACTIVITIES,
   CENTERS,
   MEMBERS,
-  PROJECTS,
-  RESOURCES,
   STATS
 } from "~/data/home";
 import { usePretextLayout } from "~/composables/usePretextLayout";
@@ -25,9 +22,24 @@ const heroDescription = "技术研发、品牌传播、活动策划与人才成�
 const heroText = usePretextLayout(heroDescription, 31);
 const route = useRoute();
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
-const { homepageSlots } = usePublishedPortal();
+const { config, homepageSlots, warnings } = usePublishedPortal();
 const flashNews = homepageSlots.flash;
 const publishedNews = homepageSlots.news.filter((item) => item.entityType === "article" || item.entityType === "notice");
+const publishedProjects = homepageSlots.projects;
+const publishedActivities = homepageSlots.activities;
+const publishedGallery = homepageSlots.gallery;
+const publishedResources = homepageSlots.resources;
+const emptyProjectionWarnings = warnings.filter((warning) => warning.code === "empty");
+const homeVisualLabel = config.visuals.home.alt || "官网主视觉素材位";
+const homeVisualDetail = config.visuals.home.supportingText || (config.visuals.home.assetId ? "已发布门户主视觉" : "后续使用单独设计或授权照片");
+
+function publicDate(value: string) {
+  const date = new Date(value);
+  return {
+    day: String(date.getUTCDate()).padStart(2, "0"),
+    month: date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }).toUpperCase(),
+  };
+}
 
 function clearReleaseNoticeQuery() {
   if (!import.meta.client) return;
@@ -56,6 +68,7 @@ watch(
 <template>
   <div class="home-page">
     <p v-if="releaseNotice" class="home-release-notice shell" role="status">{{ releaseNotice }}</p>
+    <p v-if="emptyProjectionWarnings.length" class="home-projection-warning shell" role="status">部分首页推荐位暂无同类型可用内容，相关位置已安全留空。</p>
     <section class="home-hero">
       <div class="home-hero__inner">
         <div class="home-hero__copy">
@@ -67,7 +80,7 @@ watch(
             <NuxtLink class="button button--ghost" to="/join">查看招新</NuxtLink>
           </div>
         </div>
-        <MediaPlaceholder label="官网主视觉素材位" detail="后续使用单独设计或授权照片" dark />
+        <MediaPlaceholder :label="homeVisualLabel" :detail="homeVisualDetail" :data-asset-id="config.visuals.home.assetId" dark />
       </div>
     </section>
 
@@ -164,33 +177,34 @@ watch(
           </div>
           <NuxtLink class="text-link" to="/projects">查看全部项目 →</NuxtLink>
         </div>
-        <div class="projects-layout">
-          <article class="featured-project">
-            <MediaPlaceholder label="智巡先锋演示素材位" detail="项目实机、流程或现场验证" dark />
+        <div v-if="publishedProjects.length" class="projects-layout">
+          <article v-if="publishedProjects[0]" class="featured-project">
+            <MediaPlaceholder :label="`${publishedProjects[0].title}演示素材位`" detail="项目实机、流程或现场验证" dark />
             <div class="featured-project__copy">
-              <span>精选项目 · {{ PROJECTS[0].category }}</span>
-              <h3>{{ PROJECTS[0].title }}</h3>
-              <p>{{ PROJECTS[0].description }}</p>
-              <strong>{{ PROJECTS[0].achievement }}</strong>
-              <NuxtLink class="button button--light" :to="`/projects/${PROJECTS[0].slug}`">查看项目详情</NuxtLink>
+              <span>精选项目 · Portal Selection</span>
+              <h3>{{ publishedProjects[0].title }}</h3>
+              <p>{{ publishedProjects[0].summary }}</p>
+              <strong>已发布项目</strong>
+              <NuxtLink class="button button--light" :to="publishedProjects[0].to">查看项目详情</NuxtLink>
             </div>
           </article>
           <div class="project-list">
             <NuxtLink
-              v-for="(project, index) in PROJECTS.slice(1)"
-              :key="project.slug"
-              :to="`/projects/${project.slug}`"
+              v-for="(project, index) in publishedProjects.slice(1)"
+              :key="project.sourceId"
+              :to="project.to"
             >
               <strong>0{{ index + 1 }}</strong>
               <div>
-                <span>{{ project.category }}</span>
+                <span>精选项目</span>
                 <h3>{{ project.title }}</h3>
-                <p>{{ project.description }}</p>
+                <p>{{ project.summary }}</p>
               </div>
               <span aria-hidden="true">→</span>
             </NuxtLink>
           </div>
         </div>
+        <EmptyState v-else title="暂无精选项目" description="项目发布并配置到首页后会显示在这里。" />
       </div>
     </section>
 
@@ -203,20 +217,21 @@ watch(
           </div>
           <NuxtLink class="text-link" to="/activities">活动日历 →</NuxtLink>
         </div>
-        <div class="activities-list">
-          <NuxtLink v-for="activity in ACTIVITIES" :key="activity.title" :to="activity.to" class="activity-row">
+        <div v-if="publishedActivities.length" class="activities-list">
+          <NuxtLink v-for="activity in publishedActivities" :key="activity.sourceId" :to="activity.to" class="activity-row">
             <div class="activity-date">
-              <strong>{{ activity.day }}</strong>
-              <span>{{ activity.month }}</span>
+              <strong>{{ publicDate(activity.publishedAt).day }}</strong>
+              <span>{{ publicDate(activity.publishedAt).month }}</span>
             </div>
-            <span>{{ activity.type }}</span>
+            <span>近期活动</span>
             <div>
               <h3>{{ activity.title }}</h3>
-              <p>{{ activity.meta }}</p>
+              <p>{{ activity.summary }}</p>
             </div>
             <span class="activity-row__action">查看活动 →</span>
           </NuxtLink>
         </div>
+        <EmptyState v-else title="暂无近期活动" description="活动开放并配置到首页后会显示在这里。" />
       </div>
     </section>
 
@@ -229,12 +244,10 @@ watch(
           </div>
           <p>摄影、海报、短视频与人物专访，共同形成部落的内容档案。</p>
         </div>
-        <div class="gallery-grid">
-          <MediaPlaceholder class="gallery-grid__lead" label="年度活动摄影精选" detail="主作品素材位" />
-          <MediaPlaceholder label="校园影像" detail="摄影作品素材位" />
-          <MediaPlaceholder label="活动视觉" detail="海报与品牌作品素材位" />
-          <MediaPlaceholder label="人物专访" detail="访谈封面素材位" />
+        <div v-if="publishedGallery.length" class="gallery-grid gallery-grid--portal">
+          <NuxtLink v-for="item in publishedGallery" :key="item.sourceId" class="gallery-grid__lead" :to="item.to"><MediaPlaceholder :label="item.title" :detail="item.summary" /><strong>{{ item.title }}</strong></NuxtLink>
         </div>
+        <EmptyState v-else title="暂无媒体专题" description="画廊专题配置到首页后会显示在这里。" />
         <NuxtLink class="button button--dark" to="/gallery">进入媒体画廊</NuxtLink>
       </div>
     </section>
@@ -269,16 +282,17 @@ watch(
           <p>所有资源先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。</p>
           <NuxtLink class="button button--dark" to="/resources">浏览资源中心</NuxtLink>
         </div>
-        <div class="resource-list">
-          <NuxtLink v-for="(resource, index) in RESOURCES" :key="resource.title" :to="resource.to">
+        <div v-if="publishedResources.length" class="resource-list">
+          <NuxtLink v-for="(resource, index) in publishedResources" :key="resource.sourceId" :to="resource.to">
             <span>0{{ index + 1 }}</span>
             <div>
-              <small>{{ resource.type }}</small>
+              <small>推荐资源</small>
               <h3>{{ resource.title }}</h3>
             </div>
-            <strong>{{ resource.access }}</strong>
+            <strong>查看详情</strong>
           </NuxtLink>
         </div>
+        <EmptyState v-else title="暂无推荐资源" description="资源可用并配置到首页后会显示在这里。" />
       </div>
     </section>
 

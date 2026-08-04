@@ -18,6 +18,15 @@ test("homepage renders explicit published-projection empty states without static
   await expect(page.getByText("2026 秋季招新通道开放，四大中心均可报名", { exact: true })).toHaveCount(0);
 });
 
+test("homepage renders every curated domain through the published portal projection", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator(".featured-project h3")).toHaveText("智巡先锋");
+  await expect(page.locator(".activities-list .activity-row")).toHaveCount(3);
+  await expect(page.locator(".resource-list > a")).toHaveCount(3);
+  await expect(page.getByRole("link", { name: /年度活动影像记录/ })).toHaveAttribute("href", "/gallery/annual-activity-record");
+});
+
 test("legacy Help Center routes redirect once to their enabled fallback", async ({ page }) => {
   await page.goto("/help");
   await expect(page).toHaveURL(/\/$/);

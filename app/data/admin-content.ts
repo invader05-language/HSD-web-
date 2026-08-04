@@ -1,4 +1,5 @@
 import type { PortalContentKind, PortalContentRecord, PortalContentStatus } from "~/types/portal-content";
+import type { PortalCatalogEntityType, PortalSlotId } from "~/types/portal-content";
 
 export type AdminContentStatus = "草稿" | "待审核" | "待发布" | "已发布" | "已下架";
 
@@ -85,12 +86,11 @@ export function getContentOverview(records: PortalContentRecord[]): AdminContent
 }
 
 export interface HomepageSlot {
-  id: string;
+  id: PortalSlotId;
   label: string;
   capacity: number;
-  current: number;
   description: string;
-  items: string[];
+  allowedTypes: PortalCatalogEntityType[];
 }
 
 export const ADMIN_CONTENT_RECORDS: AdminContentRecord[] = [
@@ -223,49 +223,43 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
     id: "flash",
     label: "HSD 快讯",
     capacity: 1,
-    current: 1,
     description: "首页 Banner 下方的即时信息入口",
-    items: ["2026 秋季招新通道开放"]
+    allowedTypes: ["flash"]
   },
   {
     id: "news",
     label: "推荐新闻",
     capacity: 3,
-    current: 2,
     description: "近期新闻与联盟动态",
-    items: ["鸿蒙启航，共赴星河万里", "专属实训工作室开放"]
+    allowedTypes: ["article", "notice"]
   },
   {
     id: "projects",
     label: "精选项目",
     capacity: 4,
-    current: 3,
     description: "优先展示成熟项目与竞赛成果",
-    items: ["智巡先锋", "小白云", "校园影像地图"]
+    allowedTypes: ["project"]
   },
   {
     id: "activities",
     label: "近期活动",
     capacity: 3,
-    current: 2,
     description: "按时间顺序展示可报名活动",
-    items: ["2026 秋季招新宣讲会", "HarmonyOS 原生开发工作坊"]
+    allowedTypes: ["activity"]
   },
   {
     id: "gallery",
     label: "媒体专题",
     capacity: 1,
-    current: 1,
     description: "使用一张主视觉承载专题入口",
-    items: ["我们的 2026 夏日"]
+    allowedTypes: ["gallery"]
   },
   {
     id: "resources",
     label: "推荐资源",
     capacity: 3,
-    current: 2,
     description: "公开或成员可访问的学习资料",
-    items: ["HarmonyOS 入门路线", "竞赛项目复盘模板"]
+    allowedTypes: ["resource"]
   }
 ];
 

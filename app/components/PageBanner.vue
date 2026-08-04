@@ -1,14 +1,20 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+import type { PortalVisualConfig } from "~/types/portal-config";
+
+const props = withDefaults(defineProps<{
   eyebrow: string;
   title: string;
   description: string;
   tone?: "dark" | "warm" | "red";
   mediaLabel?: string;
+  visual?: PortalVisualConfig;
 }>(), {
   tone: "dark",
   mediaLabel: "页面主题视觉素材位"
 });
+
+const visualLabel = computed(() => props.visual?.alt || props.mediaLabel);
+const visualDetail = computed(() => props.visual?.supportingText || (props.visual?.assetId ? "已发布门户主视觉" : "等待正式授权素材"));
 </script>
 
 <template>
@@ -22,8 +28,7 @@ withDefaults(defineProps<{
           <slot name="actions" />
         </div>
       </div>
-      <MediaPlaceholder :label="mediaLabel" :dark="tone === 'dark' || tone === 'red'" />
+      <MediaPlaceholder :label="visualLabel" :detail="visualDetail" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
     </div>
   </section>
 </template>
-
