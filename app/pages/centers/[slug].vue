@@ -95,11 +95,11 @@ useHead(() => ({
           <article v-for="person in people" :key="person.id">
             <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="md" />
             <div>
-              <p>{{ person.role }}</p>
+              <p>{{ person.memberDuty }}</p>
               <h3>{{ person.name }}</h3>
             </div>
-            <p>{{ person.direction }}</p>
-            <p>{{ person.bio }}</p>
+            <p v-if="person.baizeDirection">{{ person.baizeDirection }}</p>
+            <p v-if="person.bio">{{ person.bio }}</p>
           </article>
         </div>
       </div>

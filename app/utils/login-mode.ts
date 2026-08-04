@@ -16,6 +16,10 @@ export function getLoginErrorMessage(status: MockLoginResult["status"]): string 
       return "该账号未获管理员资格，请使用成员登录。";
     case "admin-access-disabled":
       return "该账号的管理员资格已停用，请联系联盟总负责人。";
+    case "invalid_credentials":
+      return "账号或密码不正确，请检查后重试。";
+    case "password_change_required":
+      return "首次登录需要修改初始密码。";
     case "success":
       return "";
   }

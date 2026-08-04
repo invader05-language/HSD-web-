@@ -6,6 +6,7 @@ import {
   useSessionStore
 } from "../../app/stores/session";
 import { useAdminAccessStore } from "../../app/stores/admin-access";
+import { resolveProtectedRouteTarget } from "../../app/utils/route-access";
 
 describe("session persistence", () => {
   beforeEach(() => {
@@ -13,6 +14,114 @@ describe("session persistence", () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.history.pushState({}, "", "/");
+  });
+
+  function registerFirstLoginAccount() {
+    const access = useAdminAccessStore();
+    access.registerFormalMemberAccount({
+      account: "20269999",
+      memberId: "member-20269999",
+      name: "新成员",
+      adminLevel: "member",
+      adminAccessEnabled: true,
+      mustChangePassword: true
+    });
+    access.persistAccessState();
+  }
+
+  function registerFirstLoginAdministrator() {
+    const access = useAdminAccessStore();
+    access.registerFormalMemberAccount({
+      account: "20269998",
+      memberId: "member-20269998",
+      name: "新管理员",
+      adminLevel: "admin",
+      adminCenterRole: "白泽开发中心负责人",
+      adminAccessEnabled: true,
+      mustChangePassword: true
+    });
+    access.persistAccessState();
+  }
+
+  it("accepts only the fixed initial password for a first-login account", () => {
+    registerFirstLoginAccount();
+    const session = useSessionStore();
+
+    expect(session.signIn("20269999", "wrong-password")).toMatchObject({
+      status: "invalid_credentials"
+    });
+    expect(session.isAuthenticated).toBe(false);
+
+    expect(session.signIn("20269999", "hsd1314")).toMatchObject({
+      status: "password_change_required"
+    });
+    expect(session.isAuthenticated).toBe(true);
+    expect(session.mustChangePassword).toBe(true);
+  });
+
+  it("restores a first-login session without removing its restriction", () => {
+    registerFirstLoginAccount();
+    useSessionStore().signIn("20269999", "hsd1314");
+    window.history.pushState({}, "", "/admin");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+    expect(restored.restore()).toBe(true);
+    expect(restored.currentAccountId).toBe("20269999");
+    expect(restored.mustChangePassword).toBe(true);
+    expect(resolveProtectedRouteTarget("/admin", "/admin", restored))
+      .toBe("/member/change-password?redirect=%2Fmember");
+  });
+
+  it("restores an enabled first-login administrator before restricting it to password change", () => {
+    registerFirstLoginAdministrator();
+    useSessionStore().signIn("20269998", "hsd1314", { requireAdmin: true });
+    window.history.pushState({}, "", "/admin");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+
+    expect(restored.restore()).toBe(true);
+    expect(restored.currentAccountId).toBe("20269998");
+    expect(restored.mustChangePassword).toBe(true);
+    expect(resolveProtectedRouteTarget("/admin", "/admin", restored))
+      .toBe("/member/change-password?redirect=%2Fmember");
+  });
+
+  it("rejects a disabled first-login administrator during admin restore and clears its session", () => {
+    registerFirstLoginAdministrator();
+    useSessionStore().signIn("20269998", "hsd1314", { requireAdmin: true });
+    useAdminAccessStore().setAdminAccessEnabled("20269998", false, {
+      account: "admin-alliance",
+      name: "张同学",
+      level: "owner"
+    });
+    window.history.pushState({}, "", "/admin");
+    setActivePinia(createPinia());
+
+    const restored = useSessionStore();
+
+    expect(restored.restore()).toBe(false);
+    expect(restored.isAuthenticated).toBe(false);
+    expect(window.sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it("completes the mock password-change flow without persisting the replacement password", () => {
+    registerFirstLoginAccount();
+    const session = useSessionStore();
+    session.signIn("20269999", "hsd1314");
+
+    expect(session.completePasswordChange("hsd1314", "hsd1314")).toEqual({
+      status: "invalid_input",
+      errors: { password: "新密码不能与初始密码相同。" }
+    });
+    expect(session.completePasswordChange("new-pass-2026", "new-pass-2026"))
+      .toEqual({ status: "success" });
+    expect(session.mustChangePassword).toBe(false);
+    expect(window.localStorage.getItem("baiyun-hsd-admin-access"))
+      .not.toContain("new-pass-2026");
+    expect(window.sessionStorage.getItem(SESSION_STORAGE_KEY))
+      .not.toContain("new-pass-2026");
   });
 
   it("serializes only the authenticated account, issued-at time, and storage version", () => {

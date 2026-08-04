@@ -19,9 +19,14 @@ export type RecruitmentCenter = (typeof RECRUITMENT_CENTERS)[number];
 export type BaizeDirection = (typeof BAIZE_DIRECTIONS)[number];
 export type LaterChoice = Exclude<RecruitmentCenter, "白泽开发中心">;
 
+export function isBaizeDirection(value: unknown): value is BaizeDirection {
+  return typeof value === "string"
+    && (BAIZE_DIRECTIONS as readonly string[]).includes(value);
+}
+
 export type RegistrationProfileDraft = Pick<
   MemberProfile,
-  "name" | "studentId" | "grade" | "className" | "direction" | "bio" | "avatarUrl"
+  "name" | "studentId" | "grade" | "className" | "bio" | "avatarUrl"
 >;
 
 export interface RecruitmentApplicationDraft {
@@ -56,7 +61,6 @@ export function createRegistrationProfileDraft(profile: MemberProfile): Registra
     studentId: profile.studentId,
     grade: profile.grade,
     className: profile.className,
-    direction: profile.direction,
     bio: profile.bio,
     avatarUrl: profile.avatarUrl,
   };

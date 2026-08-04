@@ -26,9 +26,9 @@ useHead(() => ({
 <template>
   <div v-if="person" class="member-detail">
     <PageBanner
-      :eyebrow="person.role"
+      :eyebrow="person.memberDuty"
       :title="person.name"
-      :description="person.bio"
+      :description="person.bio || `${person.centerName} · ${person.memberDuty}`"
       tone="warm"
       :media-label="`${person.name}公开风采素材位`"
     />
@@ -45,9 +45,9 @@ useHead(() => ({
                 <dt>所属中心</dt>
                 <dd>{{ person.centerName }}</dd>
               </div>
-              <div>
+              <div v-if="person.baizeDirection">
                 <dt>实践方向</dt>
-                <dd>{{ person.direction }}</dd>
+                <dd>{{ person.baizeDirection }}</dd>
               </div>
             </dl>
           </div>

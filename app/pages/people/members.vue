@@ -25,7 +25,7 @@ const visibleMembers = computed(() => {
 
   return publicMembers.value.filter((person) => {
     const matchesCenter = center.value === "all" || person.centerSlug === center.value;
-    const searchableText = [person.name, person.centerName, person.direction, person.bio]
+    const searchableText = [person.name, person.centerName, person.baizeDirection, person.bio]
       .join(" ")
       .toLocaleLowerCase();
 
@@ -39,7 +39,7 @@ const visibleMembers = computed(() => {
     <PageBanner
       eyebrow="Public Members"
       title="全体成员名录"
-      description="浏览成员公开的基础风采与实践方向。头像未上传时，统一显示白底 HSD 默认头像。"
+      description="浏览正式成员默认公开的基础风采资料。白泽开发中心成员同时展示统一实践方向；头像未上传时使用白底 HSD 默认头像。"
       tone="dark"
       media-label="成员共同实践影像素材位"
     />
@@ -49,7 +49,7 @@ const visibleMembers = computed(() => {
         <div class="directory-toolbar">
           <label>
             <span>搜索成员</span>
-            <input v-model="query" type="search" placeholder="姓名、中心或实践方向">
+            <input v-model="query" type="search" placeholder="姓名、中心或白泽实践方向">
           </label>
           <label>
             <span>按中心筛选</span>
@@ -74,7 +74,7 @@ const visibleMembers = computed(() => {
             <div class="people-member-card__content">
               <span>{{ person.centerName }}</span>
               <h2>{{ person.name }}</h2>
-              <strong>{{ person.direction }}</strong>
+              <strong v-if="person.baizeDirection">{{ person.baizeDirection }}</strong>
               <ul v-if="getFeaturedHonors(person).length" class="featured-honors">
                 <li
                   v-for="honor in getFeaturedHonors(person)"
@@ -84,7 +84,7 @@ const visibleMembers = computed(() => {
                   重点荣誉 · {{ honor.title }}
                 </li>
               </ul>
-              <p>{{ person.bio }}</p>
+              <p v-if="person.bio">{{ person.bio }}</p>
               <span class="directory-card__action">查看成员详情 →</span>
             </div>
           </NuxtLink>
@@ -95,7 +95,7 @@ const visibleMembers = computed(() => {
           </template>
         </EmptyState>
 
-        <p class="privacy-note">本页仅展示成员主动公开的基础风采信息，不包含个人联系方式、考核结果或成长记录。</p>
+        <p class="privacy-note">本页默认展示正式成员的基础风采信息，不包含学号、班级、联系方式、报名信息、考核结果或帐号资料。</p>
       </div>
     </section>
   </div>

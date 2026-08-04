@@ -16,7 +16,7 @@ export const ADMIN_CENTER_LEAD_LABELS = [
 export type AdminCenterRole = (typeof ADMIN_CENTER_LEAD_LABELS)[number];
 
 export const ADMIN_ACCESS_STORAGE_KEY = "baiyun-hsd-admin-access";
-export const ADMIN_ACCESS_STORAGE_VERSION = 1;
+export const ADMIN_ACCESS_STORAGE_VERSION = 2;
 
 export function getAdminLevelLabel(level: AdminLevel): string {
   if (level === "owner") return "联盟总负责人";
@@ -33,6 +33,7 @@ export interface MockAccount {
   name: string;
   adminLevel: AdminLevel;
   adminAccessEnabled: boolean;
+  mustChangePassword: boolean;
   adminCenterRole?: AdminCenterRole;
 }
 
@@ -60,6 +61,8 @@ export function getAdminCandidateDisplay(account: MockAccount): AdminCandidateDi
 
 export type MockLoginResult =
   | { status: "success"; account: MockAccount }
+  | { status: "password_change_required"; account: MockAccount }
+  | { status: "invalid_credentials"; account: string }
   | { status: "unknown-account"; account: string }
   | { status: "admin-access-missing"; account: MockAccount }
   | { status: "admin-access-disabled"; account: MockAccount };
@@ -76,7 +79,13 @@ function createPlatformMemberAccount(
   options: Pick<MockAccount, "adminLevel" | "adminAccessEnabled" | "adminCenterRole">
 ): MockAccount {
   const member = getPlatformMember(memberId);
-  return { account, memberId: member.id, name: member.name, ...options };
+  return {
+    account,
+    memberId: member.id,
+    name: member.name,
+    mustChangePassword: false,
+    ...options
+  };
 }
 
 // Account authorization remains centralized here. Platform-member-backed accounts reuse
@@ -87,14 +96,16 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
     memberId: DEMO_MEMBER_PROFILE.id,
     name: DEMO_MEMBER_PROFILE.name,
     adminLevel: "member",
-    adminAccessEnabled: true
+    adminAccessEnabled: true,
+    mustChangePassword: false
   },
   {
     account: DEMO_APPLICANT_ACCOUNT,
     memberId: DEMO_APPLICANT_PROFILE.id,
     name: DEMO_APPLICANT_PROFILE.name,
     adminLevel: "member",
-    adminAccessEnabled: true
+    adminAccessEnabled: true,
+    mustChangePassword: false
   },
   createPlatformMemberAccount("media-admin", "member-li", {
     adminLevel: "admin",

@@ -62,7 +62,7 @@ test("login modes reject members from administrator access and admit qualified a
   await expect(page).toHaveURL(/\/admin$/);
 });
 
-test("owner qualification changes are confirmed and written to the audit log", async ({ page }) => {
+test("owner qualification changes are confirmed without an audit-log entry point", async ({ page }) => {
   await signInToAdmin(page, "/admin/accounts");
 
   const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
@@ -90,12 +90,7 @@ test("owner qualification changes are confirmed and written to the audit log", a
   await confirm.getByRole("button", { name: "确认变更" }).click();
   await expect(memberRow).toContainText("普通成员");
 
-  await page.getByRole("link", { name: "操作日志", exact: true }).click();
-  const audit = page.getByRole("table", { name: "管理员操作日志" });
-  await expect(audit).toContainText("分配中心负责人资格");
-  await expect(audit).toContainText("停用管理员资格");
-  await expect(audit).toContainText("启用管理员资格");
-  await expect(audit).toContainText("撤销管理员资格");
+  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
 });
 
 test("a newly qualified account can start an admin session but cannot manage accounts", async ({ page }) => {
@@ -140,21 +135,59 @@ test("dashboard prioritizes actionable work instead of decorative charts", async
   await expect(page.getByRole("heading", { name: "今日待办" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "招新进度" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "媒体与存储" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "上传任务", exact: true })).toHaveCount(0);
+  await expect(page.getByText("最近操作记录", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "新建" }).click();
   await expect(page.getByRole("menu", { name: "快捷新建" })).toContainText("上传学习资料");
 });
 
-test("member administration separates internal public and growth information", async ({ page }) => {
+test("member administration defaults formal profiles to public without visibility controls", async ({ page }) => {
   await signInToAdmin(page, "/admin/members");
 
   await expect(page.getByRole("heading", { level: 1, name: "全体成员" })).toBeVisible();
   await expect(page.getByRole("table", { name: "成员管理名单" })).toBeVisible();
+  await expect(page.getByLabel("公开资料")).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "公开资料" })).toHaveCount(0);
+  await expect(page.getByText("资料待审核", { exact: true })).toHaveCount(0);
+
+  const mediaRow = page.getByRole("row").filter({ hasText: "李同学" });
+  await expect(mediaRow.getByRole("cell", { name: "—", exact: true })).toBeVisible();
+
   await page.getByRole("link", { name: "查看成员 林同学" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "内部资料" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "公开资料" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "成长与荣誉" })).toBeVisible();
+  await page.getByRole("tab", { name: "公开资料" }).click();
+  await expect(page.getByLabel("资料状态")).toHaveCount(0);
+  await expect(page.getByText("公开状态", { exact: true })).toHaveCount(0);
+});
+
+test("core-member administration only adds eligible formal members and keeps centres read-only", async ({ page }) => {
+  await signInToAdmin(page, "/admin/core-members");
+
+  await expect(page.getByRole("heading", { level: 1, name: "核心人员配置" })).toBeVisible();
+  await expect(page.getByText(/任期|公开展示|暂不公开|拖动手柄|部落介绍展示预览/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "移除", exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "添加核心人员" }).click();
+  const dialog = page.getByRole("dialog", { name: "添加核心人员" });
+  await expect(dialog.getByText("高同学", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: /选择 高同学/ }).click();
+  await dialog.getByRole("button", { name: "确认添加" }).click();
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("高同学");
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("核心人员");
+
+  await page.reload();
+  await expect(page.getByRole("list", { name: "核心人员名单" })).toContainText("高同学");
+
+  await page.getByRole("link", { name: "中心组织", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "中心组织" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /配置中心资料/ })).toHaveCount(0);
+  await expect(page.getByText("配置中心资料", { exact: false })).toHaveCount(0);
 });
 
 test("project activity and portal content share a clear draft review publish workflow", async ({ page }) => {
@@ -184,6 +217,8 @@ test("media uploads and learning resources expose honest storage states", async 
   await expect(page.getByRole("heading", { name: "上传新素材" })).toBeVisible();
   await expect(page.getByText("等待上传")).toBeVisible();
   await page.getByRole("button", { name: "关闭上传面板" }).click();
+  await page.locator(".admin-asset-card").first().click();
+  await expect(page.getByRole("button", { name: "移入回收站" })).toHaveCount(0);
 
   await page.getByRole("link", { name: "学习资料", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "学习资料" })).toBeVisible();
@@ -191,11 +226,4 @@ test("media uploads and learning resources expose honest storage states", async 
   await page.getByRole("button", { name: "编辑资源 HarmonyOS 入门路线" }).click();
   await expect(page.getByText("版本历史")).toBeVisible();
   await expect(page.getByText("病毒扫描与 Office 转换将在后端接入")).toBeVisible();
-});
-
-test("audit records make sensitive operations reviewable", async ({ page }) => {
-  await signInToAdmin(page, "/admin/logs");
-  await expect(page.getByRole("heading", { level: 1, name: "操作日志" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "管理员操作日志" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "变更前 / 变更后" }).first()).toBeVisible();
 });

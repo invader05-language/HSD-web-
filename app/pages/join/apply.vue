@@ -159,7 +159,6 @@ async function submitApplication() {
         studentId: profileDraft.studentId.trim(),
         grade: profileDraft.grade.trim(),
         className: profileDraft.className.trim(),
-        direction: profileDraft.direction.trim(),
         bio: profileDraft.bio.trim(),
       },
       {
@@ -207,7 +206,7 @@ onBeforeUnmount(() => {
           <details>
             <summary>查看已提交报名摘要</summary>
             <div class="recruitment-summary-grid">
-              <section><h3>成员资料</h3><p>姓名：{{ currentProfile.name }}</p><p>实践方向：{{ currentProfile.direction }}</p><p>联系方式：{{ submittedApplication.contact }}（仅招新联系）</p></section>
+              <section><h3>成员资料</h3><p>姓名：{{ currentProfile.name }}</p><p v-if="currentProfile.bio">个人简介：{{ currentProfile.bio }}</p><p>联系方式：{{ submittedApplication.contact }}（仅招新联系）</p></section>
               <section><h3>报名志愿</h3><p>第一志愿：{{ submittedApplication.firstChoice }}</p><p>第二志愿：{{ submittedApplication.secondChoice || "未填写" }}</p><p>第三志愿：{{ submittedApplication.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ submittedApplication.baizeDirection || "不适用" }}</p></section>
             </div>
           </details>
@@ -233,8 +232,7 @@ onBeforeUnmount(() => {
                   <label data-field="studentId"><span>学号</span><input v-model="profileDraft.studentId" inputmode="numeric" maxlength="14" :aria-invalid="Boolean(errors.studentId)" :aria-describedby="errors.studentId ? 'student-id-error' : undefined"><small v-if="errors.studentId" id="student-id-error" class="form-error">{{ errors.studentId }}</small></label>
                   <label data-field="grade"><span>年级</span><select v-model="profileDraft.grade" :aria-invalid="Boolean(errors.grade)" :aria-describedby="errors.grade ? 'grade-error' : undefined"><option value="">请选择年级</option><option v-for="grade in grades" :key="grade" :value="grade">{{ grade }}</option></select><small v-if="errors.grade" id="grade-error" class="form-error">{{ errors.grade }}</small></label>
                   <label data-field="className"><span>班级</span><input v-model="profileDraft.className" maxlength="30" :aria-invalid="Boolean(errors.className)" :aria-describedby="errors.className ? 'class-name-error' : undefined"><small v-if="errors.className" id="class-name-error" class="form-error">{{ errors.className }}</small></label>
-                  <label data-field="direction" class="registration-fields__wide"><span>实践方向</span><input v-model="profileDraft.direction" maxlength="80" :aria-invalid="Boolean(errors.direction)" :aria-describedby="errors.direction ? 'direction-error' : undefined"><small v-if="errors.direction" id="direction-error" class="form-error">{{ errors.direction }}</small></label>
-                  <label data-field="bio" class="registration-fields__wide"><span>个人简介</span><textarea v-model="profileDraft.bio" rows="5" maxlength="180" :aria-invalid="Boolean(errors.bio)" :aria-describedby="errors.bio ? 'bio-error' : undefined"></textarea><small>20–180 个字符，介绍你的实践重点或想持续发展的方向。</small><small v-if="errors.bio" id="bio-error" class="form-error">{{ errors.bio }}</small></label>
+                  <label data-field="bio" class="registration-fields__wide"><span>个人简介（选填）</span><textarea v-model="profileDraft.bio" rows="5" maxlength="180" :aria-invalid="Boolean(errors.bio)" :aria-describedby="errors.bio ? 'bio-error' : undefined"></textarea><small>最多 180 个字符，可介绍你的实践重点或想持续发展的方向。</small><small v-if="errors.bio" id="bio-error" class="form-error">{{ errors.bio }}</small></label>
                   <label data-field="contact" class="registration-fields__wide"><span>联系方式</span><input v-model="applicationDraft.contact" maxlength="50" autocomplete="tel" :aria-invalid="Boolean(errors.contact)" :aria-describedby="errors.contact ? 'contact-error contact-help' : 'contact-help'"><small id="contact-help">仅用于招新联系，不展示在公开成员资料中。</small><small v-if="errors.contact" id="contact-error" class="form-error">{{ errors.contact }}</small></label>
                 </div>
                 <section class="registration-managed" aria-label="系统管理信息"><h3>系统管理信息</h3><dl><div><dt>成员身份</dt><dd>预备成员</dd></div><div><dt>所属中心</dt><dd>待确定</dd></div><div><dt>组织职务</dt><dd>暂无组织职务</dd></div></dl></section>
@@ -254,7 +252,7 @@ onBeforeUnmount(() => {
               <section v-show="step === 3" aria-labelledby="application-confirmation-heading">
                 <header class="recruitment-section-heading"><span>03</span><div><h2 id="application-confirmation-heading">确认并提交</h2><p>请核对全部资料；提交后会同步已保存成员资料与本次招新申请。</p></div></header>
                 <div class="recruitment-confirmation-grid">
-                  <section><header><h3>成员资料</h3><button type="button" class="text-link" @click="goToStep(1)">修改</button></header><div class="recruitment-confirmation-profile"><HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="sm" /><div><p>姓名：{{ profileDraft.name }}</p><p>学号：{{ profileDraft.studentId }}</p><p>年级：{{ profileDraft.grade }}</p><p>班级：{{ profileDraft.className }}</p></div></div><p>实践方向：{{ profileDraft.direction }}</p><p>个人简介：{{ profileDraft.bio }}</p><p>联系方式：{{ applicationDraft.contact }}（仅招新联系）</p></section>
+                  <section><header><h3>成员资料</h3><button type="button" class="text-link" @click="goToStep(1)">修改</button></header><div class="recruitment-confirmation-profile"><HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="sm" /><div><p>姓名：{{ profileDraft.name }}</p><p>学号：{{ profileDraft.studentId }}</p><p>年级：{{ profileDraft.grade }}</p><p>班级：{{ profileDraft.className }}</p></div></div><p v-if="profileDraft.bio">个人简介：{{ profileDraft.bio }}</p><p>联系方式：{{ applicationDraft.contact }}（仅招新联系）</p></section>
                   <section><header><h3>报名志愿</h3><button type="button" class="text-link" @click="goToStep(2)">修改</button></header><p>第一志愿：{{ applicationDraft.firstChoice }}</p><p>第二志愿：{{ applicationDraft.secondChoice || "未填写" }}</p><p>第三志愿：{{ applicationDraft.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ applicationDraft.baizeDirection || "不适用" }}</p><p>调剂意愿：{{ applicationDraft.acceptsAdjustment ? "接受调剂" : "不接受调剂" }}</p></section>
                 </div>
                 <label data-field="confirmation" class="registration-confirmation"><input v-model="confirmation" type="checkbox" :aria-invalid="Boolean(errors.confirmation)" :aria-describedby="errors.confirmation ? 'confirmation-error' : undefined">我确认以上资料真实，并同意仅将联系方式用于本次招新联系。</label><small v-if="errors.confirmation" id="confirmation-error" class="form-error">{{ errors.confirmation }}</small>
@@ -270,7 +268,7 @@ onBeforeUnmount(() => {
             </form>
           </div>
 
-          <aside class="recruitment-application-aside"><p class="eyebrow">Application Notes</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像、方向与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p>当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p></aside>
+          <aside class="recruitment-application-aside"><p class="eyebrow">Application Notes</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p>当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p></aside>
         </div>
       </div>
     </section>

@@ -8,6 +8,7 @@ import {
   type LoginMode
 } from "~/utils/login-continuation";
 import { getLoginDestination, getLoginErrorMessage } from "~/utils/login-mode";
+import { buildPasswordChangeTarget } from "~/utils/password-change";
 
 const route = useRoute();
 const session = useSessionStore();
@@ -21,7 +22,7 @@ const modeCopy = computed(() => isAdminMode.value
   ? {
       eyebrow: "Administrator Access",
       heading: "进入管理工作台",
-      description: "管理员登录仅用于平台事务、操作日志和管理员资格配置。系统会根据账号的管理员资格决定是否允许进入。",
+      description: "管理员登录仅用于平台事务和管理员资格配置。系统会根据账号的管理员资格决定是否允许进入。",
       title: "管理员登录"
     }
   : {
@@ -51,8 +52,16 @@ async function signIn(values: Record<string, unknown>) {
   submitting.value = true;
   serverError.value = "";
   await new Promise((resolve) => setTimeout(resolve, 450));
-  const result = session.signIn(String(values.account ?? ""), { requireAdmin: isAdminMode.value });
+  const result = session.signIn(
+    String(values.account ?? ""),
+    String(values.password ?? ""),
+    { requireAdmin: isAdminMode.value }
+  );
   submitting.value = false;
+  if (result.status === "password_change_required") {
+    await navigateTo(buildPasswordChangeTarget(redirectTarget.value));
+    return;
+  }
   if (result.status !== "success") {
     serverError.value = getLoginErrorMessage(result.status);
     return;
@@ -69,7 +78,7 @@ async function signIn(values: Record<string, unknown>) {
         <h1>{{ modeCopy.heading }}</h1>
         <p>{{ modeCopy.description }}</p>
         <ul v-if="!isAdminMode"><li>查看招新录取与阶段考核</li><li>提交或取消活动报名</li><li>编辑个人资料与头像</li><li>访问内部成员资料</li></ul>
-        <ul v-else><li>处理平台日常事务</li><li>查看操作日志与回收站</li><li>仅负责人可配置管理员资格</li></ul>
+        <ul v-else><li>处理平台日常事务</li><li>管理成员、内容与媒体资源</li><li>仅负责人可配置管理员资格</li></ul>
       </div>
     </div>
     <div class="login-page__form">
