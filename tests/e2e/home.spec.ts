@@ -10,6 +10,14 @@ test("desktop homepage exposes the approved content sequence", async ({ page }) 
   await expect(page.getByRole("heading", { name: "由成员记录，也由成员创作" })).toBeVisible();
 });
 
+test("homepage renders explicit published-projection empty states without static flash or news", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByText("暂无已发布快讯", { exact: true })).toBeVisible();
+  await expect(page.getByText("暂无已发布动态", { exact: true })).toBeVisible();
+  await expect(page.getByText("2026 秋季招新通道开放，四大中心均可报名", { exact: true })).toHaveCount(0);
+});
+
 test("legacy Help Center routes redirect once to their enabled fallback", async ({ page }) => {
   await page.goto("/help");
   await expect(page).toHaveURL(/\/$/);

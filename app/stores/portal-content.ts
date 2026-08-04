@@ -184,8 +184,8 @@ function seedRecords(): PortalContentRecord[] {
   };
   return [
     published({ kind: "flash", title: "2026 秋季招新通道开放", summary: "四大中心均可报名。", target: { type: "internal-route", value: "/join" } }, "flash-recruitment-2026", "2026-07-30T09:24:00.000Z"),
-    published({ kind: "article", title: "从一次分享会，到一支真正协作的项目团队", summary: "记录成员从技术交流到原型落地。", target: { type: "internal-route", value: "/updates/project-team" } }, "article-project-team", "2026-07-24T08:00:00.000Z"),
-    published({ kind: "notice", title: "实训工作室暑期开放安排", summary: "说明暑期值班、设备借用与安全管理安排。", target: { type: "internal-route", value: "/updates/studio-hours" } }, "notice-studio", "2026-07-20T08:00:00.000Z"),
+    published({ kind: "article", slug: "project-team", title: "从一次分享会，到一支真正协作的项目团队", summary: "记录成员从技术交流到原型落地。", target: { type: "internal-route", value: "/updates/project-team" } }, "article-project-team", "2026-07-24T08:00:00.000Z"),
+    published({ kind: "notice", slug: "studio-hours", title: "实训工作室暑期开放安排", summary: "说明暑期值班、设备借用与安全管理安排。", target: { type: "internal-route", value: "/updates/studio-hours" } }, "notice-studio", "2026-07-20T08:00:00.000Z"),
   ];
 }
 

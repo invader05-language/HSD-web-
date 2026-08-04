@@ -7,6 +7,9 @@ export const ACTIVITY_DETAILS = [
     time: "19:00–21:00",
     type: "技术沙龙",
     title: "HarmonyOS 原生应用入门",
+    to: "/activities/harmonyos-salon",
+    publishedAt: "2026-08-06T00:00:00.000Z",
+    available: true,
     location: "鸿蒙实训工作室",
     status: "报名中",
     summary: "从工程结构、页面构建到一次简单的多设备交互，完成可运行的 HarmonyOS 原生应用。",
@@ -20,6 +23,9 @@ export const ACTIVITY_DETAILS = [
     time: "14:30–18:00",
     type: "项目实训",
     title: "从需求到可演示原型",
+    to: "/activities/project-camp",
+    publishedAt: "2026-08-12T00:00:00.000Z",
+    available: true,
     location: "产教融合中心",
     status: "报名中",
     summary: "用半天时间走完问题定义、需求排序、页面结构与演示讲述，做出可沟通的项目原型。",
@@ -33,6 +39,9 @@ export const ACTIVITY_DETAILS = [
     time: "19:30–21:00",
     type: "媒体创作",
     title: "校园影像叙事与活动摄影",
+    to: "/activities/media-story",
+    publishedAt: "2026-08-22T00:00:00.000Z",
+    available: true,
     location: "图书馆报告厅",
     status: "即将开放",
     summary: "从选题、现场观察到画面组织，学习如何用一组照片讲清一次校园活动。",
@@ -45,4 +54,3 @@ export const ACTIVITY_DETAILS = [
 export function findActivity(slug: string) {
   return ACTIVITY_DETAILS.find((activity) => activity.slug === slug);
 }
-

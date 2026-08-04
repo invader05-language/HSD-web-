@@ -34,10 +34,10 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     sourceId: activity.slug,
     title: activity.title,
     summary: activity.summary,
-    to: `/activities/${activity.slug}`,
-    publishedAt: toIso(activity.date),
+    to: activity.to,
+    publishedAt: activity.publishedAt,
     eligibleSlots: ["activities"],
-    available: activity.status === "报名中" || activity.status === "即将开放",
+    available: activity.available,
   }));
   const gallery = GALLERY_ALBUMS.map((album): PortalCatalogItem => ({
     entityType: "gallery",

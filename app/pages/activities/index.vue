@@ -1,44 +1,76 @@
 <script setup lang="ts">
-import { ACTIVITY_DETAILS, ACTIVITY_FILTERS } from "~/data/activities";
+import type { PortalCatalogItem } from "~/types/portal-content";
+import { usePortalCatalog } from "~/composables/usePortalCatalog";
 
-useHead({ title: "活动中心｜白云 HSD 开发者部落" });
+type PublicView = "all" | "activities" | "articles" | "notices";
+type TimelineItem = PortalCatalogItem & { entityType: "activity" | "article" | "notice" };
 
-const activeFilter = ref("全部");
-const visibleActivities = computed(() => {
-  if (activeFilter.value === "全部") return ACTIVITY_DETAILS;
-  return ACTIVITY_DETAILS.filter((activity) => activity.type === activeFilter.value);
+const views = [
+  { value: "all", label: "全部动态" },
+  { value: "activities", label: "活动" },
+  { value: "articles", label: "新闻" },
+  { value: "notices", label: "公告" },
+] as const;
+const route = useRoute();
+const catalog = usePortalCatalog();
+const activeView = computed<PublicView>(() => {
+  const value = String(route.query.view ?? "all");
+  return views.some((view) => view.value === value) ? value as PublicView : "all";
 });
+const timeline = computed<TimelineItem[]>(() => catalog
+  .filter((item): item is TimelineItem => item.available && ["activity", "article", "notice"].includes(item.entityType))
+  .filter((item) => activeView.value === "all"
+    || (activeView.value === "activities" && item.entityType === "activity")
+    || (activeView.value === "articles" && item.entityType === "article")
+    || (activeView.value === "notices" && item.entityType === "notice"))
+  .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)));
+
+useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
 </script>
 
 <template>
   <div>
     <PageBanner
-      eyebrow="Activities"
-      title="下一场活动，从这里开始"
-      description="技术沙龙、项目实训、摄影创作和赛事协作对所有同学公开浏览；提交报名时再登录。"
+      eyebrow="Updates & Activities"
+      title="动态与活动"
+      description="查看公开新闻、公告与近期活动；活动详情无需登录，提交报名时再验证成员身份。"
       tone="warm"
-      media-label="近期活动日期视觉位"
+      media-label="动态与活动视觉位"
     />
     <section class="section">
       <div class="shell">
-        <FilterToolbar v-model="activeFilter" :filters="ACTIVITY_FILTERS" :result-label="`共 ${visibleActivities.length} 场活动`" />
-        <div v-if="visibleActivities.length" class="activity-catalog">
-          <NuxtLink v-for="activity in visibleActivities" :key="activity.slug" :to="`/activities/${activity.slug}`">
-            <time :datetime="activity.date">{{ activity.date.slice(5).replace('-', '.') }}</time>
+        <nav class="filter-toolbar" aria-label="动态类型">
+          <div class="filter-toolbar__options">
+            <NuxtLink
+              v-for="view in views"
+              :key="view.value"
+              :to="{ path: '/activities', query: { view: view.value } }"
+              :class="{ 'is-active': activeView === view.value }"
+              :aria-current="activeView === view.value ? 'page' : undefined"
+            >
+              {{ view.label }}
+            </NuxtLink>
+          </div>
+          <span>共 {{ timeline.length }} 条公开内容</span>
+        </nav>
+        <div v-if="timeline.length" class="activity-catalog">
+          <NuxtLink
+            v-for="item in timeline"
+            :key="`${item.entityType}:${item.sourceId}`"
+            :to="item.to"
+            data-testid="public-timeline-item"
+          >
+            <time :datetime="item.publishedAt">{{ item.publishedAt.slice(0, 10).replaceAll('-', '.') }}</time>
             <div>
-              <span>{{ activity.type }} · {{ activity.status }}</span>
-              <h2>{{ activity.title }}</h2>
-              <p>{{ activity.summary }}</p>
+              <span>{{ item.entityType === "activity" ? "活动" : item.entityType === "article" ? "新闻" : "公开公告" }}</span>
+              <h2>{{ item.title }}</h2>
+              <p>{{ item.summary }}</p>
             </div>
-            <strong>{{ activity.location }} →</strong>
+            <strong>{{ item.entityType === "activity" ? "查看活动" : "阅读详情" }} →</strong>
           </NuxtLink>
         </div>
-        <EmptyState v-else />
-        <nav class="pagination" aria-label="活动分页">
-          <button type="button" disabled>上一页</button><button type="button" class="is-active">1</button><button type="button" disabled>下一页</button>
-        </nav>
+        <EmptyState v-else title="暂无已发布内容" description="当前分类还没有可公开浏览的动态或活动。" />
       </div>
     </section>
   </div>
 </template>
-

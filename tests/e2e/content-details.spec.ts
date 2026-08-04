@@ -1,5 +1,47 @@
 import { expect, test } from "@playwright/test";
 
+test("dynamic and activity views expose only their requested public record types", async ({ page }) => {
+  const views = [
+    { value: "all", label: "全部动态", shown: ["校园影像叙事与活动摄影", "从一次分享会，到一支真正协作的项目团队", "实训工作室暑期开放安排"] },
+    { value: "activities", label: "活动", shown: ["校园影像叙事与活动摄影"], hidden: ["从一次分享会，到一支真正协作的项目团队", "实训工作室暑期开放安排"] },
+    { value: "articles", label: "新闻", shown: ["从一次分享会，到一支真正协作的项目团队"], hidden: ["HarmonyOS 原生应用入门", "实训工作室暑期开放安排"] },
+    { value: "notices", label: "公告", shown: ["实训工作室暑期开放安排"], hidden: ["HarmonyOS 原生应用入门", "从一次分享会，到一支真正协作的项目团队"] },
+  ] as const;
+
+  for (const view of views) {
+    await page.goto(`/activities?view=${view.value}`);
+    await expect(page.getByRole("heading", { level: 1, name: "动态与活动" })).toBeVisible();
+    await expect(page.getByRole("link", { name: view.label })).toHaveAttribute("aria-current", "page");
+    for (const title of view.shown) await expect(page.getByRole("heading", { name: title })).toBeVisible();
+    for (const title of view.hidden ?? []) await expect(page.getByRole("heading", { name: title })).toHaveCount(0);
+  }
+});
+
+test("all public updates are ordered by descending public time and keep domain detail routes", async ({ page }) => {
+  await page.goto("/activities?view=all");
+  const items = page.getByTestId("public-timeline-item");
+
+  await expect(items).toHaveCount(5);
+  await expect(items.nth(0)).toContainText("校园影像叙事与活动摄影");
+  await expect(items.nth(3)).toContainText("从一次分享会，到一支真正协作的项目团队");
+  await expect(items.nth(4)).toContainText("实训工作室暑期开放安排");
+  await expect(page.getByRole("link", { name: /HarmonyOS 原生应用入门/ })).toHaveAttribute("href", "/activities/harmonyos-salon");
+  await expect(page.getByRole("link", { name: /从一次分享会，到一支真正协作的项目团队/ })).toHaveAttribute("href", "/updates/project-team");
+});
+
+test("published news and notices have public details while unknown updates return 404", async ({ page }) => {
+  await page.goto("/updates/project-team");
+  await expect(page.getByRole("heading", { level: 1, name: "从一次分享会，到一支真正协作的项目团队" })).toBeVisible();
+  await expect(page.getByText("记录成员从技术交流到原型落地。", { exact: true })).toBeVisible();
+  await expect(page.getByText(/审核|退回|下架原因/)).toHaveCount(0);
+
+  await page.goto("/updates/studio-hours");
+  await expect(page.getByText("公开公告", { exact: true }).first()).toBeVisible();
+
+  const response = await page.goto("/updates/missing");
+  expect(response?.status()).toBe(404);
+});
+
 test("resource entries open details before any file action", async ({ page }) => {
   await page.goto("/resources");
   await page.getByRole("link", { name: /校园科创项目需求说明模板/ }).click();

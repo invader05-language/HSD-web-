@@ -2,14 +2,13 @@
 import {
   ACTIVITIES,
   CENTERS,
-  FLASH_NEWS,
   MEMBERS,
-  NEWS,
   PROJECTS,
   RESOURCES,
   STATS
 } from "~/data/home";
 import { usePretextLayout } from "~/composables/usePretextLayout";
+import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
 
 useHead({
@@ -26,6 +25,9 @@ const heroDescription = "技术研发、品牌传播、活动策划与人才成�
 const heroText = usePretextLayout(heroDescription, 31);
 const route = useRoute();
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
+const { homepageSlots } = usePublishedPortal();
+const flashNews = homepageSlots.flash;
+const publishedNews = homepageSlots.news.filter((item) => item.entityType === "article" || item.entityType === "notice");
 
 function clearReleaseNoticeQuery() {
   if (!import.meta.client) return;
@@ -72,13 +74,14 @@ watch(
     <section class="flash-band" aria-labelledby="flash-heading">
       <div class="flash-band__inner shell">
         <h2 id="flash-heading">HSD 快讯</h2>
-        <div class="flash-band__items">
-          <NuxtLink v-for="item in FLASH_NEWS" :key="item.title" :to="item.to">
-            <span class="flash-band__tag">{{ item.tag }}</span>
+        <div v-if="flashNews.length" class="flash-band__items">
+          <NuxtLink v-for="item in flashNews" :key="item.sourceId" :to="item.to">
+            <span class="flash-band__tag">快讯</span>
             <span>{{ item.title }}</span>
-            <time>{{ item.date }}</time>
+            <time :datetime="item.publishedAt">{{ item.publishedAt.slice(5, 10).replace('-', '.') }}</time>
           </NuxtLink>
         </div>
+        <p v-else class="flash-band__empty" role="status">暂无已发布快讯</p>
       </div>
     </section>
 
@@ -100,24 +103,25 @@ watch(
           </div>
           <NuxtLink class="text-link" to="/activities">查看全部动态 →</NuxtLink>
         </div>
-        <div class="news-layout">
-          <article class="news-feature">
+        <div v-if="publishedNews.length" class="news-layout">
+          <article v-if="publishedNews[0]" class="news-feature">
             <MediaPlaceholder label="新闻主图素材位" detail="项目协作与活动现场" />
             <div>
-              <span>{{ NEWS[0].category }} · {{ NEWS[0].date }}</span>
-              <h3>{{ NEWS[0].title }}</h3>
-              <p>{{ NEWS[0].summary }}</p>
-              <NuxtLink class="text-link" :to="NEWS[0].to">阅读详情 →</NuxtLink>
+              <span>{{ publishedNews[0].entityType === "notice" ? "公开公告" : "新闻" }} · {{ publishedNews[0].publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
+              <h3>{{ publishedNews[0].title }}</h3>
+              <p>{{ publishedNews[0].summary }}</p>
+              <NuxtLink class="text-link" :to="publishedNews[0].to">阅读详情 →</NuxtLink>
             </div>
           </article>
           <div class="news-list">
-            <NuxtLink v-for="item in NEWS.slice(1)" :key="item.title" :to="item.to">
-              <span>{{ item.category }} · {{ item.date }}</span>
+            <NuxtLink v-for="item in publishedNews.slice(1)" :key="item.sourceId" :to="item.to">
+              <span>{{ item.entityType === "notice" ? "公开公告" : "新闻" }} · {{ item.publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
               <h3>{{ item.title }}</h3>
               <p>{{ item.summary }}</p>
             </NuxtLink>
           </div>
         </div>
+        <EmptyState v-else title="暂无已发布动态" description="新闻与公开公告发布后会显示在这里。" />
       </div>
     </section>
 
