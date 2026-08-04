@@ -17,6 +17,7 @@ useHead({ title: "报名人员｜HSD 管理台" });
 const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
+const route = useRoute();
 const visible = computed(() => filterAndSortRecruitmentApplications(ADMIN_CANDIDATES, {
   query: query.value,
   firstChoice: center.value,
@@ -39,7 +40,8 @@ function exportRecruitmentCsv() {
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
+  <NuxtPage v-if="route.params.id" />
+  <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Applications"
       title="报名人员"
