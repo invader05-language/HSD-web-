@@ -122,7 +122,10 @@ test("mobile administration retains identity and filtered navigation", async ({ 
 
   await expect(page.locator(".admin-topbar__identity")).toContainText("李同学 · 新媒体中心负责人");
   await expect(page.getByRole("heading", { level: 1, name: "管理工作台" })).toBeVisible();
-  await expect(page.locator(".admin-dashboard-grid")).toHaveCSS("grid-template-columns", "1fr");
+  const dashboardColumnCount = await page.locator(".admin-dashboard-grid").evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+  ));
+  expect(dashboardColumnCount).toBe(1);
   await page.getByRole("button", { name: "打开管理导航" }).click();
   const mobileNavigation = page.getByRole("navigation", { name: "移动端管理导航" });
   await expect(mobileNavigation).toContainText("项目管理");
