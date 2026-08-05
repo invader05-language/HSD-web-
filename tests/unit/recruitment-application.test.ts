@@ -39,6 +39,7 @@ function validApplicationDraft(): RecruitmentApplicationDraft {
 
 describe("recruitment application domain", () => {
   beforeEach(() => {
+    localStorage.clear();
     setActivePinia(createPinia());
   });
 
@@ -369,8 +370,8 @@ describe("recruitment application domain", () => {
     const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
-    const beforeDeadline = new Date("2026-09-17T23:00:00.000Z");
-    const afterDeadline = new Date("2026-09-18T00:00:00.000Z");
+    const beforeDeadline = new Date("2026-09-18T15:00:00.000Z");
+    const afterDeadline = new Date("2026-09-18T16:00:00.000Z");
 
     applicationStore.submitApplication(
       createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
@@ -382,14 +383,16 @@ describe("recruitment application domain", () => {
 
     expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)?.status)
       .toBe("locked");
+    expect(applicationStore.getApplication(CURRENT_BATCH_ID, session.currentMemberId)?.lockReason)
+      .toBe("deadline");
   });
 
   it("keeps a withdrawn application withdrawn after the batch deadline", () => {
     const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
-    const beforeDeadline = new Date("2026-09-17T23:00:00.000Z");
-    const afterDeadline = new Date("2026-09-18T00:00:00.000Z");
+    const beforeDeadline = new Date("2026-09-18T15:00:00.000Z");
+    const afterDeadline = new Date("2026-09-18T16:00:00.000Z");
 
     applicationStore.submitApplication(
       createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),

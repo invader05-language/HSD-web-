@@ -23,6 +23,7 @@ import {
   getCurrentAssessmentRound,
   isAssessmentRoundEditable,
 } from "../utils/recruitment-assessment-rules";
+import { getEffectiveRecruitmentBatchStatus } from "../utils/recruitment-batch-rules";
 import { useAdminAccessStore } from "./admin-access";
 import { useMemberAdministrationStore } from "./member-administration";
 import { MEMBER_PROFILE_STORAGE_KEY, useMemberProfileStore } from "./member-profile";
@@ -74,6 +75,8 @@ interface PersistedAssessmentState {
   version: typeof RECRUITMENT_ASSESSMENT_STORAGE_VERSION;
   batches: Record<string, RecruitmentAssessmentBatchState>;
 }
+
+export type AssessmentAdjustmentDecision = RecruitmentCenter | "not-admitted";
 
 const ROUND_LABELS: Record<AssessmentRoundNumber, RecruitmentAssessmentCandidate["currentPhase"]> = {
   1: "第一轮考核",
@@ -344,8 +347,11 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         if (existing) {
           existing.batchId = state.batchId;
           existing.memberId = application.memberId;
-          existing.center = application.firstChoice;
-          existing.acceptsAdjustment = application.acceptsAdjustment;
+          const hasRecordedOutcome = Object.values(existing.roundOutcomes).some((outcome) => outcome !== "pending");
+          if (!hasRecordedOutcome && !existing.finalDecision) {
+            existing.center = application.firstChoice;
+            existing.acceptsAdjustment = application.acceptsAdjustment;
+          }
           return;
         }
         state.records.push({
@@ -361,6 +367,15 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     getCandidates(batchId: string): RecruitmentAssessmentCandidate[] {
       const state = this.getBatchState(batchId);
       return state.records.map((record) => this.toCandidate(state, record));
+    },
+    getActionableCandidates(batchId: string): RecruitmentAssessmentCandidate[] {
+      const state = this.getBatchState(batchId);
+      return state.records
+        .filter((record) => (
+          getAssessmentProcessingStatus(record) === "offline-adjustment-pending"
+          || isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
+        ))
+        .map((record) => this.toCandidate(state, record));
     },
     getCandidate(batchId: string, candidateId: string): RecruitmentAssessmentCandidate | undefined {
       const state = this.getBatchState(batchId);
@@ -390,6 +405,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         throw new Error("ASSESSMENT_BATCH_ARCHIVED_READ_ONLY");
       }
       this.getBatchState(batchId);
+    },
+    assertAssessmentWritable(batchId: string, now: Date) {
+      this.assertCurrentBatch(batchId, now);
+      const batchStatus = getEffectiveRecruitmentBatchStatus(
+        useRecruitmentBatchStore().getBatchOrThrow(batchId),
+        now,
+      ).status;
+      if (batchStatus !== "closed") throw new Error("ASSESSMENT_BATCH_NOT_CLOSED");
     },
     resolveOwner() {
       const session = useSessionStore();
@@ -447,7 +470,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       internalNote?: string;
       now: Date;
     }) {
-      this.assertCurrentBatch(input.batchId, input.now);
+      this.assertAssessmentWritable(input.batchId, input.now);
       const state = this.getBatchState(input.batchId);
       if (state.status !== "assessing") throw new Error("ASSESSMENT_NOT_EDITABLE");
       const record = state.records.find((item) => item.candidateId === input.candidateId);
@@ -456,6 +479,9 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (!isAssessmentRoundEditable(record, input.round, state.currentRound)) {
         throw new Error("ASSESSMENT_ROUND_NOT_CURRENT");
       }
+      const applicationStore = useRecruitmentApplicationStore();
+      useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
+      applicationStore.lockApplicationForAssessment(input.batchId, record.memberId, input.now);
       record.roundOutcomes[input.round] = input.outcome;
       if (input.internalNote !== undefined) record.internalNote = input.internalNote.trim();
       record.updatedAt = input.now.toISOString();
@@ -467,11 +493,12 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     recordAdjustmentDecision(input: {
       batchId: string;
       candidateId: string;
+      decision?: AssessmentAdjustmentDecision;
       finalCenter?: RecruitmentCenter;
-      admitted: boolean;
+      admitted?: boolean;
       now: Date;
     }) {
-      this.assertCurrentBatch(input.batchId, input.now);
+      this.assertAssessmentWritable(input.batchId, input.now);
       const state = this.getBatchState(input.batchId);
       if (state.status === "published") throw new Error("ASSESSMENT_NOT_EDITABLE");
       const record = state.records.find((item) => item.candidateId === input.candidateId);
@@ -480,12 +507,21 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (getAssessmentProcessingStatus(record) !== "offline-adjustment-pending") {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_PENDING");
       }
+      if (input.decision === undefined && input.admitted === undefined) {
+        throw new Error("ASSESSMENT_ADJUSTMENT_DECISION_REQUIRED");
+      }
+      const decision = input.decision ?? (
+        input.admitted ? input.finalCenter : "not-admitted"
+      );
+      const admitted = decision !== "not-admitted";
       if (!record.acceptsAdjustment
-        || (input.admitted && (!input.finalCenter || input.finalCenter === "白泽开发中心"))) {
+        || (admitted && (!decision || decision === "白泽开发中心"))) {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
-      record.finalDecision = input.admitted ? "admitted" : "not-admitted";
-      record.finalCenter = input.admitted ? input.finalCenter : undefined;
+      useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
+      useRecruitmentApplicationStore().lockApplicationForAssessment(input.batchId, record.memberId, input.now);
+      record.finalDecision = admitted ? "admitted" : "not-admitted";
+      record.finalCenter = admitted ? decision : undefined;
       record.updatedAt = input.now.toISOString();
       this.appendAudit(state, "record-adjustment", actor.account, input.now);
       this.touch(state);
@@ -497,13 +533,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       now: Date,
       reason?: string,
     ) {
-      this.assertCurrentBatch(batchId, now);
+      this.assertAssessmentWritable(batchId, now);
       const actor = this.resolveOwner();
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       const state = this.getBatchState(batchId);
       if (state.status !== "assessing") throw new Error("ASSESSMENT_NOT_EDITABLE");
       const incomplete = state.records.some((record) => (
-        isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
+        getAssessmentProcessingStatus(record) === "offline-adjustment-pending"
+        || isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
       ));
       if (incomplete) throw new Error("ASSESSMENT_ROUND_INCOMPLETE");
 
@@ -548,6 +585,11 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const actor = this.resolveOwner();
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       const state = this.getBatchState(batchId);
+      const batchStatus = getEffectiveRecruitmentBatchStatus(
+        useRecruitmentBatchStore().getBatchOrThrow(batchId),
+        now,
+      ).status;
+      if (batchStatus !== "closed") throw new Error("ASSESSMENT_BATCH_NOT_CLOSED");
       const summary = this.getPublicationSummary(batchId);
       if (state.status !== "ready-to-publish" || !summary.canPublish) {
         throw new Error("ASSESSMENT_NOT_READY");
@@ -603,6 +645,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         state.publishedAt = publishedAt;
         this.appendAudit(state, "publish", actor.account, now, reason);
         this.touch(state);
+        useRecruitmentBatchStore().markAssessmentPublished(batchId, publishedAt);
         return state;
       } catch (error) {
         this.batches[batchId] = assessmentSnapshot;

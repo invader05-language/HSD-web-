@@ -86,6 +86,7 @@ export interface SubmittedRecruitmentApplication {
   updatedAt: string;
   withdrawnAt?: string;
   lockedAt?: string;
+  lockReason?: "deadline" | "early-close" | "assessment";
 }
 
 export const PREPARATORY_MEMBER_STATUS = {

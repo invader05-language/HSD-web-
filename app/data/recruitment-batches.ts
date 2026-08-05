@@ -4,8 +4,8 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
   {
     id: "batch-current",
     name: "2026 秋季招新",
-    startAt: "2026-08-01T00:00:00.000Z",
-    endAt: "2026-09-18T00:00:00.000Z",
+    startAt: "2026-07-31T16:00:00.000Z",
+    endAt: "2026-09-18T15:59:59.999Z",
     timezone: "Asia/Shanghai",
     openCenterIds: [
       "baize-development",
@@ -24,8 +24,8 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
   {
     id: "batch-next",
     name: "2027 春季补招",
-    startAt: "2027-02-01T00:00:00.000Z",
-    endAt: "2027-03-01T00:00:00.000Z",
+    startAt: "2027-01-31T16:00:00.000Z",
+    endAt: "2027-02-28T15:59:59.999Z",
     timezone: "Asia/Shanghai",
     openCenterIds: ["new-media", "tuowei-planning", "talent-development"],
     responsibleAccountIds: ["admin-alliance"],
@@ -39,8 +39,8 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
   {
     id: "batch-closed",
     name: "2025 秋季招新",
-    startAt: "2025-08-22T00:00:00.000Z",
-    endAt: "2025-09-20T00:00:00.000Z",
+    startAt: "2025-08-21T16:00:00.000Z",
+    endAt: "2025-09-20T15:59:59.999Z",
     timezone: "Asia/Shanghai",
     openCenterIds: [
       "baize-development",

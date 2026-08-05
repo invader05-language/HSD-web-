@@ -4,14 +4,18 @@ import { useSessionStore } from "~/stores/session";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { resolveLoginAwareTarget } from "~/utils/login-continuation";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
+import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 
 useHead({ title: "加入我们｜白云 HSD 开发者部落" });
 const session = useSessionStore();
 const batchStore = useRecruitmentBatchStore();
+const now = useRecruitmentNow();
 const route = useRoute();
 const isJoinLanding = computed(() => route.path === "/join");
-const currentBatch = computed(() => batchStore.currentOpenBatch);
-const upcomingBatch = computed(() => batchStore.upcomingBatch);
+const currentBatch = computed(() => batchStore.currentOpenBatchAt(now.value));
+const pausedBatch = computed(() => batchStore.currentPausedBatchAt(now.value));
+const upcomingBatch = computed(() => batchStore.upcomingBatchAt(now.value));
+watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
 const canApply = computed(() => Boolean(currentBatch.value));
 const applyTarget = computed(() => resolveLoginAwareTarget("/join/apply", session.isAuthenticated));
 const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名表" : "登录后填写报名表");
@@ -47,11 +51,12 @@ const { config } = usePublishedPortal();
         <div v-else class="join-batch-notice join-batch-notice--closed" role="status">
           <div>
             <p class="eyebrow">Recruitment Schedule</p>
-            <h2>{{ upcomingBatch ? `下一批次：${upcomingBatch.name}` : "当前暂无招新安排" }}</h2>
-            <p v-if="upcomingBatch">报名将于 {{ new Date(upcomingBatch.startAt).toLocaleDateString("zh-CN") }} 开放，当前暂不能提交报名。</p>
+            <h2>{{ pausedBatch ? `当前批次“${pausedBatch.name}”报名已暂停` : upcomingBatch ? `下一批次：${upcomingBatch.name}` : "当前暂无招新安排" }}</h2>
+            <p v-if="pausedBatch">管理员暂时关闭了报名入口，已填写内容不会被提交；恢复报名后可继续提交。</p>
+            <p v-else-if="upcomingBatch">报名将于 {{ new Date(upcomingBatch.startAt).toLocaleDateString("zh-CN") }} 开放，当前暂不能提交报名。</p>
             <p v-else>招新批次尚未发布，报名入口将在批次开放后启用。</p>
           </div>
-          <strong>报名入口暂不可用</strong>
+          <strong>{{ pausedBatch ? "报名入口已暂停" : "报名入口暂不可用" }}</strong>
         </div>
       </div>
     </section>

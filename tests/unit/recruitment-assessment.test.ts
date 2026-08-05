@@ -22,6 +22,7 @@ function saveFirstRoundForActiveCandidates(
   store: ReturnType<typeof useRecruitmentAssessmentStore>,
   rejectCandidatesWithoutAccounts = false,
 ) {
+  closeBatchForAssessment();
   for (const candidate of store.getCandidates(BATCH_ID)) {
     if (candidate.currentPhase !== "第一轮考核" || candidate.processingStatus !== "assessing") continue;
     store.saveRoundOutcome({
@@ -48,6 +49,18 @@ function saveCurrentRoundForActiveCandidates(store: ReturnType<typeof useRecruit
       outcome: "passed",
       now: new Date("2026-08-04T10:11:00.000Z"),
     });
+  }
+}
+
+function closeBatchForAssessment() {
+  const store = useRecruitmentBatchStore();
+  if (store.getBatchOrThrow(BATCH_ID).lifecycleStatus !== "closed") {
+    store.close(
+      BATCH_ID,
+      true,
+      new Date("2026-08-04T10:30:00.000Z"),
+      "测试关闭报名窗口",
+    );
   }
 }
 
@@ -102,6 +115,8 @@ describe("recruitment assessment store", () => {
 
     expect(store.getBatchState(BATCH_ID)).toMatchObject({ currentRound: 1, status: "assessing" });
     expect(candidate).toMatchObject({ currentPhase: "第一轮考核", processingStatus: "assessing" });
+
+    closeBatchForAssessment();
 
     store.saveRoundOutcome({
       batchId: BATCH_ID,
@@ -212,9 +227,31 @@ describe("recruitment assessment store", () => {
     expect(store.getCandidate(BATCH_ID, "candidate-zhang")?.roundOutcomes[1]).toBeUndefined();
   });
 
+  it("does not allow assessment writes while registration is open or paused", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    expect(() => store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      round: 1,
+      outcome: "passed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+
+    useRecruitmentBatchStore().pause(BATCH_ID, new Date("2026-08-04T10:00:00.000Z"));
+    expect(() => store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      round: 1,
+      outcome: "passed",
+      now: new Date("2026-08-04T10:01:00.000Z"),
+    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+  });
+
   it("routes a failed accepted-adjustment candidate to offline input", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
 
     store.saveRoundOutcome({
       batchId: BATCH_ID,
@@ -226,6 +263,12 @@ describe("recruitment assessment store", () => {
     expect(store.getCandidate(BATCH_ID, "candidate-chen")).toMatchObject({
       processingStatus: "offline-adjustment-pending",
     });
+
+    expect(() => store.recordAdjustmentDecision({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      now: new Date("2026-08-04T10:04:00.000Z"),
+    })).toThrow("ASSESSMENT_ADJUSTMENT_DECISION_REQUIRED");
 
     store.recordAdjustmentDecision({
       batchId: BATCH_ID,
@@ -241,9 +284,87 @@ describe("recruitment assessment store", () => {
     });
   });
 
+  it("hides a completed candidate from the action queue and brings Baize back for the next round", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
+
+    store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      round: 1,
+      outcome: "passed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+    expect(store.getActionableCandidates(BATCH_ID).some((candidate) => candidate.candidateId === "candidate-wang")).toBe(false);
+
+    saveFirstRoundForActiveCandidates(store);
+    expect(store.getActionableCandidates(BATCH_ID).some((candidate) => candidate.candidateId === "candidate-zhou")).toBe(false);
+
+    store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:10:00.000Z"));
+    expect(store.getActionableCandidates(BATCH_ID).some((candidate) => candidate.candidateId === "candidate-zhou")).toBe(true);
+  });
+
+  it("keeps an unresolved adjustment in the round gate until one final decision is recorded", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
+
+    store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      round: 1,
+      outcome: "failed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+    saveFirstRoundForActiveCandidates(store);
+
+    expect(() => store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:10:00.000Z")))
+      .toThrow("ASSESSMENT_ROUND_INCOMPLETE");
+
+    store.recordAdjustmentDecision({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      decision: "not-admitted",
+      now: new Date("2026-08-04T10:11:00.000Z"),
+    });
+    expect(store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:12:00.000Z")).currentRound).toBe(2);
+  });
+
+  it("locks the candidate application when the first assessment result is saved", () => {
+    signInOwner();
+    const applicationStore = useRecruitmentApplicationStore();
+    applicationStore.replaceApplications([application({
+      id: "application-chen",
+      memberId: "applicant-chen",
+      firstChoice: "新媒体中心",
+      preferences: [{ rank: 1, center: "新媒体中心" }],
+      acceptsAdjustment: true,
+    })]);
+    const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
+
+    store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      round: 1,
+      outcome: "passed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+
+    expect(applicationStore.getApplication(BATCH_ID, "applicant-chen")).toMatchObject({
+      status: "locked",
+      lockedAt: "2026-08-04T10:30:00.000Z",
+      lockReason: "assessment",
+    });
+    expect(() => applicationStore.withdrawApplication(BATCH_ID, "applicant-chen", new Date("2026-08-04T10:01:00.000Z")))
+      .toThrow("APPLICATION_LOCKED");
+  });
+
   it("rejects an adjustment decision unless the candidate is awaiting offline adjustment", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
 
     expect(() => store.recordAdjustmentDecision({
       batchId: BATCH_ID,
@@ -278,6 +399,7 @@ describe("recruitment assessment store", () => {
   it("rejects editing a White Ze later round before the global round advances", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
 
     expect(() => store.saveRoundOutcome({
       batchId: BATCH_ID,
@@ -315,6 +437,7 @@ describe("recruitment assessment store", () => {
     store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:12:00.000Z"));
     saveCurrentRoundForActiveCandidates(store);
     store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:13:00.000Z"));
+    closeBatchForAssessment();
 
     expect(store.getCandidate(BATCH_ID, "candidate-zhou")).toMatchObject({
       finalDecision: "admitted",
@@ -345,6 +468,8 @@ describe("recruitment assessment store", () => {
   it("does not publish until the whole batch is complete, then promotes the linked account atomically", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
+
+    closeBatchForAssessment();
 
     expect(() => store.publishBatchResults(BATCH_ID, true, new Date("2026-08-04T10:00:00.000Z")))
       .toThrow("ASSESSMENT_NOT_READY");
@@ -382,6 +507,25 @@ describe("recruitment assessment store", () => {
       identity: "正式成员",
       center: "新媒体中心",
     });
+    expect(() => useRecruitmentBatchStore().reopen(
+      BATCH_ID,
+      true,
+      new Date("2026-08-04T10:21:00.000Z"),
+    )).toThrow("BATCH_RESULTS_PUBLISHED_READ_ONLY");
+  });
+
+  it("rejects publication while the recruitment window is still open", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    expect(() => store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      round: 1,
+      outcome: "passed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+    expect(() => store.publishBatchResults(BATCH_ID, true, new Date("2026-08-04T10:20:00.000Z")))
+      .toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
   });
 
   it("discards persisted state with cross-batch identities or malformed round outcomes", () => {

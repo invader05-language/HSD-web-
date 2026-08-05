@@ -10,8 +10,9 @@ import { getAdminCenterScope } from "~/utils/admin-center-scope";
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
 type StageFilter = "全部阶段" | "第一轮考核" | "第二轮考核" | "第三轮考核";
-type ResultFilter = "全部结果" | "考核中" | "待调剂处理" | "待整批发布" | "已发布";
+type ResultFilter = "全部结果" | "考核中" | "待调剂处理";
 type RoundDraft = "" | "passed" | "failed";
+type AdjustmentDraft = "" | RecruitmentCenter | "not-admitted";
 
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
@@ -21,7 +22,9 @@ const route = useRoute();
 const batch = computed(() => batchStore.getBatch(props.batchId));
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
-const candidates = computed(() => assessmentStore.getCandidates(props.batchId)
+const allCandidates = computed(() => assessmentStore.getCandidates(props.batchId)
+  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
+const candidates = computed(() => assessmentStore.getActionableCandidates(props.batchId)
   .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
 const currentRoundLabel = computed(() => `第${["一", "二", "三"][state.value.currentRound - 1]}轮考核`);
 const isOwner = computed(() => session.canManageAdminAccounts);
@@ -41,8 +44,7 @@ watch(centerScope, (scope) => {
 const selectedCandidateId = ref<string>();
 const roundDrafts = ref<Partial<Record<AssessmentRoundNumber, RoundDraft>>>({});
 const internalNote = ref("");
-const adjustmentCenter = ref<RecruitmentCenter | "">("");
-const adjustmentAdmitted = ref(true);
+const adjustmentDecision = ref<AdjustmentDraft>("");
 const showSaveConfirmation = ref(false);
 const showAdvanceConfirmation = ref(false);
 const saveMessage = ref("");
@@ -74,7 +76,7 @@ const filteredCandidates = computed(() => {
     return matchesCenter && matchesQuery && matchesStage && matchesResult && matchesAdjustment;
   });
 });
-const roundIncomplete = computed(() => candidates.value.some((candidate) => candidate.currentPhase === currentRoundLabel.value));
+const roundIncomplete = computed(() => candidates.value.length > 0);
 const canAdvance = computed(() => isOwner.value && state.value.status === "assessing" && !roundIncomplete.value);
 const advanceLabel = computed(() => {
   if (state.value.status !== "assessing") return "考核已完成，等待发布";
@@ -108,7 +110,7 @@ function phaseLabel(candidate: RecruitmentAssessmentCandidate) {
   return candidate.currentPhase ?? "—";
 }
 
-function processingLabel(candidate: RecruitmentAssessmentCandidate): Exclude<ResultFilter, "全部结果"> {
+function processingLabel(candidate: RecruitmentAssessmentCandidate): string {
   switch (candidate.processingStatus) {
     case "assessing": return "考核中";
     case "offline-adjustment-pending": return "待调剂处理";
@@ -153,8 +155,9 @@ function resetDrafts() {
     getAssessmentRounds(candidate.center).map((round) => [round, candidate.roundOutcomes[round] ?? ""]),
   ) as Partial<Record<AssessmentRoundNumber, RoundDraft>>;
   internalNote.value = candidate.internalNote ?? "";
-  adjustmentCenter.value = candidate.finalCenter ?? "";
-  adjustmentAdmitted.value = candidate.finalDecision !== "not-admitted";
+  adjustmentDecision.value = candidate.finalDecision === "not-admitted"
+    ? "not-admitted"
+    : candidate.finalCenter ?? "";
   saveError.value = "";
   saveMessage.value = "";
 }
@@ -185,8 +188,7 @@ function requestSave() {
     showSaveConfirmation.value = true;
     return;
   }
-  if (candidate.processingStatus === "offline-adjustment-pending"
-    && (!adjustmentAdmitted.value || adjustmentCenter.value)) {
+  if (candidate.processingStatus === "offline-adjustment-pending" && adjustmentDecision.value) {
     showSaveConfirmation.value = true;
     return;
   }
@@ -211,13 +213,11 @@ function confirmSave() {
         internalNote: internalNote.value,
         now: new Date(),
       });
-    } else if (candidate.processingStatus === "offline-adjustment-pending"
-      && (!adjustmentAdmitted.value || adjustmentCenter.value)) {
+    } else if (candidate.processingStatus === "offline-adjustment-pending" && adjustmentDecision.value) {
       assessmentStore.recordAdjustmentDecision({
         batchId: props.batchId,
         candidateId: candidate.candidateId,
-        finalCenter: adjustmentAdmitted.value ? adjustmentCenter.value || undefined : undefined,
-        admitted: adjustmentAdmitted.value,
+        decision: adjustmentDecision.value as Exclude<AdjustmentDraft, "">,
         now: new Date(),
       });
     } else {
@@ -226,6 +226,7 @@ function confirmSave() {
     showSaveConfirmation.value = false;
     saveError.value = "";
     saveMessage.value = "结果已保存到当前批次的内部 Mock 状态，尚未对成员发布。";
+    selectedCandidateId.value = undefined;
   } catch (error) {
     showSaveConfirmation.value = false;
     saveError.value = errorText(error, "保存失败");
@@ -268,10 +269,10 @@ function confirmAdvance() {
     </section>
 
     <section class="admin-summary-strip" aria-label="批次考核概览">
-      <div><span>本批次人员</span><strong>{{ candidates.length }}</strong><small>{{ batchId }}</small></div>
-      <div><span>当前轮待录入</span><strong>{{ candidates.filter((candidate) => candidate.currentPhase === currentRoundLabel).length }}</strong><small>{{ currentRoundLabel }}</small></div>
+      <div><span>本批次人员</span><strong>{{ allCandidates.length }}</strong><small>{{ batchId }}</small></div>
+      <div><span>当前轮待处理</span><strong>{{ candidates.filter((candidate) => candidate.currentPhase === currentRoundLabel).length }}</strong><small>{{ currentRoundLabel }}</small></div>
       <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "offline-adjustment-pending").length }}</strong><small>线下确认后录入</small></div>
-      <div><span>待整批发布</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "ready-to-publish").length }}</strong><small>不会单独发布</small></div>
+      <div><span>已完成隐藏</span><strong>{{ allCandidates.length - candidates.length }}</strong><small>结果发布页可查</small></div>
     </section>
 
     <section class="admin-roster">
@@ -289,7 +290,7 @@ function confirmAdvance() {
           <div><span>Candidate Roster</span><h2>预备成员名单</h2></div>
           <div>
             <p>共 {{ filteredCandidates.length }} 人</p>
-            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="isOwner ? '请先完成当前轮所有可编辑结果' : '仅联盟总负责人可推进全局轮次'" @click="requestAdvance">{{ advanceLabel }}</button>
+            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="isOwner ? '请先完成当前轮所有结果和调剂决定' : '仅联盟总负责人可推进全局轮次'" @click="requestAdvance">{{ advanceLabel }}</button>
             <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
           </div>
         </header>
@@ -297,7 +298,7 @@ function confirmAdvance() {
         <div class="admin-filters">
           <label>搜索成员<input v-model="filters.query" type="search" placeholder="姓名或学号"></label>
           <label>当前阶段<select v-model="filters.stage"><option>全部阶段</option><option>第一轮考核</option><option>第二轮考核</option><option>第三轮考核</option></select></label>
-          <label>处理状态<select v-model="filters.result"><option>全部结果</option><option>考核中</option><option>待调剂处理</option><option>待整批发布</option><option>已发布</option></select></label>
+          <label>处理状态<select v-model="filters.result"><option>全部结果</option><option>考核中</option><option>待调剂处理</option></select></label>
           <label>调剂意愿<select v-model="filters.adjustment"><option>全部</option><option>接受调剂</option><option>不接受调剂</option></select></label>
         </div>
 
@@ -327,7 +328,7 @@ function confirmAdvance() {
         <div class="admin-drawer__body">
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
           <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
-          <section v-if="selectedCandidate.processingStatus === 'offline-adjustment-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>线下调剂结果</h3></header><p class="admin-inline-note">录取时需选择普通中心；不录取时无需填写去向。此决定仍属于内部结果，需整批发布后才对成员生效。</p><label>线下决定<select v-model="adjustmentAdmitted" aria-label="线下决定"><option :value="true">录取至最终中心</option><option :value="false">不录取</option></select></label><label v-if="adjustmentAdmitted">最终中心<select v-model="adjustmentCenter" aria-label="最终中心"><option value="">请选择最终中心</option><option v-for="center in regularCenters" :key="center" :value="center">{{ center }}</option></select></label></section>
+          <section v-if="selectedCandidate.processingStatus === 'offline-adjustment-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>线下调剂结果</h3></header><p class="admin-inline-note">请选择最终调剂中心或不录取。此决定仍属于内部结果，需整批发布后才对成员生效。</p><label>最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="center in regularCenters" :key="center" :value="center">录取至{{ center }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'offline-adjustment-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明"></textarea></label></section>
           <section class="admin-sync-preview"><strong>保存与发布边界</strong><p>保存只更新当前批次的内部考核状态；整批发布才会更新成员结果中心、正式成员关系和公开投影。真实后端接入后必须在同一事务中完成。</p></section>
         </div>

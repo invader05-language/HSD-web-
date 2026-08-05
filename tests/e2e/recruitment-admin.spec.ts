@@ -51,6 +51,14 @@ test("offline adjustment records only regular-center destinations", async ({ pag
   await page.goto("/admin/recruitment");
   await completeAdminDemoLogin(page);
 
+  // Assessment writes are only allowed after the active recruitment batch is closed.
+  await page.goto("/admin/recruitment/batches/batch-current");
+  await page.getByRole("button", { name: "提前关闭" }).click();
+  const closeDialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
+  await closeDialog.getByRole("button", { name: "确认提前关闭" }).click();
+  await expect(page.getByRole("status")).toContainText("提前关闭已完成");
+  await page.goto("/admin/recruitment");
+
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
 
@@ -58,16 +66,39 @@ test("offline adjustment records only regular-center destinations", async ({ pag
   await drawer.getByRole("button", { name: "保存结果" }).click();
   await drawer.getByRole("button", { name: "确认保存" }).click();
 
-  const finalCenter = drawer.getByLabel("最终中心");
+  await expect(drawer).toHaveCount(0);
+  await page.getByRole("button", { name: "查看处理 陈同学" }).click();
+  const adjustmentDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+
+  const finalCenter = adjustmentDrawer.getByLabel("最终调剂结果");
 
   await expect(finalCenter).toBeVisible();
   await expect(finalCenter.locator("option[value='白泽开发中心']")).toHaveCount(0);
   await expect(finalCenter.locator("option")).toHaveText([
-    "请选择最终中心",
-    "新媒体中心",
-    "拓维策划中心",
-    "人才发展中心"
+    "请选择处理结果",
+    "不录取",
+    "录取至新媒体中心",
+    "录取至拓维策划中心",
+    "录取至人才发展中心",
   ]);
+});
+
+test("only the alliance owner can create a draft recruitment batch", async ({ page }) => {
+  await page.goto("/admin/recruitment/batches");
+  await completeAdminDemoLogin(page, "/admin/recruitment/batches");
+  await page.getByRole("button", { name: "新建招新批次" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "新建招新批次" });
+  await drawer.getByLabel("批次名称").fill("2027 春季补招");
+  await drawer.getByLabel("报名开始时间").fill("2027-02-20");
+  await drawer.getByLabel("报名截止时间").fill("2027-03-08");
+  await drawer.getByRole("checkbox", { name: "白泽开发中心" }).uncheck();
+  await drawer.getByRole("button", { name: "保存草稿" }).click();
+
+  await expect(page.getByRole("status")).toContainText("保存为草稿");
+  await expect(page.getByRole("heading", { level: 3, name: "2027 春季补招" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "2027 春季补招" }).locator("..")
+    .getByText("草稿")).toBeVisible();
 });
 
 test("recruitment batches and publication complete the administration workflow", async ({ page }) => {

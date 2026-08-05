@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RECRUITMENT_CENTERS } from "~/data/recruitment-application";
 import { RECRUITMENT_BATCHES as LEGACY_BATCHES } from "~/data/recruitment-admin";
 import { RECRUITMENT_BATCHES as DOMAIN_BATCHES } from "~/data/recruitment-batches";
 import {
@@ -8,7 +9,10 @@ import {
   getRecruitmentBatchStatusLabel,
   type AdminRecruitmentBatchLike
 } from "~/data/recruitment-admin-context";
+import { getRecruitmentBatchCommandMessage } from "~/utils/recruitment-batch-messages";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
+import { useSessionStore } from "~/stores/session";
+import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "招新批次｜HSD 管理台" });
@@ -24,6 +28,23 @@ interface AdminBatchListItem extends AdminRecruitmentBatchLike {
 
 const showCreate = ref(false);
 const batchStore = useRecruitmentBatchStore();
+const session = useSessionStore();
+const now = useRecruitmentNow();
+watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
+const createMessage = ref("");
+const createError = ref("");
+const draftForm = reactive({
+  name: "",
+  startAt: "",
+  endAt: "",
+  openCenterIds: ["baize-development", "new-media", "tuowei-planning", "talent-development"],
+});
+const centerOptions = [
+  ["baize-development", RECRUITMENT_CENTERS[0]],
+  ["new-media", RECRUITMENT_CENTERS[1]],
+  ["tuowei-planning", RECRUITMENT_CENTERS[2]],
+  ["talent-development", RECRUITMENT_CENTERS[3]],
+] as const;
 const batches = computed<AdminBatchListItem[]>(() => {
   const storeBatches = (batchStore as unknown as { batches?: unknown }).batches;
   const source = Array.isArray(storeBatches) && storeBatches.length > 0
@@ -34,9 +55,9 @@ const batches = computed<AdminBatchListItem[]>(() => {
 const visibleBatches = computed(() => batches.value.map((batch) => ({
   ...batch,
   statusLabel: getRecruitmentBatchStatusLabel(
-    getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id) })
+    getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id, now.value) })
   ),
-  statusKey: getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id) }),
+  statusKey: getAdminBatchStatus({ ...batch, effectiveStatus: batchStore.effectiveStatus(batch.id, now.value) }),
   periodLabel: formatRecruitmentBatchPeriod(batch),
   centerCount: batch.openCenterIds?.length ?? batch.centers ?? 0,
   applicantCount: batch.applicants ?? 0
@@ -45,6 +66,37 @@ const openBatchCount = computed(() => visibleBatches.value.filter((batch) => bat
 const applicantTotal = computed(() => visibleBatches.value.reduce((total, batch) => total + batch.applicantCount, 0));
 const openCenterTotal = computed(() => visibleBatches.value.find((batch) => batch.statusKey === "open")?.centerCount ?? 0);
 const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "draft").length);
+
+function openCreateDrawer() {
+  createError.value = "";
+  draftForm.name = "";
+  draftForm.startAt = "";
+  draftForm.endAt = "";
+  draftForm.openCenterIds = centerOptions.map(([id]) => id);
+  showCreate.value = true;
+}
+
+function toDateTime(value: string, endOfDay = false) {
+  return value
+    ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+08:00`).toISOString()
+    : "";
+}
+
+function saveDraft() {
+  try {
+    batchStore.createBatch({
+      name: draftForm.name,
+      startAt: toDateTime(draftForm.startAt),
+      endAt: toDateTime(draftForm.endAt, true),
+      openCenterIds: draftForm.openCenterIds,
+    });
+    showCreate.value = false;
+    createError.value = "";
+    createMessage.value = "招新批次已保存为草稿，可进入批次继续复核并发布。";
+  } catch (error) {
+    createError.value = getRecruitmentBatchCommandMessage(error);
+  }
+}
 </script>
 
 <template>
@@ -52,12 +104,14 @@ const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.s
     <AdminPageHeading
       eyebrow="Recruitment Cycles"
       title="招新批次"
-      description="统一管理报名时间、开放中心、负责人和批次状态；关闭后的历史批次继续保留只读记录。"
+      description="统一管理报名时间、开放中心和批次状态；关闭后的历史批次继续保留只读记录。"
     >
       <template #actions>
-        <button type="button" class="button" @click="showCreate = true">新建招新批次</button>
+        <button v-if="session.canManageAdminAccounts" type="button" class="button" @click="openCreateDrawer">新建招新批次</button>
       </template>
     </AdminPageHeading>
+
+    <p v-if="createMessage" class="admin-save-message" role="status">{{ createMessage }}</p>
 
     <section class="admin-summary-strip" aria-label="批次概览">
       <div><span>开放批次</span><strong>{{ String(openBatchCount).padStart(2, "0") }}</strong><small>全站同一时间最多一个</small></div>
@@ -69,7 +123,7 @@ const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.s
     <section class="admin-list-card">
       <header>
         <div><span>Recruitment Batch List</span><h2>全部招新批次</h2></div>
-        <p>Mock 数据 · 共 {{ visibleBatches.length }} 个批次</p>
+        <p>共 {{ visibleBatches.length }} 个批次</p>
       </header>
       <div class="admin-batch-list">
         <article v-for="batch in visibleBatches" :key="batch.id">
@@ -85,45 +139,43 @@ const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.s
             <div><dt>负责人</dt><dd>{{ batch.owner || "联盟总负责人" }}</dd></div>
           </dl>
           <NuxtLink class="admin-text-action" :to="buildRecruitmentBatchRoute(batch.id)">
-            {{ batch.statusKey === "closed" || batch.statusKey === "archived" ? "查看归档" : "进入批次" }} →
+            {{ batch.statusKey === "archived" ? "查看归档" : batch.statusKey === "closed" ? "处理收尾" : "进入批次" }} →
           </NuxtLink>
         </article>
       </div>
     </section>
 
-    <div v-if="showCreate" class="admin-drawer-backdrop" @click.self="showCreate = false">
+    <div v-if="showCreate && session.canManageAdminAccounts" class="admin-drawer-backdrop" @click.self="showCreate = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="新建招新批次">
         <header class="admin-drawer__header">
-          <div><span>New Recruitment Cycle</span><h2>新建招新批次</h2><p>当前仅展示字段结构，不写入数据库</p></div>
+          <div><span>New Recruitment Cycle</span><h2>新建招新批次</h2><p>保存后形成草稿，报名统一使用用户端当前招新表单。</p></div>
           <button type="button" aria-label="关闭新建批次" @click="showCreate = false">×</button>
         </header>
         <div class="admin-drawer__body">
           <section>
             <header><span>01</span><h3>批次信息</h3></header>
             <div class="admin-form-grid">
-              <label>批次名称<input value="2027 春季补招"></label>
-              <label>负责人<select><option>联盟总负责人</option><option>人才发展中心负责人</option></select></label>
-              <label>报名开始时间<input type="date" value="2027-02-20"></label>
-              <label>报名截止时间<input type="date" value="2027-03-08"></label>
+              <label>批次名称<input v-model="draftForm.name" required placeholder="例如：2027 春季招新"></label>
+              <label>负责人<input value="联盟总负责人" readonly></label>
+              <label>报名开始时间<input v-model="draftForm.startAt" type="date" required></label>
+              <label>报名截止时间<input v-model="draftForm.endAt" type="date" required></label>
             </div>
           </section>
           <section>
             <header><span>02</span><h3>开放中心</h3></header>
             <div class="admin-check-grid">
-              <label><input type="checkbox" checked> 白泽开发中心</label>
-              <label><input type="checkbox" checked> 新媒体中心</label>
-              <label><input type="checkbox" checked> 拓维策划中心</label>
-              <label><input type="checkbox" checked> 人才发展中心</label>
+              <label v-for="[id, label] in centerOptions" :key="id"><span>{{ label }}</span><input v-model="draftForm.openCenterIds" type="checkbox" :value="id"></label>
             </div>
           </section>
           <section class="admin-inline-note">
-            保存后只会形成草稿，批次公开前仍需完成报名表和负责人配置。
+            保存后为草稿，不会立即开放报名。发布批次后，用户进入“加入我们”时会自动关联到唯一开放批次。
           </section>
+          <p v-if="createError" class="admin-save-message" role="alert">{{ createError }}</p>
         </div>
         <footer class="admin-drawer__footer">
-          <span>Mock 原型，不创建真实批次</span>
+          <span>联盟总负责人创建 · 保存为草稿</span>
           <button type="button" class="button button--ghost" @click="showCreate = false">取消</button>
-          <button type="button" class="button" @click="showCreate = false">保存草稿</button>
+          <button type="button" class="button" @click="saveDraft">保存草稿</button>
         </footer>
       </aside>
     </div>
