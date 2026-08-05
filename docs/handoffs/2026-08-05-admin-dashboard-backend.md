@@ -19,6 +19,8 @@
 3. 先做后端资源级授权测试，再接前端 API Gateway。API 返回 401/403/5xx 时前端显示错误态，不静默使用 Mock。
 4. 详情页或执行动作接口仍需独立授权，不能因为工作台返回过 target 就直接信任。
 
+`target.action` 只能使用前端登记的语义动作：`overview`、`manage`、`applications`、`assess`、`publish-results`、`review`、`publish`、`view`、`create`、`list`、`automation`、`configure`、`health`。带 `capability` 的任务或批次动作必须同时出现在 `operator.capabilities` 中。
+
 ## 不应实现的内容
 
 - 不要信任客户端 `accountId`、`centerRole` 或任意 URL。
