@@ -65,7 +65,9 @@ components:
         content:
           $ref: '#/components/schemas/ContentDashboardSummary'
         portal:
-          $ref: '#/components/schemas/PortalDashboardSummary'
+          oneOf:
+            - $ref: '#/components/schemas/PortalDashboardSummary'
+            - type: 'null'
         media:
           $ref: '#/components/schemas/MediaDashboardSummary'
         warnings:

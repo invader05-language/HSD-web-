@@ -3,7 +3,7 @@ import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
 import { formatRecruitmentApplicationSubmittedAt } from "~/data/recruitment-admin";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useSessionStore } from "~/stores/session";
-import { getAdminCenterScope } from "~/utils/admin-center-scope";
+import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 
@@ -17,8 +17,7 @@ const application = computed(() => assessmentStore
   .getCandidates(batchId.value)
   .map((record) => record.candidate)
   .find((candidate) => candidate?.id === applicationId.value
-    && (!getAdminCenterScope(session.currentAccount?.adminCenterRole)
-      || candidate.preferences[0] === getAdminCenterScope(session.currentAccount?.adminCenterRole))));
+    && canAccessRecruitmentCandidate(candidate, getAdminCenterScope(session.currentAccount?.adminCenterRole))));
 
 useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
 </script>

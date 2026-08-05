@@ -2,7 +2,7 @@
 
 ## 目标
 
-前端工作台已经按 `AdminDashboardSnapshot` 设计为只读运营投影。后端接入时实现 `GET /api/admin/dashboard`，让服务端成为权限、指标、招新批次选择和异常状态的唯一权威来源。前端现阶段默认使用 Mock Gateway，API Gateway 已保留可替换边界。
+前端工作台已经按 `AdminDashboardSnapshot` 设计为只读运营投影。后端接入时实现 `GET /api/admin/dashboard`，让服务端成为权限、指标、招新批次选择和异常状态的唯一权威来源。前端现阶段默认使用 Mock Gateway，API Gateway 已保留可替换边界。`portal` 只对拥有 `portal.configure` 或 `portal.publish` capability 的操作者返回对象；其他操作者必须收到 `null`，不能通过该接口获知门户草稿或线上版本状态。
 
 ## 必须保持的业务意图
 

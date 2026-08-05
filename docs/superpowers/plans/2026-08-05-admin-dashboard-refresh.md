@@ -37,7 +37,7 @@
 
 **Interfaces:**
 - `DashboardTarget` has `module: "recruitment" | "content" | "portal" | "media" | "member"`, `action: string`, optional `resourceType` and `resourceId`.
-- `AdminDashboardSnapshot` has `schemaVersion`, `generatedAt`, `timezone`, `operator`, `metrics`, `tasks`, `recruitment`, `content`, `portal`, `media`, and `warnings`.
+- `AdminDashboardSnapshot` has `schemaVersion`, `generatedAt`, `timezone`, `operator`, `metrics`, `tasks`, `recruitment`, `content`, `portal`, `media`, and `warnings`; `portal` is `null` when the operator has neither `portal.configure` nor `portal.publish`.
 - `AdminDashboardGateway` exposes `getSnapshot(options?: { now?: Date }): Promise<AdminDashboardSnapshot>`.
 - `useAdminDashboard(options?: { gateway?: AdminDashboardGateway })` exposes `snapshot`, `loading`, `error`, and `refresh`.
 
@@ -86,4 +86,4 @@
 - [ ] **Step 1: Run focused unit tests and the full unit suite.** Existing baseline failure `recruitment-batch-rules.test.ts` must be distinguished from regressions.
 - [ ] **Step 2: Run `nuxt typecheck` and `nuxt build` using the available HSD Node wrapper or the documented system-runtime fallback if Node 22.19.0 is unavailable.**
 - [ ] **Step 3: Run the admin Playwright suite; if Chrome `SIGABRT` or Nuxt `EMFILE` recurs, preserve the exact command and error as an environment limitation rather than claiming pass.
-- [ ] **Step 4: Review the final diff for scope, privacy, capability leaks, route correctness, desktop/mobile overlap, and backend handoff completeness. Do not commit or push without explicit authorization.
+- [ ] **Step 4: Review the final diff for scope, privacy, capability leaks, route correctness, desktop/mobile overlap, and backend handoff completeness. Do not commit or push without explicit authorization.**

@@ -34,6 +34,15 @@ describe("administration platform navigation", () => {
     ).toContain("/admin/accounts");
   });
 
+  it("uses the batch roster as the primary application entry and hides portal configuration without capability", () => {
+    const centerAdminItems = getAdminNavigationForAccess({ canManageAdminAccounts: false })
+      .flatMap((group) => group.items);
+
+    expect(centerAdminItems.find((item) => item.id === "applications")?.to)
+      .toBe("/admin/recruitment/batches/batch-current/applications");
+    expect(centerAdminItems.map((item) => item.id)).not.toContain("homepage");
+  });
+
   it("resolves nested routes to the correct navigation item", () => {
     expect(getAdminNavigationState("/admin/resources")).toEqual({
       groupId: "media-resources",

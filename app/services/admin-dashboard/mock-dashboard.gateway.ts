@@ -21,7 +21,11 @@ import { useRecruitmentAssessmentStore } from "../../stores/recruitment-assessme
 import { useRecruitmentBatchStore } from "../../stores/recruitment-batch";
 import { useSessionStore } from "../../stores/session";
 import type { AdminDashboardGateway, DashboardSnapshotOptions } from "./dashboard-gateway";
-import { getAdminCenterScope, getRecruitmentCenterId } from "../../utils/admin-center-scope";
+import {
+  canAccessPortalContent,
+  getAdminCenterScope,
+  getRecruitmentCenterId,
+} from "../../utils/admin-center-scope";
 
 export interface OperatingRecruitmentBatch {
   batch: RecruitmentBatch;
@@ -156,7 +160,7 @@ function buildWarnings(operator: DashboardOperator): DashboardWarning[] {
       target: { module: "content", action: "list" },
     });
   }
-  if (configStore.persistenceError) {
+  if (hasCapability(operator, "portal.configure") && configStore.persistenceError) {
     warnings.push({
       code: configStore.persistenceError,
       level: "error",
@@ -322,9 +326,10 @@ export function createMockDashboardGateway(): AdminDashboardGateway {
       const operator = getCapabilities();
       const contentStore = usePortalContentStore();
       const configStore = usePortalConfigStore();
-      const visibleContentRecords = operator.level === "owner"
-        ? contentStore.records
-        : contentStore.records.filter((record) => record.createdBy === operator.id);
+      const visibleContentRecords = contentStore.records.filter((record) => canAccessPortalContent(record, {
+        operatorId: operator.id,
+        centerRole: operator.centerRole,
+      }));
       const content = getContentOverview(visibleContentRecords);
       const inReview = hasCapability(operator, "content.review") ? content.inReview : 0;
       const pendingPublication = hasCapability(operator, "content.publish") ? content.pendingPublication : 0;
@@ -334,7 +339,9 @@ export function createMockDashboardGateway(): AdminDashboardGateway {
       const centerScope = getCenterScope(operator);
       const visibleAssets = operator.level === "owner"
         ? ADMIN_ASSETS
-        : ADMIN_ASSETS.filter((asset) => Boolean(centerScope && asset.owner.includes(centerScope)));
+        : ADMIN_ASSETS.filter((asset) => Boolean(
+          centerScope && asset.ownerCenterId === getRecruitmentCenterId(centerScope),
+        ));
       const processing = visibleAssets.filter((asset) => (
         ["waiting", "uploading", "processing"].includes(asset.processingStatus)
       )).length;
@@ -353,7 +360,12 @@ export function createMockDashboardGateway(): AdminDashboardGateway {
             value: tasks.length,
             target: tasks[0]?.target ?? { module: "recruitment", action: "overview" },
           },
-          { id: "content-review", label: "待审核内容", value: inReview, target: { module: "content", action: "review" } },
+          {
+            id: "content-review",
+            label: hasCapability(operator, "content.review") ? "待审核内容" : "我的内容",
+            value: hasCapability(operator, "content.review") ? inReview : visibleContentRecords.length,
+            target: { module: "content", action: hasCapability(operator, "content.review") ? "review" : "list" },
+          },
           { id: "content-publish", label: "待发布内容", value: pendingPublication, target: { module: "content", action: "publish" } },
           {
             id: "system-warnings",
@@ -380,11 +392,13 @@ export function createMockDashboardGateway(): AdminDashboardGateway {
               target: { module: "content", action: "view", resourceType: "content", resourceId: record.id },
             })),
         },
-        portal: {
-          draftRevision: configStore.draftConfig.revision,
-          publishedRevision: configStore.publishedConfig.revision,
-          isDirty: configStore.draftConfig.revision !== configStore.publishedConfig.revision,
-        },
+        portal: hasCapability(operator, "portal.configure") || hasCapability(operator, "portal.publish")
+          ? {
+              draftRevision: configStore.draftConfig.revision,
+              publishedRevision: configStore.publishedConfig.revision,
+              isDirty: configStore.draftConfig.revision !== configStore.publishedConfig.revision,
+            }
+          : null,
         media: { total: visibleAssets.length, processing, failed, reviewPending },
         warnings,
       };

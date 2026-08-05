@@ -15,6 +15,7 @@ export interface AdminNavigationGroup {
 
 export interface AdminNavigationAccess {
   canManageAdminAccounts: boolean;
+  canConfigurePortal?: boolean;
 }
 
 export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
@@ -28,7 +29,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     label: "招新与考核",
     items: [
       { id: "batches", label: "招新批次", to: "/admin/recruitment/batches", feature: "recruitmentBatches" },
-      { id: "applications", label: "报名人员", to: "/admin/recruitment/applications" },
+      { id: "applications", label: "报名人员", to: "/admin/recruitment/batches/batch-current/applications" },
       { id: "assessment", label: "预备成员考核", to: "/admin/recruitment" },
       { id: "publication", label: "结果发布", to: "/admin/recruitment/publish" }
     ]
@@ -90,10 +91,12 @@ export function getAdminNavigationForAccess(
   access: AdminNavigationAccess,
   features: ReleaseFeatures = RELEASE_FEATURES
 ) {
+  const canConfigurePortal = access.canConfigurePortal ?? access.canManageAdminAccounts;
   return ADMIN_NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) => (item.id !== "accounts" || access.canManageAdminAccounts)
+        && (item.id !== "homepage" || canConfigurePortal)
         && (item.feature === undefined || features[item.feature])
     )
   })).filter((group) => group.items.length > 0);

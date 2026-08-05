@@ -23,7 +23,7 @@
     { "id": "my-work", "label": "待处理事项", "value": 5, "detail": "当前账号可执行的优先事项", "target": { "module": "recruitment", "action": "assess", "resourceType": "batch", "resourceId": "batch-current" } },
     { "id": "content-review", "label": "待审核内容", "value": 2, "detail": "内容审核队列", "target": { "module": "content", "action": "review" } },
     { "id": "content-publish", "label": "待发布内容", "value": 1, "detail": "已审核待发布", "target": { "module": "content", "action": "publish" } },
-    { "id": "abnormal", "label": "异常任务", "value": 1, "detail": "需要重试或人工处理", "target": { "module": "media", "action": "failures" } }
+    { "id": "abnormal", "label": "异常任务", "value": 1, "detail": "需要重试或人工处理", "target": { "module": "media", "action": "health" } }
   ],
   "tasks": [],
   "recruitment": {

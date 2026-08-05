@@ -128,10 +128,12 @@ export function isAdminDashboardSnapshot(value: unknown): value is AdminDashboar
       ((value.operator as Record<string, unknown>).capabilities as DashboardCapability[]),
     ))
     || !isContentSummary(value.content)
-    || !isRecord(value.portal)
-    || !isPositiveInteger(value.portal.draftRevision)
-    || !isPositiveInteger(value.portal.publishedRevision)
-    || typeof value.portal.isDirty !== "boolean"
+    || !(value.portal === null || (
+      isRecord(value.portal)
+      && isPositiveInteger(value.portal.draftRevision)
+      && isPositiveInteger(value.portal.publishedRevision)
+      && typeof value.portal.isDirty === "boolean"
+    ))
     || !isRecord(value.media)
     || !isNonNegativeInteger(value.media.total)
     || !isNonNegativeInteger(value.media.processing)

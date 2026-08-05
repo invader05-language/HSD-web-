@@ -8,6 +8,7 @@ export type AssetProcessingStatus =
   | "failed";
 export type AssetReviewStatus = "pending" | "approved" | "rejected";
 export type ResourceAccess = "public" | "member" | "center";
+export type AdminAssetCenterId = "baize-development" | "new-media" | "tuowei-planning" | "talent-development";
 
 export interface AdminAsset {
   id: string;
@@ -16,6 +17,7 @@ export interface AdminAsset {
   dimensions: string;
   size: string;
   owner: string;
+  ownerCenterId: AdminAssetCenterId;
   createdAt: string;
   processingStatus: AssetProcessingStatus;
   reviewStatus: AssetReviewStatus;
@@ -65,6 +67,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "2400 × 900",
     size: "3.8 MB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-30",
     processingStatus: "ready",
     reviewStatus: "approved",
@@ -80,6 +83,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "6000 × 4000",
     size: "12.6 MB",
     owner: "摄影组 · 周同学",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-29",
     processingStatus: "processing",
     reviewStatus: "pending",
@@ -94,6 +98,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "1920 × 1080",
     size: "186 MB",
     owner: "白泽开发中心",
+    ownerCenterId: "baize-development",
     createdAt: "2026-07-28",
     processingStatus: "ready",
     reviewStatus: "approved",
@@ -108,6 +113,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "4800 × 3200",
     size: "8.2 MB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-27",
     processingStatus: "ready",
     reviewStatus: "rejected",
@@ -122,6 +128,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "3840 × 2160",
     size: "1.8 GB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-26",
     processingStatus: "failed",
     reviewStatus: "pending",

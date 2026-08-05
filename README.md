@@ -274,3 +274,11 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 - 生产构建：Nuxt 混合渲染（SSR + CSR route rules）
 
 页面或交互修改后必须同步更新需求文档、原型/截图、变更记录和验收标准。
+
+## 2026-08-06 管理工作台权限修复
+
+- 旧报名名单入口统一跳转到批次报名入口；名单、详情和导出只读取当前管理员中心范围内的第一志愿报名人员，联盟总负责人保留全量访问权。
+- 内容列表、详情、预览与草稿写操作统一执行内容所有权校验；中心管理员只能操作自己创建的内容。
+- Dashboard 门户状态改为 capability 投影：没有 `portal.configure` 或 `portal.publish` 的中心管理员收到 `portal: null`，页面不显示门户状态或配置入口。
+- 媒体素材新增稳定的 `ownerCenterId`，摄影组素材归入新媒体中心；禁止根据展示名称字符串推断权限。
+- Dashboard OpenAPI、前端类型、Owner/Center JSON 示例和契约测试保持一致。

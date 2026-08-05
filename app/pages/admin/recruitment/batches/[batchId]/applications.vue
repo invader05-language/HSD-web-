@@ -16,7 +16,7 @@ import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
 } from "~/utils/recruitment-export";
-import { getAdminCenterScope } from "~/utils/admin-center-scope";
+import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import { useSessionStore } from "~/stores/session";
 
 definePageMeta({ layout: "admin" });
@@ -34,7 +34,7 @@ const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
   .getCandidates(batchId.value)
   .map((record) => record.candidate)
   .filter((candidate): candidate is AdminCandidate => Boolean(candidate))
-  .filter((candidate) => !centerScope.value || candidate.preferences[0] === centerScope.value));
+  .filter((candidate) => canAccessRecruitmentCandidate(candidate, centerScope.value)));
 watch(centerScope, (scope) => {
   center.value = scope ?? "全部中心";
 }, { immediate: true });
@@ -59,7 +59,8 @@ function exportRecruitmentCsv() {
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
+  <NuxtPage v-if="route.params.id" />
+  <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Batch Applications"
       :title="`${batch?.name ?? '未知批次'} · 报名人员`"

@@ -260,7 +260,7 @@ onMounted(() => {
         </section>
 
         <div class="admin-dashboard-side-stack">
-          <section class="admin-dashboard-panel admin-dashboard-portal">
+          <section v-if="snapshot.portal" class="admin-dashboard-panel admin-dashboard-portal">
             <header>
               <div><span>Portal State</span><h2>门户发布状态</h2></div>
               <NuxtLink :to="routeFor({ module: 'portal', action: 'configure' })">配置门户 →</NuxtLink>

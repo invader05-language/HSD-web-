@@ -20,7 +20,7 @@ const showUpload = ref(false);
 const selected = ref<(typeof ADMIN_ASSETS)[number] | null>(null);
 const visible = computed(() => filterAdminAssets(
   centerScope.value
-    ? ADMIN_ASSETS.filter((asset) => asset.owner.includes(centerScope.value!))
+    ? ADMIN_ASSETS.filter((asset) => asset.ownerCenterId === getRecruitmentCenterId(centerScope.value!))
     : ADMIN_ASSETS,
   filters,
 ));

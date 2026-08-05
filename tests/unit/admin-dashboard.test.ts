@@ -15,6 +15,8 @@ import { usePortalConfigStore } from "../../app/stores/portal-config";
 import { useActivitiesStore } from "../../app/stores/activities";
 import { useAdminDashboard } from "../../app/composables/useAdminDashboard";
 import type { RecruitmentAssessmentBatchState } from "../../app/stores/recruitment-assessment";
+import { readFileSync } from "node:fs";
+import { isAdminDashboardSnapshot } from "../../app/services/admin-dashboard/api-dashboard.gateway";
 
 const now = new Date("2026-08-05T08:00:00.000Z");
 
@@ -87,6 +89,7 @@ describe("mock dashboard gateway", () => {
     expect(snapshot.content.recent).toHaveLength(0);
     expect(snapshot.warnings).toHaveLength(0);
     expect(snapshot.media.total).toBeLessThan(5);
+    expect(snapshot.portal).toBeNull();
   });
 
   it("scopes center-visible content and assessment records to the current center", async () => {
@@ -204,6 +207,14 @@ describe("mock dashboard gateway", () => {
 });
 
 describe("API dashboard gateway", () => {
+  it("accepts the checked-in owner and center dashboard examples as API contracts", () => {
+    const ownerExample = JSON.parse(readFileSync("docs/contracts/examples/admin-dashboard-owner.json", "utf8"));
+    const centerExample = JSON.parse(readFileSync("docs/contracts/examples/admin-dashboard-center-admin.json", "utf8"));
+
+    expect(isAdminDashboardSnapshot(ownerExample)).toBe(true);
+    expect(isAdminDashboardSnapshot(centerExample)).toBe(true);
+  });
+
   it("rejects an invalid API response instead of treating it as a dashboard snapshot", async () => {
     const gateway = new ApiDashboardGateway(async () => ({ schemaVersion: 1 }));
 

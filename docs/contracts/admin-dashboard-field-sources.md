@@ -12,8 +12,8 @@
 | `recruitment` 选择 | `selection` | 招新批次 + 考核/发布状态 | 优先 open/paused；其次 unfinished-work；其次最近 upcoming；没有则 null |
 | `recruitment.assessment` | total/ready/pending/adjustmentPending/decision | 该批次考核记录 | 不能把预备成员报名直接当正式成员；发布资格由后端事务校验 |
 | `content` | `inReview/pendingPublication/recent` | 内容记录与审核状态 | recent 按 updatedAt 降序；中心管理员仅投影自己创建的内容，避免泄漏其他范围信息 |
-| `portal` | draft/published 状态 | 门户配置版本 | 发布配置必须经过 owner 权限与版本校验 |
-| `media` | total/processing/failed/reviewPending | 媒体素材处理与审核 | 不返回虚构容量上限；失败项保留可追踪 resource id |
+| `portal` | draft/published 状态；无门户能力时为 `null` | 门户配置版本 | 仅拥有 `portal.configure` 或 `portal.publish` 的操作者可读取；发布配置必须经过 owner 权限与版本校验 |
+| `media` | total/processing/failed/reviewPending | 媒体素材处理与审核 | 素材归属使用稳定的 `ownerCenterId`，不得以展示名称字符串推断授权；不返回虚构容量上限；失败项保留可追踪 resource id |
 | `warnings` | 自动化、持久化、同步错误 | 各领域 outbox/失败记录 | 只展示未解决告警；每条告警可选语义 target |
 
 ## 一致性与隐私

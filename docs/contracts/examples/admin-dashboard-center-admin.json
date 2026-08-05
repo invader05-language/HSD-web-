@@ -24,7 +24,7 @@
     "actions": []
   },
   "content": { "inReview": 0, "pendingPublication": 0, "recent": [] },
-  "portal": { "draftRevision": 1, "publishedRevision": 1, "isDirty": false },
+  "portal": null,
   "media": { "total": 2, "processing": 1, "failed": 0, "reviewPending": 1 },
   "warnings": []
 }

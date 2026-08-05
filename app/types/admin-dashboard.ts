@@ -131,7 +131,7 @@ export interface AdminDashboardSnapshot {
   tasks: DashboardTask[];
   recruitment: RecruitmentDashboardContext | null;
   content: ContentDashboardSummary;
-  portal: PortalDashboardSummary;
+  portal: PortalDashboardSummary | null;
   media: MediaDashboardSummary;
   warnings: DashboardWarning[];
 }
