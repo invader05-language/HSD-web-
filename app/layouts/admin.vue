@@ -75,7 +75,7 @@ function toggleGroup(groupId: string) {
     <a class="skip-link" href="#admin-main-content">跳至管理内容</a>
 
     <aside class="admin-sidebar">
-      <NuxtLink class="admin-brand" to="/admin/recruitment" aria-label="HSD 管理台">
+      <NuxtLink class="admin-brand" to="/admin" aria-label="HSD 管理台">
         <span>&lt; HSD &gt;</span>
         <strong>管理台</strong>
       </NuxtLink>

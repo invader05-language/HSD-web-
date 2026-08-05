@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05T07:00:00.000Z",
+  "timezone": "Asia/Shanghai",
+  "operator": {
+    "id": "media-admin",
+    "name": "新媒体中心负责人",
+    "level": "admin",
+    "centerRole": "新媒体中心负责人",
+    "capabilities": ["recruitment.assessment.edit", "content.create"]
+  },
+  "metrics": [
+    { "id": "my-work", "label": "待处理事项", "value": 1, "detail": "新媒体中心范围内", "target": { "module": "recruitment", "action": "assess", "resourceType": "batch", "resourceId": "batch-current" } },
+    { "id": "content-review", "label": "我的内容", "value": 1, "detail": "当前账号创建的草稿", "target": { "module": "content", "action": "list" } },
+    { "id": "content-publish", "label": "待发布内容", "value": 0, "detail": "无发布权限", "target": { "module": "content", "action": "list" } },
+    { "id": "abnormal", "label": "异常任务", "value": 0, "detail": "当前范围内无异常", "target": { "module": "media", "action": "health" } }
+  ],
+  "tasks": [],
+  "recruitment": {
+    "selection": "open",
+    "batch": { "id": "batch-current", "name": "2026 秋季招新", "status": "open", "startAt": "2026-08-01T00:00:00.000Z", "endAt": "2026-09-18T00:00:00.000Z" },
+    "applicationCount": 2,
+    "assessment": { "total": 2, "pending": 2, "adjustmentPending": 0, "canPublish": false },
+    "actions": []
+  },
+  "content": { "inReview": 0, "pendingPublication": 0, "recent": [] },
+  "portal": { "draftRevision": 1, "publishedRevision": 1, "isDirty": false },
+  "media": { "total": 2, "processing": 1, "failed": 0, "reviewPending": 1 },
+  "warnings": []
+}

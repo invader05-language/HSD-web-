@@ -314,7 +314,7 @@ describe("recruitment batch lifecycle commands", () => {
     const store = useRecruitmentBatchStore();
     store.replaceBatches([batch(), batch({
       id: "batch-next",
-      startAt: "2026-08-05T00:00:00.000Z",
+      startAt: "2026-08-06T00:00:00.000Z",
     })]);
 
     expect(() => store.openNow("batch-next", true, NOW)).toThrow("BATCH_ALREADY_OPEN");

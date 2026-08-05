@@ -6,15 +6,24 @@ import {
   filterAdminAssets,
   getAssetProcessingLabel
 } from "~/data/admin-assets";
+import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "媒体素材库｜HSD 管理台" });
 
 const filters = reactive({ query: "", type: "全部类型", state: "全部状态" });
+const session = useSessionStore();
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const view = ref<"grid" | "list">("grid");
 const showUpload = ref(false);
 const selected = ref<(typeof ADMIN_ASSETS)[number] | null>(null);
-const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
+const visible = computed(() => filterAdminAssets(
+  centerScope.value
+    ? ADMIN_ASSETS.filter((asset) => asset.owner.includes(centerScope.value!))
+    : ADMIN_ASSETS,
+  filters,
+));
 </script>
 
 <template>

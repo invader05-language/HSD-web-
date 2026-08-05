@@ -16,20 +16,28 @@ import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
 } from "~/utils/recruitment-export";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
+import { useSessionStore } from "~/stores/session";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const assessmentStore = useRecruitmentAssessmentStore();
+const session = useSessionStore();
 const batchId = computed(() => String(route.params.batchId));
 const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
 const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
 const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
   .getCandidates(batchId.value)
   .map((record) => record.candidate)
-  .filter((candidate): candidate is AdminCandidate => Boolean(candidate)));
+  .filter((candidate): candidate is AdminCandidate => Boolean(candidate))
+  .filter((candidate) => !centerScope.value || candidate.preferences[0] === centerScope.value));
+watch(centerScope, (scope) => {
+  center.value = scope ?? "全部中心";
+}, { immediate: true });
 const visible = computed(() => filterAndSortRecruitmentApplications(scopedCandidates.value, {
   query: query.value,
   firstChoice: center.value,

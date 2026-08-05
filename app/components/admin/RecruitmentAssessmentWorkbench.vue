@@ -5,6 +5,7 @@ import { getAssessmentRounds } from "~/utils/recruitment-assessment-rules";
 import { useRecruitmentAssessmentStore, type RecruitmentAssessmentCandidate } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
@@ -19,10 +20,11 @@ const route = useRoute();
 
 const batch = computed(() => batchStore.getBatch(props.batchId));
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
-const candidates = computed(() => assessmentStore.getCandidates(props.batchId));
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const candidates = computed(() => assessmentStore.getCandidates(props.batchId)
+  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
 const currentRoundLabel = computed(() => `第${["一", "二", "三"][state.value.currentRound - 1]}轮考核`);
 const isOwner = computed(() => session.canManageAdminAccounts);
-const centerGroups = ["全部人员", ...RECRUITMENT_CENTERS] as const;
 const filters = reactive({
   center: "全部人员" as "全部人员" | RecruitmentCenter,
   query: "",
@@ -30,6 +32,12 @@ const filters = reactive({
   result: "全部结果" as ResultFilter,
   adjustment: "全部" as "全部" | "接受调剂" | "不接受调剂",
 });
+const centerGroups = computed<Array<"全部人员" | RecruitmentCenter>>(
+  () => centerScope.value ? [centerScope.value] : ["全部人员", ...RECRUITMENT_CENTERS],
+);
+watch(centerScope, (scope) => {
+  filters.center = scope ?? "全部人员";
+}, { immediate: true });
 const selectedCandidateId = ref<string>();
 const roundDrafts = ref<Partial<Record<AssessmentRoundNumber, RoundDraft>>>({});
 const internalNote = ref("");

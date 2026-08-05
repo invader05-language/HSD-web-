@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05T07:00:00.000Z",
+  "timezone": "Asia/Shanghai",
+  "operator": {
+    "id": "admin-alliance",
+    "name": "联盟总负责人",
+    "level": "owner",
+    "centerRole": null,
+    "capabilities": [
+      "recruitment.batch.manage",
+      "recruitment.assessment.edit",
+      "recruitment.result.publish",
+      "content.create",
+      "content.review",
+      "content.publish",
+      "portal.configure",
+      "portal.publish",
+      "member.create"
+    ]
+  },
+  "metrics": [
+    { "id": "my-work", "label": "待处理事项", "value": 5, "detail": "当前账号可执行的优先事项", "target": { "module": "recruitment", "action": "assess", "resourceType": "batch", "resourceId": "batch-current" } },
+    { "id": "content-review", "label": "待审核内容", "value": 2, "detail": "内容审核队列", "target": { "module": "content", "action": "review" } },
+    { "id": "content-publish", "label": "待发布内容", "value": 1, "detail": "已审核待发布", "target": { "module": "content", "action": "publish" } },
+    { "id": "abnormal", "label": "异常任务", "value": 1, "detail": "需要重试或人工处理", "target": { "module": "media", "action": "failures" } }
+  ],
+  "tasks": [],
+  "recruitment": {
+    "selection": "open",
+    "batch": { "id": "batch-current", "name": "2026 秋季招新", "status": "open", "startAt": "2026-08-01T00:00:00.000Z", "endAt": "2026-09-18T00:00:00.000Z" },
+    "applicationCount": 6,
+    "assessment": { "total": 6, "pending": 5, "adjustmentPending": 0, "canPublish": false },
+    "actions": []
+  },
+  "content": { "inReview": 2, "pendingPublication": 1, "recent": [] },
+  "portal": { "draftRevision": 1, "publishedRevision": 1, "isDirty": false },
+  "media": { "total": 5, "processing": 1, "failed": 1, "reviewPending": 2 },
+  "warnings": []
+}

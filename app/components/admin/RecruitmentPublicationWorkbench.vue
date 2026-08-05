@@ -2,6 +2,7 @@
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 const assessmentStore = useRecruitmentAssessmentStore();
@@ -9,7 +10,9 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const batch = computed(() => batchStore.getBatch(props.batchId));
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
-const candidates = computed(() => assessmentStore.getCandidates(props.batchId));
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const candidates = computed(() => assessmentStore.getCandidates(props.batchId)
+  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
 const summary = computed(() => assessmentStore.getPublicationSummary(props.batchId));
 const isOwner = computed(() => session.canManageAdminAccounts);
 const showConfirmation = ref(false);

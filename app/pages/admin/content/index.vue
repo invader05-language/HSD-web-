@@ -1,19 +1,28 @@
 <script setup lang="ts">
 import { getContentOverview, PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS, toAdminContentRecord } from "~/data/admin-content";
 import { usePortalContentStore } from "~/stores/portal-content";
+import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "官网内容｜HSD 管理台" });
 
 const route = useRoute();
 const content = usePortalContentStore();
+const session = useSessionStore();
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const visibleContentRecords = computed(() => centerScope.value
+  ? content.records.filter((record) => record.createdBy === session.currentAccount?.account)
+  : content.records);
 const query = ref(typeof route.query.query === "string" ? route.query.query : "");
 const status = ref(typeof route.query.status === "string" ? route.query.status : "全部状态");
 const kind = ref(typeof route.query.kind === "string" ? route.query.kind : "全部分类");
 const automationNotice = ref("");
-const unresolvedAutomationFailures = computed(() => content.automationFailures.filter((failure) => !failure.resolvedAt));
-const overview = computed(() => getContentOverview(content.records));
-const rows = computed(() => content.records
+const unresolvedAutomationFailures = computed(() => centerScope.value
+  ? []
+  : content.automationFailures.filter((failure) => !failure.resolvedAt));
+const overview = computed(() => getContentOverview(visibleContentRecords.value));
+const rows = computed(() => visibleContentRecords.value
   .map(toAdminContentRecord)
   .filter((record) => (!query.value.trim() || [record.title, record.summary, record.owner].join(" ").toLowerCase().includes(query.value.trim().toLowerCase()))
     && (status.value === "全部状态" || record.status === status.value)
