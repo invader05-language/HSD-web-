@@ -71,9 +71,7 @@ test("internal resource login continues to an honest unavailable state", async (
   await expect(page.getByRole("button", { name: "文件暂未接入" })).toBeDisabled();
   await page.getByRole("link", { name: "登录查看下载权限" }).click();
   await expect(page).toHaveURL(/\/login\?redirect=%2Fresources%2Fmember-training-package$/);
-  await page.waitForFunction(() => Boolean(
-    (document.querySelector("form") as Element & { __vueParentComponent?: unknown })?.__vueParentComponent
-  ));
+  await expect(page.getByLabel("学号或成员账号")).toBeVisible();
 
   await page.getByLabel("学号或成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
