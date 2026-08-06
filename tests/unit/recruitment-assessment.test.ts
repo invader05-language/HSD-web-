@@ -227,25 +227,47 @@ describe("recruitment assessment store", () => {
     expect(store.getCandidate(BATCH_ID, "candidate-zhang")?.roundOutcomes[1]).toBeUndefined();
   });
 
-  it("does not allow assessment writes while registration is open or paused", () => {
+  it("allows candidate assessment writes while registration is open or paused, but keeps batch commands closed-only", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
-    expect(() => store.saveRoundOutcome({
+    store.saveRoundOutcome({
       batchId: BATCH_ID,
       candidateId: "candidate-wang",
       round: 1,
       outcome: "passed",
       now: new Date("2026-08-04T10:00:00.000Z"),
-    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+    });
+    expect(store.getCandidate(BATCH_ID, "candidate-wang")).toMatchObject({
+      roundOutcomes: { 1: "passed" },
+      processingStatus: "ready-to-publish",
+    });
 
     useRecruitmentBatchStore().pause(BATCH_ID, new Date("2026-08-04T10:00:00.000Z"));
-    expect(() => store.saveRoundOutcome({
+    store.saveRoundOutcome({
       batchId: BATCH_ID,
-      candidateId: "candidate-wang",
+      candidateId: "candidate-chen",
       round: 1,
-      outcome: "passed",
+      outcome: "failed",
       now: new Date("2026-08-04T10:01:00.000Z"),
-    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+    });
+    expect(store.getCandidate(BATCH_ID, "candidate-chen")?.processingStatus)
+      .toBe("offline-adjustment-pending");
+
+    store.recordAdjustmentDecision({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      decision: "not-admitted",
+      now: new Date("2026-08-04T10:02:00.000Z"),
+    });
+    expect(store.getCandidate(BATCH_ID, "candidate-chen")).toMatchObject({
+      finalDecision: "not-admitted",
+      processingStatus: "ready-to-publish",
+    });
+
+    expect(() => store.advanceAssessmentRound(BATCH_ID, true, new Date("2026-08-04T10:03:00.000Z")))
+      .toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+    expect(() => store.publishBatchResults(BATCH_ID, true, new Date("2026-08-04T10:04:00.000Z")))
+      .toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
   });
 
   it("routes a failed accepted-adjustment candidate to offline input", () => {
@@ -551,16 +573,20 @@ describe("recruitment assessment store", () => {
     )).toThrow("BATCH_RESULTS_PUBLISHED_READ_ONLY");
   });
 
-  it("rejects publication while the recruitment window is still open", () => {
+  it("allows candidate writes while the recruitment window is open but rejects publication", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();
-    expect(() => store.saveRoundOutcome({
+    store.saveRoundOutcome({
       batchId: BATCH_ID,
       candidateId: "candidate-wang",
       round: 1,
       outcome: "passed",
       now: new Date("2026-08-04T10:00:00.000Z"),
-    })).toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
+    });
+    expect(store.getCandidate(BATCH_ID, "candidate-wang")).toMatchObject({
+      roundOutcomes: { 1: "passed" },
+      processingStatus: "ready-to-publish",
+    });
     expect(() => store.publishBatchResults(BATCH_ID, true, new Date("2026-08-04T10:20:00.000Z")))
       .toThrow("ASSESSMENT_BATCH_NOT_CLOSED");
   });

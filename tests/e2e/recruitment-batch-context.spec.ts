@@ -154,14 +154,13 @@ test("closed batches use a processing entry while archived batches use archive w
 test("an owner can record a not-admitted adjustment without choosing a destination center", async ({ page }) => {
   await page.goto("/admin/recruitment/batches/batch-current/assessment");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches/batch-current/assessment");
-  await closeBatchBeforeAssessment(page);
-  await page.getByRole("link", { name: /进入考核台/ }).click();
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
   await drawer.getByLabel("第一轮结果").selectOption("failed");
   await drawer.getByRole("button", { name: "保存结果" }).click();
   await drawer.getByRole("button", { name: "确认保存" }).click();
+  await expect(page.getByRole("status")).toContainText("结果已保存");
   await expect(drawer).toHaveCount(0);
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();

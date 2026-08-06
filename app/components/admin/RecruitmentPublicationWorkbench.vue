@@ -3,6 +3,7 @@ import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope } from "~/utils/admin-center-scope";
+import { getEffectiveRecruitmentBatchStatus } from "~/utils/recruitment-batch-rules";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 const assessmentStore = useRecruitmentAssessmentStore();
@@ -10,6 +11,17 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const batch = computed(() => batchStore.getBatch(props.batchId));
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
+const effectiveBatchStatus = computed(() => (
+  batch.value ? getEffectiveRecruitmentBatchStatus(batch.value, new Date()).status : "closed"
+));
+const effectiveBatchStatusLabel = computed(() => ({
+  draft: "批次草稿",
+  upcoming: "报名尚未开放",
+  open: "报名开放中",
+  paused: "报名已暂停",
+  closed: "报名已关闭",
+  archived: "批次已归档",
+}[effectiveBatchStatus.value]));
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const candidates = computed(() => assessmentStore.getCandidates(props.batchId)
   .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
@@ -32,7 +44,10 @@ const summary = computed(() => {
     notAdmitted,
     // The operation is intentionally batch-wide and owner-only. A center admin
     // may review scoped rows but must never see an actionable publish state.
-    canPublish: isOwner.value && state.value.status === "ready-to-publish" && pending === 0,
+    canPublish: isOwner.value
+      && effectiveBatchStatus.value === "closed"
+      && state.value.status === "ready-to-publish"
+      && pending === 0,
   };
 });
 const showConfirmation = ref(false);
@@ -73,10 +88,10 @@ function publish() {
     <AdminPageHeading eyebrow="Batch Result Publication" :title="`${batch?.name ?? '未知批次'} · 结果发布`" :description="`发布范围：当前批次全部候选人（batchId：${batchId}）。内部考核保存不会提前公开。`">
       <template #actions>
         <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
-        <button type="button" class="button" :disabled="!isOwner || !summary.canPublish || state.status === 'published'" :title="isOwner ? '需先完成全批次考核与调剂处理' : '仅联盟总负责人可整批发布'" @click="showConfirmation = true">整批发布结果</button>
+        <button type="button" class="button" :disabled="!isOwner || !summary.canPublish || state.status === 'published'" :title="isOwner ? (effectiveBatchStatus === 'closed' ? '需先完成全批次考核与调剂处理' : '关闭报名后才能整批发布') : '仅联盟总负责人可整批发布'" @click="showConfirmation = true">整批发布结果</button>
       </template>
     </AdminPageHeading>
-    <div class="admin-publication-warning"><strong>内部保存不等于对成员公开</strong><p>只有整批结果具备发布条件后，才可一次性更新成员结果中心和成员身份投影。</p></div>
+    <div class="admin-publication-warning"><strong>{{ effectiveBatchStatusLabel }} · 内部保存不等于对成员公开</strong><p v-if="effectiveBatchStatus === 'closed'">只有整批结果具备发布条件后，才可一次性更新成员结果中心和成员身份投影。</p><p v-else-if="effectiveBatchStatus === 'open' || effectiveBatchStatus === 'paused'">可以继续查看和录入已有考核结果；关闭报名后才能推进全局轮次并整批发布。</p><p v-else>当前批次不可发布，请先完成批次发布或恢复可处理状态。</p></div>
     <section class="admin-summary-strip" aria-label="结果发布概览"><div><span>本批次人员</span><strong>{{ summary.total }}</strong><small>{{ batchId }}</small></div><div><span>已形成结果</span><strong>{{ summary.ready }}</strong><small>等待整批发布</small></div><div><span>待处理</span><strong>{{ summary.pending }}</strong><small>含考核与调剂</small></div><div><span>可录取</span><strong>{{ summary.admitted }}</strong><small>发布时才升级身份</small></div></section>
     <section class="admin-list-card"><header><div><span>Publication Review</span><h2>整批发布复核</h2></div><p>当前状态：{{ state.status === "published" ? "已发布" : summary.canPublish ? "可整批发布" : "暂不可发布" }}</p></header><div class="admin-publication-list"><article v-for="candidate in candidates" :key="candidate.candidateId" :class="{ 'is-disabled': candidate.processingStatus === 'assessing' || candidate.processingStatus === 'offline-adjustment-pending' }"><span><strong>{{ candidate.candidate?.name ?? candidate.memberId }}</strong><small>{{ candidate.candidate?.studentId ?? candidate.memberId }}</small></span><div><span>第一志愿</span><strong>{{ candidate.center }}</strong></div><div><span>内部结果</span><AdminStatusPill :status="outcomeLabel(candidate)" /></div><div><span>处理状态</span><strong>{{ processingLabel(candidate) }}</strong></div><small>{{ candidate.finalCenter ? `最终中心：${candidate.finalCenter}` : '尚未形成最终中心' }}</small></article></div></section>
     <p v-if="feedback" class="admin-save-message" role="status">{{ feedback }}</p><p v-if="error" class="admin-save-message" role="alert">{{ error }}</p>

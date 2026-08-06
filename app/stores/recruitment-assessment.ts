@@ -413,6 +413,11 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.getBatchState(batchId);
     },
     assertAssessmentWritable(batchId: string, now: Date) {
+      // Candidate-level commands remain writable while the registration window
+      // is open or paused. The first result locks that candidate's application.
+      this.assertCurrentBatch(batchId, now);
+    },
+    assertAssessmentBatchClosed(batchId: string, now: Date) {
       this.assertCurrentBatch(batchId, now);
       const batchStatus = getEffectiveRecruitmentBatchStatus(
         useRecruitmentBatchStore().getBatchOrThrow(batchId),
@@ -544,7 +549,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       now: Date,
       reason?: string,
     ) {
-      this.assertAssessmentWritable(batchId, now);
+      this.assertAssessmentBatchClosed(batchId, now);
       const actor = this.resolveOwner();
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       const state = this.getBatchState(batchId);
@@ -602,11 +607,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const actor = this.resolveOwner();
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       const state = this.getBatchState(batchId);
-      const batchStatus = getEffectiveRecruitmentBatchStatus(
-        useRecruitmentBatchStore().getBatchOrThrow(batchId),
-        now,
-      ).status;
-      if (batchStatus !== "closed") throw new Error("ASSESSMENT_BATCH_NOT_CLOSED");
+      this.assertAssessmentBatchClosed(batchId, now);
       const summary = this.getPublicationSummary(batchId);
       if (state.status !== "ready-to-publish" || !summary.canPublish) {
         throw new Error("ASSESSMENT_NOT_READY");
