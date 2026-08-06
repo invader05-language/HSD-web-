@@ -10,6 +10,7 @@ import type {
 } from "../types/portal-content";
 import { useSessionStore } from "./session";
 import { canUseAssetForPortalContent } from "../data/admin-assets";
+import { canAccessPortalContent } from "../utils/admin-center-scope";
 import { isSafeInternalPath } from "../utils/internal-route";
 
 export const PORTAL_CONTENT_STORAGE_KEY = "baiyun-hsd.portal-content";
@@ -260,6 +261,16 @@ function ownerActorId(): string {
   return session.currentAccount.account;
 }
 
+function assertCanManagePortalContent(record: PortalContentRecord, actor: string) {
+  const session = useSessionStore();
+  if (!canAccessPortalContent(record, {
+    operatorId: actor,
+    centerRole: session.currentAccount?.adminCenterRole,
+  })) {
+    throw new Error("PORTAL_CONTENT_FORBIDDEN");
+  }
+}
+
 function addAudit(
   record: PortalContentRecord,
   action: PortalContentAuditRecord["action"],
@@ -420,6 +431,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = actorId();
       const record = this.getById(id);
       if (!record) throw new Error("PORTAL_CONTENT_NOT_FOUND");
+      assertCanManagePortalContent(record, actor);
       if (!["draft", "published", "unpublished"].includes(record.status)) {
         throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
       }
@@ -451,6 +463,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = actorId();
       const record = this.getById(id);
       if (!record || record.status !== "draft") throw new Error("PORTAL_CONTENT_INVALID_TRANSITION");
+      assertCanManagePortalContent(record, actor);
       assertValidContentShape(record.kind, record.title, record.summary, record.target, record.blocks);
       const slug = slugify(record.slug);
       assertUniqueSlug(this.records, slug, record.id);

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_ASSETS,
+  ADMIN_UPLOAD_TASKS,
   canSelectAsset,
+  filterAdminAssetsByOwnerCenter,
   filterAdminAssets,
+  filterAdminUploadTasksByOwnerCenter,
+  getAdminAssetSummary,
   getResourceAccessLabel
 } from "../../app/data/admin-assets";
 
@@ -33,5 +37,18 @@ describe("administration media and resource rules", () => {
         state: "可使用"
       }).map((asset) => asset.name)
     ).toEqual(["2026 招新首页主视觉"]);
+  });
+
+  it("keeps asset overview, list and upload queue inside one owner center scope", () => {
+    const assets = filterAdminAssetsByOwnerCenter(ADMIN_ASSETS, "new-media");
+    const tasks = filterAdminUploadTasksByOwnerCenter(ADMIN_UPLOAD_TASKS, "new-media");
+    const summary = getAdminAssetSummary(assets);
+
+    expect(assets).toHaveLength(4);
+    expect(assets.every((asset) => asset.ownerCenterId === "new-media")).toBe(true);
+    expect(tasks).toHaveLength(2);
+    expect(tasks.every((task) => task.ownerCenterId === "new-media")).toBe(true);
+    expect(summary).toMatchObject({ total: 4, imageCount: 3, videoCount: 1, processing: 1, reviewPending: 2 });
+    expect(filterAdminAssetsByOwnerCenter(ADMIN_ASSETS)).toHaveLength(ADMIN_ASSETS.length);
   });
 });

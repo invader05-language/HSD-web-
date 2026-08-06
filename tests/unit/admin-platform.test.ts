@@ -6,10 +6,6 @@ import {
   getAdminNavigationForAccess,
   getAdminNavigationState
 } from "../../app/data/admin-platform";
-import {
-  ADMIN_DASHBOARD_METRICS,
-  ADMIN_TODOS
-} from "../../app/data/admin-dashboard";
 
 describe("administration platform navigation", () => {
   it("exposes the seven confirmed business domains with a system management group", () => {
@@ -38,6 +34,15 @@ describe("administration platform navigation", () => {
     ).toContain("/admin/accounts");
   });
 
+  it("uses the batch roster as the primary application entry and hides portal configuration without capability", () => {
+    const centerAdminItems = getAdminNavigationForAccess({ canManageAdminAccounts: false })
+      .flatMap((group) => group.items);
+
+    expect(centerAdminItems.find((item) => item.id === "applications")?.to)
+      .toBe("/admin/recruitment/batches/batch-current/applications");
+    expect(centerAdminItems.map((item) => item.id)).not.toContain("homepage");
+  });
+
   it("resolves nested routes to the correct navigation item", () => {
     expect(getAdminNavigationState("/admin/resources")).toEqual({
       groupId: "media-resources",
@@ -64,25 +69,29 @@ describe("administration platform navigation", () => {
 });
 
 describe("administration dashboard", () => {
-  it("links every overview metric to an actionable administration view", () => {
-    expect(ADMIN_DASHBOARD_METRICS.map((metric) => metric.label)).toEqual([
-      "待处理事项",
-      "待审核内容",
-      "待发布内容",
-      "存储使用情况"
-    ]);
-    expect(
-      ADMIN_DASHBOARD_METRICS.every((metric) => metric.to.startsWith("/admin/"))
-    ).toBe(true);
+  it("keeps the dashboard as a semantic snapshot projection rather than static mock cards", () => {
+    const page = readFileSync("app/pages/admin/index.vue", "utf8");
+
+    expect(page).toContain('useAdminDashboard');
+    expect(page).toContain('dashboardTargetToRoute');
+    expect(page).not.toContain('ADMIN_DASHBOARD_METRICS');
+    expect(page).not.toContain('ADMIN_TODOS');
+    expect(page).not.toContain('ADMIN_STORAGE_OVERVIEW');
   });
 
-  it("orders urgent work before normal reminders", () => {
-    expect(ADMIN_TODOS.map((todo) => todo.priority)).toEqual([
-      "urgent",
-      "urgent",
-      "warning",
-      "normal"
-    ]);
-    expect(ADMIN_TODOS.every((todo) => todo.to.startsWith("/admin/"))).toBe(true);
+  it("keeps direct dashboard actions limited to implemented destinations", () => {
+    const page = readFileSync("app/pages/admin/index.vue", "utf8");
+
+    expect(page).toContain('content.create');
+    expect(page).toContain('member.create');
+    expect(page).not.toContain('上传学习资料');
+  });
+
+  it("keeps the independently routed upload queue center-scoped", () => {
+    const page = readFileSync("app/pages/admin/uploads.vue", "utf8");
+
+    expect(page).toContain("filterAdminUploadTasksByOwnerCenter");
+    expect(page).toContain("visibleUploadTasks");
+    expect(page).not.toContain('v-for="task in ADMIN_UPLOAD_TASKS"');
   });
 });

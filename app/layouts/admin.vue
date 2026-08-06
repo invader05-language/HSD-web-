@@ -13,7 +13,10 @@ const route = useRoute();
 const session = useSessionStore();
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
-const navigation = computed(() => getAdminNavigationForAccess(session, RELEASE_FEATURES));
+const navigation = computed(() => getAdminNavigationForAccess({
+  canManageAdminAccounts: session.canManageAdminAccounts,
+  canConfigurePortal: session.canManageAdminAccounts,
+}, RELEASE_FEATURES));
 const currentIdentity = computed(() => session.currentAccount ?? null);
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
 const adminLevelLabel = computed(() => session.currentAccount
@@ -75,7 +78,7 @@ function toggleGroup(groupId: string) {
     <a class="skip-link" href="#admin-main-content">跳至管理内容</a>
 
     <aside class="admin-sidebar">
-      <NuxtLink class="admin-brand" to="/admin/recruitment" aria-label="HSD 管理台">
+      <NuxtLink class="admin-brand" to="/admin" aria-label="HSD 管理台">
         <span>&lt; HSD &gt;</span>
         <strong>管理台</strong>
       </NuxtLink>

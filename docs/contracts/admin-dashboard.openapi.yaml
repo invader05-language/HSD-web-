@@ -1,0 +1,263 @@
+openapi: 3.1.0
+info:
+  title: HSD Admin Dashboard API
+  version: 1.0.0
+  description: >-
+    管理工作台只读运营投影。服务端负责身份、权限、指标和当前招新批次选择；
+    前端只负责展示和将语义化 target 映射到已登记的管理端路由。
+servers:
+  - url: /
+paths:
+  /api/admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      summary: 获取当前管理员的工作台快照
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: 工作台快照
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardSnapshot'
+        '401':
+          description: 未登录
+        '403':
+          description: 当前账号无管理端访问权限
+        '500':
+          description: 快照生成失败；前端不得静默回退 Mock
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: hsd_session
+  schemas:
+    AdminDashboardSnapshot:
+      type: object
+      required: [schemaVersion, generatedAt, timezone, operator, metrics, tasks, recruitment, content, portal, media, warnings]
+      allOf:
+        - if:
+            properties:
+              operator:
+                properties:
+                  capabilities:
+                    not:
+                      contains:
+                        enum: [portal.configure, portal.publish]
+          then:
+            properties:
+              portal:
+                type: 'null'
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        generatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC
+        timezone:
+          type: string
+          const: Asia/Shanghai
+        operator:
+          $ref: '#/components/schemas/DashboardOperator'
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardMetric'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardTask'
+        recruitment:
+          oneOf:
+            - $ref: '#/components/schemas/RecruitmentDashboardContext'
+            - type: 'null'
+        content:
+          $ref: '#/components/schemas/ContentDashboardSummary'
+        portal:
+          oneOf:
+            - $ref: '#/components/schemas/PortalDashboardSummary'
+            - type: 'null'
+          description: 拥有 portal.configure 或 portal.publish capability 时返回对象；其他操作者必须为 null。
+        media:
+          $ref: '#/components/schemas/MediaDashboardSummary'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardWarning'
+    DashboardOperator:
+      type: object
+      required: [id, name, level, capabilities]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        level:
+          type: string
+          enum: [member, admin, owner]
+        centerRole:
+          type: [string, 'null']
+          description: 中心管理员的中心角色；owner 为 null
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+              - recruitment.batch.manage
+              - recruitment.assessment.edit
+              - recruitment.result.publish
+              - content.create
+              - content.review
+              - content.publish
+              - portal.configure
+              - portal.publish
+              - member.create
+    DashboardTarget:
+      type: object
+      required: [module, action]
+      properties:
+        module:
+          type: string
+          enum: [recruitment, content, portal, media, member]
+        action:
+          type: string
+          enum: [overview, manage, applications, assess, publish-results, review, publish, view, create, list, automation, configure, health]
+          description: 由前端路由表登记的语义动作，不是任意 URL
+        resourceType: { type: [string, 'null'] }
+        resourceId: { type: [string, 'null'] }
+    DashboardMetric:
+      type: object
+      required: [id, label, value, target]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        value: { type: integer, minimum: 0 }
+        detail: { type: [string, 'null'] }
+        target:
+          $ref: '#/components/schemas/DashboardTarget'
+    DashboardTask:
+      type: object
+      required: [id, title, priority, target]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        meta: { type: string }
+        priority:
+          type: string
+          enum: [urgent, warning, normal]
+        capability:
+          type: string
+          enum:
+            - recruitment.batch.manage
+            - recruitment.assessment.edit
+            - recruitment.result.publish
+            - content.create
+            - content.review
+            - content.publish
+            - portal.configure
+            - portal.publish
+            - member.create
+        target:
+          $ref: '#/components/schemas/DashboardTarget'
+    RecruitmentDashboardContext:
+      type: object
+      required: [batch, selection, applicationCount, assessment, actions]
+      properties:
+        selection:
+          type: string
+          enum: [open, paused, unfinished-work, upcoming]
+        batch:
+          $ref: '#/components/schemas/RecruitmentBatchSummary'
+        assessment:
+          $ref: '#/components/schemas/RecruitmentAssessmentSummary'
+        applicationCount:
+          type: integer
+          minimum: 0
+        actions:
+          type: array
+          items:
+            type: object
+            required: [capability, target]
+            properties:
+              capability:
+                $ref: '#/components/schemas/DashboardCapability'
+              target: { $ref: '#/components/schemas/DashboardTarget' }
+    RecruitmentBatchSummary:
+      type: object
+      required: [id, name, status, startAt, endAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status:
+          type: string
+          enum: [draft, upcoming, open, paused, closed, archived]
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+    RecruitmentAssessmentSummary:
+      type: object
+      required: [total, pending, adjustmentPending, canPublish]
+      properties:
+        total: { type: integer, minimum: 0 }
+        pending: { type: integer, minimum: 0 }
+        adjustmentPending: { type: integer, minimum: 0 }
+        canPublish: { type: boolean }
+    ContentDashboardSummary:
+      type: object
+      required: [inReview, pendingPublication, recent]
+      properties:
+        inReview: { type: integer, minimum: 0 }
+        pendingPublication: { type: integer, minimum: 0 }
+        recent:
+          type: array
+          items:
+            type: object
+            required: [id, kind, title, status, updatedAt, target]
+            properties:
+              id: { type: string }
+              kind: { type: string, enum: [flash, article, notice] }
+              title: { type: string }
+              status: { type: string, enum: [draft, in-review, pending-publication, published, unpublished] }
+              updatedAt: { type: string, format: date-time }
+              target: { $ref: '#/components/schemas/DashboardTarget' }
+    PortalDashboardSummary:
+      type: object
+      required: [draftRevision, publishedRevision, isDirty]
+      properties:
+        draftRevision: { type: integer, minimum: 1 }
+        publishedRevision: { type: integer, minimum: 1 }
+        isDirty: { type: boolean }
+    MediaDashboardSummary:
+      type: object
+      required: [total, processing, failed, reviewPending]
+      properties:
+        total: { type: integer, minimum: 0 }
+        processing: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        reviewPending: { type: integer, minimum: 0 }
+    DashboardWarning:
+      type: object
+      required: [code, level, title, count, target]
+      properties:
+        code: { type: string }
+        title: { type: string }
+        detail: { type: [string, 'null'] }
+        count: { type: integer, minimum: 0 }
+        level:
+          type: string
+          enum: [warning, error]
+        target:
+          $ref: '#/components/schemas/DashboardTarget'
+    DashboardCapability:
+      type: string
+      enum:
+        - recruitment.batch.manage
+        - recruitment.assessment.edit
+        - recruitment.result.publish
+        - content.create
+        - content.review
+        - content.publish
+        - portal.configure
+        - portal.publish
+        - member.create

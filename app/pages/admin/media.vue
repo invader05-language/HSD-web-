@@ -2,19 +2,40 @@
 import {
   ADMIN_ASSETS,
   ADMIN_UPLOAD_TASKS,
+  type AdminAssetCenterId,
   canSelectAsset,
   filterAdminAssets,
+  filterAdminAssetsByOwnerCenter,
+  filterAdminUploadTasksByOwnerCenter,
+  getAdminAssetSummary,
   getAssetProcessingLabel
 } from "~/data/admin-assets";
+import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "媒体素材库｜HSD 管理台" });
 
 const filters = reactive({ query: "", type: "全部类型", state: "全部状态" });
+const session = useSessionStore();
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const ownerCenterId = computed<AdminAssetCenterId | undefined>(() => centerScope.value
+  ? getRecruitmentCenterId(centerScope.value) as AdminAssetCenterId
+  : undefined);
 const view = ref<"grid" | "list">("grid");
 const showUpload = ref(false);
 const selected = ref<(typeof ADMIN_ASSETS)[number] | null>(null);
-const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
+const visible = computed(() => filterAdminAssets(
+  filterAdminAssetsByOwnerCenter(ADMIN_ASSETS, ownerCenterId.value),
+  filters,
+));
+const overview = computed(() => getAdminAssetSummary(
+  filterAdminAssetsByOwnerCenter(ADMIN_ASSETS, ownerCenterId.value),
+));
+const visibleUploadTasks = computed(() => filterAdminUploadTasksByOwnerCenter(
+  ADMIN_UPLOAD_TASKS,
+  ownerCenterId.value,
+));
 </script>
 
 <template>
@@ -23,10 +44,10 @@ const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
       <template #actions><button type="button" class="button" @click="showUpload = true">上传素材</button></template>
     </AdminPageHeading>
     <section class="admin-summary-strip" aria-label="素材概览">
-      <div><span>全部素材</span><strong>486</strong><small>图片 391 · 视频 76</small></div>
-      <div><span>存储使用</span><strong>38%</strong><small>演示配额 26.4 / 70 GB</small></div>
-      <div><span>处理中</span><strong>07</strong><small>缩略图与视频转码</small></div>
-      <div><span>待审核</span><strong>12</strong><small>公开授权与内容检查</small></div>
+      <div><span>全部素材</span><strong>{{ overview.total }}</strong><small>图片 {{ overview.imageCount }} · 视频 {{ overview.videoCount }}</small></div>
+      <div><span>存储使用</span><strong>—</strong><small>当前范围素材</small></div>
+      <div><span>处理中</span><strong>{{ overview.processing }}</strong><small>缩略图与视频转码</small></div>
+      <div><span>待审核</span><strong>{{ overview.reviewPending }}</strong><small>公开授权与内容检查</small></div>
     </section>
     <section class="admin-list-card admin-media-workspace">
       <header><div><span>Asset Management</span><h2>全部媒体素材</h2></div><div class="admin-view-toggle"><button type="button" :class="{ 'is-active': view === 'grid' }" @click="view = 'grid'">网格</button><button type="button" :class="{ 'is-active': view === 'list' }" @click="view = 'list'">紧凑</button></div></header>
@@ -45,7 +66,7 @@ const visible = computed(() => filterAdminAssets(ADMIN_ASSETS, filters));
           <header class="admin-drawer__header"><div><span>UPLOAD QUEUE</span><h2>上传新素材</h2><p>原型展示分片上传、处理与审核状态</p></div><button type="button" aria-label="关闭上传面板" @click="showUpload = false">×</button></header>
           <div class="admin-drawer__body">
             <section><header><span>01</span><h3>选择文件</h3></header><button class="admin-upload-zone" type="button"><strong>拖放文件到这里，或选择本地文件</strong><small>图片建议单张不超过 20 MB；视频建议先完成剪辑与压缩</small></button></section>
-            <section><header><span>02</span><h3>上传与处理队列</h3></header><div class="admin-upload-list"><article v-for="task in ADMIN_UPLOAD_TASKS" :key="task.id"><div><strong>{{ task.name }}</strong><small>{{ task.type }} · {{ task.note }}</small></div><AdminStatusPill :status="task.status" /><span><i :style="{ width: `${task.progress}%` }" /></span><b>{{ task.progress }}%</b></article></div></section>
+            <section><header><span>02</span><h3>上传与处理队列</h3></header><div class="admin-upload-list"><article v-for="task in visibleUploadTasks" :key="task.id"><div><strong>{{ task.name }}</strong><small>{{ task.type }} · {{ task.note }}</small></div><AdminStatusPill :status="task.status" /><span><i :style="{ width: `${task.progress}%` }" /></span><b>{{ task.progress }}%</b></article></div></section>
             <section><header><span>03</span><h3>存储与审核说明</h3></header><p class="admin-inline-note">后端接入后：浏览器分片直传对象存储；服务端记录文件元数据；异步生成缩略图、转码、病毒扫描；审核通过后才可被官网选择。</p></section>
           </div>
           <footer class="admin-drawer__footer"><span>当前不会真正读取或上传本地文件</span><button type="button" class="button" @click="showUpload = false">保存演示任务</button></footer>

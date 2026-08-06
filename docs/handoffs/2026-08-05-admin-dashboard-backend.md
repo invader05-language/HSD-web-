@@ -1,0 +1,37 @@
+# 管理工作台后端交接
+
+## 目标
+
+前端工作台已经按 `AdminDashboardSnapshot` 设计为只读运营投影。后端接入时实现 `GET /api/admin/dashboard`，让服务端成为权限、指标、招新批次选择和异常状态的唯一权威来源。前端现阶段默认使用 Mock Gateway，API Gateway 已保留可替换边界。`portal` 只对拥有 `portal.configure` 或 `portal.publish` capability 的操作者返回对象；其他操作者必须收到 `null`，不能通过该接口获知门户草稿或线上版本状态。
+
+## 必须保持的业务意图
+
+1. 管理工作台不是新的业务域，也不能存一份“工作台待办”作为第二状态源。
+2. 当前批次不是简单取最新记录：先取 `open` 或 `paused`；没有时取有未完成考核/调剂/结果发布事项的最近 `closed` 批次；再取最近 `upcoming`；全都没有时返回 `recruitment: null`。
+3. owner 是全局权限；中心管理员的考核、内容和媒体事项必须按中心范围过滤。客户端传入的账号、中心或资源 id 不能扩大权限。
+4. 批次、报名、考核、正式成员晋级仍由各自领域服务和事务负责；工作台只展示摘要与语义 target。
+5. 当前没有开放批次时，用户端“加入我们”仍展示介绍和下一批次时间，报名按钮禁用；工作台可以显示最近 upcoming，但不能创建预报名或伪造开放状态。
+
+## API 接入顺序
+
+1. 先实现会话解析和 `DashboardOperator` 能力计算，再实现各领域 read model。
+2. 以 OpenAPI 和两个 JSON 示例作为契约测试输入；日期全部 ISO UTC，前端用 `Asia/Shanghai` 展示。
+3. 先做后端资源级授权测试，再接前端 API Gateway。API 返回 401/403/5xx 时前端显示错误态，不静默使用 Mock。
+4. 详情页或执行动作接口仍需独立授权，不能因为工作台返回过 target 就直接信任。
+
+`target.action` 只能使用前端登记的语义动作：`overview`、`manage`、`applications`、`assess`、`publish-results`、`review`、`publish`、`view`、`create`、`list`、`automation`、`configure`、`health`。带 `capability` 的任务或批次动作必须同时出现在 `operator.capabilities` 中。
+
+## 不应实现的内容
+
+- 不要信任客户端 `accountId`、`centerRole` 或任意 URL。
+- 不要把前端 Mock 候选人、联系人、内部笔记或静态存储配额迁移成生产数据。
+- 不要在 dashboard endpoint 内复制招新状态机、发布事务或成员身份转换逻辑。
+- 不要在 API 失败时返回看似成功的 Mock 数据。
+
+## 联调验收
+
+- owner 能看到全局批次、内容审核/发布、门户配置和成员入口。
+- 中心管理员只能看到自身中心的考核和可创建内容，不应看到发布门户、全局管理员账号或其他中心候选人。
+- 开放、暂停、已结束待处理、下一批次和无批次五种选择均有契约测试。
+- 自动化失败、门户持久化失败、媒体处理失败在 `warnings` 中可追踪，并能导航到对应模块。
+- PII 不出现在工作台快照；所有操作在领域 API 再次鉴权。

@@ -16,20 +16,28 @@ import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
 } from "~/utils/recruitment-export";
+import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
+import { useSessionStore } from "~/stores/session";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const assessmentStore = useRecruitmentAssessmentStore();
+const session = useSessionStore();
 const batchId = computed(() => String(route.params.batchId));
 const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
 const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
 const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
   .getCandidates(batchId.value)
   .map((record) => record.candidate)
-  .filter((candidate): candidate is AdminCandidate => Boolean(candidate)));
+  .filter((candidate): candidate is AdminCandidate => Boolean(candidate))
+  .filter((candidate) => canAccessRecruitmentCandidate(candidate, centerScope.value)));
+watch(centerScope, (scope) => {
+  center.value = scope ?? "全部中心";
+}, { immediate: true });
 const visible = computed(() => filterAndSortRecruitmentApplications(scopedCandidates.value, {
   query: query.value,
   firstChoice: center.value,
@@ -51,7 +59,8 @@ function exportRecruitmentCsv() {
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
+  <NuxtPage v-if="route.params.id" />
+  <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Batch Applications"
       :title="`${batch?.name ?? '未知批次'} · 报名人员`"

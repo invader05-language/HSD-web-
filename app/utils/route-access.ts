@@ -55,5 +55,8 @@ export function resolveProtectedRouteTarget(
   if (normalizedPath === "/admin/accounts" && !session.canManageAdminAccounts) {
     return buildAdminForbiddenTarget(normalizedPath);
   }
+  if (normalizedPath.startsWith("/admin/content/home") && !session.canManageAdminAccounts) {
+    return buildAdminForbiddenTarget(normalizedPath);
+  }
   return undefined;
 }

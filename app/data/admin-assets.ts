@@ -8,6 +8,7 @@ export type AssetProcessingStatus =
   | "failed";
 export type AssetReviewStatus = "pending" | "approved" | "rejected";
 export type ResourceAccess = "public" | "member" | "center";
+export type AdminAssetCenterId = "baize-development" | "new-media" | "tuowei-planning" | "talent-development";
 
 export interface AdminAsset {
   id: string;
@@ -16,6 +17,7 @@ export interface AdminAsset {
   dimensions: string;
   size: string;
   owner: string;
+  ownerCenterId: AdminAssetCenterId;
   createdAt: string;
   processingStatus: AssetProcessingStatus;
   reviewStatus: AssetReviewStatus;
@@ -32,6 +34,7 @@ export interface AdminUploadTask {
   progress: number;
   status: "等待上传" | "上传中" | "处理中" | "待审核" | "可使用" | "失败";
   note: string;
+  ownerCenterId: AdminAssetCenterId;
 }
 
 export interface ResourceVersion {
@@ -65,6 +68,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "2400 × 900",
     size: "3.8 MB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-30",
     processingStatus: "ready",
     reviewStatus: "approved",
@@ -80,6 +84,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "6000 × 4000",
     size: "12.6 MB",
     owner: "摄影组 · 周同学",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-29",
     processingStatus: "processing",
     reviewStatus: "pending",
@@ -94,6 +99,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "1920 × 1080",
     size: "186 MB",
     owner: "白泽开发中心",
+    ownerCenterId: "baize-development",
     createdAt: "2026-07-28",
     processingStatus: "ready",
     reviewStatus: "approved",
@@ -108,6 +114,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "4800 × 3200",
     size: "8.2 MB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-27",
     processingStatus: "ready",
     reviewStatus: "rejected",
@@ -122,6 +129,7 @@ export const ADMIN_ASSETS: AdminAsset[] = [
     dimensions: "3840 × 2160",
     size: "1.8 GB",
     owner: "新媒体中心",
+    ownerCenterId: "new-media",
     createdAt: "2026-07-26",
     processingStatus: "failed",
     reviewStatus: "pending",
@@ -132,10 +140,10 @@ export const ADMIN_ASSETS: AdminAsset[] = [
 ];
 
 export const ADMIN_UPLOAD_TASKS: AdminUploadTask[] = [
-  { id: "u1", name: "招新宣讲会现场-01.jpg", type: "JPG", progress: 0, status: "等待上传", note: "等待用户确认文件与公开授权" },
-  { id: "u2", name: "中心介绍短片.mp4", type: "MP4", progress: 68, status: "上传中", note: "分片上传，可断点续传" },
-  { id: "u3", name: "摄影采风-精选.zip", type: "ZIP", progress: 100, status: "处理中", note: "生成缩略图并读取元数据" },
-  { id: "u4", name: "旧版活动录像.mov", type: "MOV", progress: 34, status: "失败", note: "文件超过演示限制，需要重新压缩" }
+  { id: "u1", name: "招新宣讲会现场-01.jpg", type: "JPG", progress: 0, status: "等待上传", note: "等待用户确认文件与公开授权", ownerCenterId: "new-media" },
+  { id: "u2", name: "中心介绍短片.mp4", type: "MP4", progress: 68, status: "上传中", note: "分片上传，可断点续传", ownerCenterId: "baize-development" },
+  { id: "u3", name: "摄影采风-精选.zip", type: "ZIP", progress: 100, status: "处理中", note: "生成缩略图并读取元数据", ownerCenterId: "new-media" },
+  { id: "u4", name: "旧版活动录像.mov", type: "MOV", progress: 34, status: "失败", note: "文件超过演示限制，需要重新压缩", ownerCenterId: "tuowei-planning" }
 ];
 
 export const ADMIN_RESOURCES: AdminLearningResource[] = [
@@ -210,8 +218,35 @@ export function canUseAssetForPortalContent(assetId: string) {
   return Boolean(asset?.imageUrl && asset.type === "图片" && canSelectAsset(asset));
 }
 
+export function filterAdminAssetsByOwnerCenter(
+  assets: readonly AdminAsset[],
+  ownerCenterId?: string,
+) {
+  return ownerCenterId ? assets.filter((asset) => asset.ownerCenterId === ownerCenterId) : assets;
+}
+
+export function filterAdminUploadTasksByOwnerCenter(
+  tasks: readonly AdminUploadTask[],
+  ownerCenterId?: string,
+) {
+  return ownerCenterId ? tasks.filter((task) => task.ownerCenterId === ownerCenterId) : tasks;
+}
+
+export function getAdminAssetSummary(assets: readonly AdminAsset[]) {
+  const imageCount = assets.filter((asset) => asset.type === "图片").length;
+  const videoCount = assets.filter((asset) => asset.type === "视频").length;
+  return {
+    total: assets.length,
+    imageCount,
+    videoCount,
+    processing: assets.filter((asset) => ["waiting", "uploading", "processing"].includes(asset.processingStatus)).length,
+    failed: assets.filter((asset) => asset.processingStatus === "failed").length,
+    reviewPending: assets.filter((asset) => asset.reviewStatus === "pending").length,
+  };
+}
+
 export function filterAdminAssets(
-  assets: AdminAsset[],
+  assets: readonly AdminAsset[],
   filters: { query: string; type: string; state: string }
 ) {
   const query = filters.query.trim().toLocaleLowerCase();

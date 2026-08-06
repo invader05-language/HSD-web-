@@ -333,6 +333,15 @@ describe("recruitment assessment store", () => {
     expect(profileStore.profiles).toEqual(profileSnapshot);
   });
 
+  it("keeps whole-batch publication owner-only for center administrators", () => {
+    const session = useSessionStore();
+    expect(session.signIn("media-admin", { requireAdmin: true }).status).toBe("success");
+    const store = useRecruitmentAssessmentStore();
+
+    expect(() => store.publishBatchResults(BATCH_ID, true, new Date("2026-08-04T10:00:00.000Z")))
+      .toThrow("OWNER_PERMISSION_REQUIRED");
+  });
+
   it("does not publish until the whole batch is complete, then promotes the linked account atomically", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();

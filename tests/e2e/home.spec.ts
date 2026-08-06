@@ -59,11 +59,7 @@ test("public detail remains open and personal signup continues through login", a
 
 test("authenticated activity signup uses the current session without asking for login again", async ({ page }) => {
   await page.goto("/login?redirect=%2Factivities%2Fharmonyos-salon");
-  await page.waitForFunction(() => Boolean(
-    (document.querySelector("form") as Element & {
-      __vueParentComponent?: unknown
-    })?.__vueParentComponent
-  ));
+  await expect(page.getByLabel("成员账号")).toBeVisible();
   await page.getByLabel("成员账号").fill("demo-member");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();

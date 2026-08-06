@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { getContentOverview, PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS, toAdminContentRecord } from "~/data/admin-content";
 import { usePortalContentStore } from "~/stores/portal-content";
+import { useSessionStore } from "~/stores/session";
+import { canAccessPortalContent, getAdminCenterScope } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "官网内容｜HSD 管理台" });
 
 const route = useRoute();
 const content = usePortalContentStore();
+const session = useSessionStore();
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const visibleContentRecords = computed(() => content.records.filter((record) => canAccessPortalContent(record, {
+  operatorId: session.currentAccount?.account,
+  centerRole: session.currentAccount?.adminCenterRole,
+})));
 const query = ref(typeof route.query.query === "string" ? route.query.query : "");
 const status = ref(typeof route.query.status === "string" ? route.query.status : "全部状态");
 const kind = ref(typeof route.query.kind === "string" ? route.query.kind : "全部分类");
 const automationNotice = ref("");
-const unresolvedAutomationFailures = computed(() => content.automationFailures.filter((failure) => !failure.resolvedAt));
-const overview = computed(() => getContentOverview(content.records));
-const rows = computed(() => content.records
+const unresolvedAutomationFailures = computed(() => centerScope.value
+  ? []
+  : content.automationFailures.filter((failure) => !failure.resolvedAt));
+const overview = computed(() => getContentOverview(visibleContentRecords.value));
+const rows = computed(() => visibleContentRecords.value
   .map(toAdminContentRecord)
   .filter((record) => (!query.value.trim() || [record.title, record.summary, record.owner].join(" ").toLowerCase().includes(query.value.trim().toLowerCase()))
     && (status.value === "全部状态" || record.status === status.value)
@@ -40,7 +50,7 @@ function retryAutomationDraft(automationKey: string) {
   <div class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Content & Portal" title="官网内容" description="维护 HSD 快讯、新闻和公开公告。草稿、审核、待发布与官网公开版本分开保存。">
       <template #actions>
-        <NuxtLink class="button button--ghost" to="/admin/content/home">门户配置</NuxtLink>
+        <NuxtLink v-if="!centerScope" class="button button--ghost" to="/admin/content/home">门户配置</NuxtLink>
         <NuxtLink class="button" to="/admin/content/new">新建内容</NuxtLink>
       </template>
     </AdminPageHeading>

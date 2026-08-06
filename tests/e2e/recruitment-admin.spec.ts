@@ -78,7 +78,7 @@ test("recruitment batches and publication complete the administration workflow",
 
   await page.getByRole("link", { name: "报名人员", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "报名人员" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "招新报名人员" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "批次报名人员" })).toBeVisible();
 
   await page.getByRole("link", { name: "结果发布", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "结果发布" })).toBeVisible();
@@ -86,9 +86,9 @@ test("recruitment batches and publication complete the administration workflow",
   await expect(page.getByText("内部保存不等于对成员公开")).toBeVisible();
 });
 
-test("application roster filters, sorts, and opens a read-only application record", async ({ page }) => {
+test("legacy application routes redirect to the scoped batch roster and record", async ({ page }) => {
   await page.goto("/admin/recruitment/applications");
-  await completeAdminDemoLogin(page, "/admin/recruitment/applications");
+  await completeAdminDemoLogin(page, "/admin/recruitment/batches/batch-current/applications");
 
   await page.getByLabel("搜索报名人").fill("林");
   await expect(page.getByRole("row")).toHaveCount(2);
@@ -96,7 +96,7 @@ test("application roster filters, sorts, and opens a read-only application recor
   await page.getByRole("link", { name: "查看报名 林同学" }).click();
 
   await expect.poll(() => new URL(page.url()).pathname)
-    .toBe("/admin/recruitment/applications/candidate-lin");
+    .toBe("/admin/recruitment/batches/batch-current/applications/candidate-lin");
   await expect(page.getByRole("heading", { level: 1, name: "林同学" })).toBeVisible();
   await expect(page.getByLabel("联系方式")).toHaveValue("lin@example.com");
   await expect(page.getByText("2026-07-30 14:28 提交")).toBeVisible();
@@ -106,6 +106,6 @@ test("application roster filters, sorts, and opens a read-only application recor
 
   await page.goto("/admin/recruitment/applications/missing");
 
-  await expect(page).toHaveURL(/\/admin\/recruitment\/applications\/missing$/);
+  await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/applications\/missing$/);
   await expect(page.getByRole("heading", { name: "报名记录不存在", exact: true })).toBeVisible();
 });

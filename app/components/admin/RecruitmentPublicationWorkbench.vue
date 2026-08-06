@@ -2,6 +2,7 @@
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope } from "~/utils/admin-center-scope";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 const assessmentStore = useRecruitmentAssessmentStore();
@@ -9,9 +10,31 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const batch = computed(() => batchStore.getBatch(props.batchId));
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
-const candidates = computed(() => assessmentStore.getCandidates(props.batchId));
-const summary = computed(() => assessmentStore.getPublicationSummary(props.batchId));
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const candidates = computed(() => assessmentStore.getCandidates(props.batchId)
+  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
 const isOwner = computed(() => session.canManageAdminAccounts);
+const summary = computed(() => {
+  const visibleCandidates = candidates.value;
+  const ready = visibleCandidates.filter((candidate) => candidate.processingStatus === "ready-to-publish").length;
+  const adjustmentPending = visibleCandidates.filter((candidate) => candidate.processingStatus === "offline-adjustment-pending").length;
+  const pending = visibleCandidates.filter((candidate) => (
+    candidate.processingStatus === "assessing" || candidate.processingStatus === "offline-adjustment-pending"
+  )).length;
+  const admitted = visibleCandidates.filter((candidate) => candidate.finalDecision === "admitted").length;
+  const notAdmitted = visibleCandidates.filter((candidate) => candidate.finalDecision === "not-admitted").length;
+  return {
+    total: visibleCandidates.length,
+    ready,
+    pending,
+    adjustmentPending,
+    admitted,
+    notAdmitted,
+    // The operation is intentionally batch-wide and owner-only. A center admin
+    // may review scoped rows but must never see an actionable publish state.
+    canPublish: isOwner.value && state.value.status === "ready-to-publish" && pending === 0,
+  };
+});
 const showConfirmation = ref(false);
 const feedback = ref("");
 const error = ref("");

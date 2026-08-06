@@ -136,7 +136,7 @@ describe("portal content store", () => {
       payload: { batchName: "秋季招新", publicRoute: "/join", publicEndAt: "2026-09-01T00:00:00.000Z", isOpen: true },
     });
     const session = useSessionStore();
-    session.signIn("media-admin", { requireAdmin: true });
+    session.signIn("admin-alliance", { requireAdmin: true });
     store.invalidateSource("recruitment-batch", "batch-close", new Date("2026-08-05T00:00:00.000Z"));
 
     expect(() => store.submitForReview(result.contentId!, now)).toThrow("PORTAL_SOURCE_NOT_PUBLIC");

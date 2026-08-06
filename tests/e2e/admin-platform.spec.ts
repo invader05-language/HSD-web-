@@ -118,29 +118,39 @@ test("a newly qualified account can start an admin session but cannot manage acc
 
 test("mobile administration retains identity and filtered navigation", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signInToAdmin(page, "/admin/recruitment", "media-admin");
+  await signInToAdmin(page, "/admin", "media-admin");
 
   await expect(page.locator(".admin-topbar__identity")).toContainText("李同学 · 新媒体中心负责人");
+  await expect(page.getByRole("heading", { level: 1, name: "管理工作台" })).toBeVisible();
+  const dashboardColumnCount = await page.locator(".admin-dashboard-grid").evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+  ));
+  expect(dashboardColumnCount).toBe(1);
   await page.getByRole("button", { name: "打开管理导航" }).click();
   const mobileNavigation = page.getByRole("navigation", { name: "移动端管理导航" });
   await expect(mobileNavigation).toContainText("项目管理");
   await expect(mobileNavigation).not.toContainText("管理员资格配置");
 });
 
-test("dashboard prioritizes actionable work instead of decorative charts", async ({ page }) => {
+test("dashboard presents a capability-aware operational workbench", async ({ page }) => {
   await signInToAdmin(page, "/admin");
 
   await expect(page.getByRole("heading", { level: 1, name: "管理工作台" })).toBeVisible();
   await expect(page.getByRole("region", { name: "核心管理指标" }).getByRole("link")).toHaveCount(4);
-  await expect(page.getByRole("heading", { name: "今日待办" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "招新进度" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "媒体与存储" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "优先队列" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "当前操作批次" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容发布动态" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "门户发布状态" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "媒体健康" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "上传任务", exact: true })).toHaveCount(0);
-  await expect(page.getByText("最近操作记录", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "新建" }).click();
-  await expect(page.getByRole("menu", { name: "快捷新建" })).toContainText("上传学习资料");
+  const quickActions = page.getByRole("menu", { name: "快捷新建" });
+  await expect(quickActions).toContainText("发布 HSD 快讯");
+  await expect(quickActions).toContainText("添加成员");
+  await expect(quickActions).not.toContainText("上传学习资料");
 });
 
 test("member administration defaults formal profiles to public without visibility controls", async ({ page }) => {

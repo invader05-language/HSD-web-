@@ -1,10 +1,25 @@
 <script setup lang="ts">
 import { usePortalContentStore } from "~/stores/portal-content";
+import { useSessionStore } from "~/stores/session";
+import { canAccessPortalContent } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();
 const content = usePortalContentStore();
-const record = computed(() => content.getById(String(route.params.id)));
+const session = useSessionStore();
+const sourceRecord = computed(() => content.getById(String(route.params.id)));
+const record = computed(() => {
+  const candidate = sourceRecord.value;
+  return candidate && canAccessPortalContent(candidate, {
+    operatorId: session.currentAccount?.account,
+    centerRole: session.currentAccount?.adminCenterRole,
+  }) ? candidate : undefined;
+});
+watchEffect(() => {
+  if (sourceRecord.value && !record.value) {
+    void navigateTo(`/admin/forbidden?from=${encodeURIComponent(route.fullPath)}`, { replace: true });
+  }
+});
 useHead({ title: computed(() => `${record.value?.title ?? '内容不存在'}｜HSD 管理台`) });
 function onSaved() {}
 </script>
