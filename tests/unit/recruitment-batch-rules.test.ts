@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type {
   RecruitmentBatch,
@@ -309,6 +309,8 @@ describe("recruitment batch lifecycle commands", () => {
   });
 
   it("keeps only one open batch when opening another batch", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
     const store = useRecruitmentBatchStore();
@@ -317,8 +319,12 @@ describe("recruitment batch lifecycle commands", () => {
       startAt: "2026-08-06T00:00:00.000Z",
     })]);
 
-    expect(() => store.openNow("batch-next", true, NOW)).toThrow("BATCH_ALREADY_OPEN");
-    expect(store.currentOpenBatch?.id).toBe("batch-current");
+    try {
+      expect(() => store.openNow("batch-next", true, NOW)).toThrow("BATCH_ALREADY_OPEN");
+      expect(store.currentOpenBatch?.id).toBe("batch-current");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("requires explicit reopen confirmation after a close", () => {
