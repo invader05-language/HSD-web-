@@ -22,6 +22,11 @@ interface PersistedPortalContentState {
   automationFailures: PortalAutomationFailure[];
 }
 
+export interface PortalContentStoreSnapshot {
+  records: PortalContentRecord[];
+  automationFailures: PortalAutomationFailure[];
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -365,6 +370,17 @@ export const usePortalContentStore = defineStore("portal-content", {
       .map(clone),
   },
   actions: {
+    captureSnapshot(): PortalContentStoreSnapshot {
+      return {
+        records: clone(this.records),
+        automationFailures: clone(this.automationFailures),
+      };
+    },
+    restoreSnapshot(snapshot: PortalContentStoreSnapshot) {
+      this.persistProposed(snapshot.records, snapshot.automationFailures);
+      this.records = clone(snapshot.records);
+      this.automationFailures = clone(snapshot.automationFailures);
+    },
     persist() {
       try {
         writePersistedState(this.records, this.automationFailures);

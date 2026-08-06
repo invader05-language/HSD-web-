@@ -40,6 +40,46 @@ export type RecruitmentBatchStatusReason =
   | "force-closed"
   | "archived";
 
+export type RecruitmentBatchCommandErrorCode =
+  | "RECRUITMENT_BATCH_NOT_FOUND"
+  | "BATCH_ALREADY_PUBLISHED"
+  | "BATCH_ALREADY_OPEN"
+  | "BATCH_SCHEDULE_OVERLAP"
+  | "BATCH_CENTER_REQUIRED"
+  | "BATCH_WINDOW_INVALID"
+  | "OWNER_PERMISSION_REQUIRED"
+  | "BATCH_STORAGE_WRITE_FAILED"
+  | "BATCH_STORAGE_UNAVAILABLE";
+
+export interface RecruitmentBatchConflictSummary {
+  batchId: string;
+  batchName: string;
+  startAt: string;
+  endAt: string;
+}
+
+export interface RecruitmentBatchPublishReadiness {
+  ok: boolean;
+  code?: RecruitmentBatchCommandErrorCode;
+  message?: string;
+  conflict?: RecruitmentBatchConflictSummary;
+}
+
+export class RecruitmentBatchCommandError extends Error {
+  readonly code: RecruitmentBatchCommandErrorCode;
+  readonly conflict?: RecruitmentBatchConflictSummary;
+
+  constructor(
+    code: RecruitmentBatchCommandErrorCode,
+    options: { conflict?: RecruitmentBatchConflictSummary } = {},
+  ) {
+    super(code);
+    this.name = "RecruitmentBatchCommandError";
+    this.code = code;
+    this.conflict = options.conflict;
+  }
+}
+
 export interface RecruitmentBatch {
   id: string;
   name: string;
@@ -57,6 +97,13 @@ export interface RecruitmentBatch {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RecruitmentBatchDraftInput {
+  name: string;
+  startAt: string;
+  endAt: string;
+  openCenterIds: readonly string[];
 }
 
 export interface RecruitmentBatchStatusResult {

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
 import {
   filterAndSortRecruitmentApplications,
   formatRecruitmentApplicationSubmittedAt,
@@ -12,6 +11,7 @@ import {
   formatRecruitmentBatchPeriod
 } from "~/data/recruitment-admin-context";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
+import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import {
   buildRecruitmentExportName,
   serializeRecruitmentCsv
@@ -23,9 +23,10 @@ definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const assessmentStore = useRecruitmentAssessmentStore();
+const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const batchId = computed(() => String(route.params.batchId));
-const batch = computed(() => RECRUITMENT_BATCHES.find((item) => item.id === batchId.value));
+const batch = computed(() => batchStore.getBatch(batchId.value));
 const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));

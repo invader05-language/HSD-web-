@@ -6298,6 +6298,7 @@ label small:not(:empty),
   display: flex;
   min-height: 44px;
   align-items: center;
+  justify-content: space-between;
   gap: 9px;
   border: 1px solid #e0e3e6;
   border-radius: 4px;
@@ -6305,6 +6306,334 @@ label small:not(:empty),
   background: #fafbfb;
   color: #484e55;
   font-size: 11px;
+}
+
+.admin-check-grid input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 20px;
+  accent-color: #b1202b;
+}
+
+.admin-check-grid label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-save-message--error {
+  border-color: #ebc7ca;
+  background: #fff1f2;
+  color: #9e1b26;
+}
+
+.admin-batch-context-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(120px, 1fr));
+  margin-top: 22px;
+  border-top: 3px solid #b1202b;
+  border-bottom: 1px solid #dfe3e6;
+  background: #fff;
+}
+
+.admin-batch-context-summary > div {
+  min-width: 0;
+  padding: 16px 17px;
+  border-right: 1px solid #e4e7e9;
+}
+
+.admin-batch-context-summary > div:last-child {
+  border-right: 0;
+}
+
+.admin-batch-context-summary__label,
+.admin-batch-readiness header > div > span,
+.admin-batch-editor-centers header > span {
+  display: block;
+  color: #969ca3;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-batch-context-summary strong {
+  display: block;
+  margin-top: 7px;
+  color: #292d32;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.admin-batch-context-summary__primary strong {
+  margin-top: 6px;
+}
+
+.admin-batch-context-summary small {
+  display: block;
+  margin-top: 4px;
+  color: #8e949b;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.admin-batch-progress {
+  display: block;
+  overflow: hidden;
+  height: 6px;
+  margin-top: 11px;
+  border-radius: 999px;
+  background: #eef0f2;
+}
+
+.admin-batch-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #b1202b;
+  transition: width 240ms ease;
+}
+
+.admin-batch-progress[data-status="paused"] > span {
+  background: #c1782f;
+}
+
+.admin-batch-progress[data-status="closed"] > span,
+.admin-batch-progress[data-status="archived"] > span {
+  background: #69727b;
+}
+
+.admin-batch-readiness {
+  margin-top: 20px;
+  border-left: 3px solid #c1782f;
+  background: #fff7ed;
+}
+
+.admin-batch-readiness header,
+.admin-batch-editor-centers header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 18px 11px;
+  border-bottom: 1px solid #f0dfcb;
+}
+
+.admin-batch-readiness header h2 {
+  margin: 3px 0 0;
+  color: #3b3030;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.admin-batch-readiness header p,
+.admin-batch-editor-centers header small {
+  margin: 0;
+  color: #8b735d;
+  font-size: 10px;
+}
+
+.admin-batch-readiness__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 18px 17px;
+}
+
+.admin-batch-readiness__status {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-batch-readiness__status strong {
+  color: #8b541d;
+  font-size: 13px;
+}
+
+.admin-batch-readiness__status span {
+  color: #815524;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.admin-batch-readiness__status.is-ready strong,
+.admin-batch-readiness__status.is-ready span {
+  color: #2f7450;
+}
+
+.admin-batch-readiness__actions,
+.admin-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.admin-batch-workspace {
+  margin-top: 20px;
+}
+
+.admin-batch-context-nav {
+  display: grid;
+}
+
+.admin-batch-workflow-row {
+  display: grid;
+  grid-template-columns: 42px minmax(180px, 1.1fr) minmax(190px, 1fr) 90px minmax(105px, auto);
+  align-items: center;
+  gap: 16px;
+  min-height: 76px;
+  border-bottom: 1px solid #eceef0;
+  padding: 12px 22px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-batch-workflow-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-batch-workflow-row:hover {
+  background: #faf7f7;
+}
+
+.admin-batch-workflow-row__step {
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f8e7e9;
+  color: #b1202b;
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.admin-batch-workflow-row__name,
+.admin-batch-workflow-row__state {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-batch-workflow-row__name strong,
+.admin-batch-workflow-row__state strong {
+  color: #292d32;
+  font-size: 12px;
+}
+
+.admin-batch-workflow-row__name small,
+.admin-batch-workflow-row__state small {
+  color: #8f959c;
+  font-size: 10px;
+}
+
+.admin-batch-workflow-row__count {
+  color: #292d32;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-batch-workflow-row__action {
+  color: #9e1b26;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-batch-audit {
+  margin-top: 20px;
+}
+
+.admin-batch-audit .admin-table-scroll table {
+  min-width: 860px;
+}
+
+.admin-empty-copy {
+  margin: 0;
+  padding: 24px 22px;
+  color: #8f959c;
+  font-size: 11px;
+}
+
+.admin-batch-editor-centers {
+  margin-top: 24px;
+}
+
+.admin-batch-editor-centers header {
+  padding-inline: 0;
+  border-bottom-color: #e6e8ea;
+}
+
+.admin-batch-editor-centers header small {
+  color: #8f959c;
+}
+
+@media (max-width: 1180px) {
+  .admin-batch-context-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-batch-context-summary > div:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .admin-batch-workflow-row {
+    grid-template-columns: 42px minmax(170px, 1fr) minmax(150px, 1fr) auto;
+  }
+
+  .admin-batch-workflow-row__count {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-batch-context-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-batch-context-summary__primary {
+    grid-column: 1 / -1;
+  }
+
+  .admin-batch-context-summary > div:nth-child(3n) {
+    border-right: 1px solid #e4e7e9;
+  }
+
+  .admin-batch-context-summary > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .admin-batch-readiness header,
+  .admin-batch-readiness__body {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-batch-readiness__actions,
+  .admin-batch-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-batch-workflow-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 13px 16px;
+  }
+
+  .admin-batch-workflow-row__state {
+    grid-column: 2 / -1;
+  }
+
+  .admin-batch-workflow-row__action {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }
 
 .admin-publication-warning {
@@ -7192,6 +7521,28 @@ label small:not(:empty),
 .admin-result-pill[data-result="待处理"] {
   background: #fff0df;
   color: #9b5c14;
+}
+
+.admin-result-pill[data-result="报名中"] {
+  background: #e6f4ec;
+  color: #26744b;
+}
+
+.admin-result-pill[data-result="已暂停"] {
+  background: #fff0df;
+  color: #9b5c14;
+}
+
+.admin-result-pill[data-result="待开始"] {
+  background: #eaf0f7;
+  color: #46627f;
+}
+
+.admin-result-pill[data-result="已关闭"],
+.admin-result-pill[data-result="已归档"],
+.admin-result-pill[data-result="草稿"] {
+  background: #f0f2f3;
+  color: #697078;
 }
 
 .admin-empty {
@@ -9567,6 +9918,10 @@ body.is-admin-drawer-open {
 
   .admin-dashboard-side-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recruitment-application-page .task-page__header h1 {
+    font-size: 36px;
   }
 
   .recruitment-application-layout {

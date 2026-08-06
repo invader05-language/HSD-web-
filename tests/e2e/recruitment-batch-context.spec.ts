@@ -11,6 +11,16 @@ async function completeAdminDemoLogin(
   await expect(page).toHaveURL(new RegExp(`${expectedPath.replaceAll("/", "\\/")}$`));
 }
 
+async function closeBatchBeforeAssessment(page: import("@playwright/test").Page) {
+  await page.getByRole("link", { name: "招新批次" }).click();
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
+  await page.getByRole("button", { name: "提前关闭" }).click();
+  const dialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
+  await dialog.getByRole("button", { name: "确认提前关闭" }).click();
+  await expect(page.getByRole("status")).toContainText("提前关闭已完成");
+}
+
 test("batch links preserve batchId context across roster, assessment and publication", async ({ page }) => {
   await page.goto("/admin/recruitment/batches");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
@@ -45,11 +55,19 @@ test("batch links preserve batchId context across roster, assessment and publica
   const candidateDrawer = page.getByRole("dialog", { name: "预备成员详情" });
   await candidateDrawer.getByLabel("第一轮结果").selectOption("passed");
   await candidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
-  await candidateDrawer.getByRole("button", { name: "保存结果" }).click();
-  await candidateDrawer.getByRole("button", { name: "确认保存" }).click();
+  await candidateDrawer.getByRole("button", { name: "取消" }).click();
+  await closeBatchBeforeAssessment(page);
+  await page.getByRole("link", { name: /进入考核台/ }).click();
+  await expect(page.getByRole("button", { name: "查看处理 周同学" })).toBeVisible();
+  await page.getByRole("button", { name: "查看处理 周同学" }).click();
+  const reopenedCandidateDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await reopenedCandidateDrawer.getByLabel("第一轮结果").selectOption("passed");
+  await reopenedCandidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
+  await reopenedCandidateDrawer.getByRole("button", { name: "保存结果" }).click();
+  await reopenedCandidateDrawer.getByRole("button", { name: "确认保存" }).click();
   await expect(page.getByRole("status")).toContainText("结果已保存");
-  await expect(page.getByRole("row", { name: /周同学/ })).toContainText("通过");
-  await candidateDrawer.getByRole("button", { name: "关闭详情" }).click();
+  await expect(candidateDrawer).toHaveCount(0);
+  await expect(page.getByRole("row", { name: /周同学/ })).toHaveCount(0);
 
   await page.getByRole("link", { name: "返回批次概览" }).click();
   await page
@@ -61,31 +79,99 @@ test("batch links preserve batchId context across roster, assessment and publica
   await expect(page.getByText("发布范围：当前批次全部候选人")).toBeVisible();
 });
 
+test("batch detail presents a structured work area for active batches", async ({ page }) => {
+  await page.goto("/admin/recruitment/batches/batch-current");
+  await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches/batch-current");
+
+  await expect(page.getByRole("heading", { level: 2, name: "批次工作区" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "生命周期记录" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /进入名单/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /进入考核台/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /进入结果发布/ })).toBeVisible();
+  await expect(page.getByText("报名人数")).toBeVisible();
+  await expect(page.getByText("开放中心")).toBeVisible();
+});
+
 test("ordinary admins can inspect a batch but cannot mutate its lifecycle", async ({ page }) => {
   await page.goto("/admin/recruitment/batches/batch-current");
   await completeAdminDemoLogin(page, "media-admin", "/admin/recruitment/batches/batch-current");
 
   const pauseButton = page.getByRole("button", { name: "暂停报名" });
   await expect(pauseButton).toBeDisabled();
-  await expect(page.getByText("普通管理员不会显示可执行的批次变更权限")).toBeVisible();
+  await expect(page.getByText("当前账号仅可查看与处理授权数据")).toBeVisible();
+
+  await page.goto("/admin/recruitment/batches");
+  await expect(page.getByRole("button", { name: "新建招新批次" })).toHaveCount(0);
+});
+
+test("draft publish readiness explains schedule conflicts and successful publish closes the dialog", async ({ page }) => {
+  await page.goto("/admin/recruitment/batches");
+  await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
+
+  await page.getByRole("button", { name: "新建招新批次" }).click();
+  const drawer = page.getByRole("dialog", { name: "新建招新批次" });
+  await drawer.getByLabel("批次名称").fill("111");
+  await drawer.getByLabel("报名开始时间").fill("2026-08-10");
+  await drawer.getByLabel("报名截止时间").fill("2026-08-28");
+  await drawer.getByRole("button", { name: "保存草稿" }).click();
+
+  const draftRow = page.getByRole("article").filter({ hasText: "111" });
+  await draftRow.getByRole("link", { name: /进入批次/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "111" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "发布准备检查" })).toBeVisible();
+  await expect(page.getByText(/与「2026 秋季招新」重叠/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "发布批次" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "修改批次时间" })).toBeVisible();
+
+  await page.getByRole("link", { name: "返回批次列表" }).click();
+  await page.getByRole("button", { name: "新建招新批次" }).click();
+  const readyDrawer = page.getByRole("dialog", { name: "新建招新批次" });
+  await readyDrawer.getByLabel("批次名称").fill("2027 春季补招");
+  await readyDrawer.getByLabel("报名开始时间").fill("2027-03-20");
+  await readyDrawer.getByLabel("报名截止时间").fill("2027-04-08");
+  await readyDrawer.getByRole("button", { name: "保存草稿" }).click();
+
+  const readyRow = page.getByRole("article").filter({ hasText: "2027 春季补招" }).filter({ hasText: "草稿" });
+  await readyRow.getByRole("link", { name: /进入批次/ }).click();
+  await expect(page.getByRole("button", { name: "发布批次" })).toBeEnabled();
+  await page.getByRole("button", { name: "发布批次" }).click();
+  const dialog = page.getByRole("alertdialog", { name: /确认发布批次/ });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "确认发布批次" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("发布批次已完成");
+});
+
+test("closed batches use a processing entry while archived batches use archive wording", async ({ page }) => {
+  await page.goto("/admin/recruitment/batches");
+  await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
+
+  const closedRow = page.getByRole("article").filter({ hasText: "2025 秋季招新" });
+  await expect(closedRow.getByRole("link", { name: /处理收尾/ })).toBeVisible();
+  await expect(closedRow.getByRole("link", { name: /查看归档/ })).toHaveCount(0);
 });
 
 test("an owner can record a not-admitted adjustment without choosing a destination center", async ({ page }) => {
   await page.goto("/admin/recruitment/batches/batch-current/assessment");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches/batch-current/assessment");
+  await closeBatchBeforeAssessment(page);
+  await page.getByRole("link", { name: /进入考核台/ }).click();
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
   await drawer.getByLabel("第一轮结果").selectOption("failed");
   await drawer.getByRole("button", { name: "保存结果" }).click();
   await drawer.getByRole("button", { name: "确认保存" }).click();
-  await drawer.getByLabel("线下决定").selectOption({ label: "不录取" });
-  await expect(drawer.getByLabel("最终中心")).toHaveCount(0);
-  await drawer.getByRole("button", { name: "保存结果" }).click();
-  await drawer.getByRole("button", { name: "确认保存" }).click();
+  await expect(drawer).toHaveCount(0);
+
+  await page.getByRole("button", { name: "查看处理 陈同学" }).click();
+  const adjustmentDrawer = page.getByRole("dialog", { name: "预备成员详情" });
+  await adjustmentDrawer.getByLabel("最终调剂结果").selectOption("not-admitted");
+  await adjustmentDrawer.getByRole("button", { name: "保存结果" }).click();
+  await adjustmentDrawer.getByRole("button", { name: "确认保存" }).click();
 
   await expect(page.getByRole("status")).toContainText("结果已保存");
-  await expect(page.getByRole("row", { name: /陈同学/ })).toContainText("未通过");
+  await expect(page.getByRole("row", { name: /陈同学/ })).toHaveCount(0);
 });
 
 test("early open always asks for confirmation and competing open batch remains protected", async ({ page }) => {

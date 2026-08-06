@@ -9,6 +9,7 @@ import {
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
+import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 import {
   validateApplicationDraft,
   validateConfirmation,
@@ -31,9 +32,16 @@ const currentMember = useCurrentMember();
 const currentProfile = currentMember.profile;
 const batchStore = useRecruitmentBatchStore();
 const applicationStore = useRecruitmentApplicationStore();
-const capturedBatchId = ref(batchStore.currentOpenBatch?.id);
+const now = useRecruitmentNow();
+const capturedBatchId = ref(batchStore.currentOpenBatchAt(now.value)?.id ?? applicationStore.latestApplication?.batchId);
 const activeBatch = computed(() => capturedBatchId.value ? batchStore.getBatch(capturedBatchId.value) : undefined);
-const hasOpenBatch = computed(() => Boolean(activeBatch.value && batchStore.effectiveStatus(activeBatch.value.id) === "open"));
+const activeBatchStatus = computed(() => activeBatch.value
+  ? batchStore.effectiveStatus(activeBatch.value.id, now.value)
+  : undefined);
+const hasOpenBatch = computed(() => activeBatchStatus.value === "open");
+const upcomingBatch = computed(() => batchStore.upcomingBatchAt(now.value));
+const pausedBatch = computed(() => batchStore.currentPausedBatchAt(now.value));
+watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
 const step = ref<Step>(1);
 const profileDraft = reactive(createRegistrationProfileDraft(currentProfile.value));
 const applicationDraft = reactive<RecruitmentApplicationDraft>(applicationStore.createDraft());
@@ -57,6 +65,7 @@ const submittedApplication = computed(() => {
     ? application
     : undefined;
 });
+const canEditSubmittedApplication = computed(() => hasOpenBatch.value && submittedApplication.value?.status === "submitted");
 const isResubmitting = computed(() => currentBatchApplication.value?.status === "withdrawn");
 const submitButtonLabel = computed(() => {
   if (submitting.value) return "正在提交…";
@@ -250,27 +259,22 @@ onBeforeUnmount(() => {
 
     <section class="task-page__body">
       <div class="shell">
-        <section v-if="!hasOpenBatch" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
-          <p class="eyebrow">Recruitment Unavailable</p>
-          <h2>当前暂无开放报名</h2>
-          <p>{{ batchStore.upcomingBatch ? `下一批次“${batchStore.upcomingBatch.name}”计划于 ${new Date(batchStore.upcomingBatch.startAt).toLocaleDateString("zh-CN")} 开放。` : "当前没有已开放的招新批次。" }}</p>
-          <div class="recruitment-success__actions"><NuxtLink class="button" to="/join">返回加入我们</NuxtLink></div>
-        </section>
-        <section v-else-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
+        <section v-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
           <p class="eyebrow">Submitted</p>
           <h2>成员注册与招新报名已提交</h2>
           <p>你的报名已关联到“{{ submittedApplication.batchNameSnapshot }}”，并以预备成员身份进入后续流程。</p>
+          <p v-if="!hasOpenBatch" class="recruitment-batch-context">当前批次{{ activeBatchStatus === "paused" ? "已暂停报名" : "已结束" }}，报名资料保留为只读状态。</p>
           <dl>
             <div><dt>招新批次</dt><dd>{{ submittedApplication.batchNameSnapshot }}</dd></div>
             <div><dt>成员身份</dt><dd>预备成员</dd></div>
             <div><dt>所属中心</dt><dd>待确定</dd></div>
-            <div><dt>报名状态</dt><dd>已提交</dd></div>
+            <div><dt>报名状态</dt><dd>{{ submittedApplication.status === "locked" ? "已锁定" : "已提交" }}</dd></div>
           </dl>
           <div class="recruitment-success__actions">
             <NuxtLink class="button" to="/member">进入个人中心</NuxtLink>
             <NuxtLink class="button button--ghost" to="/member/results">查看结果中心</NuxtLink>
-            <button v-if="submittedApplication.status === 'submitted'" class="button button--ghost" type="button" @click="startEditingApplication">修改报名</button>
-            <button v-if="submittedApplication.status === 'submitted'" class="button button--ghost" type="button" @click="showWithdrawConfirmation = true">撤回报名</button>
+            <button v-if="canEditSubmittedApplication" class="button button--ghost" type="button" @click="startEditingApplication">修改报名</button>
+            <button v-if="canEditSubmittedApplication" class="button button--ghost" type="button" @click="showWithdrawConfirmation = true">撤回报名</button>
           </div>
           <details>
             <summary>查看已提交报名摘要</summary>
@@ -287,6 +291,13 @@ onBeforeUnmount(() => {
               <div><button type="button" class="button button--ghost" @click="showWithdrawConfirmation = false">返回检查</button><button type="button" class="button" @click="confirmWithdrawApplication">确认撤回</button></div>
             </section>
           </div>
+        </section>
+        <section v-else-if="!hasOpenBatch" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
+          <p class="eyebrow">Recruitment Unavailable</p>
+          <h2>{{ pausedBatch ? "当前批次报名已暂停" : "当前暂无开放报名" }}</h2>
+          <p v-if="pausedBatch">批次“{{ pausedBatch.name }}”暂时暂停报名，恢复后才能提交新的报名。</p>
+          <p v-else>{{ upcomingBatch ? `下一批次“${upcomingBatch.name}”计划于 ${new Date(upcomingBatch.startAt).toLocaleDateString("zh-CN")} 开放。` : "当前没有已开放的招新批次。" }}</p>
+          <div class="recruitment-success__actions"><NuxtLink class="button" to="/join">返回加入我们</NuxtLink></div>
         </section>
 
         <div v-else class="recruitment-application-layout">

@@ -113,6 +113,7 @@ export interface AdminRecruitmentBatchLike {
   status?: string;
   startAt?: string;
   endAt?: string;
+  timezone?: string;
 }
 
 export function getAdminBatchStatus(batch: AdminRecruitmentBatchLike): RecruitmentBatchEffectiveStatus {
@@ -133,5 +134,23 @@ export function getAdminBatchStatus(batch: AdminRecruitmentBatchLike): Recruitme
 
 export function formatRecruitmentBatchPeriod(batch: AdminRecruitmentBatchLike): string {
   if (!batch.startAt || !batch.endAt) return "时间尚未发布";
-  return `${batch.startAt.slice(0, 16).replace("T", " ")} — ${batch.endAt.slice(0, 16).replace("T", " ")}`;
+
+  const formatDateTime = (value: string): string => {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return value.slice(0, 16).replace("T", " ");
+
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone: batch.timezone ?? "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
+  };
+
+  return `${formatDateTime(batch.startAt)} — ${formatDateTime(batch.endAt)}`;
 }

@@ -7,9 +7,17 @@ import type {
 import {
   getCurrentOpenBatch,
   getEffectiveRecruitmentBatchStatus,
+  getRecruitmentBatchProgress,
   getUpcomingRecruitmentBatch,
 } from "../../app/utils/recruitment-batch-rules";
-import { useRecruitmentBatchStore } from "../../app/stores/recruitment-batch";
+import { formatRecruitmentBatchPeriod } from "../../app/data/recruitment-admin-context";
+import { createRecruitmentApplicationDraft, createRegistrationProfileDraft } from "../../app/data/recruitment-application";
+import {
+  RECRUITMENT_BATCH_STORAGE_KEY,
+  useRecruitmentBatchStore,
+} from "../../app/stores/recruitment-batch";
+import { useRecruitmentApplicationStore } from "../../app/stores/recruitment-application";
+import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useSessionStore } from "../../app/stores/session";
 import { usePortalContentStore } from "../../app/stores/portal-content";
 
@@ -21,7 +29,18 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
+});
+
+describe("recruitment batch period formatting", () => {
+  it("renders UTC storage timestamps in the batch timezone", () => {
+    expect(formatRecruitmentBatchPeriod({
+      startAt: "2027-02-19T16:00:00.000Z",
+      endAt: "2027-03-08T15:59:59.999Z",
+      timezone: "Asia/Shanghai",
+  })).toBe("2027-02-20 00:00 — 2027-03-08 23:59");
+  });
 });
 
 function batch(overrides: Partial<RecruitmentBatch> = {}): RecruitmentBatch {
@@ -101,6 +120,25 @@ describe("recruitment batch effective status", () => {
       batch({ id: "earlier", startAt: "2026-08-10T00:00:00.000Z" }),
     ], NOW)?.id).toBe("earlier");
   });
+
+  it("calculates time progress while preserving terminal and paused states", () => {
+    const startAt = new Date("2026-08-01T00:00:00.000Z");
+    const endAt = new Date("2026-09-01T00:00:00.000Z");
+    const midpoint = new Date((startAt.getTime() + endAt.getTime()) / 2);
+
+    expect(getRecruitmentBatchProgress(batch({ startAt: startAt.toISOString(), endAt: endAt.toISOString() }), midpoint))
+      .toMatchObject({ status: "open", percentage: 50 });
+    expect(getRecruitmentBatchProgress(batch({ startAt: "2026-08-05T00:00:00.000Z" }), NOW))
+      .toMatchObject({ status: "upcoming", percentage: 0 });
+    expect(getRecruitmentBatchProgress(batch({
+      startAt: startAt.toISOString(),
+      endAt: endAt.toISOString(),
+      manualOverride: "paused",
+    }), midpoint))
+      .toMatchObject({ status: "paused", percentage: 50 });
+    expect(getRecruitmentBatchProgress(batch({ endAt: "2026-08-03T00:00:00.000Z" }), NOW))
+      .toMatchObject({ status: "closed", percentage: 100 });
+  });
 });
 
 describe("recruitment batch lifecycle commands", () => {
@@ -130,6 +168,47 @@ describe("recruitment batch lifecycle commands", () => {
       originalStartAt: "2026-08-05T00:00:00.000Z",
       actualAt: NOW.toISOString(),
     });
+  });
+
+  it("locks submitted applications on early close and unlocks only those locks on reopen", () => {
+    const applicantSession = useSessionStore();
+    applicantSession.signIn("demo-applicant");
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(applicantSession.currentMemberId)),
+      {
+        ...createRecruitmentApplicationDraft(),
+        contact: "applicant@example.com",
+        firstChoice: "白泽开发中心",
+        secondChoice: "新媒体中心",
+        baizeDirection: "鸿蒙开发",
+        acceptsAdjustment: true,
+      },
+      true,
+      { batchId: "batch-current", now: NOW },
+    );
+
+    applicantSession.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.close("batch-current", true, NOW, "提前结束报名");
+
+    expect(applicationStore.getApplication("batch-current", "applicant-chen"))
+      .toMatchObject({ status: "locked", lockReason: "early-close" });
+
+    store.reopen("batch-current", true, new Date("2026-08-04T03:00:00.000Z"), "恢复报名");
+
+    expect(applicationStore.getApplication("batch-current", "applicant-chen"))
+      .toMatchObject({ status: "submitted", lockReason: undefined });
+  });
+
+  it("rejects closing a batch that is not open or paused", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ lifecycleStatus: "published", startAt: "2026-08-05T00:00:00.000Z" })]);
+
+    expect(() => store.close("batch-current", true, NOW)).toThrow("BATCH_NOT_CLOSABLE");
   });
 
   it("rejects early opening when the actual open interval overlaps another future batch", () => {
@@ -260,6 +339,98 @@ describe("recruitment batch lifecycle commands", () => {
     expect(store.auditRecords).toEqual([]);
   });
 
+  it("returns the conflicting published batch from publish readiness", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-current",
+        name: "2026 秋季招新",
+        lifecycleStatus: "published",
+        manualOverride: "paused",
+        startAt: "2026-08-01T00:00:00.000Z",
+        endAt: "2026-09-18T00:00:00.000Z",
+      }),
+      batch({
+        id: "batch-draft",
+        name: "111",
+        lifecycleStatus: "draft",
+        startAt: "2026-08-05T00:00:00.000Z",
+        endAt: "2026-08-28T23:59:59.999Z",
+      }),
+    ]);
+
+    expect(store.getPublishReadiness("batch-draft", NOW)).toEqual({
+      ok: false,
+      code: "BATCH_SCHEDULE_OVERLAP",
+      conflict: {
+        batchId: "batch-current",
+        batchName: "2026 秋季招新",
+        startAt: "2026-08-01T00:00:00.000Z",
+        endAt: "2026-09-18T00:00:00.000Z",
+      },
+    });
+  });
+
+  it("reports a ready draft and blocks missing centers or invalid windows", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({
+        id: "batch-ready",
+        lifecycleStatus: "draft",
+        startAt: "2026-10-01T00:00:00.000Z",
+        endAt: "2026-10-31T23:59:59.999Z",
+      }),
+      batch({
+        id: "batch-no-center",
+        lifecycleStatus: "draft",
+        openCenterIds: [],
+      }),
+      batch({
+        id: "batch-invalid-window",
+        lifecycleStatus: "draft",
+        startAt: "2026-10-31T23:59:59.999Z",
+        endAt: "2026-10-01T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(store.getPublishReadiness("batch-ready", NOW)).toEqual({ ok: true });
+    expect(store.getPublishReadiness("batch-no-center", NOW)).toMatchObject({ ok: false, code: "BATCH_CENTER_REQUIRED" });
+    expect(store.getPublishReadiness("batch-invalid-window", NOW)).toMatchObject({ ok: false, code: "BATCH_WINDOW_INVALID" });
+  });
+
+  it("attaches conflict metadata to a rejected publish without mutating state", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([
+      batch({ id: "batch-current", name: "2026 秋季招新" }),
+      batch({
+        id: "batch-draft",
+        name: "111",
+        lifecycleStatus: "draft",
+        startAt: "2026-08-05T00:00:00.000Z",
+        endAt: "2026-08-28T23:59:59.999Z",
+      }),
+    ]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-draft")));
+
+    expect(() => store.publishBatch("batch-draft", NOW)).toThrowError(
+      expect.objectContaining({
+        code: "BATCH_SCHEDULE_OVERLAP",
+        conflict: expect.objectContaining({
+          batchId: "batch-current",
+          batchName: "2026 秋季招新",
+        }),
+      }),
+    );
+    expect(store.getBatch("batch-draft")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+  });
+
   it("rejects reopening a closed batch into an overlapping future window", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -317,6 +488,194 @@ describe("recruitment batch lifecycle commands", () => {
     expect(() => store.openNow("batch-current", true, NOW)).toThrow("OWNER_PERMISSION_REQUIRED");
   });
 
+  it("lets only the alliance owner create and persist a draft batch", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+
+    const created = store.createBatch({
+      name: "2027 春季补招",
+      startAt: "2027-02-20T00:00:00.000Z",
+      endAt: "2027-03-08T00:00:00.000Z",
+      openCenterIds: ["new-media", "talent-development"],
+    }, new Date("2026-08-04T10:00:00.000Z"));
+
+    expect(created).toMatchObject({
+      name: "2027 春季补招",
+      lifecycleStatus: "draft",
+      responsibleAccountIds: ["admin-alliance"],
+      openCenterIds: ["new-media", "talent-development"],
+    });
+    expect(localStorage.getItem("baiyun-hsd-recruitment-batches")).toContain("2027 春季补招");
+  });
+
+  it("persists lifecycle audit records and assessment publication locks across store reload", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({
+      startAt: "2026-08-05T00:00:00.000Z",
+      endAt: "2026-09-18T00:00:00.000Z",
+    })]);
+    store.openNow("batch-current", true, NOW, "提前开放测试");
+    store.markAssessmentPublished("batch-current", "2026-08-04T10:20:00.000Z");
+
+    setActivePinia(createPinia());
+    const reloaded = useRecruitmentBatchStore();
+    expect(reloaded.auditRecords[0]).toMatchObject({
+      action: "open-now",
+      actorId: "admin-alliance",
+      originalStartAt: "2026-08-05T00:00:00.000Z",
+    });
+    expect(reloaded.assessmentPublishedAt["batch-current"]).toBe("2026-08-04T10:20:00.000Z");
+  });
+
+  it("persists a failed opened-flash envelope with the lifecycle transition", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    vi.spyOn(usePortalContentStore(), "createSystemDraft").mockReturnValue({
+      status: "failed",
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      automationKey: "recruitment-batch:batch-current:recruitment.batch.opened:2",
+    });
+    const persistBatch = vi.spyOn(localStorage, "setItem");
+
+    store.openNow("batch-current", true, NOW);
+
+    expect(persistBatch).toHaveBeenCalledTimes(2);
+
+    const persisted = JSON.parse(localStorage.getItem("baiyun-hsd-recruitment-batches") ?? "{}");
+    expect(persisted.automationFailures).toEqual([{
+      batchId: "batch-current",
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      automationKey: "recruitment-batch:batch-current:recruitment.batch.opened:2",
+    }]);
+
+    setActivePinia(createPinia());
+    expect(useRecruitmentBatchStore().automationFailures).toEqual(persisted.automationFailures);
+  });
+
+  it("does not emit an opened flash when the lifecycle commit fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-current")));
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.openNow("batch-current", true, NOW)).toThrow("BATCH_STORAGE_WRITE_FAILED");
+    expect(store.getBatch("batch-current")).toEqual(before);
+    expect(usePortalContentStore().records.some((record) => record.sourceId === "batch-current")).toBe(false);
+    setItem.mockRestore();
+  });
+
+  it("rolls back a batch mutation when persistence fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-current")));
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.close("batch-current", true, NOW, "写入失败测试")).toThrow("BATCH_STORAGE_WRITE_FAILED");
+    expect(store.getBatch("batch-current")).toEqual(before);
+    expect(store.auditRecords).toEqual([]);
+    setItem.mockRestore();
+  });
+
+  it("rolls back a pause when portal invalidation fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const flash = content.records.find((record) => record.sourceId === "batch-current")!;
+    vi.spyOn(content, "invalidateSource").mockImplementation(() => {
+      throw new Error("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    });
+
+    expect(() => store.pause("batch-current", NOW)).toThrow("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.getById(flash.id)?.sourceValidity).toBe("valid");
+    expect(JSON.parse(localStorage.getItem(RECRUITMENT_BATCH_STORAGE_KEY) ?? "{}").batches[0].manualOverride).toBe("force-open");
+  });
+
+  it("surfaces portal persistence failure when pause compensation also fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.pause("batch-current", NOW)).toThrow("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.persistenceError).toBe("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    setItem.mockRestore();
+  });
+
+  it("restores portal validity when a close commit fails after invalidation", () => {
+    const applicantSession = useSessionStore();
+    applicantSession.signIn("demo-applicant");
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(applicantSession.currentMemberId)),
+      {
+        ...createRecruitmentApplicationDraft(),
+        contact: "applicant@example.com",
+        firstChoice: "白泽开发中心",
+        secondChoice: "新媒体中心",
+        baizeDirection: "鸿蒙开发",
+        acceptsAdjustment: true,
+      },
+      true,
+      { batchId: "batch-current", now: NOW },
+    );
+    const beforeApplication = applicationStore.getApplication("batch-current", "applicant-chen")!;
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const flash = content.records.find((record) => record.sourceId === "batch-current")!;
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === RECRUITMENT_BATCH_STORAGE_KEY) throw new Error("quota exceeded");
+      originalSetItem(key, value);
+    });
+
+    expect(() => store.close("batch-current", true, NOW, "关闭失败测试")).toThrow("BATCH_STORAGE_WRITE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.getById(flash.id)?.sourceValidity).toBe("valid");
+    expect(applicationStore.getApplication("batch-current", "applicant-chen")).toEqual(beforeApplication);
+    expect(JSON.parse(localStorage.getItem(RECRUITMENT_BATCH_STORAGE_KEY) ?? "{}").batches[0].manualOverride).toBe("force-open");
+    setItem.mockRestore();
+  });
+
+  it("does not expose draft creation to ordinary administrators", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+
+    expect(() => store.createBatch({
+      name: "不应创建",
+      startAt: "2027-02-20T00:00:00.000Z",
+      endAt: "2027-03-08T00:00:00.000Z",
+      openCenterIds: ["new-media"],
+    }, NOW)).toThrow("OWNER_PERMISSION_REQUIRED");
+  });
+
   it("keeps only one open batch when opening another batch", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -334,7 +693,7 @@ describe("recruitment batch lifecycle commands", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
     const store = useRecruitmentBatchStore();
-    store.replaceBatches([batch({ endAt: "2026-08-03T00:00:00.000Z" })]);
+    store.replaceBatches([batch({ endAt: "2026-09-18T00:00:00.000Z" })]);
 
     store.close("batch-current", true, NOW, "deadline reached");
     expect(() => store.reopen("batch-current", false, NOW)).toThrow("CONFIRMATION_REQUIRED");

@@ -1,6 +1,7 @@
 import type {
   RecruitmentBatch,
   RecruitmentBatchStatusResult,
+  RecruitmentBatchEffectiveStatus,
 } from "../types/recruitment-batch";
 
 export function getEffectiveRecruitmentBatchStatus(
@@ -39,6 +40,28 @@ export function getEffectiveRecruitmentBatchStatus(
   }
   if (timestamp < start) return { status: "upcoming", reason: "before-start" };
   return { status: "open", reason: "within-window" };
+}
+
+export interface RecruitmentBatchProgress {
+  status: RecruitmentBatchEffectiveStatus;
+  percentage: number;
+}
+
+export function getRecruitmentBatchProgress(
+  batch: RecruitmentBatch,
+  now: Date = new Date(),
+): RecruitmentBatchProgress {
+  const status = getEffectiveRecruitmentBatchStatus(batch, now).status;
+  if (status === "closed" || status === "archived") return { status, percentage: 100 };
+  if (status === "draft" || status === "upcoming") return { status, percentage: 0 };
+
+  const start = Date.parse(batch.startAt);
+  const end = Date.parse(batch.endAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return { status, percentage: 0 };
+  }
+  const percentage = Math.round(Math.min(1, Math.max(0, (now.getTime() - start) / (end - start))) * 100);
+  return { status, percentage };
 }
 
 export function getCurrentOpenBatch(

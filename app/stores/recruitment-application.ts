@@ -54,6 +54,8 @@ function cloneApplication(application: SubmittedRecruitmentApplication): Submitt
   };
 }
 
+export type RecruitmentApplicationStoreSnapshot = Record<string, SubmittedRecruitmentApplication>;
+
 function centerConfigurationSnapshot(batch: RecruitmentBatch): CenterConfigurationSnapshot[] {
   return Object.entries(CENTER_IDS).map(([center, id]) => ({
     center: center as RecruitmentCenter,
@@ -133,6 +135,16 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
     },
   },
   actions: {
+    captureSnapshot(): RecruitmentApplicationStoreSnapshot {
+      return Object.fromEntries(
+        Object.entries(this.applicationsByBatchAndMember).map(([key, application]) => [key, cloneApplication(application)]),
+      );
+    },
+    restoreSnapshot(snapshot: RecruitmentApplicationStoreSnapshot) {
+      this.applicationsByBatchAndMember = Object.fromEntries(
+        Object.entries(snapshot).map(([key, application]) => [key, cloneApplication(application)]),
+      );
+    },
     createDraft(): RecruitmentApplicationDraft {
       return createRecruitmentApplicationDraft();
     },
@@ -239,10 +251,35 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       }
       const key = applicationKey(batch.id, memberId);
       const application = this.applicationsByBatchAndMember[key];
+      if (application?.status === "locked") throw new Error("APPLICATION_LOCKED");
       if (!application || application.status !== "submitted") throw new Error("APPLICATION_NOT_FOUND");
       const timestamp = now.toISOString();
       application.status = "withdrawn";
       application.withdrawnAt = timestamp;
+      application.updatedAt = timestamp;
+      return cloneApplication(application);
+    },
+    lockApplicationForAssessment(
+      batchId: string,
+      memberId: string,
+      now: Date,
+    ) {
+      const application = this.applicationsByBatchAndMember[applicationKey(batchId, memberId)];
+      if (!application || application.status === "withdrawn") return undefined;
+      const timestamp = now.toISOString();
+      if (application.status === "locked") {
+        // A closed batch locks submitted applications before assessment starts.
+        // Once a result is recorded, retain the lock and refine its reason so
+        // reopening can never unlock an application already touched by review.
+        if (application.lockReason === "early-close") {
+          application.lockReason = "assessment";
+          application.updatedAt = timestamp;
+        }
+        return cloneApplication(application);
+      }
+      application.status = "locked";
+      application.lockedAt = application.lockedAt ?? timestamp;
+      application.lockReason = "assessment";
       application.updatedAt = timestamp;
       return cloneApplication(application);
     },
@@ -253,8 +290,38 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         if (!batch || Date.parse(batch.endAt) > now.getTime()) return;
         application.status = "locked";
         application.lockedAt = now.toISOString();
+        application.lockReason = "deadline";
         application.updatedAt = now.toISOString();
       });
+    },
+    lockApplicationsForBatch(
+      batchId: string,
+      now: Date = new Date(),
+      reason: "early-close" | "deadline" = "early-close",
+    ) {
+      const timestamp = now.toISOString();
+      Object.values(this.applicationsByBatchAndMember)
+        .filter((application) => application.batchId === batchId && application.status === "submitted")
+        .forEach((application) => {
+          application.status = "locked";
+          application.lockedAt = timestamp;
+          application.lockReason = reason;
+          application.updatedAt = timestamp;
+        });
+    },
+    unlockApplicationsForBatch(batchId: string, reason: "early-close", now: Date = new Date()) {
+      Object.values(this.applicationsByBatchAndMember)
+        .filter((application) => (
+          application.batchId === batchId
+          && application.status === "locked"
+          && application.lockReason === reason
+        ))
+        .forEach((application) => {
+          application.status = "submitted";
+          application.lockedAt = undefined;
+          application.lockReason = undefined;
+          application.updatedAt = now.toISOString();
+        });
     },
     markCenterAvailability(batchId: string, openCenterIds: readonly string[]) {
       Object.values(this.applicationsByBatchAndMember)
