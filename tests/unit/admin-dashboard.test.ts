@@ -29,7 +29,7 @@ function createSnapshot(): AdminDashboardSnapshot {
       id: "admin-alliance",
       name: "张同学",
       level: "owner",
-      capabilities: ["content.publish"],
+      capabilities: ["content.publish", "portal.configure"],
     },
     metrics: [],
     tasks: [],
@@ -213,6 +213,18 @@ describe("API dashboard gateway", () => {
 
     expect(isAdminDashboardSnapshot(ownerExample)).toBe(true);
     expect(isAdminDashboardSnapshot(centerExample)).toBe(true);
+  });
+
+  it("requires portal visibility to follow portal capabilities", () => {
+    const noPortalCapability = createSnapshot() as AdminDashboardSnapshot & {
+      operator: { capabilities: string[] };
+      portal: unknown;
+    };
+    noPortalCapability.operator.capabilities = ["content.publish"];
+    expect(isAdminDashboardSnapshot(noPortalCapability)).toBe(false);
+
+    noPortalCapability.portal = null;
+    expect(isAdminDashboardSnapshot(noPortalCapability)).toBe(true);
   });
 
   it("rejects an invalid API response instead of treating it as a dashboard snapshot", async () => {

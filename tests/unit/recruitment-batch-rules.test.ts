@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import type {
   RecruitmentBatch,
@@ -14,6 +14,15 @@ import { useSessionStore } from "../../app/stores/session";
 import { usePortalContentStore } from "../../app/stores/portal-content";
 
 const NOW = new Date("2026-08-04T02:00:00.000Z");
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function batch(overrides: Partial<RecruitmentBatch> = {}): RecruitmentBatch {
   return {

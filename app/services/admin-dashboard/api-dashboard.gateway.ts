@@ -1,6 +1,7 @@
 import type { AdminDashboardGateway, DashboardSnapshotOptions } from "./dashboard-gateway";
 import {
   DASHBOARD_ACTIONS,
+  DASHBOARD_CAPABILITIES,
   type AdminDashboardSnapshot,
   type DashboardCapability,
   type DashboardModule,
@@ -12,17 +13,6 @@ export type DashboardApiFetcher = (
 ) => Promise<unknown>;
 
 const dashboardModules: DashboardModule[] = ["recruitment", "content", "portal", "media", "member"];
-const dashboardCapabilities: DashboardCapability[] = [
-  "recruitment.batch.manage",
-  "recruitment.assessment.edit",
-  "recruitment.result.publish",
-  "content.create",
-  "content.review",
-  "content.publish",
-  "portal.configure",
-  "portal.publish",
-  "member.create",
-];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -52,7 +42,7 @@ function isDateTime(value: unknown): value is string {
 
 function hasCapabilityList(value: unknown): boolean {
   return Array.isArray(value)
-    && value.every((item) => dashboardCapabilities.includes(item as DashboardCapability));
+    && value.every((item) => DASHBOARD_CAPABILITIES.includes(item as DashboardCapability));
 }
 
 function isRecruitmentContext(value: unknown, capabilities: readonly DashboardCapability[]): boolean {
@@ -73,7 +63,7 @@ function isRecruitmentContext(value: unknown, capabilities: readonly DashboardCa
     && isNonNegativeInteger(assessment.adjustmentPending)
     && typeof assessment.canPublish === "boolean"
     && value.actions.every((action) => isRecord(action)
-      && dashboardCapabilities.includes(action.capability as DashboardCapability)
+      && DASHBOARD_CAPABILITIES.includes(action.capability as DashboardCapability)
       && capabilities.includes(action.capability as DashboardCapability)
       && hasTarget(action.target));
 }
@@ -119,7 +109,7 @@ export function isAdminDashboardSnapshot(value: unknown): value is AdminDashboar
       && typeof task.title === "string"
       && ["urgent", "warning", "normal"].includes(task.priority as string)
       && (task.meta === undefined || typeof task.meta === "string")
-      && (task.capability === undefined || dashboardCapabilities.includes(task.capability as DashboardCapability))
+      && (task.capability === undefined || DASHBOARD_CAPABILITIES.includes(task.capability as DashboardCapability))
       && (task.capability === undefined
         || ((value.operator as Record<string, unknown>).capabilities as DashboardCapability[]).includes(task.capability as DashboardCapability))
       && hasTarget(task.target))
@@ -133,6 +123,8 @@ export function isAdminDashboardSnapshot(value: unknown): value is AdminDashboar
       && isPositiveInteger(value.portal.draftRevision)
       && isPositiveInteger(value.portal.publishedRevision)
       && typeof value.portal.isDirty === "boolean"
+      && ((value.operator.capabilities as DashboardCapability[]).includes("portal.configure")
+        || (value.operator.capabilities as DashboardCapability[]).includes("portal.publish"))
     ))
     || !isRecord(value.media)
     || !isNonNegativeInteger(value.media.total)
