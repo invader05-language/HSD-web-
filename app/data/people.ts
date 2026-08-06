@@ -38,6 +38,60 @@ type PublicAvatar =
 
 export type PublicPerson = PublicPersonBase & PublicAvatar;
 
+type MockPublicPersonInput = {
+  id: string;
+  name: string;
+  memberDuty: MemberDuty;
+  centerSlug: CenterSlug;
+  centerName: string;
+  baizeDirection?: BaizeDirection;
+  isCore: boolean;
+  order: number;
+};
+
+function createMockPublicPerson(input: MockPublicPersonInput): PublicPerson {
+  return {
+    ...input,
+    bio: `参与${input.centerName}的项目实践与团队协作，持续积累可展示的成果。`,
+    honors: [],
+    avatarVisible: false
+  };
+}
+
+const EXTENDED_CORE_PEOPLE: readonly PublicPerson[] = [
+  createMockPublicPerson({ id: "gao-development", name: "高同学", memberDuty: "核心人员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "鸿蒙开发", isCore: true, order: 17 }),
+  createMockPublicPerson({ id: "qian-development", name: "钱同学", memberDuty: "核心人员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "大模型 AIGC", isCore: true, order: 18 }),
+  createMockPublicPerson({ id: "yu-media", name: "俞同学", memberDuty: "核心人员", centerSlug: "new-media", centerName: "新媒体中心", isCore: true, order: 19 }),
+  createMockPublicPerson({ id: "jiang-planning", name: "蒋同学", memberDuty: "核心人员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: true, order: 20 }),
+  createMockPublicPerson({ id: "pan-talent", name: "潘同学", memberDuty: "核心人员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: true, order: 21 }),
+  createMockPublicPerson({ id: "su-development", name: "苏同学", memberDuty: "核心人员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "后端架构", isCore: true, order: 22 }),
+  createMockPublicPerson({ id: "he-media-core", name: "贺同学", memberDuty: "核心人员", centerSlug: "new-media", centerName: "新媒体中心", isCore: true, order: 23 }),
+  createMockPublicPerson({ id: "deng-planning", name: "邓同学", memberDuty: "核心人员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: true, order: 24 }),
+  createMockPublicPerson({ id: "ma-talent", name: "马同学", memberDuty: "核心人员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: true, order: 25 }),
+  createMockPublicPerson({ id: "lu-media", name: "陆同学", memberDuty: "核心人员", centerSlug: "new-media", centerName: "新媒体中心", isCore: true, order: 26 })
+];
+
+const EXTENDED_PUBLIC_MEMBERS: readonly PublicPerson[] = [
+  createMockPublicPerson({ id: "yan-development", name: "严同学", memberDuty: "普通成员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "鸿蒙开发", isCore: false, order: 27 }),
+  createMockPublicPerson({ id: "zhao-media", name: "赵同学", memberDuty: "普通成员", centerSlug: "new-media", centerName: "新媒体中心", isCore: false, order: 28 }),
+  createMockPublicPerson({ id: "lu-planning", name: "卢同学", memberDuty: "普通成员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: false, order: 29 }),
+  createMockPublicPerson({ id: "gao-talent", name: "高然同学", memberDuty: "普通成员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: false, order: 30 }),
+  createMockPublicPerson({ id: "shen-development", name: "沈同学", memberDuty: "普通成员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "嵌入式开发", isCore: false, order: 31 }),
+  createMockPublicPerson({ id: "xie-media", name: "谢同学", memberDuty: "普通成员", centerSlug: "new-media", centerName: "新媒体中心", isCore: false, order: 32 }),
+  createMockPublicPerson({ id: "cao-planning", name: "曹同学", memberDuty: "普通成员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: false, order: 33 }),
+  createMockPublicPerson({ id: "wei-talent", name: "魏同学", memberDuty: "普通成员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: false, order: 34 }),
+  createMockPublicPerson({ id: "bai-development", name: "白同学", memberDuty: "普通成员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "大模型 AIGC", isCore: false, order: 35 }),
+  createMockPublicPerson({ id: "du-media", name: "杜同学", memberDuty: "普通成员", centerSlug: "new-media", centerName: "新媒体中心", isCore: false, order: 36 }),
+  createMockPublicPerson({ id: "qin-planning", name: "秦同学", memberDuty: "普通成员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: false, order: 37 }),
+  createMockPublicPerson({ id: "hong-talent", name: "洪同学", memberDuty: "普通成员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: false, order: 38 }),
+  createMockPublicPerson({ id: "yu-development", name: "余同学", memberDuty: "普通成员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "后端架构", isCore: false, order: 39 }),
+  createMockPublicPerson({ id: "lu-media-member", name: "鲁同学", memberDuty: "普通成员", centerSlug: "new-media", centerName: "新媒体中心", isCore: false, order: 40 }),
+  createMockPublicPerson({ id: "kang-planning", name: "康同学", memberDuty: "普通成员", centerSlug: "tuowei-planning", centerName: "拓维策划中心", isCore: false, order: 41 }),
+  createMockPublicPerson({ id: "peng-talent", name: "彭同学", memberDuty: "普通成员", centerSlug: "talent-development", centerName: "人才发展中心", isCore: false, order: 42 }),
+  createMockPublicPerson({ id: "su-development-member", name: "舒同学", memberDuty: "普通成员", centerSlug: "baize-development", centerName: "白泽开发中心", baizeDirection: "鸿蒙开发", isCore: false, order: 43 }),
+  createMockPublicPerson({ id: "cheng-media", name: "程同学", memberDuty: "普通成员", centerSlug: "new-media", centerName: "新媒体中心", isCore: false, order: 44 })
+];
+
 export const CORE_PEOPLE: readonly PublicPerson[] = [
   {
     id: "lin-development",
@@ -217,7 +271,8 @@ export const CORE_PEOPLE: readonly PublicPerson[] = [
     avatarVisible: false,
     isCore: true,
     order: 6
-  }
+  },
+  ...EXTENDED_CORE_PEOPLE
 ];
 
 export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
@@ -326,7 +381,8 @@ export const PUBLIC_MEMBERS: readonly PublicPerson[] = [
     avatarVisible: false,
     isCore: false,
     order: 16
-  }
+  },
+  ...EXTENDED_PUBLIC_MEMBERS
 ];
 
 const ALL_PUBLIC_PEOPLE: readonly PublicPerson[] = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
@@ -353,7 +409,9 @@ export function findStaticPublicPersonForMember(memberId: string): PublicPerson 
 }
 
 export function getPeopleByCenter(slug: string): readonly PublicPerson[] {
-  return ALL_PUBLIC_PEOPLE.filter((person) => person.centerSlug === slug);
+  return ALL_PUBLIC_PEOPLE
+    .filter((person) => person.centerSlug === slug)
+    .sort((a, b) => a.order - b.order);
 }
 
 export function findPublicPerson(id: string): PublicPerson | undefined {

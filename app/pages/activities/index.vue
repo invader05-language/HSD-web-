@@ -13,6 +13,9 @@ const views = [
 ] as const;
 const route = useRoute();
 const catalog = usePortalCatalog();
+function timelineDate(item: TimelineItem) {
+  return item.entityType === "activity" ? item.eventAt ?? item.publishedAt : item.publishedAt;
+}
 const activeView = computed<PublicView>(() => {
   const value = String(route.query.view ?? "all");
   return views.some((view) => view.value === value) ? value as PublicView : "all";
@@ -23,7 +26,7 @@ const timeline = computed<TimelineItem[]>(() => catalog
     || (activeView.value === "activities" && item.entityType === "activity")
     || (activeView.value === "articles" && item.entityType === "article")
     || (activeView.value === "notices" && item.entityType === "notice"))
-  .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt)));
+  .sort((left, right) => Date.parse(timelineDate(right)) - Date.parse(timelineDate(left))));
 
 useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
 </script>
@@ -60,7 +63,7 @@ useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
             :to="item.to"
             data-testid="public-timeline-item"
           >
-            <time :datetime="item.publishedAt">{{ item.publishedAt.slice(0, 10).replaceAll('-', '.') }}</time>
+            <time :datetime="timelineDate(item)">{{ timelineDate(item).slice(0, 10).replaceAll('-', '.') }}</time>
             <div>
               <span>{{ item.entityType === "activity" ? "活动" : item.entityType === "article" ? "新闻" : "公开公告" }}</span>
               <h2>{{ item.title }}</h2>

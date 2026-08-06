@@ -12,7 +12,7 @@ export interface PortalProjectionWarning {
   sourceId: string;
   entityType: PortalReference["entityType"];
   fallbackSourceId?: string;
-  code: "fallback" | "empty";
+  code: "fallback" | "automatic-fallback" | "empty";
 }
 
 export interface HomepageProjection {
@@ -44,38 +44,63 @@ export function resolveHomepageProjection(
   };
   for (const slot of PORTAL_SLOT_IDS) {
     const references = configuredSlots[slot] ?? [];
-    for (const reference of references.slice(0, PORTAL_SLOT_CAPACITY[slot])) {
-      const configured = match(reference, catalog);
-      const configuredKey = `${reference.entityType}:${reference.sourceId}`;
-      if (configured?.available && configured.eligibleSlots.includes(slot) && !used.has(configuredKey)) {
-        resolved[slot].push({ ...configured });
-        used.add(configuredKey);
-        continue;
+    if (references.length) {
+      for (const reference of references.slice(0, PORTAL_SLOT_CAPACITY[slot])) {
+        const configured = match(reference, catalog);
+        const configuredKey = `${reference.entityType}:${reference.sourceId}`;
+        if (configured?.available && configured.eligibleSlots.includes(slot) && !used.has(configuredKey)) {
+          resolved[slot].push({ ...configured });
+          used.add(configuredKey);
+          continue;
+        }
+        const replacement = catalog
+          .filter((item) => item.entityType === reference.entityType && item.available && item.eligibleSlots.includes(slot))
+          .filter((item) => !used.has(`${item.entityType}:${item.sourceId}`))
+          .filter((item) => !reserved.has(`${item.entityType}:${item.sourceId}`))
+          .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))[0];
+        if (replacement) {
+          resolved[slot].push({ ...replacement, fallbackFor: reference.sourceId });
+          used.add(`${replacement.entityType}:${replacement.sourceId}`);
+          warnings.push({
+            slot,
+            sourceId: reference.sourceId,
+            entityType: reference.entityType,
+            fallbackSourceId: replacement.sourceId,
+            code: "fallback",
+          });
+        } else {
+          warnings.push({
+            slot,
+            sourceId: reference.sourceId,
+            entityType: reference.entityType,
+            code: "empty",
+          });
+        }
       }
-      const replacement = catalog
-        .filter((item) => item.entityType === reference.entityType && item.available && item.eligibleSlots.includes(slot))
-        .filter((item) => !used.has(`${item.entityType}:${item.sourceId}`))
-        .filter((item) => !reserved.has(`${item.entityType}:${item.sourceId}`))
-        .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))[0];
-      if (replacement) {
-        resolved[slot].push({ ...replacement, fallbackFor: reference.sourceId });
+      continue;
+    }
+
+    if (slot !== "flash" && slot !== "news") continue;
+    const fallbackTypes: readonly PortalCatalogItem["entityType"][] = slot === "flash"
+      ? ["flash"]
+      : ["article", "notice"];
+    catalog
+      .filter((item) => fallbackTypes.includes(item.entityType) && item.available && item.eligibleSlots.includes(slot))
+      .filter((item) => !used.has(`${item.entityType}:${item.sourceId}`))
+      .filter((item) => !reserved.has(`${item.entityType}:${item.sourceId}`))
+      .sort((left, right) => Date.parse(right.publishedAt) - Date.parse(left.publishedAt))
+      .slice(0, PORTAL_SLOT_CAPACITY[slot])
+      .forEach((replacement) => {
+        resolved[slot].push({ ...replacement, fallbackFor: "automatic" });
         used.add(`${replacement.entityType}:${replacement.sourceId}`);
         warnings.push({
           slot,
-          sourceId: reference.sourceId,
-          entityType: reference.entityType,
+          sourceId: slot,
+          entityType: replacement.entityType,
           fallbackSourceId: replacement.sourceId,
-          code: "fallback",
+          code: "automatic-fallback",
         });
-      } else {
-        warnings.push({
-          slot,
-          sourceId: reference.sourceId,
-          entityType: reference.entityType,
-          code: "empty",
-        });
-      }
-    }
+      });
   }
   return { slots: resolved, warnings };
 }

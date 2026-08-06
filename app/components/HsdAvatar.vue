@@ -10,8 +10,7 @@ defineProps<{
   <div class="hsd-avatar" :class="`hsd-avatar--${size || 'md'}`">
     <img v-if="src" :src="src" :alt="`${name}的头像`">
     <div v-else class="hsd-avatar__fallback" role="img" :aria-label="`${name}的默认 HSD 头像`">
-      <span>&lt; HSD &gt;</span>
+      <span>HSD</span>
     </div>
   </div>
 </template>
-

@@ -71,7 +71,7 @@ const publicMembers = memberRepository.publicMembers;
           </div>
         </div>
         <div class="member-directory">
-          <article v-for="member in publicMembers" :key="member.id">
+          <article v-for="member in publicMembers.slice(0, 6)" :key="member.id">
             <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
             <div>
               <h3>{{ member.name }}</h3>

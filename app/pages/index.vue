@@ -96,7 +96,7 @@ watch(
             <time :datetime="item.publishedAt">{{ item.publishedAt.slice(5, 10).replace('-', '.') }}</time>
           </NuxtLink>
         </div>
-        <p v-else class="flash-band__empty" role="status">暂无已发布快讯</p>
+        <p v-else class="flash-band__empty" role="status">HSD 快讯 · 暂无新消息</p>
       </div>
     </section>
 
@@ -136,7 +136,7 @@ watch(
             </NuxtLink>
           </div>
         </div>
-        <EmptyState v-else title="暂无已发布动态" description="新闻与公开公告发布后会显示在这里。" />
+        <EmptyState v-else title="当前暂无动态" description="近期内容将在此更新。" />
       </div>
     </section>
 
@@ -222,8 +222,8 @@ watch(
         <div v-if="publishedActivities.length" class="activities-list">
           <NuxtLink v-for="activity in publishedActivities" :key="activity.sourceId" :to="activity.to" class="activity-row">
             <div class="activity-date">
-              <strong>{{ publicDate(activity.publishedAt).day }}</strong>
-              <span>{{ publicDate(activity.publishedAt).month }}</span>
+              <strong>{{ publicDate(activity.eventAt ?? activity.publishedAt).day }}</strong>
+              <span>{{ publicDate(activity.eventAt ?? activity.publishedAt).month }}</span>
             </div>
             <span>近期活动</span>
             <div>
