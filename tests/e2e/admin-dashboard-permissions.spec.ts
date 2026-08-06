@@ -27,3 +27,14 @@ test("a center administrator cannot read a different center's application detail
   await expect(page.getByRole("heading", { name: "报名记录不存在", exact: true })).toBeVisible();
   await expect(page.getByLabel("联系方式")).toHaveCount(0);
 });
+
+test("a center administrator sees only its own upload tasks", async ({ page }) => {
+  await page.goto("/admin/media");
+  await completeCenterAdminLogin(page, "/admin/media");
+  await page.getByRole("button", { name: "上传素材" }).click();
+
+  await expect(page.getByText("招新宣讲会现场-01.jpg", { exact: true })).toBeVisible();
+  await expect(page.getByText("摄影采风-精选.zip", { exact: true })).toBeVisible();
+  await expect(page.getByText("中心介绍短片.mp4", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("旧版活动录像.mov", { exact: true })).toHaveCount(0);
+});

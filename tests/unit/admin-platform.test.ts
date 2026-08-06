@@ -86,4 +86,12 @@ describe("administration dashboard", () => {
     expect(page).toContain('member.create');
     expect(page).not.toContain('上传学习资料');
   });
+
+  it("keeps the independently routed upload queue center-scoped", () => {
+    const page = readFileSync("app/pages/admin/uploads.vue", "utf8");
+
+    expect(page).toContain("filterAdminUploadTasksByOwnerCenter");
+    expect(page).toContain("visibleUploadTasks");
+    expect(page).not.toContain('v-for="task in ADMIN_UPLOAD_TASKS"');
+  });
 });
