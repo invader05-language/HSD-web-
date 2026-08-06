@@ -139,7 +139,7 @@ test("1440px directories retain their approved three-column grids", async ({ pag
   const memberBoxes = await cardBoxes(page, ".people-member-list > a");
   expect(memberBoxes).toHaveLength(12);
   expect(memberBoxes[0]?.y).toBeCloseTo(memberBoxes[1]?.y ?? 0, 0);
-  expect(memberBoxes[2]?.y).toBeGreaterThan((memberBoxes[0]?.y ?? 0) + 100);
+  expect(memberBoxes[3]?.y).toBeGreaterThan((memberBoxes[0]?.y ?? 0) + 100);
   expect(memberBoxes[0]?.width).toBeCloseTo(memberBoxes[1]?.width ?? 0, 0);
 
   await page.goto("/about");

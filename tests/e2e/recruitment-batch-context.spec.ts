@@ -38,7 +38,7 @@ test("batch links preserve batchId context across roster, assessment and publica
   await page.getByRole("link", { name: "考核台" }).click();
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/assessment$/);
   await expect(page.getByText("全局当前轮次：第一轮考核")).toBeVisible();
-  await expect(page.getByRole("button", { name: "推进至第二轮考核" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭报名后推进全局轮次" })).toBeDisabled();
 
   await page.getByRole("button", { name: "查看处理 王同学" }).click();
   const regularDrawer = page.getByRole("dialog", { name: "预备成员详情" });
@@ -65,7 +65,7 @@ test("batch links preserve batchId context across roster, assessment and publica
   await reopenedCandidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
   await reopenedCandidateDrawer.getByRole("button", { name: "保存结果" }).click();
   await reopenedCandidateDrawer.getByRole("button", { name: "确认保存" }).click();
-  await expect(page.getByRole("status")).toContainText("结果已保存");
+  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
   await expect(candidateDrawer).toHaveCount(0);
   await expect(page.getByRole("row", { name: /周同学/ })).toHaveCount(0);
 
@@ -160,7 +160,7 @@ test("an owner can record a not-admitted adjustment without choosing a destinati
   await drawer.getByLabel("第一轮结果").selectOption("failed");
   await drawer.getByRole("button", { name: "保存结果" }).click();
   await drawer.getByRole("button", { name: "确认保存" }).click();
-  await expect(page.getByRole("status")).toContainText("结果已保存");
+  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
   await expect(drawer).toHaveCount(0);
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
@@ -169,7 +169,7 @@ test("an owner can record a not-admitted adjustment without choosing a destinati
   await adjustmentDrawer.getByRole("button", { name: "保存结果" }).click();
   await adjustmentDrawer.getByRole("button", { name: "确认保存" }).click();
 
-  await expect(page.getByRole("status")).toContainText("结果已保存");
+  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
   await expect(page.getByRole("row", { name: /陈同学/ })).toHaveCount(0);
 });
 
