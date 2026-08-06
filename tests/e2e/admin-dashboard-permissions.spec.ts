@@ -15,7 +15,7 @@ test("a center administrator cannot reach foreign content or portal configuratio
   await completeCenterAdminLogin(page, "/admin/content/flash-recruitment-2026");
   await expect(page).toHaveURL(/\/admin\/forbidden\?from=/);
 
-  await page.goto("/admin");
+  await page.getByRole("link", { name: "HSD 管理台" }).click();
   await expect(page.getByRole("heading", { name: "门户发布状态" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "配置门户 →" })).toHaveCount(0);
 });

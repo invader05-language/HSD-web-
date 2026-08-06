@@ -284,6 +284,43 @@ describe("recruitment assessment store", () => {
     });
   });
 
+  it("rejects non-regular adjustment centers at runtime", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    closeBatchForAssessment();
+    store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-chen",
+      round: 1,
+      outcome: "failed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+
+    for (const finalCenter of ["白泽开发中心", "", "未知中心"]) {
+      expect(() => store.recordAdjustmentDecision({
+        batchId: BATCH_ID,
+        candidateId: "candidate-chen",
+        finalCenter: finalCenter as never,
+        admitted: true,
+        now: new Date("2026-08-04T10:05:00.000Z"),
+      })).toThrow("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
+    }
+    expect(store.getCandidate(BATCH_ID, "candidate-chen")?.processingStatus)
+      .toBe("offline-adjustment-pending");
+  });
+
+  it("projects publication summary counts through a candidate visibility filter", () => {
+    const store = useRecruitmentAssessmentStore();
+    const visible = store.getCandidates(BATCH_ID)
+      .filter((candidate) => candidate.candidate?.preferences[0] === "新媒体中心");
+    const summary = store.getPublicationSummary(BATCH_ID, (candidate) => (
+      candidate.candidate?.preferences[0] === "新媒体中心"
+    ));
+
+    expect(summary.total).toBe(visible.length);
+    expect(summary.ready + summary.pending).toBeLessThanOrEqual(summary.total);
+  });
+
   it("hides a completed candidate from the action queue and brings Baize back for the next round", () => {
     signInOwner();
     const store = useRecruitmentAssessmentStore();

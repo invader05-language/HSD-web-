@@ -52,12 +52,14 @@ test("offline adjustment records only regular-center destinations", async ({ pag
   await completeAdminDemoLogin(page);
 
   // Assessment writes are only allowed after the active recruitment batch is closed.
-  await page.goto("/admin/recruitment/batches/batch-current");
+  await page.getByRole("link", { name: "招新批次" }).click();
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
   await page.getByRole("button", { name: "提前关闭" }).click();
   const closeDialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
   await closeDialog.getByRole("button", { name: "确认提前关闭" }).click();
   await expect(page.getByRole("status")).toContainText("提前关闭已完成");
-  await page.goto("/admin/recruitment");
+  await page.getByRole("link", { name: "预备成员考核", exact: true }).click();
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
@@ -96,9 +98,9 @@ test("only the alliance owner can create a draft recruitment batch", async ({ pa
   await drawer.getByRole("button", { name: "保存草稿" }).click();
 
   await expect(page.getByRole("status")).toContainText("保存为草稿");
-  await expect(page.getByRole("heading", { level: 3, name: "2027 春季补招" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3, name: "2027 春季补招" }).locator("..")
-    .getByText("草稿")).toBeVisible();
+  const draftRow = page.getByRole("article").filter({ hasText: "2027 春季补招" }).filter({ hasText: "草稿" });
+  await expect(draftRow.getByRole("heading", { level: 3, name: "2027 春季补招" })).toBeVisible();
+  await expect(draftRow.getByText("草稿")).toBeVisible();
 });
 
 test("recruitment batches and publication complete the administration workflow", async ({ page }) => {
@@ -135,7 +137,11 @@ test("legacy application routes redirect to the scoped batch roster and record",
   await expect(applicationRecord.getByRole("heading", { name: "考核处理", exact: true })).toHaveCount(0);
   await expect(applicationRecord.getByRole("heading", { name: "内部备注", exact: true })).toHaveCount(0);
 
+});
+
+test("legacy missing application route preserves its batch context after login", async ({ page }) => {
   await page.goto("/admin/recruitment/applications/missing");
+  await completeAdminDemoLogin(page, "/admin/recruitment/batches/batch-current/applications/missing");
 
   await expect(page).toHaveURL(/\/admin\/recruitment\/batches\/batch-current\/applications\/missing$/);
   await expect(page.getByRole("heading", { name: "报名记录不存在", exact: true })).toBeVisible();

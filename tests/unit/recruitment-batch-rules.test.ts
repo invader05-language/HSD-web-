@@ -526,6 +526,33 @@ describe("recruitment batch lifecycle commands", () => {
     expect(reloaded.assessmentPublishedAt["batch-current"]).toBe("2026-08-04T10:20:00.000Z");
   });
 
+  it("persists a failed opened-flash envelope with the lifecycle transition", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    vi.spyOn(usePortalContentStore(), "createSystemDraft").mockReturnValue({
+      status: "failed",
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      automationKey: "recruitment-batch:batch-current:recruitment.batch.opened:2",
+    });
+    const persistBatch = vi.spyOn(localStorage, "setItem");
+
+    store.openNow("batch-current", true, NOW);
+
+    expect(persistBatch).toHaveBeenCalledTimes(1);
+
+    const persisted = JSON.parse(localStorage.getItem("baiyun-hsd-recruitment-batches") ?? "{}");
+    expect(persisted.automationFailures).toEqual([{
+      batchId: "batch-current",
+      errorCode: "PORTAL_CONTENT_PERSISTENCE_FAILED",
+      automationKey: "recruitment-batch:batch-current:recruitment.batch.opened:2",
+    }]);
+
+    setActivePinia(createPinia());
+    expect(useRecruitmentBatchStore().automationFailures).toEqual(persisted.automationFailures);
+  });
+
   it("rolls back a batch mutation when persistence fails", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });

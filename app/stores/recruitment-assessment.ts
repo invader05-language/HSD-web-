@@ -78,6 +78,12 @@ interface PersistedAssessmentState {
 
 export type AssessmentAdjustmentDecision = RecruitmentCenter | "not-admitted";
 
+const REGULAR_ADJUSTMENT_CENTERS = [
+  "新媒体中心",
+  "拓维策划中心",
+  "人才发展中心",
+] as const;
+
 const ROUND_LABELS: Record<AssessmentRoundNumber, RecruitmentAssessmentCandidate["currentPhase"]> = {
   1: "第一轮考核",
   2: "第二轮考核",
@@ -510,12 +516,17 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (input.decision === undefined && input.admitted === undefined) {
         throw new Error("ASSESSMENT_ADJUSTMENT_DECISION_REQUIRED");
       }
+      if (input.finalCenter !== undefined
+        && !(REGULAR_ADJUSTMENT_CENTERS as readonly string[]).includes(input.finalCenter as string)) {
+        throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
+      }
       const decision = input.decision ?? (
         input.admitted ? input.finalCenter : "not-admitted"
       );
       const admitted = decision !== "not-admitted";
       if (!record.acceptsAdjustment
-        || (admitted && (!decision || decision === "白泽开发中心"))) {
+        || (admitted && (!decision
+          || !(REGULAR_ADJUSTMENT_CENTERS as readonly string[]).includes(decision as string)))) {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
       useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
@@ -557,16 +568,22 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.touch(state);
       return state;
     },
-    getPublicationSummary(batchId: string): PublicationSummary {
+    getPublicationSummary(
+      batchId: string,
+      candidateFilter?: (candidate: RecruitmentAssessmentCandidate) => boolean,
+    ): PublicationSummary {
       const state = this.getBatchState(batchId);
-      const processing = state.records.map((record) => getAssessmentProcessingStatus(record));
+      const records = candidateFilter
+        ? state.records.filter((record) => candidateFilter(this.toCandidate(state, record)))
+        : state.records;
+      const processing = records.map((record) => getAssessmentProcessingStatus(record));
       const ready = processing.filter((status) => status === "ready-to-publish").length;
       const adjustmentPending = processing.filter((status) => status === "offline-adjustment-pending").length;
       const pending = processing.filter((status) => status === "assessing" || status === "offline-adjustment-pending").length;
-      const admitted = state.records.filter((record) => getFinalDecision(record) === "admitted").length;
-      const notAdmitted = state.records.filter((record) => getFinalDecision(record) === "not-admitted").length;
+      const admitted = records.filter((record) => getFinalDecision(record) === "admitted").length;
+      const notAdmitted = records.filter((record) => getFinalDecision(record) === "not-admitted").length;
       return {
-        total: state.records.length,
+        total: records.length,
         ready,
         pending,
         adjustmentPending,

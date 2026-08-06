@@ -12,7 +12,9 @@ async function completeAdminDemoLogin(
 }
 
 async function closeBatchBeforeAssessment(page: import("@playwright/test").Page) {
-  await page.goto("/admin/recruitment/batches/batch-current");
+  await page.getByRole("link", { name: "招新批次" }).click();
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
   await page.getByRole("button", { name: "提前关闭" }).click();
   const dialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
   await dialog.getByRole("button", { name: "确认提前关闭" }).click();
@@ -55,7 +57,7 @@ test("batch links preserve batchId context across roster, assessment and publica
   await candidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
   await candidateDrawer.getByRole("button", { name: "取消" }).click();
   await closeBatchBeforeAssessment(page);
-  await page.goto("/admin/recruitment/batches/batch-current/assessment");
+  await page.getByRole("link", { name: /进入考核台/ }).click();
   await expect(page.getByRole("button", { name: "查看处理 周同学" })).toBeVisible();
   await page.getByRole("button", { name: "查看处理 周同学" }).click();
   const reopenedCandidateDrawer = page.getByRole("dialog", { name: "预备成员详情" });
@@ -109,7 +111,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
   await page.getByRole("button", { name: "新建招新批次" }).click();
   const drawer = page.getByRole("dialog", { name: "新建招新批次" });
   await drawer.getByLabel("批次名称").fill("111");
-  await drawer.getByLabel("报名开始时间").fill("2026-08-05");
+  await drawer.getByLabel("报名开始时间").fill("2026-08-10");
   await drawer.getByLabel("报名截止时间").fill("2026-08-28");
   await drawer.getByRole("button", { name: "保存草稿" }).click();
 
@@ -121,15 +123,15 @@ test("draft publish readiness explains schedule conflicts and successful publish
   await expect(page.getByRole("button", { name: "发布批次" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "修改批次时间" })).toBeVisible();
 
-  await page.goto("/admin/recruitment/batches");
+  await page.getByRole("link", { name: "返回批次列表" }).click();
   await page.getByRole("button", { name: "新建招新批次" }).click();
   const readyDrawer = page.getByRole("dialog", { name: "新建招新批次" });
   await readyDrawer.getByLabel("批次名称").fill("2027 春季补招");
-  await readyDrawer.getByLabel("报名开始时间").fill("2027-02-20");
-  await readyDrawer.getByLabel("报名截止时间").fill("2027-03-08");
+  await readyDrawer.getByLabel("报名开始时间").fill("2027-03-20");
+  await readyDrawer.getByLabel("报名截止时间").fill("2027-04-08");
   await readyDrawer.getByRole("button", { name: "保存草稿" }).click();
 
-  const readyRow = page.getByRole("article").filter({ hasText: "2027 春季补招" });
+  const readyRow = page.getByRole("article").filter({ hasText: "2027 春季补招" }).filter({ hasText: "草稿" });
   await readyRow.getByRole("link", { name: /进入批次/ }).click();
   await expect(page.getByRole("button", { name: "发布批次" })).toBeEnabled();
   await page.getByRole("button", { name: "发布批次" }).click();
@@ -153,7 +155,7 @@ test("an owner can record a not-admitted adjustment without choosing a destinati
   await page.goto("/admin/recruitment/batches/batch-current/assessment");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches/batch-current/assessment");
   await closeBatchBeforeAssessment(page);
-  await page.goto("/admin/recruitment/batches/batch-current/assessment");
+  await page.getByRole("link", { name: /进入考核台/ }).click();
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });

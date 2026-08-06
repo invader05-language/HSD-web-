@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { RECRUITMENT_BATCHES } from "~/data/recruitment-batches";
 import { RECRUITMENT_CENTERS } from "~/data/recruitment-application";
 import {
   buildRecruitmentBatchRoute,
@@ -11,6 +10,7 @@ import {
   type AdminRecruitmentBatchLike,
   type RecruitmentBatchAdminSection,
 } from "~/data/recruitment-admin-context";
+import type { AdminCandidate } from "~/data/recruitment-admin";
 import { getRecruitmentBatchCommandMessage } from "~/utils/recruitment-batch-messages";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
@@ -18,6 +18,7 @@ import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
 import { getRecruitmentBatchProgress } from "~/utils/recruitment-batch-rules";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
+import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import type { RecruitmentBatch } from "~/types/recruitment-batch";
 
 definePageMeta({ layout: "admin" });
@@ -45,11 +46,11 @@ const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchId = computed(() => String(route.params.batchId));
 watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
-const batches = computed<AdminBatchDetail[]>(() => {
-  const storeBatches = (batchStore as unknown as { batches?: unknown }).batches;
-  return (Array.isArray(storeBatches) && storeBatches.length > 0 ? storeBatches : RECRUITMENT_BATCHES) as AdminBatchDetail[];
-});
-const batch = computed(() => batches.value.find((item) => item.id === batchId.value));
+const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const batch = computed(() => batchStore.getBatch(batchId.value) as AdminBatchDetail | undefined);
+function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
+  return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
+}
 const overviewRoute = computed(() => buildRecruitmentBatchRoute(batchId.value));
 const statusKey = computed(() => {
   const effective = batchStore.effectiveStatus(batchId.value, now.value);
@@ -91,11 +92,20 @@ const centerOptions = RECRUITMENT_CENTERS.map((label, index) => [
   label,
 ] as const);
 
-const applications = computed(() => batch.value ? applicationStore.getApplicationsForBatch(batchId.value) : []);
-const candidates = computed(() => batch.value ? assessmentStore.getCandidates(batchId.value) : []);
-const actionableCandidates = computed(() => batch.value ? assessmentStore.getActionableCandidates(batchId.value) : []);
+const applications = computed(() => batch.value
+  ? applicationStore.getApplicationsForBatch(batchId.value)
+    .filter((application) => !centerScope.value || application.firstChoice === centerScope.value)
+  : []);
+const candidates = computed(() => batch.value
+  ? assessmentStore.getCandidates(batchId.value)
+    .filter(canViewCandidate)
+  : []);
+const actionableCandidates = computed(() => batch.value
+  ? assessmentStore.getActionableCandidates(batchId.value)
+    .filter(canViewCandidate)
+  : []);
 const publicationSummary = computed(() => batch.value
-  ? assessmentStore.getPublicationSummary(batchId.value)
+  ? assessmentStore.getPublicationSummary(batchId.value, canViewCandidate)
   : { total: 0, ready: 0, pending: 0, admitted: 0, notAdmitted: 0, canPublish: false });
 const applicantCount = computed(() => Math.max(applications.value.length, candidates.value.length));
 const publishReadiness = computed(() => batch.value && isDraft.value
