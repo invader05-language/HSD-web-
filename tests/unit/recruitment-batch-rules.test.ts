@@ -540,7 +540,7 @@ describe("recruitment batch lifecycle commands", () => {
 
     store.openNow("batch-current", true, NOW);
 
-    expect(persistBatch).toHaveBeenCalledTimes(1);
+    expect(persistBatch).toHaveBeenCalledTimes(2);
 
     const persisted = JSON.parse(localStorage.getItem("baiyun-hsd-recruitment-batches") ?? "{}");
     expect(persisted.automationFailures).toEqual([{
@@ -551,6 +551,22 @@ describe("recruitment batch lifecycle commands", () => {
 
     setActivePinia(createPinia());
     expect(useRecruitmentBatchStore().automationFailures).toEqual(persisted.automationFailures);
+  });
+
+  it("does not emit an opened flash when the lifecycle commit fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch({ startAt: "2026-08-05T00:00:00.000Z" })]);
+    const before = JSON.parse(JSON.stringify(store.getBatch("batch-current")));
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.openNow("batch-current", true, NOW)).toThrow("BATCH_STORAGE_WRITE_FAILED");
+    expect(store.getBatch("batch-current")).toEqual(before);
+    expect(usePortalContentStore().records.some((record) => record.sourceId === "batch-current")).toBe(false);
+    setItem.mockRestore();
   });
 
   it("rolls back a batch mutation when persistence fails", () => {

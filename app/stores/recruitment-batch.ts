@@ -454,6 +454,26 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       }
       return undefined;
     },
+    persistOpenedTransition(
+      batch: RecruitmentBatch,
+      actor: { id: string; name: string },
+      timestamp: string,
+      emitOpened: boolean,
+    ) {
+      this.persistBatches();
+      if (!emitOpened) return;
+
+      const failure = this.emitOpenedFlash(batch, actor, timestamp);
+      if (!failure) return;
+
+      this.automationFailures.unshift(failure);
+      try {
+        this.persistBatches();
+      } catch {
+        // The lifecycle transition was already committed. Keep that state even
+        // when the best-effort automation failure supplement cannot be saved.
+      }
+    },
     retryAutomationDraft(automationKey: string) {
       const result = usePortalContentStore().retryAutomationDraft(automationKey);
       if (result.status !== "failed") {
@@ -484,11 +504,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOverlappingPublishedWindow(batchId, next);
       Object.assign(batch, next);
       this.appendAudit(batch, "publish", actor, beforeStatus, afterStatus, timestamp, reason, { lifecycleStatus: "draft" });
-      if (afterStatus === "open") {
-        const failure = this.emitOpenedFlash(batch, actor, timestamp);
-        if (failure) this.automationFailures.unshift(failure);
-      }
-      this.persistBatches();
+      this.persistOpenedTransition(batch, actor, timestamp, afterStatus === "open");
       return batch;
     },
     publish(batchId: string, now: Date = new Date(), reason?: string) {
@@ -518,9 +534,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "open-now", actor, beforeStatus, "open", timestamp, reason, { manualOverride: "none" });
-      const failure = this.emitOpenedFlash(batch, actor, timestamp);
-      if (failure) this.automationFailures.unshift(failure);
-      this.persistBatches();
+      this.persistOpenedTransition(batch, actor, timestamp, true);
       return batch;
     },
     pause(batchId: string, now: Date = new Date(), reason = "pause recruitment batch") {
@@ -554,11 +568,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "resume", actor, beforeStatus, afterStatus, timestamp, reason);
-      if (afterStatus === "open") {
-        const failure = this.emitOpenedFlash(batch, actor, timestamp);
-        if (failure) this.automationFailures.unshift(failure);
-      }
-      this.persistBatches();
+      this.persistOpenedTransition(batch, actor, timestamp, afterStatus === "open");
       return batch;
     },
     close(
@@ -626,11 +636,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.version += 1;
       const afterStatus = getEffectiveRecruitmentBatchStatus(batch, now).status;
       this.appendAudit(batch, "reopen", actor, beforeStatus, afterStatus, timestamp, reason);
-      if (afterStatus === "open") {
-        const failure = this.emitOpenedFlash(batch, actor, timestamp);
-        if (failure) this.automationFailures.unshift(failure);
-      }
-      this.persistBatches();
+      this.persistOpenedTransition(batch, actor, timestamp, afterStatus === "open");
       useRecruitmentApplicationStore().unlockApplicationsForBatch(batchId, "early-close", now);
       return batch;
     },
@@ -677,11 +683,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       this.assertNoOverlappingPublishedWindow(batchId, next);
       Object.assign(batch, next);
       this.appendAudit(batch, "update", actor, beforeStatus, afterStatus, timestamp, reason, before);
-      if (beforeStatus !== "open" && afterStatus === "open") {
-        const failure = this.emitOpenedFlash(batch, actor, timestamp);
-        if (failure) this.automationFailures.unshift(failure);
-      }
-      this.persistBatches();
+      this.persistOpenedTransition(batch, actor, timestamp, beforeStatus !== "open" && afterStatus === "open");
       if (patch.openCenterIds) {
         useRecruitmentApplicationStore().markCenterAvailability(batch.id, patch.openCenterIds);
       }
