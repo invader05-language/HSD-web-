@@ -12,7 +12,10 @@ import {
 } from "../../app/utils/recruitment-batch-rules";
 import { formatRecruitmentBatchPeriod } from "../../app/data/recruitment-admin-context";
 import { createRecruitmentApplicationDraft, createRegistrationProfileDraft } from "../../app/data/recruitment-application";
-import { useRecruitmentBatchStore } from "../../app/stores/recruitment-batch";
+import {
+  RECRUITMENT_BATCH_STORAGE_KEY,
+  useRecruitmentBatchStore,
+} from "../../app/stores/recruitment-batch";
 import { useRecruitmentApplicationStore } from "../../app/stores/recruitment-application";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useSessionStore } from "../../app/stores/session";
@@ -26,6 +29,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -581,6 +585,81 @@ describe("recruitment batch lifecycle commands", () => {
     expect(() => store.close("batch-current", true, NOW, "写入失败测试")).toThrow("BATCH_STORAGE_WRITE_FAILED");
     expect(store.getBatch("batch-current")).toEqual(before);
     expect(store.auditRecords).toEqual([]);
+    setItem.mockRestore();
+  });
+
+  it("rolls back a pause when portal invalidation fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const flash = content.records.find((record) => record.sourceId === "batch-current")!;
+    vi.spyOn(content, "invalidateSource").mockImplementation(() => {
+      throw new Error("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    });
+
+    expect(() => store.pause("batch-current", NOW)).toThrow("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.getById(flash.id)?.sourceValidity).toBe("valid");
+    expect(JSON.parse(localStorage.getItem(RECRUITMENT_BATCH_STORAGE_KEY) ?? "{}").batches[0].manualOverride).toBe("force-open");
+  });
+
+  it("surfaces portal persistence failure when pause compensation also fails", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    expect(() => store.pause("batch-current", NOW)).toThrow("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.persistenceError).toBe("PORTAL_CONTENT_PERSISTENCE_FAILED");
+    setItem.mockRestore();
+  });
+
+  it("restores portal validity when a close commit fails after invalidation", () => {
+    const applicantSession = useSessionStore();
+    applicantSession.signIn("demo-applicant");
+    const profileStore = useMemberProfileStore();
+    const applicationStore = useRecruitmentApplicationStore();
+    applicationStore.submitApplication(
+      createRegistrationProfileDraft(profileStore.getProfile(applicantSession.currentMemberId)),
+      {
+        ...createRecruitmentApplicationDraft(),
+        contact: "applicant@example.com",
+        firstChoice: "白泽开发中心",
+        secondChoice: "新媒体中心",
+        baizeDirection: "鸿蒙开发",
+        acceptsAdjustment: true,
+      },
+      true,
+      { batchId: "batch-current", now: NOW },
+    );
+    const beforeApplication = applicationStore.getApplication("batch-current", "applicant-chen")!;
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = useRecruitmentBatchStore();
+    store.replaceBatches([batch()]);
+    store.openNow("batch-current", true, NOW);
+    const content = usePortalContentStore();
+    const flash = content.records.find((record) => record.sourceId === "batch-current")!;
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === RECRUITMENT_BATCH_STORAGE_KEY) throw new Error("quota exceeded");
+      originalSetItem(key, value);
+    });
+
+    expect(() => store.close("batch-current", true, NOW, "关闭失败测试")).toThrow("BATCH_STORAGE_WRITE_FAILED");
+    expect(store.effectiveStatus("batch-current", NOW)).toBe("open");
+    expect(content.getById(flash.id)?.sourceValidity).toBe("valid");
+    expect(applicationStore.getApplication("batch-current", "applicant-chen")).toEqual(beforeApplication);
+    expect(JSON.parse(localStorage.getItem(RECRUITMENT_BATCH_STORAGE_KEY) ?? "{}").batches[0].manualOverride).toBe("force-open");
     setItem.mockRestore();
   });
 

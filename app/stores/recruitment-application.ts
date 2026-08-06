@@ -54,6 +54,8 @@ function cloneApplication(application: SubmittedRecruitmentApplication): Submitt
   };
 }
 
+export type RecruitmentApplicationStoreSnapshot = Record<string, SubmittedRecruitmentApplication>;
+
 function centerConfigurationSnapshot(batch: RecruitmentBatch): CenterConfigurationSnapshot[] {
   return Object.entries(CENTER_IDS).map(([center, id]) => ({
     center: center as RecruitmentCenter,
@@ -133,6 +135,16 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
     },
   },
   actions: {
+    captureSnapshot(): RecruitmentApplicationStoreSnapshot {
+      return Object.fromEntries(
+        Object.entries(this.applicationsByBatchAndMember).map(([key, application]) => [key, cloneApplication(application)]),
+      );
+    },
+    restoreSnapshot(snapshot: RecruitmentApplicationStoreSnapshot) {
+      this.applicationsByBatchAndMember = Object.fromEntries(
+        Object.entries(snapshot).map(([key, application]) => [key, cloneApplication(application)]),
+      );
+    },
     createDraft(): RecruitmentApplicationDraft {
       return createRecruitmentApplicationDraft();
     },

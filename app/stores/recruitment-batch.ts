@@ -544,14 +544,29 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
         throw new Error("BATCH_NOT_OPEN");
       }
       const beforeStatus = "open" as const;
+      const beforeBatch = cloneBatch(batch);
+      const beforeAuditRecords = this.auditRecords.map(cloneAuditRecord);
+      const portal = usePortalContentStore();
+      const portalSnapshot = portal.captureSnapshot();
       const timestamp = now.toISOString();
       batch.manualOverride = "paused";
       batch.updatedAt = timestamp;
       batch.version += 1;
       this.appendAudit(batch, "pause", actor, beforeStatus, "paused", timestamp, reason);
-      this.persistBatches();
-      usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
-      return batch;
+      try {
+        portal.invalidateSource("recruitment-batch", batch.id, now);
+        this.persistBatches();
+        return batch;
+      } catch (error) {
+        Object.assign(batch, beforeBatch);
+        this.auditRecords = beforeAuditRecords;
+        try {
+          portal.restoreSnapshot(portalSnapshot);
+        } catch {
+          portal.persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        }
+        throw error;
+      }
     },
     resume(batchId: string, now: Date = new Date(), reason = "resume recruitment batch") {
       const actor = this.resolveOwnerActor();
@@ -585,6 +600,9 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       const applicationStore = useRecruitmentApplicationStore();
       const beforeBatch = cloneBatch(batch);
       const beforeAuditRecords = this.auditRecords.map(cloneAuditRecord);
+      const portal = usePortalContentStore();
+      const portalSnapshot = portal.captureSnapshot();
+      const applicationSnapshot = applicationStore.captureSnapshot();
       applicationStore.lockApplicationsForBatch(batchId, now, "early-close");
       const timestamp = now.toISOString();
       batch.lifecycleStatus = "closed";
@@ -594,13 +612,18 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
       batch.version += 1;
       this.appendAudit(batch, "close", actor, beforeStatus, "closed", timestamp, reason);
       try {
+        portal.invalidateSource("recruitment-batch", batch.id, now);
         this.persistBatches();
-        usePortalContentStore().invalidateSource("recruitment-batch", batch.id, now);
         return batch;
       } catch (error) {
         Object.assign(batch, beforeBatch);
         this.auditRecords = beforeAuditRecords;
-        applicationStore.unlockApplicationsForBatch(batchId, "early-close", now);
+        applicationStore.restoreSnapshot(applicationSnapshot);
+        try {
+          portal.restoreSnapshot(portalSnapshot);
+        } catch {
+          portal.persistenceError = "PORTAL_CONTENT_PERSISTENCE_FAILED";
+        }
         throw error;
       }
     },
