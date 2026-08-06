@@ -37,6 +37,19 @@ components:
     AdminDashboardSnapshot:
       type: object
       required: [schemaVersion, generatedAt, timezone, operator, metrics, tasks, recruitment, content, portal, media, warnings]
+      allOf:
+        - if:
+            properties:
+              operator:
+                properties:
+                  capabilities:
+                    not:
+                      contains:
+                        enum: [portal.configure, portal.publish]
+          then:
+            properties:
+              portal:
+                type: 'null'
       properties:
         schemaVersion:
           type: integer
@@ -68,6 +81,7 @@ components:
           oneOf:
             - $ref: '#/components/schemas/PortalDashboardSummary'
             - type: 'null'
+          description: 拥有 portal.configure 或 portal.publish capability 时返回对象；其他操作者必须为 null。
         media:
           $ref: '#/components/schemas/MediaDashboardSummary'
         warnings:
