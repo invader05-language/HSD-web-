@@ -88,6 +88,7 @@ export interface PortalCatalogItem {
   summary: string;
   to: string;
   publishedAt: string;
+  eventAt?: string;
   eligibleSlots: PortalSlotId[];
   available: boolean;
 }

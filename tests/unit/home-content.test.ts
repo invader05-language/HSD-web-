@@ -49,6 +49,9 @@ describe("homepage content", () => {
     expect(source).not.toMatch(/\bNEWS\b/);
     expect(homeDataSource).not.toMatch(/export const FLASH_NEWS\b/);
     expect(homeDataSource).not.toMatch(/export const NEWS\b/);
+    expect(source).toContain("HSD 快讯 · 暂无新消息");
+    expect(source).toContain("当前暂无动态");
+    expect(source).toContain("近期内容将在此更新。");
   });
 
   it("keeps public portal visual rendering independent from admin fixtures", () => {

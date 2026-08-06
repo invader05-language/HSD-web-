@@ -44,8 +44,8 @@ describe("public people and center directory", () => {
     expect(homeCenters).toBe(CENTERS);
   });
 
-  it("publishes six explicitly named mock core people in display order", () => {
-    expect(CORE_PEOPLE.map((person) => person.id)).toEqual([
+  it("keeps the original core people at the front of the expanded mock directory", () => {
+    expect(CORE_PEOPLE.slice(0, 6).map((person) => person.id)).toEqual([
       "lin-development",
       "chen-media",
       "zhou-planning",
@@ -56,8 +56,8 @@ describe("public people and center directory", () => {
     expect(CORE_PEOPLE.every((person) => person.isCore)).toBe(true);
   });
 
-  it("publishes six explicitly named mock members in display order", () => {
-    expect(PUBLIC_MEMBERS.map((person) => person.id)).toEqual([
+  it("keeps the original members at the front of the expanded mock directory", () => {
+    expect(PUBLIC_MEMBERS.slice(0, 6).map((person) => person.id)).toEqual([
       "guo-development",
       "he-media",
       "fang-planning",
@@ -66,6 +66,18 @@ describe("public people and center directory", () => {
       "tang-planning"
     ]);
     expect(PUBLIC_MEMBERS.every((person) => !person.isCore)).toBe(true);
+  });
+
+  it("keeps enough public mock records to exercise directory pagination", () => {
+    expect(CORE_PEOPLE.length).toBeGreaterThan(12);
+    expect(PUBLIC_MEMBERS.length).toBeGreaterThan(12);
+  });
+
+  it("projects the expanded static records into the two public directory scopes", () => {
+    const repository = useMemberRepository();
+
+    expect(repository.publicCorePeople.value).toHaveLength(17);
+    expect(repository.publicMembers.value).toHaveLength(24);
   });
 
   it("publishes only normalized member duties and Baize-only directions", () => {
@@ -131,22 +143,22 @@ describe("public people and center directory", () => {
   });
 
   it("returns the approved public people for each center", () => {
-    expect(getPeopleByCenter("baize-development").map((person) => person.id)).toEqual([
+    expect(getPeopleByCenter("baize-development").slice(0, 3).map((person) => person.id)).toEqual([
       "lin-development",
       "zheng-development",
       "guo-development"
     ]);
-    expect(getPeopleByCenter("new-media").map((person) => person.id)).toEqual([
+    expect(getPeopleByCenter("new-media").slice(0, 3).map((person) => person.id)).toEqual([
       "chen-media",
       "he-media",
       "xu-media"
     ]);
-    expect(getPeopleByCenter("tuowei-planning").map((person) => person.id)).toEqual([
+    expect(getPeopleByCenter("tuowei-planning").slice(0, 3).map((person) => person.id)).toEqual([
       "zhou-planning",
       "fang-planning",
       "tang-planning"
     ]);
-    expect(getPeopleByCenter("talent-development").map((person) => person.id)).toEqual([
+    expect(getPeopleByCenter("talent-development").slice(0, 3).map((person) => person.id)).toEqual([
       "wu-talent",
       "luo-talent",
       "sun-talent"
@@ -158,7 +170,7 @@ describe("public people and center directory", () => {
       (person) => !person.avatarVisible
     );
 
-    expect(hiddenPeople).toHaveLength(12);
+    expect(hiddenPeople).toHaveLength(CORE_PEOPLE.length + PUBLIC_MEMBERS.length);
     expect(hiddenPeople.every((person) => !Object.hasOwn(person, "avatarUrl"))).toBe(true);
     expect(hiddenPeople.every((person) => resolvePublicAvatar(person) === undefined)).toBe(true);
   });

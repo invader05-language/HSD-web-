@@ -17,7 +17,7 @@ test("dynamic and activity views expose only their requested public record types
   }
 });
 
-test("all public updates are ordered by descending public time and keep domain detail routes", async ({ page }) => {
+test("all public updates use their domain timeline time and keep detail routes", async ({ page }) => {
   await page.goto("/activities?view=all");
   const items = page.getByTestId("public-timeline-item");
 
@@ -27,6 +27,13 @@ test("all public updates are ordered by descending public time and keep domain d
   await expect(items.nth(4)).toContainText("实训工作室暑期开放安排");
   await expect(page.getByRole("link", { name: /HarmonyOS 原生应用入门/ })).toHaveAttribute("href", "/activities/harmonyos-salon");
   await expect(page.getByRole("link", { name: /从一次分享会，到一支真正协作的项目团队/ })).toHaveAttribute("href", "/updates/project-team");
+});
+
+test("activity timeline keeps event dates in a stable non-wrapping date column", async ({ page }) => {
+  await page.goto("/activities?view=activities");
+  const firstDate = page.getByTestId("public-timeline-item").first().locator("time");
+  await expect(firstDate).toHaveText("2026.08.22");
+  await expect(firstDate).toHaveCSS("white-space", "nowrap");
 });
 
 test("published news and notices have public details while unknown updates return 404", async ({ page }) => {

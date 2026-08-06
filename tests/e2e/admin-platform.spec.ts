@@ -240,7 +240,7 @@ test("portal draft preview stays isolated until an owner publishes the full conf
   await page.getByRole("button", { name: "发布门户配置" }).click();
   const confirmation = page.getByRole("dialog", { name: /确认整份发布门户配置/ });
   await confirmation.getByRole("button", { name: "确认整份发布" }).click();
-  await expect(page.getByRole("status")).toContainText("门户配置已整份发布");
+  await expect(page.locator('.admin-portal-message[role="status"]')).toContainText("门户配置已整份发布");
 
   await page.goto("/");
   await expect(page.locator(".featured-project h3")).toHaveText("智学领航");

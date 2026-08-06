@@ -36,6 +36,7 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     summary: activity.summary,
     to: activity.to,
     publishedAt: activity.publishedAt,
+    eventAt: toIso(activity.date),
     eligibleSlots: ["activities"],
     available: activity.available,
   }));

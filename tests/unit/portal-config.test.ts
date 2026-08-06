@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { readFileSync } from "node:fs";
 import { PORTAL_CONFIG_STORAGE_KEY, usePortalConfigStore } from "../../app/stores/portal-config";
-import { resolveHomepageSlots } from "../../app/composables/usePublishedPortal";
+import { resolveHomepageProjection, resolveHomepageSlots } from "../../app/composables/usePublishedPortal";
+import { usePortalCatalog } from "../../app/composables/usePortalCatalog";
 import * as publishedPortal from "../../app/composables/usePublishedPortal";
 import type { PortalCatalogItem } from "../../app/types/portal-content";
 import { useSessionStore } from "../../app/stores/session";
@@ -238,6 +239,51 @@ describe("portal configuration store", () => {
 
     expect(slots.flash[0]).toMatchObject({ sourceId: "replacement" });
     expect(slots.flash[0]?.fallbackFor).toBe("expired");
+  });
+
+  it("derives the latest published flash and news when their homepage slots are empty", () => {
+    const projection = resolveHomepageProjection({}, [
+      {
+        entityType: "flash", sourceId: "flash-old", title: "旧快讯", summary: "", to: "/join",
+        publishedAt: "2026-08-01T00:00:00.000Z", eligibleSlots: ["flash"], available: true,
+      },
+      {
+        entityType: "flash", sourceId: "flash-new", title: "新快讯", summary: "", to: "/join",
+        publishedAt: "2026-08-05T00:00:00.000Z", eligibleSlots: ["flash"], available: true,
+      },
+      {
+        entityType: "activity", sourceId: "activity-new", title: "活动不应进入新闻", summary: "", to: "/activities/activity-new",
+        publishedAt: "2026-08-06T00:00:00.000Z", eligibleSlots: ["activities"], available: true,
+      },
+      {
+        entityType: "article", sourceId: "article-new", title: "最新新闻", summary: "", to: "/updates/article-new",
+        publishedAt: "2026-08-04T00:00:00.000Z", eligibleSlots: ["news"], available: true,
+      },
+      {
+        entityType: "notice", sourceId: "notice-new", title: "最新公告", summary: "", to: "/updates/notice-new",
+        publishedAt: "2026-08-03T00:00:00.000Z", eligibleSlots: ["news"], available: true,
+      },
+    ]);
+
+    expect(projection.slots.flash.map((item) => item.sourceId)).toEqual(["flash-new"]);
+    expect(projection.slots.news.map((item) => item.sourceId)).toEqual(["article-new", "notice-new"]);
+    expect(projection.slots.news.every((item) => item.fallbackFor === "automatic")).toBe(true);
+    expect(projection.warnings).toEqual([
+      { slot: "flash", sourceId: "flash", entityType: "flash", fallbackSourceId: "flash-new", code: "automatic-fallback" },
+      { slot: "news", sourceId: "news", entityType: "article", fallbackSourceId: "article-new", code: "automatic-fallback" },
+      { slot: "news", sourceId: "news", entityType: "notice", fallbackSourceId: "notice-new", code: "automatic-fallback" },
+    ]);
+  });
+
+  it("keeps activity event time separate from content publication time", () => {
+    const activity = usePortalCatalog().find((item) => item.entityType === "activity" && item.sourceId === "media-story");
+    const article = usePortalCatalog().find((item) => item.entityType === "article");
+
+    expect(activity).toMatchObject({
+      publishedAt: "2026-08-22T00:00:00.000Z",
+      eventAt: "2026-08-22T00:00:00.000Z",
+    });
+    expect(article?.eventAt).toBeUndefined();
   });
 
   it("reports fallback and empty runtime projections without crossing entity types", () => {

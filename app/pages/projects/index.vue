@@ -16,6 +16,11 @@ const visibleProjects = computed(() => {
   return filteredProjects.value.slice(start, start + pageSize);
 });
 
+function resetProjectFilter() {
+  activeFilter.value = "全部";
+  currentPage.value = 1;
+}
+
 watch(activeFilter, () => {
   currentPage.value = 1;
 });
@@ -44,10 +49,14 @@ watch(activeFilter, () => {
             </div>
           </NuxtLink>
         </div>
-        <EmptyState v-else />
+        <section v-else class="projects-empty-state" aria-live="polite">
+          <span class="projects-empty-state__count">0 个项目</span>
+          <strong>该分类暂未收录项目</strong>
+          <p>当前筛选范围没有可展示的成果。</p>
+          <button type="button" class="text-link" @click="resetProjectFilter">查看全部项目</button>
+        </section>
         <PaginationControls v-model="currentPage" :page-count="pageCount" label="项目分页" />
       </div>
     </section>
   </div>
 </template>
-

@@ -208,7 +208,12 @@ onBeforeUnmount(() => {
   dialogTrigger?.focus();
 });
 
-function warningText(item: { code: "fallback" | "empty"; sourceId: string; fallbackSourceId?: string }) {
+function warningText(item: { slot: PortalSlotId; code: "fallback" | "automatic-fallback" | "empty"; sourceId: string; fallbackSourceId?: string }) {
+  if (item.code === "automatic-fallback") {
+    return item.slot === "flash"
+      ? `首页快讯未手动配置，当前自动展示 ${item.fallbackSourceId}；负责人可在草稿中重新精选。`
+      : `首页动态未手动配置，当前自动展示最新内容 ${item.fallbackSourceId}；负责人可在草稿中重新精选。`;
+  }
   return item.code === "fallback"
     ? `${item.sourceId} 已失效，当前公开页面自动使用 ${item.fallbackSourceId}，请确认后重新发布。`
     : `${item.sourceId} 已失效且没有同类型候选，当前公开位置留空。`;

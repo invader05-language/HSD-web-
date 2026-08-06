@@ -10,6 +10,8 @@ const center = ref("all");
 const isHydrated = ref(false);
 const memberRepository = useMemberRepository();
 const corePeople = memberRepository.publicCorePeople;
+const pageSize = 12;
+const currentPage = ref(1);
 
 onMounted(() => {
   isHydrated.value = true;
@@ -20,7 +22,7 @@ function clearFilters() {
   center.value = "all";
 }
 
-const visiblePeople = computed(() => {
+const filteredPeople = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
   return corePeople.value.filter((person) => {
@@ -31,6 +33,22 @@ const visiblePeople = computed(() => {
 
     return matchesCenter && (!normalizedQuery || searchableText.includes(normalizedQuery));
   });
+});
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredPeople.value.length / pageSize)));
+const visiblePeople = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredPeople.value.slice(start, start + pageSize);
+});
+const displayStart = computed(() => filteredPeople.value.length ? (currentPage.value - 1) * pageSize + 1 : 0);
+const displayEnd = computed(() => Math.min(currentPage.value * pageSize, filteredPeople.value.length));
+
+watch([query, center], () => {
+  currentPage.value = 1;
+});
+
+watch(pageCount, (nextPageCount) => {
+  currentPage.value = Math.min(currentPage.value, nextPageCount);
 });
 </script>
 
@@ -60,7 +78,9 @@ const visiblePeople = computed(() => {
               </option>
             </select>
           </label>
-          <p aria-live="polite">共 {{ visiblePeople.length }} 位核心人员</p>
+          <p aria-live="polite">
+            共 {{ filteredPeople.length }} 位核心人员<span v-if="filteredPeople.length">，当前显示 {{ displayStart }}–{{ displayEnd }} 位</span>
+          </p>
         </div>
 
         <div v-if="visiblePeople.length" class="people-core-grid">
@@ -95,6 +115,7 @@ const visiblePeople = computed(() => {
             <button type="button" class="button button--dark" @click="clearFilters">清除筛选</button>
           </template>
         </EmptyState>
+        <PaginationControls v-if="visiblePeople.length" v-model="currentPage" :page-count="pageCount" label="核心人员分页" />
       </div>
     </section>
   </div>

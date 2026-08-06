@@ -148,6 +148,8 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 - 已新增受登录保护的 `/admin/recruitment` 桌面端原型，采用第一志愿分组、组合筛选、名单表格、成员详情抽屉和身份变更二次确认。
 - 用户端与管理端采用同一套 Nuxt Web 工程和部署，共用品牌令牌、登录会话、领域类型和未来 API 契约；两端使用独立路由命名空间与布局，管理导航不会混入官网。
 - 当前用户端和管理端均使用前端 Mock 数据，不连接真实后端或数据库。用户端规格见 [`docs/superpowers/specs/2026-07-30-member-results-center-design.md`](docs/superpowers/specs/2026-07-30-member-results-center-design.md)，全系统规格见 [`docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md`](docs/superpowers/specs/2026-07-30-recruitment-results-system-design.md)。
+- 招新考核允许在报名开放或暂停时录入已有候选人的当前轮次和线下调剂决定；全局轮次推进与整批发布仍要求批次关闭。首次结果保存锁定报名，真实后端需保留候选人命令与批次命令的独立审计边界。
+- 首页快讯与“正在发生的事”均读取已发布门户目录；手动推荐优先，空槽运行时自动取最新有效快讯、新闻或公告，不把活动混入新闻区。`/activities` 活动记录使用 `eventAt` 表示活动发生时间，`publishedAt` 只表示内容发布时间。
 
 ## 桌面管理平台原型
 

@@ -10,6 +10,8 @@ const center = ref("all");
 const isHydrated = ref(false);
 const memberRepository = useMemberRepository();
 const publicMembers = memberRepository.publicMembers;
+const pageSize = 12;
+const currentPage = ref(1);
 
 onMounted(() => {
   isHydrated.value = true;
@@ -20,7 +22,7 @@ function clearFilters() {
   center.value = "all";
 }
 
-const visibleMembers = computed(() => {
+const filteredMembers = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
 
   return publicMembers.value.filter((person) => {
@@ -31,6 +33,22 @@ const visibleMembers = computed(() => {
 
     return matchesCenter && (!normalizedQuery || searchableText.includes(normalizedQuery));
   });
+});
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredMembers.value.length / pageSize)));
+const visibleMembers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredMembers.value.slice(start, start + pageSize);
+});
+const displayStart = computed(() => filteredMembers.value.length ? (currentPage.value - 1) * pageSize + 1 : 0);
+const displayEnd = computed(() => Math.min(currentPage.value * pageSize, filteredMembers.value.length));
+
+watch([query, center], () => {
+  currentPage.value = 1;
+});
+
+watch(pageCount, (nextPageCount) => {
+  currentPage.value = Math.min(currentPage.value, nextPageCount);
 });
 </script>
 
@@ -60,7 +78,9 @@ const visibleMembers = computed(() => {
               </option>
             </select>
           </label>
-          <p aria-live="polite">共 {{ visibleMembers.length }} 位成员</p>
+          <p aria-live="polite">
+            共 {{ filteredMembers.length }} 位成员<span v-if="filteredMembers.length">，当前显示 {{ displayStart }}–{{ displayEnd }} 位</span>
+          </p>
         </div>
 
         <div v-if="visibleMembers.length" class="people-member-list">
@@ -70,7 +90,7 @@ const visibleMembers = computed(() => {
             class="directory-card people-member-card"
             :to="`/people/${person.id}`"
           >
-            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="lg" />
+            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="md" />
             <div class="people-member-card__content">
               <span>{{ person.centerName }}</span>
               <h2>{{ person.name }}</h2>
@@ -95,6 +115,7 @@ const visibleMembers = computed(() => {
           </template>
         </EmptyState>
 
+        <PaginationControls v-if="visibleMembers.length" v-model="currentPage" :page-count="pageCount" label="全体成员分页" />
         <p class="privacy-note">本页默认展示正式成员的基础风采信息，不包含学号、班级、联系方式、报名信息、考核结果或帐号资料。</p>
       </div>
     </section>

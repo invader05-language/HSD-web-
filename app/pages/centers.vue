@@ -39,14 +39,5 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
         </NuxtLink>
       </div>
     </section>
-    <section class="section">
-      <div class="shell collaboration-flow">
-        <p class="eyebrow">How We Work</p>
-        <h2>一个项目如何跨中心推进</h2>
-        <div>
-          <span>01 发现问题</span><span>02 设计与开发</span><span>03 内容与活动</span><span>04 复盘与成长</span>
-        </div>
-      </div>
-    </section>
   </div>
 </template>
