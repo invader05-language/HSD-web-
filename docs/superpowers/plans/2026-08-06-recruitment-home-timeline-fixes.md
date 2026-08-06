@@ -12,12 +12,12 @@
 
 - 本项目产品名称统一为“白云HSD开发者部落”，遵守 `init/AGENTS.md` 的首页顺序、快讯保留和响应式基线。
 - 不新增后端、数据库、真实认证或持久化实现；Mock 字段和错误码必须可直接交接后端。
-- 本次不运行本地单测、类型检查、生产构建或本地 E2E；仅更新回归用例并由 CI 验证。
+- 交付前已运行本地单元测试、TypeScript 检查和 Nuxt 生产构建并通过；本地浏览器 E2E 不作为阻塞条件，Playwright 由 GitHub CI 回归验证。
 - 不修改 `main`，所有改动留在 `codex/recruitment-home-timeline-fixes`。
 
 ---
 
-### Task 1: 考核开放批次写入与批次级门禁
+### Task 1: 考核开放批次写入与批次级门禁（已完成代码修改与本地验证）
 
 **Files:**
 - Modify: `app/stores/recruitment-assessment.ts:405-570`
@@ -58,7 +58,7 @@ git add app/stores/recruitment-assessment.ts app/components/admin/RecruitmentAss
 git commit -m "fix: allow assessment writes before batch close"
 ```
 
-### Task 2: Homepage projection fallback and public copy
+### Task 2: Homepage projection fallback and public copy（已完成代码修改与本地验证）
 
 **Files:**
 - Modify: `app/composables/usePublishedPortal.ts:10-98`
@@ -95,7 +95,7 @@ git add app/composables/usePublishedPortal.ts app/pages/index.vue app/pages/admi
 git commit -m "fix: link homepage updates to published portal fallback"
 ```
 
-### Task 3: Activity event date and responsive timeline
+### Task 3: Activity event date and responsive timeline（已完成代码修改与本地验证）
 
 **Files:**
 - Modify: `app/types/portal-content.ts:80-100`
@@ -129,7 +129,7 @@ git add app/types/portal-content.ts app/composables/usePortalCatalog.ts app/page
 git commit -m "fix: keep activity dates readable across portal layouts"
 ```
 
-### Task 4: Static verification and handoff
+### Task 4: Static verification and handoff（已完成本地门禁，等待 PR CI）
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-06-recruitment-home-timeline-fixes-design.md`
@@ -141,9 +141,9 @@ git commit -m "fix: keep activity dates readable across portal layouts"
 
 Record the open/paused assessment policy, closed-only global commands, runtime homepage fallback, `eventAt` semantics, and the deferred local test policy in the requirements and route handoff sections.
 
-- [ ] **Step 2: Run static checks only**
+- [ ] **Step 2: Run final pre-commit checks**
 
-Run `git diff --check`, inspect all changed files, search for stale `ASSESSMENT_BATCH_NOT_CLOSED` assumptions and old homepage empty copy, and verify no `.pnpm-store` or generated output is staged. Do not run local unit tests, typecheck, build, or Playwright in this task.
+Run `git diff --check`, the full unit suite, TypeScript check, and production build. Inspect all changed files, search for stale `ASSESSMENT_BATCH_NOT_CLOSED` assumptions and old homepage empty copy, and verify no `.pnpm-store` or generated output is staged. Keep local Playwright E2E deferred to GitHub CI.
 
 - [ ] **Step 3: Commit docs and final handoff**
 

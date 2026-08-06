@@ -9,7 +9,7 @@
 1. 用户端 `/join` 只接受当前唯一开放批次；没有开放批次时展示介绍和下一批时间，但报名入口禁用，不产生无法归属批次的预报名。
 2. 招新批次由联盟总负责人创建，普通管理员不显示“新建招新批次”入口，也不能通过 store 命令绕过权限。
 3. 新建批次保存为草稿；负责人固定为创建者联盟总负责人。报名表统一使用 `/join/apply`，不为批次创建额外表单配置。
-4. 批次关闭后才能整批发布考核结果。结果发布后禁止重新开放该批次；需要重新招新时创建新批次。
+4. 候选人级考核结果和线下调剂决定在批次开放、暂停或关闭时均可录入；批次关闭后才能推进全局考核轮次和整批发布结果。结果发布后禁止重新开放该批次；需要重新招新时创建新批次。
 5. 结果第一次写入某个成员时锁定该成员报名，之后不能编辑志愿或撤回；其他成员仍可在报名窗口内操作。
 6. 考核工作台只显示当前轮待录入和待调剂人员。普通中心完成通过/不通过后立即隐藏；白泽通过当前轮后隐藏，推进全局轮次后在下一轮重新出现；不通过人员不再回显。
 7. 推进全局轮次前，当前轮所有可编辑结果和所有待调剂决定必须完成。
@@ -36,6 +36,8 @@ POST /admin/recruitment/batches/:batchId/assessment/advance
 POST /admin/recruitment/batches/:batchId/assessment/publish
   -> publish requires effective batch status=closed and all workflow items complete
 ```
+
+候选人级的 `round` 和 `adjustment` 命令接受有效批次状态 `open | paused | closed`；`advance` 与 `publish` 命令必须拒绝 `open | paused` 并返回 `ASSESSMENT_BATCH_NOT_CLOSED`。首次轮次结果与报名锁定必须在同一事务中完成。
 
 后端必须在事务中完成“首次考核结果 + 报名锁定”，并以 `batchId + memberId` 唯一约束报名；发布后禁止新增报名进入已发布考核状态。前端保留 `sourceType/sourceUrl/externalId` 等可选外部内容字段，但本功能不接入微信公众号或大模型。
 
