@@ -361,6 +361,60 @@ describe("portal content store", () => {
     expect(() => store.publish(draft.id, true, now)).toThrow("PORTAL_CONTENT_INVALID_BLOCK");
   });
 
+  it("accepts directly uploaded media blocks and keeps them in the public snapshot", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalContentStore();
+    const media = {
+      id: "media-portal-1",
+      localBlobId: "blob-portal-1",
+      role: "detail",
+      kind: "image",
+      title: "现场照片",
+      caption: "发布现场记录",
+      alt: "成员在活动现场交流",
+      aspect: "landscape",
+      sortOrder: 0,
+      status: "ready",
+    } as const;
+    const draft = store.createDraft({
+      kind: "article",
+      title: "直接上传内容",
+      summary: "内容正文使用独立上传素材。",
+      blocks: [
+        { type: "image", media } as any,
+        { type: "paragraph", text: "正文内容。" },
+      ],
+    }, now);
+
+    store.submitForReview(draft.id, now);
+    store.approve(draft.id, now);
+    const published = store.publish(draft.id, true, now);
+
+    expect((published.publishedRevision?.blocks[0] as any).media).toMatchObject({
+      id: "media-portal-1",
+      status: "ready",
+    });
+    expect((published.publishedRevision?.blocks[0] as any).assetId).toBeUndefined();
+  });
+
+  it("migrates legacy asset image blocks into a reviewable legacy attachment", () => {
+    const legacyRecord = JSON.parse(JSON.stringify(usePortalContentStore().records[1]));
+    legacyRecord.blocks = [{ type: "image", assetId: "asset-recruitment-hero", alt: "旧版主视觉" }, { type: "paragraph", text: "旧正文" }];
+    localStorage.setItem("baiyun-hsd.portal-content", JSON.stringify({
+      version: 3,
+      records: [legacyRecord],
+      automationFailures: [],
+    }));
+
+    setActivePinia(createPinia());
+    const restored = usePortalContentStore();
+    const image = restored.records[0]?.blocks[0] as any;
+
+    expect(image.media).toMatchObject({ legacyAssetId: "asset-recruitment-hero", status: "ready" });
+    expect(image.assetId).toBeUndefined();
+  });
+
   it("persists proposed manual command state before mutating memory", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });

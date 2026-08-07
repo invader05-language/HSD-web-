@@ -1,4 +1,6 @@
 import { defineStore } from "pinia";
+import { ADMIN_MEMBERS, type AdminMember } from "../data/admin-members";
+import { MOCK_ACCOUNTS } from "../data/admin-system";
 import { CENTER_SLUGS, type CenterSlug } from "../data/centers";
 import {
   cloneMemberProfile,
@@ -10,17 +12,51 @@ import {
   type MemberRegistrationProfilePatch,
 } from "../data/member-profile";
 import { isBaizeDirection } from "../data/recruitment-application";
+import { getStaticPublicIdForMember } from "../data/people";
+import { getCenterSlug } from "../utils/member-account-form";
 
 export const MEMBER_PROFILE_STORAGE_KEY = "baiyun-hsd-member-profiles";
-export const MEMBER_PROFILE_STORAGE_VERSION = 1;
+export const MEMBER_PROFILE_STORAGE_VERSION = 2;
+const LEGACY_MEMBER_PROFILE_STORAGE_VERSIONS = [1, MEMBER_PROFILE_STORAGE_VERSION] as const;
 
 interface PersistedMemberProfileState {
   version: typeof MEMBER_PROFILE_STORAGE_VERSION;
   profiles: Record<string, MemberProfile>;
 }
 
+function createPlatformMemberProfile(member: AdminMember): MemberProfile {
+  const isFormal = member.identity === "正式成员";
+  return {
+    id: member.id,
+    ...(isFormal
+      ? {
+          publicId: getStaticPublicIdForMember(member.id) ?? `platform-${member.id}`,
+          centerSlug: getCenterSlug(member.center),
+        }
+      : {}),
+    name: member.name,
+    studentId: member.studentId,
+    grade: member.grade,
+    className: "待补充",
+    center: member.center,
+    memberDuty: member.memberDuty,
+    identity: member.identity,
+    ...(member.baizeDirection ? { baizeDirection: member.baizeDirection } : {}),
+    bio: member.profileSummary,
+    ...(member.avatarUrl ? { avatarUrl: member.avatarUrl } : {}),
+    publicDirectoryVisible: false,
+  };
+}
+
 function createInitialProfiles(): Record<string, MemberProfile> {
   return {
+    ...Object.fromEntries(
+      MOCK_ACCOUNTS
+        .filter((account) => account.adminLevel !== "member")
+        .map((account) => ADMIN_MEMBERS.find((member) => member.id === account.memberId))
+        .filter((member): member is AdminMember => Boolean(member))
+        .map((member) => [member.id, createPlatformMemberProfile(member)])
+    ),
     [DEMO_MEMBER_PROFILE.id]: cloneMemberProfile(DEMO_MEMBER_PROFILE),
     [DEMO_APPLICANT_PROFILE.id]: cloneMemberProfile(DEMO_APPLICANT_PROFILE),
   };
@@ -52,6 +88,7 @@ function isMemberProfile(value: unknown): value is MemberProfile {
   }
   if (value.baizeDirection !== undefined && !isBaizeDirection(value.baizeDirection)) return false;
   if (value.avatarUrl !== undefined && typeof value.avatarUrl !== "string") return false;
+  if (value.publicDirectoryVisible !== undefined && typeof value.publicDirectoryVisible !== "boolean") return false;
   if (value.identity === "正式成员" && (!value.publicId || !value.centerSlug)) return false;
   return value.center === "白泽开发中心" || value.baizeDirection === undefined;
 }
@@ -70,14 +107,12 @@ function parsePersistedProfiles(serialized: string | null): Record<string, Membe
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed)
-      || parsed.version !== MEMBER_PROFILE_STORAGE_VERSION
+      || !LEGACY_MEMBER_PROFILE_STORAGE_VERSIONS.includes(parsed.version as 1 | 2)
       || !isRecord(parsed.profiles)
       || !Object.values(parsed.profiles).every(isMemberProfile)
       || !Object.entries(parsed.profiles).every(([memberId, profile]) => (
         isMemberProfile(profile) && memberId === profile.id
-      ))
-      || !isMemberProfile(parsed.profiles[DEMO_MEMBER_PROFILE.id])
-      || !isMemberProfile(parsed.profiles[DEMO_APPLICANT_PROFILE.id])) {
+      ))) {
       return undefined;
     }
     return cloneProfiles(parsed.profiles as Record<string, MemberProfile>);
@@ -101,7 +136,14 @@ function restoreInitialOrPersistedProfiles(): Record<string, MemberProfile> {
   } catch {
     serialized = null;
   }
-  return parsePersistedProfiles(serialized) ?? createInitialProfiles();
+  const initialProfiles = createInitialProfiles();
+  const persistedProfiles = parsePersistedProfiles(serialized);
+  return persistedProfiles
+    ? {
+        ...initialProfiles,
+        ...cloneProfiles(persistedProfiles),
+      }
+    : initialProfiles;
 }
 
 function createPersistedProfileState(

@@ -69,7 +69,7 @@ describe("admin dashboard targets", () => {
     expect(dashboardTargetToRoute({ module: "portal", action: "configure" })).toBe(
       "/admin/content/home",
     );
-    expect(dashboardTargetToRoute({ module: "media", action: "health" })).toBe("/admin/media");
+    expect(dashboardTargetToRoute({ module: "media", action: "health" })).toBe("/admin");
   });
 });
 

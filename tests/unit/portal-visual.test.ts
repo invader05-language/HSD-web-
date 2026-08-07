@@ -44,4 +44,15 @@ describe("published portal visuals", () => {
     expect(bannerSource).toContain("resolvePortalAssetSource(props.visual?.assetId)");
     expect(bannerSource).toContain(':src="visualSource"');
   });
+
+  it("renders uploaded portal visuals through the shared media viewer", () => {
+    const homeSource = readFileSync("app/pages/index.vue", "utf8");
+    const bannerSource = readFileSync("app/components/PageBanner.vue", "utf8");
+    const configSource = readFileSync("app/pages/admin/content/home.vue", "utf8");
+
+    expect(homeSource).toContain("ContentMediaView");
+    expect(bannerSource).toContain("ContentMediaView");
+    expect(configSource).toContain("ContentMediaUploader");
+    expect(configSource).toContain("直接上传主视觉素材");
+  });
 });

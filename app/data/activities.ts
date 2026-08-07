@@ -1,5 +1,16 @@
 export const ACTIVITY_FILTERS = ["全部", "技术沙龙", "项目实训", "媒体创作", "赛事活动"] as const;
 
+export const ACTIVITY_TYPE_OPTIONS = ["技术沙龙", "项目实训", "媒体创作", "赛事活动"] as const;
+
+export const ACTIVITY_TIME_OPTIONS = [
+  "08:30–10:00",
+  "10:00–11:30",
+  "14:00–16:00",
+  "14:30–18:00",
+  "19:00–21:00",
+  "19:30–21:00",
+] as const;
+
 export const ACTIVITY_DETAILS = [
   {
     slug: "harmonyos-salon",
@@ -14,7 +25,7 @@ export const ACTIVITY_DETAILS = [
     status: "报名中",
     summary: "从工程结构、页面构建到一次简单的多设备交互，完成可运行的 HarmonyOS 原生应用。",
     capacity: "40 人",
-    audience: "对鸿蒙开发感兴趣、具备基础编程能力的同学",
+    content: "对鸿蒙开发感兴趣、具备基础编程能力的同学",
     agenda: ["认识 HarmonyOS 应用结构", "现场完成第一个页面", "多设备交互演示", "答疑与后续学习路线"]
   },
   {
@@ -30,7 +41,7 @@ export const ACTIVITY_DETAILS = [
     status: "报名中",
     summary: "用半天时间走完问题定义、需求排序、页面结构与演示讲述，做出可沟通的项目原型。",
     capacity: "32 人",
-    audience: "开发、设计、策划方向均可参加",
+    content: "开发、设计、策划方向均可参加",
     agenda: ["问题定义", "需求优先级", "快速原型", "小组路演与反馈"]
   },
   {
@@ -46,7 +57,7 @@ export const ACTIVITY_DETAILS = [
     status: "即将开放",
     summary: "从选题、现场观察到画面组织，学习如何用一组照片讲清一次校园活动。",
     capacity: "60 人",
-    audience: "摄影、剪辑、推文与品牌设计方向同学",
+    content: "摄影、剪辑、推文与品牌设计方向同学",
     agenda: ["活动摄影观察方法", "镜头组合", "现场光线", "作品复盘"]
   }
 ] as const;

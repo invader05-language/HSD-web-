@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { resolvePortalAssetSource } from "~/data/portal-assets";
 import type { PortalVisualConfig } from "~/types/portal-config";
+import type { ContentMediaAttachment } from "~/types/content-media";
 
 const props = withDefaults(defineProps<{
   eyebrow: string;
@@ -10,6 +11,7 @@ const props = withDefaults(defineProps<{
   tone?: "dark" | "warm" | "red";
   mediaLabel?: string;
   visual?: PortalVisualConfig;
+  media?: ContentMediaAttachment;
 }>(), {
   tone: "dark",
   mediaLabel: "页面主题视觉素材位"
@@ -31,7 +33,9 @@ const visualSource = computed(() => resolvePortalAssetSource(props.visual?.asset
           <slot name="actions" />
         </div>
       </div>
-      <MediaPlaceholder :label="visualLabel" :detail="visualDetail" :src="visualSource" :alt="visual?.alt" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
+      <ContentMediaView v-if="media" :item="media" preview="thumbnail" :controls="false" class="page-banner__media" />
+      <ContentMediaView v-else-if="visual?.media" :item="visual.media" preview="thumbnail" :controls="false" class="page-banner__media" />
+      <MediaPlaceholder v-else :label="visualLabel" :detail="visualDetail" :src="visualSource" :alt="visual?.alt" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
     </div>
   </section>
 </template>

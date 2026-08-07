@@ -1,13 +1,21 @@
-import { ACTIVITY_DETAILS } from "../data/activities";
-import { GALLERY_ALBUMS } from "../data/gallery";
-import { PROJECT_DETAILS } from "../data/projects";
 import { PUBLIC_RESOURCES } from "../data/resources";
 import type { PortalCatalogItem } from "../types/portal-content";
+import { useActivitiesStore } from "../stores/activities";
+import { useGalleryStore } from "../stores/gallery";
+import { useProjectsStore } from "../stores/projects";
 import { usePortalContentStore } from "../stores/portal-content";
 
 const toIso = (date: string) => `${date}T00:00:00.000Z`;
 
 export function usePortalCatalog(): PortalCatalogItem[] {
+  const activitiesStore = useActivitiesStore();
+  const galleryStore = useGalleryStore();
+  const projectsStore = useProjectsStore();
+  if (import.meta.client) {
+    activitiesStore.hydrate();
+    galleryStore.hydrate();
+    projectsStore.hydrate();
+  }
   const content = usePortalContentStore().getPublicRecords().map((record): PortalCatalogItem => ({
     entityType: record.kind,
     sourceId: record.id,
@@ -19,36 +27,61 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     available: record.sourceValidity === "valid" && (!record.expiresAt || Date.parse(record.expiresAt) > Date.now()),
   }));
 
-  const projects = PROJECT_DETAILS.map((project): PortalCatalogItem => ({
+  const projects = projectsStore.getPublicProjects().map((project): PortalCatalogItem => ({
     entityType: "project",
     sourceId: project.slug,
     title: project.title,
     summary: project.description,
     to: `/projects/${project.slug}`,
-    publishedAt: "2026-07-30T00:00:00.000Z",
+    publishedAt: project.publishedAt,
+    media: project.cover ?? undefined,
     eligibleSlots: ["projects"],
     available: true,
   }));
-  const activities = ACTIVITY_DETAILS.map((activity): PortalCatalogItem => ({
+  const activities = activitiesStore.getPublicActivities().map((activity): PortalCatalogItem => ({
     entityType: "activity",
     sourceId: activity.slug,
     title: activity.title,
     summary: activity.summary,
-    to: activity.to,
+    to: `/activities/${activity.slug}`,
     publishedAt: activity.publishedAt,
     eventAt: toIso(activity.date),
+    media: activity.cover ?? undefined,
     eligibleSlots: ["activities"],
-    available: activity.available,
+    // The portal slot represents published activity content. Registration state
+    // controls the detail-page CTA, but closed/upcoming activities can still be
+    // shown and selected as recent activity records.
+    available: true,
   }));
-  const gallery = GALLERY_ALBUMS.map((album): PortalCatalogItem => ({
+  const gallery = galleryStore.getPublicAlbums().map((album): PortalCatalogItem => ({
     entityType: "gallery",
     sourceId: album.slug,
     title: album.title,
     summary: album.summary,
     to: album.to,
-    publishedAt: `${album.year}-01-01T00:00:00.000Z`,
+    publishedAt: album.publishedAt,
+    media: album.assets
+      .slice()
+      .filter((asset) => (asset.status ?? "ready") === "ready")
+      .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
+      .map((asset) => ({
+        id: asset.id,
+        legacyAssetId: asset.assetId,
+        localBlobId: asset.localBlobId,
+        role: "detail" as const,
+        kind: asset.kind ?? "image",
+        title: asset.title,
+        caption: asset.caption,
+        alt: asset.alt,
+        aspect: asset.aspect,
+        sortOrder: asset.sortOrder ?? 0,
+        url: asset.imageUrl,
+        thumbnailUrl: asset.thumbnailUrl,
+        status: asset.status ?? "ready",
+        errorMessage: asset.errorMessage,
+      }))[0],
     eligibleSlots: ["gallery"],
-    available: true,
+    available: album.assets.length > 0 && album.assets.some((asset) => (asset.status ?? "ready") === "ready"),
   }));
   const resources = PUBLIC_RESOURCES.map((resource): PortalCatalogItem => ({
     entityType: "resource",

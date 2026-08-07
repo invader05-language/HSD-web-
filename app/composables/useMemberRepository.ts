@@ -113,6 +113,7 @@ export function useMemberRepository() {
     });
     const staticIds = new Set(staticPeople.map((person) => person.id));
     const newFormalPeople = formalProfiles.value
+      .filter((profile) => profile.publicDirectoryVisible !== false)
       .filter((profile) => (
         !staticIds.has(profile.publicId)
         && !getStaticPublicIdForMember(profile.id)
@@ -128,7 +129,9 @@ export function useMemberRepository() {
       });
 
     const representedMemberIds = new Set([
-      ...formalProfiles.value.map((profile) => profile.id),
+      ...formalProfiles.value
+        .filter((profile) => profile.publicDirectoryVisible !== false)
+        .map((profile) => profile.id),
       ...staticPeople
         .map((person) => getStaticMemberIdForPublicPerson(person.id))
         .filter((memberId): memberId is string => Boolean(memberId)),

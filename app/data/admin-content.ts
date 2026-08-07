@@ -91,6 +91,7 @@ export interface HomepageSlot {
   capacity: number;
   description: string;
   allowedTypes: PortalCatalogEntityType[];
+  sourceHint: string;
 }
 
 export const ADMIN_CONTENT_RECORDS: AdminContentRecord[] = [
@@ -224,42 +225,48 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
     label: "HSD 快讯",
     capacity: 1,
     description: "首页 Banner 下方的即时信息入口",
-    allowedTypes: ["flash"]
+    allowedTypes: ["flash"],
+    sourceHint: "来自已发布官网内容，可在官网内容中创建。"
   },
   {
     id: "news",
     label: "推荐新闻",
     capacity: 3,
     description: "近期新闻与联盟动态",
-    allowedTypes: ["article", "notice"]
+    allowedTypes: ["article", "notice"],
+    sourceHint: "来自已发布新闻或公告，可在官网内容中创建。"
   },
   {
     id: "projects",
     label: "精选项目",
     capacity: 4,
     description: "优先展示成熟项目与竞赛成果",
-    allowedTypes: ["project"]
+    allowedTypes: ["project"],
+    sourceHint: "来自项目管理中已发布的项目。"
   },
   {
     id: "activities",
     label: "近期活动",
     capacity: 3,
-    description: "按时间顺序展示可报名活动",
-    allowedTypes: ["activity"]
+    description: "按时间顺序展示已发布活动",
+    allowedTypes: ["activity"],
+    sourceHint: "来自活动管理中已发布的活动；报名状态由活动管理控制。"
   },
   {
     id: "gallery",
     label: "媒体专题",
     capacity: 1,
     description: "使用一张主视觉承载专题入口",
-    allowedTypes: ["gallery"]
+    allowedTypes: ["gallery"],
+    sourceHint: "来自画廊专题中已发布且有封面的专题。"
   },
   {
     id: "resources",
     label: "推荐资源",
     capacity: 3,
     description: "公开或成员可访问的学习资料",
-    allowedTypes: ["resource"]
+    allowedTypes: ["resource"],
+    sourceHint: "当前为系统预置资源，后续接入资源管理。"
   }
 ];
 

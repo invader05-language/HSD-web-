@@ -1,20 +1,50 @@
 <script setup lang="ts">
+import { useGalleryStore } from "~/stores/gallery";
+import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
+
 definePageMeta({ layout: "admin" });
 useHead({ title: "画廊专题｜HSD 管理台" });
-const albums = [
-  { title: "我们的 2026 夏日", count: 24, state: "已发布", cover: "#8d2330" },
-  { title: "鸿蒙技术沙龙现场", count: 36, state: "待审核", cover: "#3f4e58" },
-  { title: "校园秋日摄影采风", count: 18, state: "草稿", cover: "#806648" }
-];
+
+const galleryStore = useGalleryStore();
+const session = useSessionStore();
+const route = useRoute();
+if (import.meta.client) galleryStore.hydrate();
+
+const scopedAlbums = computed(() => session.adminLevel === "owner"
+  ? galleryStore.albums
+  : galleryStore.albums.filter((album) => album.ownerCenterId === getRecruitmentCenterId(getAdminCenterScope(session.currentAccount?.adminCenterRole)!)));
+
+function albumStatus(album: typeof galleryStore.albums[number]) {
+  if (album.publishedState === "published") return "已发布";
+  if (album.status === "unpublished") return "已下架";
+  return "草稿";
+}
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Gallery Stories" title="画廊专题" description="从素材库选择已审核图片组成专题；用户端采用大图瀑布流与灯箱，不把图片嵌入额外灰色框。">
-      <template #actions><button type="button" class="button">新建画廊专题</button></template>
+  <NuxtPage v-if="route.path !== '/admin/gallery'" />
+  <div v-else class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading eyebrow="Gallery Stories" title="画廊专题" description="在专题自己的新建或编辑页直接上传、审阅和发布图片与视频；中心负责人只能管理所属中心内容，联盟总负责人可管理全部专题。">
+      <template #actions><NuxtLink class="button" to="/admin/gallery/new">新建画廊专题</NuxtLink></template>
     </AdminPageHeading>
-    <section class="admin-gallery-admin-grid">
-      <article v-for="album in albums" :key="album.title"><div :style="{ '--gallery-cover': album.cover }"><span>&lt; HSD GALLERY &gt;</span><AdminStatusPill :status="album.state" /><h2>{{ album.title }}</h2><p>{{ album.count }} 张已选素材</p></div><footer><span>封面暗层与文字预览</span><button type="button">编辑专题 →</button></footer></article>
+
+    <section class="admin-gallery-admin-grid" aria-label="画廊专题列表">
+      <article v-for="album in scopedAlbums" :key="album.id">
+        <div :style="{ '--gallery-cover': '#3f4e58' }">
+          <span>&lt; HSD GALLERY &gt;</span>
+          <AdminStatusPill :status="albumStatus(album)" />
+          <h2>{{ album.title }}</h2>
+          <p>{{ album.assets.length }} 项专题素材</p>
+        </div>
+        <footer><span>{{ album.team || "未填写制作团队" }}</span><NuxtLink :to="`/admin/gallery/${encodeURIComponent(album.id)}`">编辑专题</NuxtLink></footer>
+      </article>
+    </section>
+
+    <section v-if="!scopedAlbums.length" class="admin-list-card admin-empty" aria-live="polite">
+      <strong>暂无可管理画廊</strong>
+      <p>创建一个专题后，直接在专题编辑页添加图片或视频。</p>
+      <NuxtLink class="button" to="/admin/gallery/new">新建画廊专题</NuxtLink>
     </section>
   </div>
 </template>

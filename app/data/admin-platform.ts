@@ -66,7 +66,6 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     id: "media-resources",
     label: "媒体与资源",
     items: [
-      { id: "media", label: "媒体素材库", to: "/admin/media" },
       { id: "gallery", label: "画廊专题", to: "/admin/gallery" },
       { id: "resources", label: "学习资料", to: "/admin/resources" },
       { id: "uploads", label: "上传任务", to: "/admin/uploads", feature: "uploadTasks" }

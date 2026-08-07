@@ -371,7 +371,7 @@ export function createMockDashboardGateway(): AdminDashboardGateway {
             id: "system-warnings",
             label: "异常任务",
             value: warnings.reduce((total, warning) => total + warning.count, 0),
-            target: warnings[0]?.target ?? { module: "media", action: "health" },
+            target: warnings[0]?.target ?? { module: "content", action: "list" },
           },
         ],
         tasks,

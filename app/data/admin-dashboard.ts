@@ -28,7 +28,7 @@ export const ADMIN_DASHBOARD_METRICS: AdminDashboardMetric[] = [
   {
     label: "待审核内容",
     value: "06",
-    description: "媒体素材与个人荣誉",
+    description: "门户内容与个人荣誉",
     to: "/admin/content?status=待审核",
     tone: "dark"
   },
@@ -39,13 +39,6 @@ export const ADMIN_DASHBOARD_METRICS: AdminDashboardMetric[] = [
     to: "/admin/content?status=待发布",
     tone: "green"
   },
-  {
-    label: "存储使用情况",
-    value: "37%",
-    description: "Mock 配额 100 GB",
-    to: "/admin/media?view=storage",
-    tone: "amber"
-  }
 ];
 
 export const ADMIN_TODOS: AdminTodo[] = [
@@ -110,7 +103,6 @@ export const ADMIN_QUICK_CREATE = [
   { label: "新建公告", to: "/admin/content?create=notice" },
   { label: "新建项目", to: "/admin/projects?create=project" },
   { label: "新建活动", to: "/admin/activities?create=activity" },
-  { label: "上传媒体作品", to: "/admin/media?upload=1" },
   { label: "上传学习资料", to: "/admin/resources?upload=1" },
   { label: "添加成员", to: "/admin/members?create=member" }
 ];

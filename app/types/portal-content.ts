@@ -1,3 +1,5 @@
+import type { ContentMediaAttachment } from "./content-media";
+
 export type PortalContentKind = "flash" | "article" | "notice";
 export type PortalContentStatus = "draft" | "in-review" | "pending-publication" | "published" | "unpublished";
 export type PortalPublishedState = "published" | "unpublished";
@@ -9,7 +11,7 @@ export type PortalSlotId = "flash" | "news" | "projects" | "activities" | "galle
 export type ContentBlock =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
-  | { type: "image"; assetId: string; alt: string; caption?: string };
+  | { type: "image"; media?: ContentMediaAttachment; assetId?: string; alt: string; caption?: string };
 
 export interface PortalContentTarget {
   type: "internal-route";
@@ -89,6 +91,7 @@ export interface PortalCatalogItem {
   to: string;
   publishedAt: string;
   eventAt?: string;
+  media?: ContentMediaAttachment;
   eligibleSlots: PortalSlotId[];
   available: boolean;
 }

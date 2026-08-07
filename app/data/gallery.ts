@@ -1,10 +1,20 @@
+import type { ContentMediaKind, ContentMediaRole, ContentMediaStatus } from "../types/content-media";
+
 export interface GalleryAsset {
   id: string;
+  assetId?: string;
   title: string;
   caption: string;
   alt: string;
   aspect: "landscape" | "portrait" | "wide";
   imageUrl?: string;
+  localBlobId?: string;
+  thumbnailUrl?: string;
+  role?: ContentMediaRole;
+  kind?: ContentMediaKind;
+  status?: ContentMediaStatus;
+  sortOrder?: number;
+  errorMessage?: string;
 }
 
 export interface GalleryAlbum {

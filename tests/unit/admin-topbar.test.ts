@@ -7,9 +7,9 @@ describe("administration topbar wayfinding", () => {
       group: "项目与活动",
       page: "项目管理"
     });
-    expect(getAdminTopbarLabel("/admin/media")).toEqual({
+    expect(getAdminTopbarLabel("/admin/gallery")).toEqual({
       group: "媒体与资源",
-      page: "媒体素材库"
+      page: "画廊专题"
     });
     expect(getAdminTopbarLabel("/admin/accounts")).toEqual({
       group: "系统管理",

@@ -3,6 +3,7 @@ import { RELEASE_FEATURES } from "../../app/config/release-features";
 import { getAdminNavigationForAccess } from "../../app/data/admin-platform";
 import {
   createReleaseNoticeState,
+  RETIRED_MEDIA_LIBRARY_NOTICE,
   resolveDisabledRoute
 } from "../../app/utils/admin-release-access";
 
@@ -12,8 +13,12 @@ describe("admin release feature availability", () => {
       to: "/admin",
       notice: "当前版本暂未开放"
     });
+    expect(resolveDisabledRoute("/admin/media", RELEASE_FEATURES)).toEqual({
+      to: "/admin",
+      notice: RETIRED_MEDIA_LIBRARY_NOTICE
+    });
     expect(resolveDisabledRoute("/admin/uploads", RELEASE_FEATURES)).toEqual({
-      to: "/admin/media",
+      to: "/admin",
       notice: "当前版本暂未开放"
     });
     expect(resolveDisabledRoute("/admin/recycle-bin", RELEASE_FEATURES)).toEqual({
@@ -29,6 +34,13 @@ describe("admin release feature availability", () => {
     expect(state.notice.value).toBe("当前版本暂未开放");
     expect(state.receive(undefined)).toBe(false);
     expect(state.notice.value).toBeUndefined();
+  });
+
+  it("explains that the retired media library has moved to content editors", () => {
+    const state = createReleaseNoticeState();
+
+    expect(state.receive(RETIRED_MEDIA_LIBRARY_NOTICE)).toBe(true);
+    expect(state.notice.value).toBe(RETIRED_MEDIA_LIBRARY_NOTICE);
   });
 
   it("rejects arbitrary query text instead of presenting it as a system notice", () => {

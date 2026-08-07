@@ -19,6 +19,8 @@ import {
   validateMemberProfileDraft,
 } from "../../app/utils/member-profile-form";
 
+const MEMBER_PROFILE_STORAGE_KEY = "baiyun-hsd-member-profiles";
+
 describe("member profile domain", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -49,6 +51,45 @@ describe("member profile domain", () => {
 
     expect(session.currentMemberId).toBe(DEMO_APPLICANT_PROFILE.id);
     expect(repository.currentProfile.value.id).toBe(DEMO_APPLICANT_PROFILE.id);
+  });
+
+  it("provisions member profiles for administrator-backed platform accounts", () => {
+    const profileStore = useMemberProfileStore();
+
+    expect(profileStore.getProfile("member-zhang")).toMatchObject({
+      name: "张同学",
+      center: "拓维策划中心",
+      centerSlug: "tuowei-planning",
+      identity: "正式成员",
+      publicId: "platform-member-zhang",
+    });
+    expect(profileStore.getProfile("member-li")).toMatchObject({
+      name: "李同学",
+      center: "新媒体中心",
+      centerSlug: "new-media",
+      identity: "正式成员",
+      publicId: "platform-member-li",
+    });
+  });
+
+  it("migrates legacy profile storage while preserving saved member edits", () => {
+    const legacyProfiles = {
+      [DEMO_MEMBER_PROFILE.id]: {
+        ...DEMO_MEMBER_PROFILE,
+        name: "林同学的已保存修改",
+      },
+      [DEMO_APPLICANT_PROFILE.id]: DEMO_APPLICANT_PROFILE,
+    };
+    localStorage.setItem(MEMBER_PROFILE_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      profiles: legacyProfiles,
+    }));
+    setActivePinia(createPinia());
+
+    const profileStore = useMemberProfileStore();
+
+    expect(profileStore.getProfile(DEMO_MEMBER_PROFILE.id).name).toBe("林同学的已保存修改");
+    expect(profileStore.getProfile("member-zhang").name).toBe("张同学");
   });
 
   it("never projects a preparatory applicant into formal public or admin directories", () => {

@@ -15,13 +15,13 @@
 - 海外备用部署：<https://baiyun-hsd-web.vercel.app>
 - 托管方案：腾讯云 EdgeOne Pages 免费套餐（全球可用区，含中国大陆）+ Vercel Hobby 备用
 - EdgeOne 默认域名受预览鉴权保护，临时体验链接需在控制台点击“预览”生成，有效期为 3 小时；长期公开访问需绑定自有域名
-- 当前为前端原型环境，登录、报名和成员数据均为 Mock，不保存真实业务数据
+- 当前为前端原型环境，登录、报名和成员数据均为 Mock；活动与画廊的草稿、公开快照、报名审核状态会按版本写入浏览器 `localStorage`，仍不连接真实后端
 
 ## 技术栈
 
 - Nuxt 4 + Vue 3 + TypeScript
 - Tailwind CSS 4 + CSS 设计令牌
-- Pinia（仅用于现有前端会话状态）
+- Pinia（会话、活动和画廊领域状态；后端接入前使用版本化浏览器存储）
 - VeeValidate + Zod
 - Pretext 文本布局测量
 - Vitest + Playwright
@@ -162,12 +162,14 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 | 工作台 | `/admin` | 待办、招新进度、内容状态、存储概览、快捷新建 |
 | 招新与考核 | `/admin/recruitment/**` | 批次、报名人员、考核录入、结果发布 |
 | 组织与成员 | `/admin/members/**`、`/admin/core-members`、`/admin/honors` | 成员资料、核心人员、中心组织、荣誉审核 |
-| 项目与活动 | `/admin/projects`、`/admin/activities/**` | 项目成果、活动排期、容量与报名名单 |
+| 项目与活动 | `/admin/projects`、`/admin/activities`、`/admin/activities/new`、`/admin/activities/[id]`、`/admin/activities/registrations` | 项目成果、活动草稿/发布、报名审核与名单 |
 | 内容与门户 | `/admin/content/**` | 快讯/新闻/帮助内容、首页固定槽位、Banner |
-| 媒体与资源 | `/admin/media`、`/admin/gallery`、`/admin/resources`、`/admin/uploads` | 素材审核、画廊专题、资源版本、上传队列 |
+| 媒体与资源 | `/admin/gallery`、`/admin/resources` | 画廊专题、资源版本 |
 | 系统与权限 | `/admin/accounts`、`/admin/roles`、`/admin/logs`、`/admin/recycle-bin` | 管理账号、角色矩阵、操作日志、可恢复删除 |
 
-原型中的保存、审核、发布和下架是独立状态；身份、结果发布、权限和永久删除等高风险动作均需二次确认。当前所有编辑只更新前端 Mock 会话，不写入数据库。
+原型中的保存、审核、发布和下架是独立状态；身份、结果发布、权限和永久删除等高风险动作均需二次确认。活动与画廊的领域写操作通过 Pinia Store 持久化草稿和公开快照，其他管理模块仍保留前端 Mock 边界，不写入数据库。
+
+后端接入活动、画廊和项目直接上传时，先阅读 [`docs/handoffs/2026-08-07-content-direct-upload-backend.md`](docs/handoffs/2026-08-07-content-direct-upload-backend.md)，其中记录了上传附件、内容归属、发布快照、权限校验和历史 Mock 数据迁移边界。项目接口不再接收或返回“制作团队”“协作中心”；管理员账号需要同时具备可用的成员档案。
 
 图片、视频与学习资料的正式实现建议采用“浏览器分片直传对象存储 + 数据库保存元数据和引用关系 + 异步缩略图/转码/病毒扫描 + CDN 分发”。只有处理完成且审核通过的素材才可被官网选择。PDF 预览、Office 转换、临时签名下载和访问日志在原型中明确标记为后端待接入能力。
 
@@ -253,7 +255,6 @@ Playwright 默认调用本机 Chrome；首次测试前请确认已安装 Chrome�
 - [招新考核台](artifacts/admin/hsd-admin-recruitment-1440.png)
 - [项目管理](artifacts/admin/hsd-admin-projects-1440.png)
 - [首页内容配置](artifacts/admin/hsd-admin-homepage-config-1440.png)
-- [媒体素材库](artifacts/admin/hsd-admin-media-1440.png)
 - [学习资料](artifacts/admin/hsd-admin-resources-1440.png)
 - [角色权限](artifacts/admin/hsd-admin-roles-1440.png)
 

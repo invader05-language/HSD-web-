@@ -8,6 +8,7 @@ import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
 import { resolvePortalAssetSource } from "~/data/portal-assets";
+import ContentMediaView from "~/components/ContentMediaView.vue";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
@@ -82,7 +83,8 @@ watch(
             <NuxtLink class="button button--ghost" to="/join">查看招新</NuxtLink>
           </div>
         </div>
-        <MediaPlaceholder :label="homeVisualLabel" :detail="homeVisualDetail" :src="homeVisualSource" :alt="config.visuals.home.alt" :data-asset-id="config.visuals.home.assetId" dark />
+        <ContentMediaView v-if="config.visuals.home.media" :item="config.visuals.home.media" preview="thumbnail" :controls="false" class="home-hero__media" />
+        <MediaPlaceholder v-else :label="homeVisualLabel" :detail="homeVisualDetail" :src="homeVisualSource" :alt="config.visuals.home.alt" :data-asset-id="config.visuals.home.assetId" dark />
       </div>
     </section>
 
@@ -181,7 +183,8 @@ watch(
         </div>
         <div v-if="publishedProjects.length" class="projects-layout">
           <article v-if="publishedProjects[0]" class="featured-project">
-            <MediaPlaceholder :label="`${publishedProjects[0].title}演示素材位`" detail="项目实机、流程或现场验证" dark />
+            <ContentMediaView v-if="publishedProjects[0].media" :item="publishedProjects[0].media" preview="thumbnail" :controls="false" class="featured-project__media" />
+            <MediaPlaceholder v-else :label="`${publishedProjects[0].title}演示素材位`" detail="项目实机、流程或现场验证" dark />
             <div class="featured-project__copy">
               <span>精选项目 · Portal Selection</span>
               <h3>{{ publishedProjects[0].title }}</h3>
@@ -246,8 +249,8 @@ watch(
           </div>
           <p>摄影、海报、短视频与人物专访，共同形成部落的内容档案。</p>
         </div>
-        <div v-if="publishedGallery.length" class="gallery-grid gallery-grid--portal">
-          <NuxtLink v-for="item in publishedGallery" :key="item.sourceId" class="gallery-grid__lead" :to="item.to"><MediaPlaceholder :label="item.title" :detail="item.summary" /><strong>{{ item.title }}</strong></NuxtLink>
+        <div v-if="publishedGallery.length" class="gallery-grid gallery-grid--portal" :class="{ 'is-single': publishedGallery.length === 1 }">
+          <NuxtLink v-for="item in publishedGallery" :key="item.sourceId" class="gallery-grid__lead" :to="item.to"><ContentMediaView v-if="item.media" :item="item.media" preview="thumbnail" :controls="false" /><MediaPlaceholder v-else :label="item.title" :detail="item.summary" /><strong>{{ item.title }}</strong></NuxtLink>
         </div>
         <EmptyState v-else title="暂无媒体专题" description="画廊专题配置到首页后会显示在这里。" />
         <NuxtLink class="button button--dark" to="/gallery">进入媒体画廊</NuxtLink>

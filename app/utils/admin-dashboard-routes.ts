@@ -36,7 +36,7 @@ export function dashboardTargetToRoute(target: DashboardTarget): string {
   }
 
   if (target.module === "portal") return "/admin/content/home";
-  if (target.module === "media") return "/admin/media";
+  if (target.module === "media") return "/admin";
   if (target.module === "member") {
     return target.action === "create" ? "/admin/members?create=member" : "/admin/members";
   }

@@ -1,26 +1,34 @@
 <script setup lang="ts">
-import { findGalleryAlbum, getGalleryBatch } from "~/data/gallery";
+import { useGalleryStore } from "~/stores/gallery";
+import { GALLERY_PUBLISHED_SLUGS_COOKIE } from "~/stores/gallery";
+import { GALLERY_ALBUMS } from "~/data/gallery";
 
 const route = useRoute();
-const album = computed(() => findGalleryAlbum(String(route.params.slug)));
-
-if (!album.value) {
+const galleryStore = useGalleryStore();
+const slug = String(route.params.slug);
+const publishedSlugsCookie = useCookie<string[]>(GALLERY_PUBLISHED_SLUGS_COOKIE, { default: () => [] });
+if (import.meta.client) galleryStore.hydrate();
+const album = computed(() => galleryStore.getPublicBySlug(slug));
+if (import.meta.server && !album.value && !GALLERY_ALBUMS.some((item) => item.slug === slug) && !publishedSlugsCookie.value.includes(slug)) {
   throw createError({ statusCode: 404, statusMessage: "媒体专题不存在" });
 }
-
-const requestedVisibleCount = Number(route.query.visible);
-const initialVisibleCount = Number.isFinite(requestedVisibleCount) && requestedVisibleCount > 12
-  ? Math.min(album.value.assets.length, requestedVisibleCount)
-  : 12;
-const visibleCount = ref(initialVisibleCount);
+const requestedVisibleCount = computed(() => Number(route.query.visible));
+const visibleCount = ref(12);
 const activeIndex = ref(0);
 const isLightboxOpen = ref(false);
-const visibleAssets = computed(() => getGalleryBatch(album.value!, visibleCount.value));
-const remainingCount = computed(() => album.value!.assets.length - visibleCount.value);
+const visibleAssets = computed(() => album.value?.assets.slice(0, Math.max(0, visibleCount.value)) ?? []);
+const remainingCount = computed(() => Math.max(0, (album.value?.assets.length ?? 0) - visibleCount.value));
 const nextBatchCount = computed(() => Math.min(12, remainingCount.value));
 
+watch([album, requestedVisibleCount], ([nextAlbum, requestedCount]) => {
+  if (!nextAlbum) return;
+  visibleCount.value = Number.isFinite(requestedCount) && requestedCount > 12
+    ? Math.min(nextAlbum.assets.length, requestedCount)
+    : 12;
+}, { immediate: true });
+
 function loadMore() {
-  visibleCount.value = Math.min(album.value!.assets.length, visibleCount.value + 12);
+  visibleCount.value = Math.min(album.value?.assets.length ?? 0, visibleCount.value + 12);
 }
 
 function openLightbox(index: number) {
@@ -111,4 +119,17 @@ useHead(() => ({ title: `${album.value?.title}｜媒体画廊` }));
       @close="isLightboxOpen = false"
     />
   </main>
+
+  <section v-else class="section section--cool">
+    <div class="shell">
+      <EmptyState
+        title="媒体专题不存在"
+        description="该专题可能尚未发布，或已被下线。"
+      >
+        <template #action>
+          <NuxtLink class="button" to="/gallery">返回媒体画廊</NuxtLink>
+        </template>
+      </EmptyState>
+    </div>
+  </section>
 </template>

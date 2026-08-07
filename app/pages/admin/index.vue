@@ -279,18 +279,6 @@ onMounted(() => {
             </div>
           </section>
 
-          <section class="admin-dashboard-panel admin-dashboard-media">
-            <header>
-              <div><span>Media Health</span><h2>媒体健康</h2></div>
-              <NuxtLink :to="routeFor({ module: 'media', action: 'health' })">管理素材 →</NuxtLink>
-            </header>
-            <div>
-              <article><span>素材总数</span><strong>{{ snapshot.media.total }}</strong></article>
-              <article><span>处理中</span><strong>{{ snapshot.media.processing }}</strong></article>
-              <article><span>处理失败</span><strong :class="{ 'is-danger': snapshot.media.failed }">{{ snapshot.media.failed }}</strong></article>
-              <article><span>待审核</span><strong>{{ snapshot.media.reviewPending }}</strong></article>
-            </div>
-          </section>
         </div>
       </div>
     </template>

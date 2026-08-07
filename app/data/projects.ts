@@ -15,10 +15,8 @@ export const PROJECT_DETAILS = PROJECTS.map((project, index) => ({
   technologies: index === 0
     ? ["HarmonyOS", "AI 视觉识别", "事件驱动架构"]
     : ["Vue", "HarmonyOS", "校园场景研究"],
-  team: "白泽开发中心 × 新媒体中心 × 拓维策划中心"
 }));
 
 export function findProject(slug: string) {
   return PROJECT_DETAILS.find((project) => project.slug === slug);
 }
-

@@ -1,46 +1,87 @@
 <script setup lang="ts">
-import { ADMIN_ACTIVITY_RECORDS } from "~/data/admin-content";
 import { useActivitiesStore } from "~/stores/activities";
+import { useSessionStore } from "~/stores/session";
+import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "活动管理｜HSD 管理台" });
+
 const activitiesStore = useActivitiesStore();
+const session = useSessionStore();
+const route = useRoute();
+if (import.meta.client) activitiesStore.hydrate();
+
 const activityActionNotice = ref("");
 const automationEventLabel = "activity.registration.opened";
+const scopedActivities = computed(() => {
+  if (session.adminLevel === "owner") return activitiesStore.activities;
+  const centerScope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
+  return centerScope
+    ? activitiesStore.activities.filter((activity) => activity.ownerCenterId === getRecruitmentCenterId(centerScope))
+    : [];
+});
+const registrationCount = computed(() => activitiesStore.registrations.length);
+const pendingCount = computed(() => activitiesStore.registrations.filter((item) => item.status === "registered").length);
+const openCount = computed(() => scopedActivities.value.filter((activity) => activity.registrationOpen && activity.publishedState === "published").length);
 
-function openRegistration(activityId: string) {
+function toggleRegistration(activity: typeof activitiesStore.activities[number]) {
   try {
-    activitiesStore.openRegistration(activityId);
-    activityActionNotice.value = `报名已开放，并已处理 ${automationEventLabel} 快讯草稿事件。`;
+    activitiesStore.setRegistrationOpen(activity.id, !activity.registrationOpen);
+    activityActionNotice.value = activity.registrationOpen
+      ? `报名已开放，并已处理 ${automationEventLabel} 快讯草稿事件。`
+      : "报名已关闭。";
   } catch (caught) {
     activityActionNotice.value = caught instanceof Error ? `操作失败：${caught.message}` : "操作失败。";
   }
 }
+
+function openRegistration(activityId: string) {
+  const activity = activitiesStore.getById(activityId);
+  if (activity) toggleRegistration(activity);
+}
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Activities" title="活动管理" description="管理活动排期、报名容量、采集字段、取消状态与名单导出，报名数据继续保持 Mock 边界。">
-      <template #actions><NuxtLink class="button button--ghost" to="/admin/activities/registrations">报名名单</NuxtLink><button type="button" class="button">新建活动</button></template>
+  <NuxtPage v-if="route.path !== '/admin/activities'" />
+  <div v-else class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading eyebrow="Activities" title="活动管理" description="编辑活动草稿，直接发布到用户端，并处理报名的录取或不录取结果。活动不设候补和人数上限。">
+      <template #actions>
+        <NuxtLink class="button button--ghost" to="/admin/activities/registrations">报名名单</NuxtLink>
+        <NuxtLink class="button" to="/admin/activities/new">新建活动</NuxtLink>
+      </template>
     </AdminPageHeading>
+
     <section class="admin-summary-strip" aria-label="活动概览">
-      <div><span>近期活动</span><strong>08</strong><small>未来 60 天</small></div>
-      <div><span>开放报名</span><strong>03</strong><small>当前可提交报名</small></div>
-      <div><span>累计报名</span><strong>164</strong><small>本学期 Mock 数据</small></div>
-      <div><span>待审核</span><strong>01</strong><small>发布前内容检查</small></div>
+      <div><span>活动总数</span><strong>{{ scopedActivities.length }}</strong><small>当前权限范围</small></div>
+      <div><span>开放报名</span><strong>{{ openCount }}</strong><small>不限人数</small></div>
+      <div><span>累计报名</span><strong>{{ registrationCount }}</strong><small>已提交报名</small></div>
+      <div><span>待审核</span><strong>{{ pendingCount }}</strong><small>需要录取或不录取</small></div>
     </section>
-    <AdminRecordWorkspace :records="ADMIN_ACTIVITY_RECORDS" table-label="活动管理列表" item-label="活动" new-label="新建活动" :categories="['招新活动', '技术沙龙', '媒体活动']" />
+
     <section class="admin-list-card" aria-labelledby="activity-registration-control-title">
-      <header><div><span>Registration Control</span><h2 id="activity-registration-control-title">活动报名状态</h2></div><p>开放报名成功后生成待人工审核的 HSD 快讯草稿。</p></header>
+      <header>
+        <div><span>Activity Workspace</span><h2 id="activity-registration-control-title">活动发布与报名状态</h2></div>
+        <p>中心负责人仅能管理本中心活动，联盟总负责人可管理全部活动。</p>
+      </header>
       <p v-if="activityActionNotice" role="status">{{ activityActionNotice }}</p>
-      <div class="admin-table-scroll"><table aria-label="活动报名状态"><thead><tr><th>活动</th><th>报名截止</th><th>状态</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="activity in activitiesStore.activities" :key="activity.id"><td>{{ activity.title }}</td><td>{{ activity.registrationEndAt.slice(0, 10) }}</td><td>{{ activity.registrationOpen ? "报名开放" : "报名关闭" }}</td><td><button type="button" :disabled="activity.registrationOpen" @click="openRegistration(activity.id)">开放报名</button></td></tr></tbody></table></div>
-    </section>
-    <section class="admin-context-grid admin-context-grid--activities">
-      <article v-for="activity in ADMIN_ACTIVITY_RECORDS" :key="activity.id">
-        <span>{{ activity.schedule }}</span><h2>{{ activity.title }}</h2><p>报名截止 {{ activity.deadline }}</p>
-        <div class="admin-capacity"><i :style="{ width: `${Math.min(100, activity.registrations / activity.capacity * 100)}%` }" /></div>
-        <footer><strong>{{ activity.registrations }} / {{ activity.capacity }} 人</strong><NuxtLink to="/admin/activities/registrations">查看报名名单 →</NuxtLink></footer>
-      </article>
+      <div class="admin-table-scroll">
+        <table aria-label="活动发布与报名状态">
+          <thead><tr><th>活动</th><th>发布状态</th><th>报名截止</th><th>报名</th><th><span class="sr-only">操作</span></th></tr></thead>
+          <tbody>
+            <tr v-for="activity in scopedActivities" :key="activity.id">
+              <td><strong>{{ activity.title || "未命名活动" }}</strong><small>{{ activity.type || "未分类" }} · {{ activity.ownerCenterId }}</small></td>
+              <td>{{ activity.publishedState === "published" ? "已发布" : activity.status === "unpublished" ? "已下架" : "草稿" }}</td>
+              <td>{{ activity.registrationEndAt ? activity.registrationEndAt.slice(0, 10) : "未设置" }}</td>
+              <td>{{ activity.registrationOpen ? "开放" : "关闭" }}</td>
+              <td>
+                <NuxtLink :to="`/admin/activities/${encodeURIComponent(activity.id)}`">编辑</NuxtLink>
+                <button type="button" :disabled="activity.publishedState !== 'published'" @click="toggleRegistration(activity)">{{ activity.registrationOpen ? "关闭报名" : "开放报名" }}</button>
+              </td>
+            </tr>
+            <tr v-if="!scopedActivities.length"><td colspan="5">当前权限范围内暂无活动。</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 </template>

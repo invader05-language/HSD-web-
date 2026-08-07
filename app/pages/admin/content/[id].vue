@@ -2,6 +2,7 @@
 import { usePortalContentStore } from "~/stores/portal-content";
 import { useSessionStore } from "~/stores/session";
 import { canAccessPortalContent } from "~/utils/admin-center-scope";
+import PortalContentEditor from "~/components/admin/PortalContentEditor.vue";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();

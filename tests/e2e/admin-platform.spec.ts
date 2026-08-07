@@ -141,7 +141,8 @@ test("dashboard presents a capability-aware operational workbench", async ({ pag
   await expect(page.getByRole("heading", { name: "当前操作批次" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "内容发布动态" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "门户发布状态" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "媒体健康" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "媒体健康" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "管理素材 →" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "上传任务", exact: true })).toHaveCount(0);
@@ -221,7 +222,8 @@ test("project activity and portal content share a clear draft review publish wor
     .getByRole("link", { name: "门户配置", exact: true })
     .click();
   await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
-  await expect(page.getByText("固定模块，不允许删除")).toBeVisible();
+  await expect(page.getByText("固定模块，不允许删除")).toHaveCount(0);
+  await expect(page.getByText("公开配置需要重新确认")).toHaveCount(0);
 });
 
 test("portal draft preview stays isolated until an owner publishes the full configuration", async ({ page }) => {
@@ -259,18 +261,13 @@ test("portal visuals are merged and the legacy banner route redirects to them", 
   await expect(page.getByText("招新按钮是否可用仍由招新批次控制")).toBeVisible();
 });
 
-test("media uploads and learning resources expose honest storage states", async ({ page }) => {
-  await signInToAdmin(page, "/admin/media");
-  await expect(page.getByRole("heading", { level: 1, name: "媒体素材库" })).toBeVisible();
-  await expect(page.getByText("处理中", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "上传素材" }).click();
-  await expect(page.getByRole("heading", { name: "上传新素材" })).toBeVisible();
-  await expect(page.getByText("等待上传")).toBeVisible();
-  await page.getByRole("button", { name: "关闭上传面板" }).click();
-  await page.locator(".admin-asset-card").first().click();
-  await expect(page.getByRole("button", { name: "移入回收站" })).toHaveCount(0);
-  await page.getByRole("button", { name: "关闭素材详情" }).click();
+test("retired media library redirects to the workbench while learning resources remain available", async ({ page }) => {
+  await signInToAdmin(page, "/admin");
+  await page.goto("/admin/media");
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin");
+  await expect(page.getByRole("link", { name: "媒体素材库", exact: true })).toHaveCount(0);
 
+  await page.getByRole("button", { name: /媒体与资源/ }).click();
   await page.getByRole("link", { name: "学习资料", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "学习资料" })).toBeVisible();
   await expect(page.getByRole("table", { name: "学习资料管理列表" })).toBeVisible();
