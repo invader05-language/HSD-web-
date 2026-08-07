@@ -1,19 +1,27 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import type { GalleryAsset } from "~/data/gallery";
+import type { ContentMediaAttachment } from "~/types/content-media";
 
 const props = defineProps<{ item: GalleryAsset; featured?: boolean }>();
 defineEmits<{ open: [] }>();
 
-const imageFailed = ref(false);
-const showImage = computed(() => Boolean(props.item.imageUrl) && !imageFailed.value);
+const mediaItem = computed<ContentMediaAttachment>(() => ({
+  id: props.item.id,
+  localBlobId: props.item.localBlobId,
+  role: "detail",
+  kind: props.item.kind ?? "image",
+  title: props.item.title,
+  caption: props.item.caption,
+  alt: props.item.alt,
+  aspect: props.item.aspect,
+  sortOrder: props.item.sortOrder ?? 0,
+  url: props.item.imageUrl,
+  thumbnailUrl: props.item.thumbnailUrl,
+  status: props.item.status ?? "ready",
+  errorMessage: props.item.errorMessage,
+}));
 
-watch(
-  () => [props.item.id, props.item.imageUrl],
-  () => {
-    imageFailed.value = false;
-  }
-);
 </script>
 
 <template>
@@ -25,14 +33,7 @@ watch(
     :aria-label="`查看照片：${item.title}`"
     @click="$emit('open')"
   >
-    <img
-      v-if="showImage"
-      :src="item.imageUrl"
-      :alt="item.alt"
-      loading="lazy"
-      @error="imageFailed = true"
-    >
-    <span v-else class="gallery-media-frame__fallback" aria-hidden="true">&lt; HSD &gt;</span>
+    <ContentMediaView :item="mediaItem" preview="thumbnail" :controls="false" />
     <span class="gallery-media-frame__overlay">
       <strong>{{ item.title }}</strong>
       <small>{{ item.caption }}</small>

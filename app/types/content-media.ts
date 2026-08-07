@@ -1,0 +1,29 @@
+export const CONTENT_MEDIA_ROLES = ["cover", "detail"] as const;
+export type ContentMediaRole = (typeof CONTENT_MEDIA_ROLES)[number];
+
+export const CONTENT_MEDIA_KINDS = ["image", "video"] as const;
+export type ContentMediaKind = (typeof CONTENT_MEDIA_KINDS)[number];
+
+export const CONTENT_MEDIA_STATUSES = ["uploading", "processing", "ready", "failed"] as const;
+export type ContentMediaStatus = (typeof CONTENT_MEDIA_STATUSES)[number];
+
+export type ContentMediaAspect = "landscape" | "portrait" | "wide";
+
+export interface ContentMediaAttachment {
+  id: string;
+  mediaId?: string;
+  /** Client-only bridge for data created before direct uploads existed. */
+  legacyAssetId?: string;
+  localBlobId?: string;
+  role: ContentMediaRole;
+  kind: ContentMediaKind;
+  title: string;
+  caption: string;
+  alt: string;
+  aspect: ContentMediaAspect;
+  sortOrder: number;
+  url?: string;
+  thumbnailUrl?: string;
+  status: ContentMediaStatus;
+  errorMessage?: string;
+}

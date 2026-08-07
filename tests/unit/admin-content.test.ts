@@ -102,4 +102,23 @@ describe("administration content workflow", () => {
     expect(activities).toContain("openRegistration");
     expect(activities).toContain("activity.registration.opened");
   });
+
+  it("renders the official content editor on both create and edit routes", () => {
+    const createPage = readFileSync("app/pages/admin/content/new.vue", "utf8");
+    const editPage = readFileSync("app/pages/admin/content/[id].vue", "utf8");
+
+    expect(createPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');
+    expect(editPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');
+  });
+
+  it("keeps portal configuration helper copy visible without the removed warning panels", () => {
+    const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
+    const slotData = readFileSync("app/data/admin-content.ts", "utf8");
+
+    expect(source).toContain("slot.sourceHint");
+    expect(slotData).toContain("来自已发布官网内容");
+    expect(slotData).toContain("当前为系统预置资源");
+    expect(source).not.toContain("公开配置需要重新确认");
+    expect(source).not.toContain("固定模块，不允许删除");
+  });
 });

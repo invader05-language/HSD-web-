@@ -71,4 +71,21 @@ describe("homepage content", () => {
     expect(source).toContain('<NuxtLink to="/activities">动态与活动</NuxtLink>');
     expect(source).not.toContain('<NuxtLink to="/activities">活动中心</NuxtLink>');
   });
+
+  it("uses the first published gallery media and portal-specific compact layout", () => {
+    const source = readFileSync(`${process.cwd()}/app/pages/index.vue`, "utf8");
+    const styles = readFileSync(`${process.cwd()}/app/assets/css/main.css`, "utf8");
+
+    expect(source).toContain("item.media");
+    expect(source).toContain("ContentMediaView");
+    expect(styles).toContain(".gallery-grid--portal > a:first-child");
+    expect(styles).toContain(".gallery-grid--portal.is-single");
+  });
+
+  it("scopes dashboard content links so the header action is not treated as a content row", () => {
+    const styles = readFileSync(`${process.cwd()}/app/assets/css/main.css`, "utf8");
+
+    expect(styles).toContain(".admin-dashboard-content > header > a");
+    expect(styles).toContain(".admin-dashboard-content > div > a");
+  });
 });

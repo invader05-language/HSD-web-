@@ -92,6 +92,7 @@ onBeforeUnmount(() => {
             <NuxtLink role="menuitem" to="/member">个人中心</NuxtLink>
             <NuxtLink role="menuitem" to="/member/profile">编辑个人资料</NuxtLink>
             <NuxtLink role="menuitem" to="/member/results">结果中心</NuxtLink>
+            <NuxtLink v-if="session.canAccessAdmin" role="menuitem" to="/admin">进入管理端</NuxtLink>
             <hr>
             <button role="menuitem" type="button" @click="signOut">退出登录</button>
           </nav>

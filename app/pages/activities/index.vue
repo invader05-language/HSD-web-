@@ -64,6 +64,7 @@ useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
             data-testid="public-timeline-item"
           >
             <time :datetime="timelineDate(item)">{{ timelineDate(item).slice(0, 10).replaceAll('-', '.') }}</time>
+            <ContentMediaView v-if="item.entityType === 'activity' && item.media" :item="item.media" preview="thumbnail" :controls="false" />
             <div>
               <span>{{ item.entityType === "activity" ? "活动" : item.entityType === "article" ? "新闻" : "公开公告" }}</span>
               <h2>{{ item.title }}</h2>

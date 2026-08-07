@@ -232,6 +232,39 @@ describe("portal configuration store", () => {
     expect(store.publish(catalog, true).visuals.home.assetId).toBe("asset-recruitment-hero");
   });
 
+  it("publishes a directly uploaded visual attachment and restores legacy visuals into the new shape", () => {
+    const session = useSessionStore();
+    session.signIn("admin-alliance", { requireAdmin: true });
+    const store = usePortalConfigStore();
+    clearDefaultSlots(store);
+    const media = {
+      id: "portal-visual-1",
+      localBlobId: "portal-visual-blob-1",
+      role: "cover" as const,
+      kind: "image" as const,
+      title: "",
+      caption: "",
+      alt: "官网首页主视觉",
+      aspect: "wide" as const,
+      sortOrder: 0,
+      status: "ready" as const,
+    };
+
+    store.saveDraft({ visuals: { home: { media, alt: media.alt } } });
+    expect(store.publish(catalog, true).visuals.home.media).toMatchObject({ id: media.id });
+
+    const persisted = JSON.parse(localStorage.getItem(PORTAL_CONFIG_STORAGE_KEY)!);
+    persisted.version = 3;
+    persisted.draftConfig.visuals.home = { assetId: "asset-recruitment-hero", alt: "旧主视觉" };
+    persisted.publishedConfig.visuals.home = { assetId: "asset-recruitment-hero", alt: "旧主视觉" };
+    localStorage.setItem(PORTAL_CONFIG_STORAGE_KEY, JSON.stringify(persisted));
+    setActivePinia(createPinia());
+    const restored = usePortalConfigStore();
+
+    expect(restored.draftConfig.visuals.home.assetId).toBeUndefined();
+    expect(restored.draftConfig.visuals.home.media).toMatchObject({ legacyAssetId: "asset-recruitment-hero" });
+  });
+
   it("uses the newest same-slot, same-type available item without changing the saved config", () => {
     const slots = resolveHomepageSlots({
       flash: [{ entityType: "flash", sourceId: "expired" }],

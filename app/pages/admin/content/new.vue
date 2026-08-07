@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PortalContentKind } from "~/types/portal-content";
+import PortalContentEditor from "~/components/admin/PortalContentEditor.vue";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "新建官网内容｜HSD 管理台" });

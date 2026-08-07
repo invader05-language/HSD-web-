@@ -59,6 +59,40 @@ test("saved profile values project to public pages and the member menu", async (
   await expect(page.getByRole("link", { name: "登录" })).toBeVisible();
 });
 
+test("administrator member menus provide a return path to the management console", async ({ page }) => {
+  await page.goto("/login?redirect=%2F");
+  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.getByRole("button", { name: /张同学的成员菜单/ }).click();
+  await expect(page.getByRole("menuitem", { name: "进入管理端" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "进入管理端" }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+});
+
+test("administrator member identities render all member-facing pages", async ({ page }) => {
+  await page.goto("/login?redirect=%2Fmember");
+  await page.getByLabel("学号或成员账号").fill("admin-alliance");
+  await page.getByLabel("密码", { exact: true }).fill("demo-password");
+  await page.getByRole("button", { name: "登录并继续" }).click();
+
+  await expect(page).toHaveURL(/\/member$/);
+  await expect(page.getByRole("heading", { name: "你好，张同学" })).toBeVisible();
+
+  await page.goto("/member/profile");
+  await expect(page.getByRole("heading", { name: "编辑个人资料" })).toBeVisible();
+  await expect(page.getByLabel("姓名")).toHaveValue("张同学");
+
+  await page.goto("/member/results");
+  await expect(page.getByRole("heading", { name: "结果中心" })).toBeVisible();
+  await expect(page.getByLabel("当前招新批次").getByText("张同学", { exact: true })).toBeVisible();
+
+  await page.goto("/join/apply");
+  await expect(page.getByRole("heading", { name: "成员注册与招新报名" })).toBeVisible();
+});
+
 test("avatar selection previews locally and the profile remains usable on mobile", async ({ page }) => {
   await page.goto("/login?redirect=%2Fmember%2Fprofile");
   await completeDemoLogin(page);

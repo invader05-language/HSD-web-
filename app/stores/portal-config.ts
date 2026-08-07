@@ -1,11 +1,12 @@
 import { defineStore } from "pinia";
 import type { PortalCatalogItem } from "../types/portal-content";
-import type { PortalConfig, PortalConfigAuditRecord, PortalConfigPatch, PortalReference, PortalSlots } from "../types/portal-config";
+import type { PortalConfig, PortalConfigAuditRecord, PortalConfigPatch, PortalReference, PortalSlots, PortalVisualConfig } from "../types/portal-config";
 import { canUseAssetForPortalContent } from "../data/admin-assets";
+import { createLegacyContentMediaAttachment, isContentMediaAttachmentComplete } from "../utils/content-media";
 import { useSessionStore } from "./session";
 
 export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
-export const PORTAL_CONFIG_STORAGE_VERSION = 3;
+export const PORTAL_CONFIG_STORAGE_VERSION = 4;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
 export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 1, resources: 3 } as const;
@@ -66,13 +67,32 @@ function isConfig(value: unknown): value is PortalConfig {
   const slots = config.slots as Record<string, unknown>;
   const visuals = config.visuals as Record<string, unknown>;
   const hasVisual = (visual: unknown) => typeof visual === "object" && visual !== null
-    && typeof (visual as Record<string, unknown>).alt === "string";
+    && typeof (visual as Record<string, unknown>).alt === "string"
+    && ((visual as Record<string, unknown>).assetId === undefined || typeof (visual as Record<string, unknown>).assetId === "string");
   const validReference = (reference: unknown) => typeof reference === "object" && reference !== null
     && ["flash", "article", "notice", "project", "activity", "gallery", "resource"].includes((reference as Record<string, unknown>).entityType as string)
     && typeof (reference as Record<string, unknown>).sourceId === "string";
   return hasVisual(visuals.home)
     && hasVisual(visuals.join)
     && PORTAL_SLOT_IDS.every((slot) => Array.isArray(slots[slot]) && slots[slot].every(validReference));
+}
+
+function migrateVisual(value: PortalVisualConfig): PortalVisualConfig {
+  if (!value.assetId || value.media) return clone(value);
+  const migrated = clone(value);
+  migrated.media = createLegacyContentMediaAttachment(value.assetId, value.alt);
+  delete migrated.assetId;
+  return migrated;
+}
+
+function migrateConfig(value: PortalConfig): PortalConfig {
+  return {
+    ...clone(value),
+    visuals: {
+      home: migrateVisual(value.visuals.home),
+      join: migrateVisual(value.visuals.join),
+    },
+  };
 }
 
 function isAuditRecord(value: unknown, allowLegacyReason = false): value is PortalConfigAuditRecord {
@@ -95,19 +115,29 @@ function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig
     const parsed: unknown = JSON.parse(serialized);
     if (typeof parsed !== "object" || parsed === null) return undefined;
     const state = parsed as Record<string, unknown>;
-    const isLegacyVersion = state.version === 2;
+    const isLegacyVersion = state.version === 2 || state.version === 3;
     if ((state.version !== PORTAL_CONFIG_STORAGE_VERSION && !isLegacyVersion)
       || !isConfig(state.draftConfig)
       || !isConfig(state.publishedConfig)
       || !Array.isArray(state.auditRecords)
       || !state.auditRecords.every((record) => isAuditRecord(record, isLegacyVersion))) return undefined;
+    const draftConfig = migrateConfig(state.draftConfig);
+    const publishedConfig = migrateConfig(state.publishedConfig);
+    const auditRecords = clone(state.auditRecords).map((record) => ({
+      ...record,
+      reason: record.reason || "legacy portal publication",
+    }));
+    if (isLegacyVersion) {
+      try {
+        writePersistedConfigs(draftConfig, publishedConfig, auditRecords);
+      } catch {
+        // The migrated state remains available in memory when storage is unavailable.
+      }
+    }
     return {
-      draftConfig: clone(state.draftConfig),
-      publishedConfig: clone(state.publishedConfig),
-      auditRecords: clone(state.auditRecords).map((record) => ({
-        ...record,
-        reason: record.reason || "legacy portal publication",
-      })),
+      draftConfig,
+      publishedConfig,
+      auditRecords,
     };
   } catch {
     return undefined;
@@ -144,7 +174,10 @@ function validate(config: PortalConfig, catalog: readonly PortalCatalogItem[]) {
     }
   }
   for (const visual of Object.values(config.visuals)) {
-    if (visual.assetId && (!visual.alt.trim() || !canUseAssetForPortalContent(visual.assetId))) {
+    if (visual.media && !isContentMediaAttachmentComplete(visual.media)) {
+      throw new Error("PORTAL_CONFIG_INVALID_VISUAL");
+    }
+    if (!visual.media && visual.assetId && (!visual.alt.trim() || !canUseAssetForPortalContent(visual.assetId))) {
       throw new Error("PORTAL_CONFIG_INVALID_VISUAL");
     }
   }

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import type {
+  ContentBlock,
   PortalAutomationResult,
   PortalContentAuditRecord,
   PortalContentDraftInput,
@@ -8,13 +9,16 @@ import type {
   PortalAutomationFailure,
   PortalSourceEvent,
 } from "../types/portal-content";
+import type { ContentMediaAttachment } from "../types/content-media";
 import { useSessionStore } from "./session";
 import { canUseAssetForPortalContent } from "../data/admin-assets";
+import { createLegacyContentMediaAttachment, isContentMediaAttachmentComplete } from "../utils/content-media";
 import { canAccessPortalContent } from "../utils/admin-center-scope";
 import { isSafeInternalPath } from "../utils/internal-route";
 
 export const PORTAL_CONTENT_STORAGE_KEY = "baiyun-hsd.portal-content";
-export const PORTAL_CONTENT_STORAGE_VERSION = 3;
+export const PORTAL_CONTENT_STORAGE_VERSION = 4;
+const LEGACY_PORTAL_CONTENT_STORAGE_VERSIONS = [3, PORTAL_CONTENT_STORAGE_VERSION] as const;
 
 interface PersistedPortalContentState {
   version: typeof PORTAL_CONTENT_STORAGE_VERSION;
@@ -95,18 +99,62 @@ function isTarget(value: unknown): boolean {
   return isRecord(value) && value.type === "internal-route" && isSafeInternalPath(value.value);
 }
 
-function isBlocks(value: unknown): boolean {
-  return Array.isArray(value) && value.every((block) => {
-    if (!isRecord(block) || typeof block.type !== "string") return false;
+function isMediaAttachment(value: unknown): value is ContentMediaAttachment {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && (value.role === "cover" || value.role === "detail")
+    && (value.kind === "image" || value.kind === "video")
+    && typeof value.title === "string"
+    && typeof value.caption === "string"
+    && typeof value.alt === "string"
+    && (value.aspect === "landscape" || value.aspect === "portrait" || value.aspect === "wide")
+    && typeof value.sortOrder === "number"
+    && (value.status === "uploading" || value.status === "processing" || value.status === "ready" || value.status === "failed")
+    && (value.mediaId === undefined || typeof value.mediaId === "string")
+    && (value.legacyAssetId === undefined || typeof value.legacyAssetId === "string")
+    && (value.localBlobId === undefined || typeof value.localBlobId === "string")
+    && (value.url === undefined || typeof value.url === "string")
+    && (value.thumbnailUrl === undefined || typeof value.thumbnailUrl === "string")
+    && (value.errorMessage === undefined || typeof value.errorMessage === "string");
+}
+
+function normalizeContentBlocks(value: unknown): ContentBlock[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const normalized: ContentBlock[] = [];
+  for (const block of value) {
+    if (!isRecord(block) || typeof block.type !== "string") return undefined;
     if (block.type === "heading" || block.type === "paragraph") {
-      return typeof block.text === "string" && block.text.trim().length > 0;
+      if (typeof block.text !== "string") return undefined;
+      normalized.push({ type: block.type, text: block.text });
+      continue;
     }
-    return block.type === "image"
-      && typeof block.assetId === "string" && block.assetId.trim().length > 0
-      && canUseAssetForPortalContent(block.assetId)
-      && typeof block.alt === "string" && block.alt.trim().length > 0
-      && (block.caption === undefined || typeof block.caption === "string");
-  });
+    if (block.type !== "image") return undefined;
+    if (isMediaAttachment(block.media)) {
+      normalized.push({
+        type: "image",
+        media: block.media,
+        alt: typeof block.alt === "string" ? block.alt : block.media.alt,
+        ...(typeof block.caption === "string" ? { caption: block.caption } : {}),
+      });
+      continue;
+    }
+    if (typeof block.assetId !== "string" || !block.assetId.trim() || !canUseAssetForPortalContent(block.assetId) || typeof block.alt !== "string") return undefined;
+    normalized.push({
+      type: "image",
+      media: createLegacyContentMediaAttachment(block.assetId, block.alt, typeof block.caption === "string" ? block.caption : ""),
+      alt: block.alt,
+      ...(typeof block.caption === "string" ? { caption: block.caption } : {}),
+    });
+  }
+  return normalized;
+}
+
+function isBlocks(value: unknown): boolean {
+  const normalized = normalizeContentBlocks(value);
+  return Boolean(normalized?.every((block) => {
+    if (block.type === "heading" || block.type === "paragraph") return block.text.trim().length > 0;
+    return Boolean(block.alt.trim()) && Boolean(block.media && isContentMediaAttachmentComplete(block.media));
+  }));
 }
 
 function hasMeaningfulStructuredText(kind: unknown, blocks: unknown): boolean {
@@ -124,6 +172,20 @@ function assertValidContentShape(kind: unknown, title: unknown, summary: unknown
   if (typeof summary !== "string" || !summary.trim()) throw new Error("PORTAL_CONTENT_INVALID_SUMMARY");
   if (!isTarget(target)) throw new Error("PORTAL_CONTENT_INVALID_TARGET");
   if (!isBlocks(blocks) || !hasMeaningfulStructuredText(kind, blocks)) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
+}
+
+function migrateRecord(value: PortalContentRecord): PortalContentRecord | undefined {
+  const blocks = normalizeContentBlocks(value.blocks);
+  if (!blocks) return undefined;
+  const publishedRevision = value.publishedRevision
+    ? { ...value.publishedRevision, blocks: normalizeContentBlocks(value.publishedRevision.blocks) }
+    : undefined;
+  if (value.publishedRevision && !publishedRevision?.blocks) return undefined;
+  return {
+    ...value,
+    blocks,
+    ...(publishedRevision ? { publishedRevision: { ...publishedRevision, blocks: publishedRevision.blocks! } } : {}),
+  };
 }
 
 function isValidContentShape(kind: unknown, title: unknown, summary: unknown, target: unknown, blocks: unknown): boolean {
@@ -187,14 +249,27 @@ function readPersistedState(): PersistedPortalContentState | undefined {
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!isRecord(parsed)
-      || parsed.version !== PORTAL_CONTENT_STORAGE_VERSION
+      || !LEGACY_PORTAL_CONTENT_STORAGE_VERSIONS.includes(parsed.version as 3 | 4)
       || !Array.isArray(parsed.records)
-      || !parsed.records.every(isPortalContentRecord)
       || !Array.isArray(parsed.automationFailures)
       || !parsed.automationFailures.every(isAutomationFailure)) {
       return undefined;
     }
-    return clone(parsed as unknown as PersistedPortalContentState);
+    const records = parsed.records.map((record) => migrateRecord(record as PortalContentRecord));
+    if (records.some((record) => !record) || records.some((record) => !isPortalContentRecord(record))) return undefined;
+    const migrated = {
+      version: PORTAL_CONTENT_STORAGE_VERSION,
+      records: records as PortalContentRecord[],
+      automationFailures: clone(parsed.automationFailures as PortalAutomationFailure[]),
+    } satisfies PersistedPortalContentState;
+    if (parsed.version !== PORTAL_CONTENT_STORAGE_VERSION) {
+      try {
+        getStorage()?.setItem(PORTAL_CONTENT_STORAGE_KEY, JSON.stringify(migrated));
+      } catch {
+        // Migration is still usable in memory when browser storage is unavailable.
+      }
+    }
+    return clone(migrated);
   } catch {
     return undefined;
   }
@@ -415,7 +490,8 @@ export const usePortalContentStore = defineStore("portal-content", {
       const actor = actorId();
       const slug = slugify(input.slug ?? input.title);
       const authoredTarget = input.target ?? { type: "internal-route" as const, value: "/activities" };
-      const blocks = input.blocks ?? [];
+      const blocks = normalizeContentBlocks(input.blocks ?? []);
+      if (!blocks) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
       assertValidContentShape(input.kind, input.title, input.summary, authoredTarget, blocks);
       assertUniqueSlug(this.records, slug);
       const id = `portal-${input.kind}-${now.getTime()}-${this.records.length + 1}`;
@@ -453,7 +529,8 @@ export const usePortalContentStore = defineStore("portal-content", {
       }
       const slug = patch.slug === undefined ? record.slug : slugify(patch.slug);
       const authoredTarget = patch.target === undefined ? record.target : patch.target;
-      const blocks = patch.blocks === undefined ? record.blocks : patch.blocks;
+      const blocks = patch.blocks === undefined ? record.blocks : normalizeContentBlocks(patch.blocks);
+      if (!blocks) throw new Error("PORTAL_CONTENT_INVALID_BLOCK");
       const title = patch.title === undefined ? record.title : patch.title;
       const summary = patch.summary === undefined ? record.summary : patch.summary;
       assertValidContentShape(record.kind, title, summary, authoredTarget, blocks);

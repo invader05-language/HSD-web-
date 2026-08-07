@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { PROJECT_DETAILS, PROJECT_FILTERS } from "~/data/projects";
+import { PROJECT_FILTERS } from "~/data/projects";
+import { useProjectsStore } from "~/stores/projects";
 
 useHead({ title: "项目成果｜白云 HSD 开发者部落" });
 
 const activeFilter = ref("全部");
+const projectsStore = useProjectsStore();
+if (import.meta.client) projectsStore.hydrate();
 const pageSize = 6;
 const currentPage = ref(1);
 const filteredProjects = computed(() => {
-  if (activeFilter.value === "全部") return PROJECT_DETAILS;
-  return PROJECT_DETAILS.filter((project) => project.category.includes(activeFilter.value));
+  const projects = projectsStore.getPublicProjects();
+  if (activeFilter.value === "全部") return projects;
+  return projects.filter((project) => project.category.includes(activeFilter.value));
 });
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredProjects.value.length / pageSize)));
 const visibleProjects = computed(() => {
@@ -40,12 +44,13 @@ watch(activeFilter, () => {
         <FilterToolbar v-model="activeFilter" :filters="PROJECT_FILTERS" :result-label="`共 ${filteredProjects.length} 个项目`" />
         <div v-if="visibleProjects.length" class="catalog-grid">
           <NuxtLink v-for="project in visibleProjects" :key="project.slug" :to="`/projects/${project.slug}`" class="catalog-card">
-            <MediaPlaceholder :label="`${project.title} 项目素材位`" />
+            <ContentMediaView v-if="project.cover" :item="project.cover" preview="thumbnail" :controls="false" />
+            <MediaPlaceholder v-else :label="`${project.title} 项目素材位`" />
             <div>
               <span>{{ project.year }} · {{ project.category }}</span>
               <h2>{{ project.title }}</h2>
               <p>{{ project.description }}</p>
-              <strong>{{ project.status }} →</strong>
+              <strong>{{ project.projectStage }} →</strong>
             </div>
           </NuxtLink>
         </div>

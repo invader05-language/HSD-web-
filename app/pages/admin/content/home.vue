@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
-import { ADMIN_ASSETS, canSelectAsset } from "~/data/admin-assets";
 import { HOMEPAGE_SLOTS } from "~/data/admin-content";
 import { usePortalCatalog } from "~/composables/usePortalCatalog";
 import { resolveHomepageProjection } from "~/composables/usePublishedPortal";
@@ -8,6 +7,10 @@ import { usePortalConfigStore } from "~/stores/portal-config";
 import { useSessionStore } from "~/stores/session";
 import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
+import type { ContentMediaAttachment } from "~/types/content-media";
+import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import ContentMediaUploader from "~/components/admin/ContentMediaUploader.vue";
+import ContentMediaView from "~/components/ContentMediaView.vue";
 import { resolvePortalTabKey, type PortalConfigView } from "~/utils/portal-tabs";
 
 definePageMeta({ layout: "admin" });
@@ -18,7 +21,6 @@ const router = useRouter();
 const configStore = usePortalConfigStore();
 const session = useSessionStore();
 const catalog = computed(() => usePortalCatalog());
-const usableVisualAssets = ADMIN_ASSETS.filter((asset) => asset.type === "图片" && canSelectAsset(asset));
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
 const showPublishConfirmation = ref(false);
@@ -29,7 +31,6 @@ const visualDraft = reactive<{ home: PortalVisualConfig; join: PortalVisualConfi
   join: { ...configStore.draftConfig.visuals.join },
 });
 const previewProjection = computed(() => resolveHomepageProjection(configStore.preview().slots, catalog.value));
-const publishedProjection = computed(() => resolveHomepageProjection(configStore.publishedConfig.slots, catalog.value));
 const canPublish = computed(() => session.adminLevel === "owner");
 const recommendationsTab = ref<HTMLButtonElement | null>(null);
 const visualsTab = ref<HTMLButtonElement | null>(null);
@@ -134,18 +135,37 @@ function removeReference(slot: PortalSlotId, index: number) {
 }
 
 function saveVisualDraft() {
-  const missingAlt = (["home", "join"] as const).some((slot) => visualDraft[slot].assetId && !visualDraft[slot].alt.trim());
+  const visuals = (['home', 'join'] as const).reduce<Record<'home' | 'join', PortalVisualConfig>>((result, slot) => {
+    const visual = visualDraft[slot];
+    result[slot] = {
+      ...visual,
+      ...(visual.media ? { media: { ...visual.media, alt: visual.alt.trim() } } : {}),
+      assetId: visual.media ? undefined : visual.assetId,
+    };
+    return result;
+  }, { home: visualDraft.home, join: visualDraft.join });
+  const missingAlt = (["home", "join"] as const).some((slot) => {
+    const visual = visuals[slot];
+    return (visual.media && !isContentMediaAttachmentComplete(visual.media)) || (visual.assetId && !visual.alt.trim());
+  });
   if (missingAlt) {
-    errorMessage.value = "选择主视觉素材后必须填写替代文本。";
+    errorMessage.value = "上传主视觉素材后必须完成上传并填写替代文本。";
     statusMessage.value = "";
     return;
   }
-  runDraftAction(() => configStore.saveDraft({
-    visuals: {
-      home: { ...visualDraft.home, assetId: visualDraft.home.assetId || undefined },
-      join: { ...visualDraft.join, assetId: visualDraft.join.assetId || undefined },
-    },
-  }));
+  runDraftAction(() => configStore.saveDraft({ visuals }));
+}
+
+function updateVisualMedia(slot: "home" | "join", items: ContentMediaAttachment[]) {
+  visualDraft[slot].media = items[0];
+  if (items[0]) {
+    visualDraft[slot].alt = items[0].alt;
+    visualDraft[slot].assetId = undefined;
+  }
+}
+
+function visualMedia(slot: "home" | "join") {
+  return visualDraft[slot].media ? [visualDraft[slot].media] : [];
 }
 
 function publishConfiguration() {
@@ -208,16 +228,6 @@ onBeforeUnmount(() => {
   dialogTrigger?.focus();
 });
 
-function warningText(item: { slot: PortalSlotId; code: "fallback" | "automatic-fallback" | "empty"; sourceId: string; fallbackSourceId?: string }) {
-  if (item.code === "automatic-fallback") {
-    return item.slot === "flash"
-      ? `首页快讯未手动配置，当前自动展示 ${item.fallbackSourceId}；负责人可在草稿中重新精选。`
-      : `首页动态未手动配置，当前自动展示最新内容 ${item.fallbackSourceId}；负责人可在草稿中重新精选。`;
-  }
-  return item.code === "fallback"
-    ? `${item.sourceId} 已失效，当前公开页面自动使用 ${item.fallbackSourceId}，请确认后重新发布。`
-    : `${item.sourceId} 已失效且没有同类型候选，当前公开位置留空。`;
-}
 </script>
 
 <template>
@@ -237,13 +247,8 @@ function warningText(item: { slot: PortalSlotId; code: "fallback" | "automatic-f
     <p v-if="statusMessage" class="admin-portal-message" role="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="admin-portal-message is-error" role="alert">{{ errorMessage }}</p>
     <div v-if="!canPublish" class="admin-fixed-notice"><strong>发布权限</strong><p>你可以保存和预览门户草稿；整份发布仅限联盟总负责人。</p></div>
-    <div v-if="publishedProjection.warnings.length" class="admin-portal-warnings" role="status">
-      <strong>公开配置需要重新确认</strong>
-      <ul><li v-for="warning in publishedProjection.warnings" :key="`${warning.slot}-${warning.sourceId}`">{{ warningText(warning) }}</li></ul>
-    </div>
 
     <section v-if="activeView === 'recommendations'" id="portal-panel-recommendations" role="tabpanel" aria-labelledby="portal-tab-recommendations" tabindex="0">
-      <div class="admin-fixed-notice"><strong>固定模块，不允许删除</strong><p>可替换、移除、上移和下移条目；容量由首页设计基线控制。每次操作都会保存草稿。</p><span>草稿版本 {{ configStore.draftConfig.revision }}</span></div>
       <section class="admin-home-slots" aria-label="首页固定模块">
         <article v-for="(slot, slotIndex) in HOMEPAGE_SLOTS" :key="slot.id">
           <header><div><span>{{ String(slotIndex + 1).padStart(2, "0") }} / FIXED SLOT</span><h2>{{ slot.label }}</h2><p>{{ slot.description }}</p></div><AdminStatusPill :status="`${configStore.draftConfig.slots[slot.id].length} / ${slot.capacity}`" /></header>
@@ -258,7 +263,7 @@ function warningText(item: { slot: PortalSlotId; code: "fallback" | "automatic-f
               <label><span class="sr-only">添加{{ slot.label }}</span><select value="" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>选择已发布内容</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
-          <footer><small>容量上限 {{ slot.capacity }} 条</small><span>{{ slot.allowedTypes.join(" / ") }}</span></footer>
+          <footer><small>容量上限 {{ slot.capacity }} 条</small><span>{{ slot.allowedTypes.join(" / ") }}</span><em>{{ slot.sourceHint }}</em></footer>
         </article>
       </section>
     </section>
@@ -266,8 +271,8 @@ function warningText(item: { slot: PortalSlotId; code: "fallback" | "automatic-f
     <section v-else id="portal-panel-visuals" class="admin-portal-visuals" role="tabpanel" aria-labelledby="portal-tab-visuals" tabindex="0">
       <article v-for="visual in [{ id: 'home' as const, label: '官网首页', note: '首页首屏主视觉' }, { id: 'join' as const, label: '加入我们', note: '招新页面主视觉' }]" :key="visual.id">
         <header><div><span>PREDEFINED VISUAL</span><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
-        <div class="admin-portal-visual-preview"><strong>{{ usableVisualAssets.find((asset) => asset.id === visualDraft[visual.id].assetId)?.name ?? "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
-        <label>{{ visual.label }}主视觉素材<select v-model="visualDraft[visual.id].assetId"><option value="">不使用素材</option><option v-for="asset in usableVisualAssets" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select></label>
+        <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
+        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
         <label>辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>

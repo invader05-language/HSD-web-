@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import GalleryLightbox from "../../app/components/GalleryLightbox.vue";
 import GalleryMediaFrame from "../../app/components/GalleryMediaFrame.vue";
+import ContentMediaView from "../../app/components/ContentMediaView.vue";
 import type { GalleryAsset } from "../../app/data/gallery";
 
 const firstAsset: GalleryAsset = {
@@ -30,13 +31,14 @@ afterEach(() => {
 describe("gallery image fallback", () => {
   it("replaces a failed media-frame image and retries when its source changes", async () => {
     const wrapper = mount(GalleryMediaFrame, {
-      props: { item: firstAsset }
+      props: { item: firstAsset },
+      global: { components: { ContentMediaView } },
     });
 
-    await wrapper.get("img").trigger("error");
+    await wrapper.get("[data-testid='content-media-view'] img").trigger("error");
 
-    expect(wrapper.find("img").exists()).toBe(false);
-    expect(wrapper.get(".gallery-media-frame__fallback").text()).toContain("HSD");
+    expect(wrapper.find("[data-testid='content-media-view'] img").exists()).toBe(false);
+    expect(wrapper.get(".content-media-view__fallback").text()).toContain("HSD");
     expect(wrapper.text()).toContain(firstAsset.title);
     expect(wrapper.text()).toContain(firstAsset.caption);
 
@@ -46,8 +48,8 @@ describe("gallery image fallback", () => {
     };
     await wrapper.setProps({ item: updatedSource });
 
-    expect(wrapper.get("img").attributes("src")).toBe(updatedSource.imageUrl);
-    expect(wrapper.find(".gallery-media-frame__fallback").exists()).toBe(false);
+    expect(wrapper.get("[data-testid='content-media-view'] img").attributes("src")).toBe(updatedSource.imageUrl);
+    expect(wrapper.find(".content-media-view__fallback").exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -57,17 +59,18 @@ describe("gallery image fallback", () => {
       props: {
         items: [firstAsset, secondAsset],
         activeIndex: 0
-      }
+      },
+      global: { components: { ContentMediaView } },
     });
     await nextTick();
 
-    const failedImage = document.body.querySelector<HTMLImageElement>(".gallery-lightbox__stage > img");
+    const failedImage = document.body.querySelector<HTMLImageElement>(".gallery-lightbox__stage [data-testid='content-media-view'] img");
     expect(failedImage).not.toBeNull();
     failedImage!.dispatchEvent(new Event("error"));
     await nextTick();
 
-    expect(document.body.querySelector(".gallery-lightbox__stage > img")).toBeNull();
-    expect(document.body.querySelector(".gallery-lightbox__fallback")?.textContent).toContain("HSD");
+    expect(document.body.querySelector(".gallery-lightbox__stage [data-testid='content-media-view'] img")).toBeNull();
+    expect(document.body.querySelector(".content-media-view__fallback")?.textContent).toContain("HSD");
     expect(document.body.textContent).toContain(firstAsset.title);
     expect(document.body.textContent).toContain(firstAsset.caption);
     expect(document.body.querySelector<HTMLButtonElement>(".gallery-lightbox__next")?.disabled).toBe(false);
@@ -76,9 +79,9 @@ describe("gallery image fallback", () => {
     await nextTick();
 
     expect(
-      document.body.querySelector<HTMLImageElement>(".gallery-lightbox__stage > img")?.getAttribute("src")
+      document.body.querySelector<HTMLImageElement>(".gallery-lightbox__stage [data-testid='content-media-view'] img")?.getAttribute("src")
     ).toBe(secondAsset.imageUrl);
-    expect(document.body.querySelector(".gallery-lightbox__fallback")).toBeNull();
+    expect(document.body.querySelector(".content-media-view__fallback")).toBeNull();
     wrapper.unmount();
   });
 });

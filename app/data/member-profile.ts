@@ -19,6 +19,8 @@ export interface MemberProfile {
   baizeDirection?: BaizeDirection;
   bio: string;
   avatarUrl?: string;
+  /** Generated administrator projections remain private until explicitly published as members. */
+  publicDirectoryVisible?: boolean;
 }
 
 export type MemberProfilePatch = Partial<Pick<

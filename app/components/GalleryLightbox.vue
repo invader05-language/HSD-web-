@@ -4,10 +4,10 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
-  ref,
-  watch
+  ref
 } from "vue";
 import type { GalleryAsset } from "~/data/gallery";
+import type { ContentMediaAttachment } from "~/types/content-media";
 
 const props = defineProps<{
   items: readonly GalleryAsset[];
@@ -21,20 +21,29 @@ const emit = defineEmits<{
 
 const dialog = ref<HTMLElement | null>(null);
 const closeButton = ref<HTMLButtonElement | null>(null);
-const imageFailed = ref(false);
 let triggerElement: HTMLElement | null = null;
 
 const activeItem = computed(() => props.items[props.activeIndex]);
-const showImage = computed(() => Boolean(activeItem.value?.imageUrl) && !imageFailed.value);
 const canGoPrevious = computed(() => props.activeIndex > 0);
 const canGoNext = computed(() => props.activeIndex < props.items.length - 1);
-
-watch(
-  () => [activeItem.value?.id, activeItem.value?.imageUrl],
-  () => {
-    imageFailed.value = false;
-  }
-);
+const activeMediaItem = computed<ContentMediaAttachment | undefined>(() => {
+  if (!activeItem.value) return undefined;
+  return {
+    id: activeItem.value.id,
+    localBlobId: activeItem.value.localBlobId,
+    role: "detail",
+    kind: activeItem.value.kind ?? "image",
+    title: activeItem.value.title,
+    caption: activeItem.value.caption,
+    alt: activeItem.value.alt,
+    aspect: activeItem.value.aspect,
+    sortOrder: activeItem.value.sortOrder ?? props.activeIndex,
+    url: activeItem.value.imageUrl,
+    thumbnailUrl: activeItem.value.thumbnailUrl,
+    status: activeItem.value.status ?? "ready",
+    errorMessage: activeItem.value.errorMessage,
+  };
+});
 
 function showPrevious() {
   if (canGoPrevious.value) emit("update:activeIndex", props.activeIndex - 1);
@@ -109,14 +118,7 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="gallery-lightbox__stage">
-        <img
-          v-if="showImage"
-          :key="activeItem.id"
-          :src="activeItem.imageUrl"
-          :alt="activeItem.alt"
-          @error="imageFailed = true"
-        >
-        <div v-else class="gallery-lightbox__fallback" aria-hidden="true">&lt; HSD &gt;</div>
+        <ContentMediaView v-if="activeMediaItem" :key="activeMediaItem.id" :item="activeMediaItem" controls />
         <div class="gallery-lightbox__caption">
           <p>{{ activeIndex + 1 }} / {{ items.length }}</p>
           <h2>{{ activeItem.title }}</h2>

@@ -22,6 +22,7 @@ describe("administration platform navigation", () => {
 
   it("removes the role matrix from navigation and keeps account configuration owner-only", () => {
     expect(ADMIN_ROUTES).not.toContain("/admin/roles");
+    expect(ADMIN_ROUTES).not.toContain("/admin/media");
     expect(
       getAdminNavigationForAccess({ canManageAdminAccounts: false })
         .flatMap((group) => group.items)
@@ -32,6 +33,14 @@ describe("administration platform navigation", () => {
         .flatMap((group) => group.items)
         .map((item) => item.to)
     ).toContain("/admin/accounts");
+  });
+
+  it("does not expose the retired media library in any administration navigation", () => {
+    const destinations = getAdminNavigationForAccess({ canManageAdminAccounts: true })
+      .flatMap((group) => group.items);
+
+    expect(destinations.map((item) => item.id)).not.toContain("media");
+    expect(destinations.map((item) => item.to)).not.toContain("/admin/media");
   });
 
   it("uses the batch roster as the primary application entry and hides portal configuration without capability", () => {
@@ -85,6 +94,8 @@ describe("administration dashboard", () => {
     expect(page).toContain('content.create');
     expect(page).toContain('member.create');
     expect(page).not.toContain('上传学习资料');
+    expect(page).not.toContain('媒体健康');
+    expect(page).not.toContain('管理素材');
   });
 
   it("keeps the independently routed upload queue center-scoped", () => {

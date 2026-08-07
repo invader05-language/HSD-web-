@@ -1,4 +1,5 @@
 import type { PortalCatalogEntityType, PortalSlotId } from "./portal-content";
+import type { ContentMediaAttachment } from "./content-media";
 
 export { type PortalSlotId } from "./portal-content";
 
@@ -9,6 +10,7 @@ export interface PortalReference {
 
 export interface PortalVisualConfig {
   assetId?: string;
+  media?: ContentMediaAttachment;
   alt: string;
   supportingText?: string;
 }

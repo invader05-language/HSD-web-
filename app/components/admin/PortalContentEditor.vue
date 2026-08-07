@@ -3,8 +3,11 @@ import type { ContentBlock, PortalContentDraftInput, PortalContentKind, PortalCo
 import { PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS } from "~/data/admin-content";
 import { usePortalContentStore } from "~/stores/portal-content";
 import { useSessionStore } from "~/stores/session";
-import { ADMIN_ASSETS, canSelectAsset, canUseAssetForPortalContent } from "~/data/admin-assets";
 import { isSafeInternalPath } from "~/utils/internal-route";
+import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import ContentMediaUploader from "./ContentMediaUploader.vue";
+import ContentMediaView from "~/components/ContentMediaView.vue";
+import type { ContentMediaAttachment } from "~/types/content-media";
 
 const props = defineProps<{ record?: PortalContentRecord; initialKind?: PortalContentKind }>();
 const emit = defineEmits<{ saved: [id: string] }>();
@@ -25,7 +28,6 @@ const actionPending = ref(false);
 const isOwner = computed(() => session.adminLevel === "owner");
 const currentStatus = computed(() => props.record ? PORTAL_CONTENT_STATUS_LABELS[props.record.status] : "草稿");
 const isReadOnly = computed(() => Boolean(props.record && ["in-review", "pending-publication"].includes(props.record.status)));
-const approvedImageAssets = computed(() => ADMIN_ASSETS.filter((asset) => asset.type === "图片" && canSelectAsset(asset)));
 
 function buildInput(): PortalContentDraftInput {
   return {
@@ -49,12 +51,12 @@ function validate() {
   }
   const invalidImage = blocks.value
     .filter((block): block is Extract<ContentBlock, { type: "image" }> => block.type === "image")
-    .find((block) => !block.assetId.trim() || !canUseAssetForPortalContent(block.assetId) || !block.alt.trim());
+    .find((block) => !block.media || !isContentMediaAttachmentComplete(block.media) || !block.alt.trim());
   if (invalidImage) {
-    error.value = !invalidImage.assetId.trim()
-      ? "图片内容块请选择一个处理完成且审核通过的媒体库素材。"
-      : !canUseAssetForPortalContent(invalidImage.assetId)
-        ? "所选图片素材尚未处理完成或未通过审核，请重新选择媒体库素材。"
+    error.value = !invalidImage.media
+      ? "图片内容块请直接上传一张图片并完成预览。"
+      : !isContentMediaAttachmentComplete(invalidImage.media)
+        ? "图片内容块需要上传完成并填写替代文本。"
         : "图片内容块必须填写替代文本。";
     return false;
   }
@@ -117,8 +119,18 @@ function completeAction(action: "return" | "approve" | "publish" | "unpublish") 
 }
 
 function addBlock(type: ContentBlock["type"]) {
-  if (type === "image") blocks.value.push({ type, assetId: "", alt: "" });
+  if (type === "image") blocks.value.push({ type, media: undefined, alt: "" });
   else blocks.value.push({ type, text: "" });
+}
+
+function updateImageBlock(index: number, items: ContentMediaAttachment[]) {
+  const block = blocks.value[index];
+  if (!block || block.type !== "image") return;
+  const media = items[0];
+  blocks.value[index] = {
+    type: "image",
+    ...(media ? { media, alt: media.alt, ...(media.caption ? { caption: media.caption } : {}) } : { alt: "" }),
+  };
 }
 
 function removeBlock(index: number) {
@@ -133,7 +145,7 @@ function removeBlock(index: number) {
     <div class="admin-content-editor__layout">
       <div class="admin-content-editor__form">
         <section><header><span>01</span><h2>基础信息</h2><AdminStatusPill :status="currentStatus" /></header><div class="admin-editor-grid"><label>内容类型<select v-model="kind" :disabled="Boolean(record)"><option v-for="(label, value) in PORTAL_CONTENT_KIND_LABELS" :key="value" :value="value">{{ label }}</option></select></label><label v-if="kind === 'flash'">站内目标<input v-model="target" :disabled="isReadOnly" placeholder="/activities"></label><p v-else class="admin-inline-note">详情地址将在保存后按内容 Slug 自动生成。</p><label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label><label class="is-wide">摘要<textarea v-model="summary" :disabled="isReadOnly" rows="4"></textarea></label><label v-if="kind === 'flash'">失效时间（可选）<input v-model="expiresAt" :disabled="isReadOnly" type="datetime-local"></label></div></section>
-        <section v-if="kind !== 'flash'"><header><span>02</span><h2>结构化正文</h2></header><div class="admin-content-blocks"><article v-for="(block, index) in blocks" :key="index"><label>{{ block.type === 'heading' ? '小标题' : block.type === 'paragraph' ? '正文段落' : '媒体库素材' }}<template v-if="block.type === 'image'"><select v-model="block.assetId" :disabled="isReadOnly"><option value="">选择已审核图片素材</option><option v-for="asset in approvedImageAssets" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select><input v-model="block.alt" :disabled="isReadOnly" placeholder="替代文本"></template><textarea v-else v-model="block.text" :disabled="isReadOnly" :rows="block.type === 'heading' ? 2 : 4"></textarea></label><button v-if="!isReadOnly" type="button" :aria-label="`移除第 ${index + 1} 个内容块`" @click="removeBlock(index)">移除</button></article></div><div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" @click="addBlock('heading')">添加标题</button><button type="button" @click="addBlock('paragraph')">添加段落</button><button type="button" @click="addBlock('image')">添加图片</button></div></section>
+        <section v-if="kind !== 'flash'"><header><span>02</span><h2>结构化正文</h2></header><div class="admin-content-blocks"><article v-for="(block, index) in blocks" :key="index"><template v-if="block.type === 'image'"><ContentMediaView v-if="isReadOnly && block.media" :item="block.media" preview="thumbnail" :controls="false" /><ContentMediaUploader v-else :model-value="block.media ? [block.media] : []" mode="cover" title="直接上传正文配图" description="上传后立即预览；新内容不经过媒体素材库。" @update:model-value="updateImageBlock(index, $event)" /></template><label v-else>{{ block.type === 'heading' ? '小标题' : '正文段落' }}<textarea v-model="block.text" :disabled="isReadOnly" :rows="block.type === 'heading' ? 2 : 4"></textarea></label><button v-if="!isReadOnly" type="button" :aria-label="`移除第 ${index + 1} 个内容块`" @click="removeBlock(index)">移除</button></article></div><div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" @click="addBlock('heading')">添加标题</button><button type="button" @click="addBlock('paragraph')">添加段落</button><button type="button" @click="addBlock('image')">添加图片</button></div></section>
         <section v-if="record"><header><span>03</span><h2>审核与发布</h2></header><p v-if="!isOwner" class="admin-inline-note">普通管理员可保存草稿、提交审核和预览；审核、发布与下架由联盟总负责人执行。</p><div v-else class="admin-content-editor__review-actions"><template v-if="record.status === 'in-review'"><label>退回原因<input v-model="rejectionReason" placeholder="必填：说明需要修改的内容"></label><button type="button" :disabled="!rejectionReason.trim()" @click="completeAction('return')">退回草稿</button><button type="button" @click="actionPending = true">审核通过</button></template><button v-if="record.status === 'pending-publication'" type="button" class="button" @click="actionPending = true">发布内容</button><label v-if="record.publishedState === 'published'">下架原因<input v-model="unpublishReason" placeholder="说明下架原因"></label><button v-if="record.publishedState === 'published'" type="button" @click="completeAction('unpublish')">确认下架</button></div></section>
       </div>
       <aside class="admin-content-editor__sidebar"><span>Public Projection</span><h2>{{ title || '未命名内容' }}</h2><p>{{ summary || '摘要将在这里显示。' }}</p><small>{{ PORTAL_CONTENT_KIND_LABELS[kind] }} · {{ currentStatus }}</small><NuxtLink v-if="record" :to="`/admin/content/${record.id}/preview`">打开预览</NuxtLink></aside>
