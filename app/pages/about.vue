@@ -2,6 +2,7 @@
 import { CENTERS } from "~/data/home";
 import { resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
 const memberRepository = useMemberRepository();
@@ -17,6 +18,7 @@ const publicMembers = memberRepository.publicMembers;
       description="白云 HSD 开发者部落隶属学校华为 ICT 学院相关学生组织体系，覆盖技术研发、内容传播、活动策划与人才成长。"
       tone="warm"
       media-label="部落年度合影素材位"
+      :visual="PAGE_VISUALS.about"
     />
 
     <section class="section">

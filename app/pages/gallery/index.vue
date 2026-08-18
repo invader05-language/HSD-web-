@@ -2,6 +2,7 @@
 import { useGalleryStore } from "~/stores/gallery";
 import type { GalleryAsset } from "~/data/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
 
@@ -57,6 +58,7 @@ async function goToPage(page: number) {
       description="这里呈现新媒体中心与成员共同完成的摄影、设计、视频和人物内容。正式素材到位后会替换当前素材位。"
       tone="dark"
       media-label="编辑部式作品拼贴素材位"
+      :visual="PAGE_VISUALS.gallery"
     />
     <section class="section section--cool">
       <div class="shell">

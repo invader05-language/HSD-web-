@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PROJECT_FILTERS } from "~/data/projects";
 import { useProjectsStore } from "~/stores/projects";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "项目成果｜白云 HSD 开发者部落" });
 
@@ -38,6 +39,7 @@ watch(activeFilter, () => {
       description="项目从真实校园问题出发，经过需求研究、技术验证、跨中心协作与持续迭代，形成可演示、可复盘的成果。"
       tone="dark"
       media-label="精选项目网格舞台"
+      :visual="PAGE_VISUALS.projects"
     />
     <section class="section section--cool">
       <div class="shell">

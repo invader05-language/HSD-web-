@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CENTERS } from "~/data/home";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 const route = useRoute();
 
@@ -15,6 +16,7 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
       description="四大中心各有专业方向，也围绕同一个项目目标共同协作。你可以从擅长的方向开始，再逐步探索更多能力。"
       tone="dark"
       media-label="四中心协作关系视觉位"
+      :visual="PAGE_VISUALS.centers"
     />
     <section class="section section--warm">
       <div class="shell center-detail-list">
