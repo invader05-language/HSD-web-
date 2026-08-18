@@ -5486,7 +5486,11 @@ label small:not(:empty),
   .join-directions,
   .form-grid,
   .member-dashboard {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-card {
+    min-width: 0;
   }
 
   .directory-toolbar {
@@ -5589,6 +5593,10 @@ label small:not(:empty),
   .catalog-card .media-placeholder,
   .detail-main .media-placeholder {
     min-height: 240px;
+  }
+
+  .catalog-card > .content-media-view {
+    min-height: 0;
   }
 
   .activity-catalog > a {
