@@ -29,6 +29,13 @@ test("approved landing visuals load and retain the intended crop mode", async ({
 test("approved visuals do not cause horizontal overflow on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
+  await page.goto("/");
+  const homeStage = page.locator('[data-visual-stage="poster"]');
+  const homePoster = page.getByRole("img", { name: "白云 HSD 开发者部落主题海报" });
+  await expect(homePoster).toBeVisible();
+  expect(await homeStage.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(390);
+  expect(await homePoster.evaluate((image) => getComputedStyle(image).objectFit)).toBe("contain");
+
   for (const path of ["/", ...pageBanners.map(([route]) => route)]) {
     await page.goto(path);
     const overflow = await page.evaluate(

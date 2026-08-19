@@ -37,6 +37,11 @@ const homeVisual = computed(() => resolvePageVisual(config.visuals.home, "home")
 const homeVisualLabel = computed(() => homeVisual.value.alt || "官网主视觉素材位");
 const homeVisualDetail = computed(() => homeVisual.value.supportingText || "后续使用单独设计或授权照片");
 const homeVisualSource = computed(() => resolvePortalAssetSource(homeVisual.value.assetId));
+const homePosterStyle = computed(() => (
+  homeVisualSource.value
+    ? { "--home-poster-image": `url("${homeVisualSource.value}")` }
+    : undefined
+));
 
 function publicDate(value: string) {
   const date = new Date(value);
@@ -85,23 +90,31 @@ watch(
             <NuxtLink class="button button--ghost" to="/join">查看招新</NuxtLink>
           </div>
         </div>
-        <ContentMediaView
-          v-if="homeVisual.media"
-          :item="homeVisual.media"
-          preview="thumbnail"
-          :controls="false"
-          class="home-hero__media home-hero__media--poster"
-        />
-        <MediaPlaceholder
-          v-else
-          :label="homeVisualLabel"
-          :detail="homeVisualDetail"
-          :src="homeVisualSource"
-          :alt="homeVisual.alt"
-          :data-asset-id="homeVisual.assetId"
-          class="home-hero__media home-hero__media--poster"
-          dark
-        />
+        <div
+          class="home-hero__stage"
+          :class="{ 'home-hero__stage--layered': Boolean(homeVisualSource) && !homeVisual.media }"
+          data-visual-stage="poster"
+          :style="homePosterStyle"
+        >
+          <div v-if="homeVisualSource && !homeVisual.media" class="home-hero__stage-backdrop" aria-hidden="true" />
+          <ContentMediaView
+            v-if="homeVisual.media"
+            :item="homeVisual.media"
+            preview="thumbnail"
+            :controls="false"
+            class="home-hero__media home-hero__media--poster"
+          />
+          <MediaPlaceholder
+            v-else
+            :label="homeVisualLabel"
+            :detail="homeVisualDetail"
+            :src="homeVisualSource"
+            :alt="homeVisual.alt"
+            :data-asset-id="homeVisual.assetId"
+            class="home-hero__media home-hero__media--poster"
+            dark
+          />
+        </div>
       </div>
     </section>
 

@@ -43,6 +43,9 @@ describe("published portal visuals", () => {
     expect(homeSource).toContain('resolvePageVisual(config.visuals.home, "home")');
     expect(homeSource).toContain(':src="homeVisualSource"');
     expect(homeSource).toContain("home-hero__media--poster");
+    expect(homeSource).toContain('data-visual-stage="poster"');
+    expect(homeSource).toContain("home-hero__stage-backdrop");
+    expect(homeSource).toContain("--home-poster-image");
     expect(joinSource).toContain('resolvePageVisual(config.visuals.join, "join")');
     expect(joinSource).toContain(':visual="joinVisual"');
     expect(bannerSource).toContain("resolvePortalAssetSource(props.visual?.assetId)");
