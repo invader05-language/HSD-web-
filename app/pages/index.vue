@@ -8,6 +8,7 @@ import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
 import { resolvePortalAssetSource } from "~/data/portal-assets";
+import { resolvePageVisual } from "~/data/page-visuals";
 import ContentMediaView from "~/components/ContentMediaView.vue";
 
 useHead({
@@ -32,9 +33,15 @@ const publishedActivities = homepageSlots.activities;
 const publishedGallery = homepageSlots.gallery;
 const publishedResources = homepageSlots.resources;
 const emptyProjectionWarnings = warnings.filter((warning) => warning.code === "empty");
-const homeVisualLabel = config.visuals.home.alt || "官网主视觉素材位";
-const homeVisualDetail = config.visuals.home.supportingText || (config.visuals.home.assetId ? "已发布门户主视觉" : "后续使用单独设计或授权照片");
-const homeVisualSource = computed(() => resolvePortalAssetSource(config.visuals.home.assetId));
+const homeVisual = computed(() => resolvePageVisual(config.visuals.home, "home"));
+const homeVisualLabel = computed(() => homeVisual.value.alt || "官网主视觉素材位");
+const homeVisualDetail = computed(() => homeVisual.value.supportingText || "后续使用单独设计或授权照片");
+const homeVisualSource = computed(() => resolvePortalAssetSource(homeVisual.value.assetId));
+const homePosterStyle = computed(() => (
+  homeVisualSource.value
+    ? { "--home-poster-image": `url("${homeVisualSource.value}")` }
+    : undefined
+));
 
 function publicDate(value: string) {
   const date = new Date(value);
@@ -83,8 +90,31 @@ watch(
             <NuxtLink class="button button--ghost" to="/join">查看招新</NuxtLink>
           </div>
         </div>
-        <ContentMediaView v-if="config.visuals.home.media" :item="config.visuals.home.media" preview="thumbnail" :controls="false" class="home-hero__media" />
-        <MediaPlaceholder v-else :label="homeVisualLabel" :detail="homeVisualDetail" :src="homeVisualSource" :alt="config.visuals.home.alt" :data-asset-id="config.visuals.home.assetId" dark />
+        <div
+          class="home-hero__stage"
+          :class="{ 'home-hero__stage--layered': Boolean(homeVisualSource) && !homeVisual.media }"
+          data-visual-stage="poster"
+          :style="homePosterStyle"
+        >
+          <div v-if="homeVisualSource && !homeVisual.media" class="home-hero__stage-backdrop" aria-hidden="true" />
+          <ContentMediaView
+            v-if="homeVisual.media"
+            :item="homeVisual.media"
+            preview="thumbnail"
+            :controls="false"
+            class="home-hero__media home-hero__media--poster"
+          />
+          <MediaPlaceholder
+            v-else
+            :label="homeVisualLabel"
+            :detail="homeVisualDetail"
+            :src="homeVisualSource"
+            :alt="homeVisual.alt"
+            :data-asset-id="homeVisual.assetId"
+            class="home-hero__media home-hero__media--poster"
+            dark
+          />
+        </div>
       </div>
     </section>
 

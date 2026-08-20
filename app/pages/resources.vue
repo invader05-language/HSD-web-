@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { PUBLIC_RESOURCES, resourcePrimaryAction } from "~/data/resources";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "资源中心｜白云 HSD 开发者部落" });
 
@@ -29,6 +30,7 @@ watch(active, () => {
       description="所有条目先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。"
       tone="warm"
       media-label="资源索引与文件视觉位"
+      :visual="PAGE_VISUALS.resources"
     />
     <section class="section">
       <div class="shell">

@@ -35,14 +35,20 @@ describe("published portal visuals", () => {
     expect(wrapper.text()).toContain("等待正式授权素材");
   });
 
-  it("connects published home and page banner visuals to the approved source resolver", () => {
+  it("connects home and join defaults without replacing configured uploads", () => {
     const homeSource = readFileSync("app/pages/index.vue", "utf8");
+    const joinSource = readFileSync("app/pages/join.vue", "utf8");
     const bannerSource = readFileSync("app/components/PageBanner.vue", "utf8");
 
-    expect(homeSource).toContain("resolvePortalAssetSource(config.visuals.home.assetId)");
+    expect(homeSource).toContain('resolvePageVisual(config.visuals.home, "home")');
     expect(homeSource).toContain(':src="homeVisualSource"');
+    expect(homeSource).toContain("home-hero__media--poster");
+    expect(homeSource).toContain('data-visual-stage="poster"');
+    expect(homeSource).toContain("home-hero__stage-backdrop");
+    expect(homeSource).toContain("--home-poster-image");
+    expect(joinSource).toContain('resolvePageVisual(config.visuals.join, "join")');
+    expect(joinSource).toContain(':visual="joinVisual"');
     expect(bannerSource).toContain("resolvePortalAssetSource(props.visual?.assetId)");
-    expect(bannerSource).toContain(':src="visualSource"');
   });
 
   it("renders uploaded portal visuals through the shared media viewer", () => {

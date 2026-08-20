@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PortalCatalogItem } from "~/types/portal-content";
 import { usePortalCatalog } from "~/composables/usePortalCatalog";
+import { PAGE_VISUALS } from "~/data/page-visuals";
 
 type PublicView = "all" | "activities" | "articles" | "notices";
 type TimelineItem = PortalCatalogItem & { entityType: "activity" | "article" | "notice" };
@@ -39,6 +40,7 @@ useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
       description="查看公开新闻、公告与近期活动；活动详情无需登录，提交报名时再验证成员身份。"
       tone="warm"
       media-label="动态与活动视觉位"
+      :visual="PAGE_VISUALS.activities"
     />
     <section class="section">
       <div class="shell">

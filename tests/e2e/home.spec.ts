@@ -10,6 +10,22 @@ test("desktop homepage exposes the approved content sequence", async ({ page }) 
   await expect(page.getByRole("heading", { name: "由成员记录，也由成员创作" })).toBeVisible();
 });
 
+test("homepage renders the approved poster as a complete scheme B card", async ({ page }) => {
+  await page.goto("/");
+
+  const media = page.locator(".home-hero__media--poster");
+  const stage = page.locator('[data-visual-stage="poster"]');
+  const poster = media.getByRole("img", { name: "白云 HSD 开发者部落主题海报" });
+  await expect(stage).toBeVisible();
+  await expect(stage.locator(".home-hero__stage-backdrop")).toBeVisible();
+  await expect(media).toBeVisible();
+  await expect(poster).toBeVisible();
+  expect(await poster.evaluate((image) => getComputedStyle(image).objectFit)).toBe("contain");
+  expect(await stage.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(41, 39, 37)");
+  expect(await stage.locator(".home-hero__stage-backdrop").evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("linear-gradient");
+  expect(await media.evaluate((element) => getComputedStyle(element).borderStyle)).toBe("none");
+});
+
 test("homepage derives published flash and news when homepage slots are not manually curated", async ({ page }) => {
   await page.goto("/");
 

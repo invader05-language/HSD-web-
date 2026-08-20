@@ -5,6 +5,7 @@ import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { resolveLoginAwareTarget } from "~/utils/login-continuation";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
+import { resolvePageVisual } from "~/data/page-visuals";
 
 useHead({ title: "加入我们｜白云 HSD 开发者部落" });
 const session = useSessionStore();
@@ -20,6 +21,7 @@ const canApply = computed(() => Boolean(currentBatch.value));
 const applyTarget = computed(() => resolveLoginAwareTarget("/join/apply", session.isAuthenticated));
 const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名表" : "登录后填写报名表");
 const { config } = usePublishedPortal();
+const joinVisual = computed(() => resolvePageVisual(config.visuals.join, "join"));
 </script>
 
 <template>
@@ -31,7 +33,7 @@ const { config } = usePublishedPortal();
       description="无论你关注开发、摄影、设计、活动还是组织成长，都可以在四大中心找到适合的参与方式。"
       tone="red"
       media-label="招新主题视觉素材位"
-      :visual="config.visuals.join"
+      :visual="joinVisual"
     >
       <template #actions>
         <NuxtLink v-if="canApply" class="button button--light" :to="applyTarget">{{ applyLabel }}</NuxtLink>
