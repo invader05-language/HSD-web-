@@ -105,6 +105,7 @@ test("ordinary admins can inspect a batch but cannot mutate its lifecycle", asyn
 });
 
 test("draft publish readiness explains schedule conflicts and successful publish closes the dialog", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-08-07T04:00:00.000Z") });
   await page.goto("/admin/recruitment/batches");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
 
