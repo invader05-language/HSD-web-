@@ -251,7 +251,7 @@ describe("recruitment assessment store", () => {
       now: new Date("2026-08-04T10:01:00.000Z"),
     });
     expect(store.getCandidate(BATCH_ID, "candidate-chen")?.processingStatus)
-      .toBe("offline-adjustment-pending");
+      .toBe("adjustment-suggestion-pending");
 
     store.recordAdjustmentDecision({
       batchId: BATCH_ID,
@@ -283,7 +283,7 @@ describe("recruitment assessment store", () => {
       now: new Date("2026-08-04T10:00:00.000Z"),
     });
     expect(store.getCandidate(BATCH_ID, "candidate-chen")).toMatchObject({
-      processingStatus: "offline-adjustment-pending",
+      processingStatus: "adjustment-suggestion-pending",
     });
 
     expect(() => store.recordAdjustmentDecision({
@@ -302,6 +302,52 @@ describe("recruitment assessment store", () => {
     expect(store.getCandidate(BATCH_ID, "candidate-chen")).toMatchObject({
       finalDecision: "admitted",
       finalCenter: "新媒体中心",
+      processingStatus: "ready-to-publish",
+    });
+  });
+
+  it("allows a center lead to submit a non-Baize adjustment suggestion but reserves the final decision for the owner", () => {
+    signInOwner();
+    const store = useRecruitmentAssessmentStore();
+    store.saveRoundOutcome({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      round: 1,
+      outcome: "failed",
+      now: new Date("2026-08-04T10:00:00.000Z"),
+    });
+
+    useSessionStore().signIn("media-admin", { requireAdmin: true });
+    store.recordAdjustmentSuggestion({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      suggestedCenter: "人才发展中心",
+      now: new Date("2026-08-04T10:01:00.000Z"),
+    });
+
+    expect(store.getCandidate(BATCH_ID, "candidate-wang")).toMatchObject({
+      adjustmentSuggestion: "人才发展中心",
+      finalDecision: undefined,
+      finalCenter: undefined,
+      processingStatus: "adjustment-suggestion-pending",
+    });
+    expect(() => store.recordAdjustmentDecision({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      decision: "人才发展中心",
+      now: new Date("2026-08-04T10:02:00.000Z"),
+    })).toThrow("OWNER_PERMISSION_REQUIRED");
+
+    signInOwner();
+    store.recordAdjustmentDecision({
+      batchId: BATCH_ID,
+      candidateId: "candidate-wang",
+      decision: "人才发展中心",
+      now: new Date("2026-08-04T10:03:00.000Z"),
+    });
+    expect(store.getCandidate(BATCH_ID, "candidate-wang")).toMatchObject({
+      finalDecision: "admitted",
+      finalCenter: "人才发展中心",
       processingStatus: "ready-to-publish",
     });
   });
@@ -328,7 +374,7 @@ describe("recruitment assessment store", () => {
       })).toThrow("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
     }
     expect(store.getCandidate(BATCH_ID, "candidate-chen")?.processingStatus)
-      .toBe("offline-adjustment-pending");
+      .toBe("adjustment-suggestion-pending");
   });
 
   it("projects publication summary counts through a candidate visibility filter", () => {

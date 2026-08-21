@@ -1,14 +1,80 @@
 import { describe, expect, it } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 import {
   DEMO_MEMBER_RESULT,
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
+  memberResultFromApi,
   describeAdmission,
   describeAssessment
 } from "../../app/data/member-results";
 import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
+import { useMemberRepository } from "../../app/composables/useMemberRepository";
+import { useMemberProfileStore } from "../../app/stores/member-profile";
 
 describe("member result presentation", () => {
+  it("keeps an opted-out formal profile out of the public directory", () => {
+    setActivePinia(createPinia());
+    const profiles = useMemberProfileStore();
+    const repository = useMemberRepository();
+
+    expect(repository.findPublicPerson(DEMO_MEMBER_PROFILE.publicId!)).toBeDefined();
+    profiles.updateProfile(DEMO_MEMBER_PROFILE.id, { publicDirectoryVisible: false });
+    expect(repository.findPublicPerson(DEMO_MEMBER_PROFILE.publicId!)).toBeUndefined();
+  });
+
+  it("projects the private API result without assessment history or internal notes", () => {
+    expect(memberResultFromApi({
+      id: "result-1",
+      batch: { id: "batch-1", name: "2026 秋季招新" },
+      decision: "ADMITTED",
+      finalCenter: { id: "baize", slug: "baize-development", name: "白泽开发中心" },
+      admissionSource: "FIRST_CHOICE",
+      baizeDirection: "HARMONYOS_DEVELOPMENT",
+      preferences: [
+        { rank: "FIRST", center: { id: "baize", slug: "baize-development", name: "白泽开发中心" } },
+        { rank: "SECOND", center: { id: "media", slug: "media", name: "新媒体中心" } },
+      ],
+      responsibleContacts: [
+        { personId: "minister-1", name: "部长甲", position: "CENTER_MINISTER", displayContact: "138 **** 0000" },
+        { personId: "minister-2", name: "部长乙", position: "CENTER_MINISTER", displayContact: "139 **** 1111" },
+      ],
+      publishedAt: "2026-08-07T09:00:00.000Z",
+    })).toEqual({
+      batchLabel: "2026 秋季招新",
+      status: "admitted",
+      identity: "正式成员",
+      preferences: [
+        { rank: 1, center: "白泽开发中心" },
+        { rank: 2, center: "新媒体中心" },
+      ],
+      baizeInterestDirection: "鸿蒙开发",
+      currentStage: "考核已结束",
+      currentConclusion: "通过",
+      finalCenter: "白泽开发中心",
+      responsibleContacts: [
+        { personId: "minister-1", role: "部长", name: "部长甲", contact: "", displayContact: "138 **** 0000" },
+        { personId: "minister-2", role: "部长", name: "部长乙", contact: "", displayContact: "139 **** 1111" },
+      ],
+    });
+    expect(memberResultFromApi({
+      id: "result-2",
+      batch: { id: "batch-1", name: "2026 秋季招新" },
+      decision: "NOT_ADMITTED",
+      finalCenter: null,
+      admissionSource: null,
+      baizeDirection: null,
+      preferences: [],
+      responsibleContacts: [],
+      publishedAt: "2026-08-07T09:00:00.000Z",
+    }).acceptsTransfer).toBeUndefined();
+    expect(memberResultFromApi()).toMatchObject({
+      batchLabel: "暂无已发布结果",
+      status: "no-application",
+      currentStage: "尚未开始",
+    });
+  });
+
   it("selects result data by the single current member id", () => {
     expect(getDemoMemberResult(DEMO_MEMBER_PROFILE.id).status).toBe("admitted");
 

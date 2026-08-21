@@ -255,8 +255,8 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
   {
     id: "gallery",
     label: "媒体专题",
-    capacity: 1,
-    description: "使用一张主视觉承载专题入口",
+    capacity: 3,
+    description: "使用一张主视觉承载专题入口，并展示两个次级专题",
     allowedTypes: ["gallery"],
     sourceHint: "来自画廊专题中已发布且有封面的专题。"
   },

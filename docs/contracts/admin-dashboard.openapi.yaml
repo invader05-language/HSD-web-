@@ -8,7 +8,7 @@ info:
 servers:
   - url: /
 paths:
-  /api/admin/dashboard:
+  /api/v1/admin/dashboard:
     get:
       operationId: getAdminDashboard
       summary: 获取当前管理员的工作台快照

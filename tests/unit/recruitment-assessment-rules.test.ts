@@ -59,7 +59,7 @@ describe("recruitment assessment round rules", () => {
     expect(getAssessmentProcessingStatus(record({
       roundOutcomes: { 1: "failed" },
       acceptsAdjustment: true,
-    }))).toBe("offline-adjustment-pending");
+    }))).toBe("adjustment-suggestion-pending");
 
     expect(getAssessmentProcessingStatus(record({
       roundOutcomes: { 1: "failed" },

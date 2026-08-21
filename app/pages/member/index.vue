@@ -15,7 +15,7 @@ const memberStatus = computed(() => applicationStore.memberStatus);
   <div class="member-space">
     <aside>
       <div class="member-space__identity"><HsdAvatar :name="profile.name" :src="profile.avatarUrl" size="md" /><div><strong>{{ profile.name }}</strong><span>{{ profile.identity }}</span></div></div>
-      <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><a href="#activities">活动与比赛</a><NuxtLink to="/member/profile">编辑个人资料</NuxtLink></nav>
+      <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><NuxtLink to="/member/growth">成长记录</NuxtLink><NuxtLink to="/member/honors">我的荣誉</NuxtLink><a href="#activities">活动与比赛</a><NuxtLink to="/member/profile">编辑个人资料</NuxtLink></nav>
       <button type="button" @click="session.signOut(); navigateTo('/')">退出登录</button>
     </aside>
     <main id="overview">

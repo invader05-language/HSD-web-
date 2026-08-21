@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { useProjectsStore } from "~/stores/projects";
+import { useContentGateway } from "~/composables/useContentGateway";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "项目管理｜HSD 管理台" });
 
 const projectsStore = useProjectsStore();
+const gateway = useContentGateway();
+if (gateway) projectsStore.activateApiMode();
 const route = useRoute();
-if (import.meta.client) projectsStore.hydrate();
+if (import.meta.client && !gateway) projectsStore.hydrate();
+onMounted(() => { if (gateway) void projectsStore.refreshFromApi(gateway); });
 const projects = computed(() => projectsStore.getManageableProjects());
 const publishedCount = computed(() => projects.value.filter((project) => project.publicationStatus === "published").length);
 const draftCount = computed(() => projects.value.filter((project) => project.publicationStatus === "draft").length);
@@ -22,6 +26,8 @@ function status(project: typeof projects.value[number]) {
 <template>
   <NuxtPage v-if="route.path !== '/admin/projects'" />
   <div v-else class="admin-recruitment-page admin-section-page">
+    <p v-if="projectsStore.apiError" role="alert">{{ projectsStore.apiError.message }}（{{ projectsStore.apiError.code }}）</p>
+    <p v-if="projectsStore.apiLoading" role="status">正在加载项目…</p>
     <AdminPageHeading eyebrow="Projects" title="项目管理" description="项目在独立编辑页维护基础信息、封面和成果素材，发布后才进入用户端项目成果与首页槽位。">
       <template #actions><NuxtLink class="button" to="/admin/projects/new">新建项目</NuxtLink></template>
     </AdminPageHeading>

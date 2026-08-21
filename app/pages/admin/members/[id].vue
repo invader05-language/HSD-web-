@@ -4,13 +4,21 @@ import {
 } from "~/data/admin-members";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { useMemberAdministrationStore } from "~/stores/member-administration";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
+import { BAIZE_DIRECTION_LABELS, type BaizeDirectionCode } from "~/utils/baize-direction-label";
+import { useSessionStore } from "~/stores/session";
+import { getOrganizationPositionLabel } from "~/utils/organization-positions";
+import { organizationMemberLabel } from "~/utils/organization-member-display";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();
-const memberRepository = useMemberRepository();
 const memberAdministration = useMemberAdministrationStore();
+const organizationGateway = useOrganizationGateway();
+if (organizationGateway) memberAdministration.activateApiMode();
+const memberRepository = useMemberRepository();
+const session = useSessionStore();
 const member = computed(() => memberRepository.findAdminMember(String(route.params.id)));
-if (!member.value) {
+if (!organizationGateway && !member.value) {
   throw createError({ statusCode: 404, statusMessage: "成员不存在" });
 }
 const preview = computed(() => getPublicProfilePreview(member.value!));
@@ -18,14 +26,62 @@ const publicPerson = computed(() => memberRepository.allPublicPeople.value.find(
   person.name === member.value?.name && person.centerName === member.value?.center
 )));
 const publicPreviewId = computed(() => publicPerson.value?.id);
-const displayDuty = computed(() => member.value?.centerLeadership
-  ? "核心人员 · 中心负责人"
-  : member.value?.memberDuty);
+const displayDuty = computed(() => member.value ? organizationMemberLabel(member.value) : "");
 const activeTab = ref("internal");
-const identityDraft = ref<NonNullable<typeof member.value>["identity"]>(member.value.identity);
+const identityDraft = ref<NonNullable<typeof member.value>["identity"]>(member.value?.identity ?? "预备成员");
 const showPromotionConfirm = ref(false);
-const saveStatus = ref<"idle" | "saved" | "storage-error" | "not-eligible">("idle");
+const saveStatus = ref<"idle" | "saved" | "storage-error" | "not-eligible" | "api-error">("idle");
 const identityChanged = computed(() => identityDraft.value !== member.value?.identity);
+const promotionCenterId = ref("");
+const promotionDuty = ref<"REGULAR" | "CORE">("REGULAR");
+const promotionBaizeDirection = ref<BaizeDirectionCode | "">("");
+const selectedPromotionCenter = computed(() => memberAdministration.apiCenters.find((center) => center.id === promotionCenterId.value));
+const positions = computed(() => member.value ? memberAdministration.positionsForPerson(member.value.id) : []);
+const canManagePositions = computed(() => Boolean(organizationGateway && session.canManageAdminAccounts && member.value?.identity === "正式成员"));
+const handoverTargetId = ref("");
+const handoverCandidates = computed(() => member.value ? memberAdministration.apiManagedMembers.filter((candidate) => (
+  candidate.id !== member.value!.id
+  && candidate.status === "FORMAL_MEMBER"
+  && candidate.membership?.center.id === memberAdministration.apiManagedMembers.find((item) => item.id === member.value!.id)?.membership?.center.id
+)) : []);
+
+async function appointMinister() {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.appointCenterMinisterFromApi(member.value.id, organizationGateway);
+}
+async function revokeMinister(version: number) {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.revokeCenterMinisterFromApi(member.value.id, version, organizationGateway);
+}
+async function handoverMinister(version: number) {
+  if (!member.value || !organizationGateway || !handoverTargetId.value) return;
+  await memberAdministration.handoverCenterMinisterFromApi(member.value.id, handoverTargetId.value, version, organizationGateway);
+  handoverTargetId.value = "";
+}
+async function appointAllianceOwner() {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.appointAllianceOwnerFromApi(member.value.id, organizationGateway);
+}
+async function revokeAllianceOwner(version: number) {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.revokeAllianceOwnerFromApi(member.value.id, version, organizationGateway);
+}
+async function grantProjectLead() {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.grantProjectLeadFromApi(member.value.id, organizationGateway);
+}
+async function revokeProjectLead(version: number) {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.revokeProjectLeadFromApi(member.value.id, version, organizationGateway);
+}
+async function toggleCoreMembership() {
+  if (!member.value || !organizationGateway) return;
+  await memberAdministration.setCoreMembershipFromApi(
+    member.value.id,
+    !(member.value.isCore ?? member.value.memberDuty === "核心人员"),
+    organizationGateway,
+  );
+}
 
 watch(() => member.value?.identity, (identity) => {
   if (identity) identityDraft.value = identity;
@@ -46,8 +102,25 @@ function requestSave() {
   saveStatus.value = "not-eligible";
 }
 
-function confirmPromotion() {
+async function confirmPromotion() {
   if (!member.value) return;
+  if (organizationGateway) {
+    const result = await memberAdministration.promoteMemberToFormalFromApi(member.value.id, {
+      centerId: promotionCenterId.value,
+      duty: promotionDuty.value,
+      ...(selectedPromotionCenter.value?.slug === "baize-development" && promotionBaizeDirection.value
+        ? { baizeDirection: promotionBaizeDirection.value }
+        : {}),
+    }, organizationGateway);
+    showPromotionConfirm.value = false;
+    if (result.status === "success" || result.status === "already_formal") {
+      identityDraft.value = "正式成员";
+      saveStatus.value = "saved";
+      return;
+    }
+    saveStatus.value = result.status === "api_error" ? "api-error" : "not-eligible";
+    return;
+  }
   const result = memberAdministration.promoteMemberToFormal(member.value.id);
   if (result.status === "success" || result.status === "already_formal") {
     showPromotionConfirm.value = false;
@@ -59,7 +132,13 @@ function confirmPromotion() {
   showPromotionConfirm.value = false;
   saveStatus.value = result.status === "storage_unavailable" ? "storage-error" : "not-eligible";
 }
-useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
+onMounted(async () => {
+  if (organizationGateway) {
+    await memberAdministration.refreshFromApi(organizationGateway);
+    promotionCenterId.value ||= memberAdministration.apiCenters[0]?.id ?? "";
+  }
+});
+useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HSD 管理台` : "成员管理｜HSD 管理台" }));
 </script>
 
 <template>
@@ -100,8 +179,9 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
             <label>学号<input :value="member.studentId" readonly></label>
             <label>年级<input :value="member.grade" readonly></label>
             <label>当前身份<select v-model="identityDraft" :disabled="member.identity === '正式成员'"><option value="正式成员">正式成员</option><option value="预备成员">预备成员</option></select></label>
-            <label>所属中心<select :value="member.center" disabled><option>白泽开发中心</option><option>新媒体中心</option><option>拓维策划中心</option><option>人才发展中心</option></select></label>
-            <label>成员职责<select :value="member.memberDuty" disabled><option>普通成员</option><option>核心人员</option></select></label>
+            <label>所属中心<select v-if="organizationGateway && member.identity === '预备成员'" v-model="promotionCenterId"><option value="">请选择中心</option><option v-for="center in memberAdministration.apiCenters" :key="center.id" :value="center.id">{{ center.name }}</option></select><input v-else :value="member.center" readonly></label>
+            <label>成员职责<select v-if="organizationGateway && member.identity === '预备成员'" v-model="promotionDuty"><option value="REGULAR">普通成员</option><option value="CORE">核心人员</option></select><input v-else :value="member.memberDuty" readonly></label>
+            <label v-if="organizationGateway && member.identity === '预备成员' && selectedPromotionCenter?.slug === 'baize-development'">实践方向<select v-model="promotionBaizeDirection"><option value="">请选择实践方向</option><option v-for="(label, code) in BAIZE_DIRECTION_LABELS" :key="code" :value="code">{{ label }}</option></select></label>
             <label>手机号<input value="138 **** 8899" readonly></label>
             <label>账号状态<select value="正常" disabled><option>正常</option><option>停用</option></select></label>
           </div>
@@ -127,11 +207,30 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
           </div>
         </div>
 
+        <section v-if="organizationGateway" class="admin-detail-form">
+          <header><span>Organization Positions</span><h2>组织职务</h2><p>正式成员所属中心只读；冲突后会刷新权威数据。</p></header>
+          <p v-if="positions.length">{{ positions.map((position) => getOrganizationPositionLabel(position.type)).join("、") }}</p>
+          <p v-else>暂无组织职务</p>
+          <div v-if="canManagePositions">
+            <button type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="toggleCoreMembership">{{ (member.isCore ?? member.memberDuty === '核心人员') ? '降为普通成员' : '设为核心成员' }}</button>
+            <button v-if="!positions.some((item) => item.type === 'ALLIANCE_OWNER')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="appointAllianceOwner">任命联盟负责人</button>
+            <button v-for="position in positions.filter((item) => item.type === 'ALLIANCE_OWNER')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeAllianceOwner(position.version)">撤销联盟负责人</button>
+            <button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="appointMinister">任命为部长</button>
+            <button v-for="position in positions.filter((item) => item.type === 'CENTER_MINISTER')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeMinister(position.version)">撤销部长</button>
+            <label v-if="positions.some((item) => item.type === 'CENTER_MINISTER')">部长交接<select v-model="handoverTargetId"><option value="">选择同中心正式成员</option><option v-for="candidate in handoverCandidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }}</option></select></label>
+            <button v-if="handoverTargetId && positions.some((item) => item.type === 'CENTER_MINISTER')" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="handoverMinister(positions.find((item) => item.type === 'CENTER_MINISTER')!.version)">确认交接</button>
+            <button v-if="!positions.some((item) => item.type === 'PROJECT_LEAD')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="grantProjectLead">授予项目负责人</button>
+            <button v-for="position in positions.filter((item) => item.type === 'PROJECT_LEAD')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeProjectLead(position.version)">撤销项目负责人</button>
+          </div>
+          <p v-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
+        </section>
+
         <footer>
           <span v-if="saveStatus === 'saved'" class="admin-member-save-status" role="status">资料已保存并同步成员目录</span>
           <span v-else-if="saveStatus === 'storage-error'" class="admin-member-save-status is-error" role="alert">浏览器存储暂不可用，未保存身份变更</span>
           <span v-else-if="saveStatus === 'not-eligible'" class="admin-member-save-status is-error" role="alert">仅支持预备成员转为正式成员</span>
-          <span v-else>最后更新：{{ member.updatedAt }} · Mock 会话</span>
+          <span v-else-if="saveStatus === 'api-error'" class="admin-member-save-status is-error" role="alert">{{ memberAdministration.apiError?.message || "正式成员身份转换失败，请刷新后重试" }}</span>
+          <span v-else>最后更新：{{ member.updatedAt }} · {{ organizationGateway ? "API 实时数据" : "Mock 会话" }}</span>
           <button type="button" class="button" @click="requestSave">保存资料</button>
         </footer>
       </section>
@@ -142,8 +241,11 @@ useHead({ title: `${member.value.name}｜成员管理｜HSD 管理台` });
         <span>Identity Change</span>
         <h2 id="identity-title">确认转为正式成员？</h2>
         <p>保存后将复用现有成员帐号，写入正式成员档案，并同步成员空间、中心关系和公开成员目录；不会创建新帐号、重置密码或修改管理员资格。</p>
-        <div><button type="button" class="button button--ghost" @click="showPromotionConfirm = false">返回检查</button><button type="button" class="button" @click="confirmPromotion">确认保存</button></div>
+        <div><button type="button" class="button button--ghost" @click="showPromotionConfirm = false">返回检查</button><button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="confirmPromotion">确认保存</button></div>
       </section>
     </div>
   </div>
+  <p v-else-if="memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步成员资料…</p>
+  <p v-else-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
+  <p v-else-if="organizationGateway" class="member-profile-error" role="alert">成员不存在或当前帐号无权查看。</p>
 </template>

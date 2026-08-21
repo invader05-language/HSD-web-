@@ -8,15 +8,16 @@ const NOW = new Date("2026-08-07T09:00:00.000Z");
 function projectInput(overrides: Record<string, unknown> = {}) {
   return {
     title: "智巡先锋测试项目",
-    category: "AI × HarmonyOS",
+    category: "SMART_HARDWARE",
     year: "2026",
     description: "面向校园巡检与应急协同的智能解决方案。",
     achievement: "场景验证中",
     projectStage: "场景验证中",
     challenge: "校园巡检信息分散，现场异常难以及时同步。",
     solution: "通过识别、告警、处置和复盘形成闭环。",
-    technologies: ["HarmonyOS", "AI 视觉识别"],
-    memberCount: 8,
+    memberPersonIds: ["person-1", "person-2"],
+    members: [{ personId: "person-1", name: "Member one" }, { personId: "person-2", name: "Member two" }],
+    displayOrder: 1,
     ownerCenterId: "baize-development",
     cover: {
       id: "project-cover",

@@ -5,6 +5,8 @@ import {
 } from "~/data/admin-members";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { useMemberAdministrationStore } from "~/stores/member-administration";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
+import { hasOrganizationPosition, organizationMemberLabel } from "~/utils/organization-member-display";
 import {
   BAIZE_DIRECTIONS,
   DEFAULT_FORMAL_MEMBER_PASSWORD,
@@ -22,20 +24,24 @@ const filters = reactive<AdminMemberFilters>({
   center: "全部中心",
   identity: "全部身份"
 });
-const memberRepository = useMemberRepository();
 const memberAdministration = useMemberAdministrationStore();
+const organizationGateway = useOrganizationGateway();
+if (organizationGateway) memberAdministration.activateApiMode();
+const memberRepository = useMemberRepository();
 const route = useRoute();
 const adminMembers = memberRepository.adminMembers;
 const visible = computed(() => filterAdminMembers(adminMembers.value, filters));
 const formalCount = computed(() => adminMembers.value.filter((member) => member.identity === "正式成员").length);
 const coreCount = computed(() => adminMembers.value.filter((member) => (
   member.identity === "正式成员"
-  && (member.memberDuty === "核心人员" || Boolean(member.centerLeadership))
+  && (member.isCore ?? member.memberDuty === "核心人员")
 )).length);
-const centerLeadCount = computed(() => adminMembers.value.filter((member) => Boolean(member.centerLeadership)).length);
+const centerLeadCount = computed(() => adminMembers.value.filter((member) => (
+  hasOrganizationPosition(member, "CENTER_MINISTER")
+)).length);
 const showCreateMember = ref(false);
 const createErrors = reactive<CreateFormalMemberErrors>({});
-const createStatus = ref<"idle" | "duplicate" | "storage-error">("idle");
+const createStatus = ref<"idle" | "duplicate" | "storage-error" | "api-error">("idle");
 
 function createEmptyMember(): CreateFormalMemberInput {
   return {
@@ -71,12 +77,14 @@ function closeCreateMember() {
   resetCreateMember();
 }
 
-function submitCreateMember() {
+async function submitCreateMember() {
   for (const key of Object.keys(createErrors) as (keyof CreateFormalMemberErrors)[]) {
     delete createErrors[key];
   }
   createStatus.value = "idle";
-  const result = memberAdministration.createFormalMember(createMember);
+  const result = organizationGateway
+    ? await memberAdministration.createFormalMemberFromApi(createMember, organizationGateway)
+    : memberAdministration.createFormalMember(createMember);
   if (result.status === "invalid_input") {
     Object.assign(createErrors, result.errors);
     return;
@@ -87,6 +95,10 @@ function submitCreateMember() {
   }
   if (result.status === "storage_unavailable") {
     createStatus.value = "storage-error";
+    return;
+  }
+  if (result.status === "api_error") {
+    createStatus.value = "api-error";
     return;
   }
   closeCreateMember();
@@ -102,7 +114,8 @@ watch(() => createMember.center, (center) => {
   if (center !== "白泽开发中心") createMember.baizeDirection = undefined;
 });
 
-onMounted(() => {
+onMounted(async () => {
+  if (organizationGateway) await memberAdministration.refreshFromApi(organizationGateway);
   if (route.query.create === "member") openCreateMember();
 });
 
@@ -122,11 +135,14 @@ onBeforeUnmount(() => {
     </AdminPageHeading>
 
     <section class="admin-summary-strip" aria-label="成员概览">
-      <div><span>全部成员</span><strong>{{ adminMembers.length }}</strong><small>当前 Mock 名单</small></div>
+      <div><span>全部成员</span><strong>{{ adminMembers.length }}</strong><small>{{ organizationGateway ? "API 实时名单" : "Mock 演示名单" }}</small></div>
       <div><span>正式成员</span><strong>{{ formalCount }}</strong><small>默认进入公开名录</small></div>
-      <div><span>核心人员</span><strong>{{ coreCount }}</strong><small>含中心负责人</small></div>
-      <div><span>中心负责人</span><strong>{{ centerLeadCount }}</strong><small>由管理员资格派生</small></div>
+      <div><span>核心人员</span><strong>{{ coreCount }}</strong><small>由成员等级决定</small></div>
+      <div><span>部长</span><strong>{{ centerLeadCount }}</strong><small>由组织职务决定</small></div>
     </section>
+
+    <p v-if="memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步成员组织数据…</p>
+    <p v-else-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
 
     <section class="admin-list-card">
       <header><div><span>Member Management</span><h2>成员管理名单</h2></div><p>共 {{ visible.length }} 人</p></header>
@@ -143,7 +159,7 @@ onBeforeUnmount(() => {
               <td><strong>{{ member.name }}</strong><small>{{ member.studentId }}</small></td>
               <td><AdminStatusPill :status="member.identity" /></td>
               <td>{{ member.center }}</td>
-              <td>{{ member.centerLeadership ? "核心人员 · 中心负责人" : member.memberDuty }}</td>
+              <td>{{ organizationMemberLabel(member) }}</td>
               <td>{{ member.center === "白泽开发中心" ? (member.baizeDirection || "—") : "—" }}</td>
               <td>{{ member.grade }}</td>
               <td>{{ member.updatedAt }}</td>
@@ -193,12 +209,13 @@ onBeforeUnmount(() => {
               </div>
               <p v-if="createStatus === 'duplicate'" class="member-profile-error" role="alert">该学号已存在，不能重复创建帐号。</p>
               <p v-else-if="createStatus === 'storage-error'" class="member-profile-error" role="alert">浏览器存储暂不可用，未创建任何帐号或成员资料。</p>
+              <p v-else-if="createStatus === 'api-error'" class="member-profile-error" role="alert">{{ memberAdministration.apiError?.message ?? "成员创建失败，请刷新后重试。" }}</p>
             </section>
           </form>
           <footer class="admin-drawer__footer">
             <span>保存后帐号和正式成员资料会同时生效</span>
             <button type="button" class="button button--ghost" @click="closeCreateMember">取消</button>
-            <button type="button" class="button" @click="submitCreateMember">确认添加</button>
+            <button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="submitCreateMember">确认添加</button>
           </footer>
         </aside>
       </div>

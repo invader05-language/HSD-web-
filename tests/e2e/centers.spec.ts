@@ -109,6 +109,30 @@ test("1440px overview exposes a non-hover action and the whole center card navig
   await expect(page.getByRole("heading", { level: 1, name: "白泽开发中心" })).toBeVisible();
 });
 
+test("overview renders live alliance owners with the shared leadership card treatment", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/centers", { waitUntil: "networkidle" });
+
+  const panel = page.getByTestId("organization-leadership-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("2 位负责人");
+  await expect(panel.locator("[data-testid='organization-leadership-card']")).toHaveCount(2);
+  await expect(panel.getByText("徐一鸣", { exact: true })).toBeVisible();
+  await expect(panel.getByText("郭展良", { exact: true })).toBeVisible();
+  await expect(panel.getByText("联盟负责人", { exact: true }).first()).toBeVisible();
+  await expect(panel).not.toContainText("202402210204");
+  await expect(panel).not.toContainText("24通信工程2班");
+  await expect(panel.locator("a[href^='/people/']")).toHaveCount(2);
+  expect(await panel.locator(".organization-leadership__grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(2);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: "networkidle" });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await expect(panel.locator("[data-testid='organization-leadership-card']")).toHaveCount(2);
+  expect(await panel.locator(".organization-leadership__grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(1);
+});
+
 test("about collaboration cards navigate from the card body", async ({ page }) => {
   await page.goto("/about");
   const card = page.getByRole("link", { name: /新媒体中心.*查看中心详情/ });
@@ -131,4 +155,35 @@ test("mobile center switcher keeps its heading on the content edge", async ({ pa
   const box = await heading.boundingBox();
 
   expect(box?.x).toBeLessThan(40);
+});
+
+test("center details use the live roster with leadership cards, filters, and bounded pages", async ({ page }) => {
+  const liveCenters = [
+    { slug: "baize-development", members: 38, core: 13, ministers: ["李靖镖"] },
+    { slug: "new-media", members: 24, core: 10, ministers: ["肖子妤", "李泽宇", "陈奕伟"] },
+    { slug: "tuowei-planning", members: 12, core: 3, ministers: ["赵志文", "梁欣然"] },
+    { slug: "talent-development", members: 48, core: 1, ministers: ["陈旭涛"] },
+  ] as const;
+
+  for (const center of liveCenters) {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(`/centers/${center.slug}`, { waitUntil: "networkidle" });
+    await expect(page.getByText(`共 ${center.members} 位成员`, { exact: false })).toBeVisible();
+    await expect(page.locator("[data-testid='center-member-card']")).toHaveCount(8);
+    await expect(page.locator("[data-testid='center-minister-card']")).toHaveCount(center.ministers.length);
+    for (const minister of center.ministers) await expect(page.getByText(minister, { exact: true }).first()).toBeVisible();
+
+    await page.goto(`/centers/${center.slug}?memberPage=2`, { waitUntil: "networkidle" });
+    await expect(page.getByText(/第 2 页/)).toBeVisible();
+    await expect(page.locator("[data-testid='center-member-card']")).toHaveCount(Math.min(8, center.members - 8));
+
+    await page.goto(`/centers/${center.slug}?memberType=core`, { waitUntil: "networkidle" });
+    await expect(page.getByText(`当前显示 核心成员 ${center.core} 人`, { exact: false })).toBeVisible();
+    await expect(page.locator("[data-testid='center-member-card']")).toHaveCount(Math.min(8, center.core));
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/centers/${center.slug}`, { waitUntil: "networkidle" });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  }
 });

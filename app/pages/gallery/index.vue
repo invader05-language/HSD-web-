@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { useGalleryStore } from "~/stores/gallery";
+import { useContentGateway } from "~/composables/useContentGateway";
 import type { GalleryAsset } from "~/data/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
+import { galleryCategoryLabel } from "~/types/gallery";
 import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
 
-const categories = ["全部", "活动摄影", "海报设计", "短视频", "人物专访"] as const;
+const categories = ["全部", "活动纪实", "视觉创作", "视频作品", "人物风采"] as const;
 const galleryStore = useGalleryStore();
-if (import.meta.client) galleryStore.hydrate();
+const gateway = useContentGateway();
+if (gateway) galleryStore.activateApiMode();
+if (import.meta.client && !gateway) galleryStore.hydrate();
+onMounted(() => { if (gateway) void galleryStore.refreshPublicFromApi(gateway); });
 const active = ref("全部");
 const pageSize = 6;
 const currentPage = ref(1);
 const filtered = computed(() => active.value === "全部"
   ? galleryStore.getPublicAlbums()
-  : galleryStore.getPublicAlbums().filter((album) => album.category === active.value));
+  : galleryStore.getPublicAlbums().filter((album) => galleryCategoryLabel(album.category) === active.value));
 const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)));
 const visible = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
@@ -62,6 +67,8 @@ async function goToPage(page: number) {
     />
     <section class="section section--cool">
       <div class="shell">
+        <p v-if="galleryStore.apiError" role="alert">{{ galleryStore.apiError.message }}（{{ galleryStore.apiError.code }}）</p>
+        <p v-if="galleryStore.apiLoading" role="status">正在加载公开画廊…</p>
         <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${filtered.length} 件作品`" />
         <div v-if="visible.length" id="gallery-results" class="gallery-catalog">
           <NuxtLink
@@ -71,10 +78,10 @@ async function goToPage(page: number) {
             class="gallery-album-card"
             :class="{ 'is-featured': index === 0 }"
           >
-            <ContentMediaView v-if="album.assets[0]" :item="toMediaItem(album.assets[0])" preview="thumbnail" :controls="false" />
+            <ContentMediaView v-if="album.cover ?? album.assets[0]" :item="toMediaItem((album.cover ?? album.assets[0])!)" preview="thumbnail" :controls="false" />
             <span v-else class="gallery-album-card__fallback" aria-hidden="true">&lt; HSD &gt;</span>
             <span class="gallery-album-card__copy">
-              <small>{{ album.category }} · {{ album.year }}</small>
+              <small>{{ galleryCategoryLabel(album.category) }} · {{ album.year }}</small>
               <strong>{{ album.title }}</strong>
               <span>{{ album.summary }}</span>
             </span>

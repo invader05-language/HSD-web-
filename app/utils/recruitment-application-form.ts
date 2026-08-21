@@ -48,15 +48,14 @@ export function validateApplicationDraft(
   const firstChoice = draft.firstChoice;
   const secondChoice = draft.secondChoice as string | undefined;
   const thirdChoice = draft.thirdChoice as string | undefined;
-  const allowedLaterChoices = RECRUITMENT_CENTERS.filter((center) => center !== "白泽开发中心");
   const laterChoices = [draft.secondChoice, draft.thirdChoice].filter(Boolean);
+  const selectedChoices = [firstChoice, secondChoice, thirdChoice];
+  const includesBaize = selectedChoices.includes("白泽开发中心");
 
   if (!firstChoice || !RECRUITMENT_CENTERS.includes(firstChoice)) errors.firstChoice = "请选择第一志愿。";
 
-  if (secondChoice === "白泽开发中心") errors.secondChoice = "白泽开发中心只能作为第一志愿。";
-  else if (secondChoice && !allowedLaterChoices.includes(secondChoice as (typeof allowedLaterChoices)[number])) errors.secondChoice = "请选择有效的第二志愿。";
-  if (thirdChoice === "白泽开发中心") errors.thirdChoice = "白泽开发中心只能作为第一志愿。";
-  else if (thirdChoice && !allowedLaterChoices.includes(thirdChoice as (typeof allowedLaterChoices)[number])) errors.thirdChoice = "请选择有效的第三志愿。";
+  if (secondChoice && !RECRUITMENT_CENTERS.includes(secondChoice as (typeof RECRUITMENT_CENTERS)[number])) errors.secondChoice = "请选择有效的第二志愿。";
+  if (thirdChoice && !RECRUITMENT_CENTERS.includes(thirdChoice as (typeof RECRUITMENT_CENTERS)[number])) errors.thirdChoice = "请选择有效的第三志愿。";
   if (firstChoice && draft.secondChoice === firstChoice) errors.secondChoice = "第二志愿不能与第一志愿重复。";
   if (firstChoice && draft.thirdChoice === firstChoice) errors.thirdChoice = "第三志愿不能与第一志愿重复。";
   if (draft.secondChoice && draft.thirdChoice === draft.secondChoice) errors.thirdChoice = "第三志愿不能与第二志愿重复。";
@@ -64,7 +63,7 @@ export function validateApplicationDraft(
     errors.thirdChoice = "志愿不能重复。";
   }
 
-  if (firstChoice === "白泽开发中心") {
+  if (includesBaize) {
     if (!draft.baizeDirection || !BAIZE_DIRECTIONS.includes(draft.baizeDirection)) {
       errors.baizeDirection = "请选择白泽意向方向。";
     }

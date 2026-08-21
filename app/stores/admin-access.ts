@@ -1,4 +1,10 @@
 import { defineStore } from "pinia";
+import type {
+  AdminAccountResponseDto,
+  AdminCenterResponseDto,
+  ManagedMemberResponseDto,
+} from "../../packages/api-client/src";
+import type { OrganizationGateway } from "../services/organization/organization-gateway";
 import {
   ADMIN_ACCESS_STORAGE_KEY,
   ADMIN_ACCESS_STORAGE_VERSION,
@@ -37,10 +43,26 @@ interface AdminAccessState {
   accounts: MockAccount[];
   qualificationDetails: Record<string, AdminQualificationDetails>;
   auditRecords: AdminAuditRecord[];
+  apiModeActive: boolean;
+  apiLoading: boolean;
+  apiError: AdminAccessApiError | null;
+  apiAccountRecords: AdminAccountResponseDto[];
+  apiCenters: AdminCenterResponseDto[];
+  apiManagedMembers: ManagedMemberResponseDto[];
 }
 
-interface PersistedAdminAccessState extends AdminAccessState {
+interface PersistedAdminAccessState {
   version: typeof ADMIN_ACCESS_STORAGE_VERSION;
+  accounts: MockAccount[];
+  qualificationDetails: Record<string, AdminQualificationDetails>;
+  auditRecords: AdminAuditRecord[];
+}
+
+export interface AdminAccessApiError {
+  status?: number;
+  code: string;
+  message: string;
+  requestId?: string;
 }
 
 const INITIAL_QUALIFICATION_DETAILS: Record<string, AdminQualificationDetails> = {
@@ -113,7 +135,45 @@ function createInitialState(): AdminAccessState {
   return {
     accounts: cloneAccounts(),
     qualificationDetails: cloneQualificationDetails(),
-    auditRecords: cloneAuditRecords()
+    auditRecords: cloneAuditRecords(),
+    apiModeActive: false,
+    apiLoading: false,
+    apiError: null,
+    apiAccountRecords: [],
+    apiCenters: [],
+    apiManagedMembers: [],
+  };
+}
+
+function accessApiError(cause: unknown): AdminAccessApiError {
+  if (cause instanceof Error) {
+    const error = cause as Error & { status?: number; code?: string; requestId?: string };
+    return {
+      ...(error.status === undefined ? {} : { status: error.status }),
+      code: error.code ?? "ORGANIZATION_API_REQUEST_FAILED",
+      message: error.message,
+      ...(error.requestId ? { requestId: error.requestId } : {}),
+    };
+  }
+  return { code: "ORGANIZATION_API_REQUEST_FAILED", message: "Organization API request failed" };
+}
+
+function apiCenterRole(centerName: string | undefined): AdminCenterRole | undefined {
+  if (!centerName) return undefined;
+  const role = `${centerName}负责人` as AdminCenterRole;
+  return ADMIN_CENTER_LEAD_LABELS.includes(role) ? role : undefined;
+}
+
+function apiAccountToStoreAccount(account: AdminAccountResponseDto): MockAccount {
+  const adminCenterRole = account.adminLevel === "ADMIN" ? apiCenterRole(account.adminCenter?.name) : undefined;
+  return {
+    account: account.username,
+    memberId: account.person.id,
+    name: account.person.name,
+    adminLevel: account.adminLevel.toLocaleLowerCase() as AdminLevel,
+    adminAccessEnabled: account.status === "ENABLED",
+    mustChangePassword: account.mustChangePassword,
+    ...(adminCenterRole ? { adminCenterRole } : {}),
   };
 }
 
@@ -197,7 +257,7 @@ function migratePersistedAccounts(value: unknown, version: unknown): unknown {
   ));
 }
 
-function parsePersistedState(serialized: string | null): AdminAccessState | undefined {
+function parsePersistedState(serialized: string | null): Omit<PersistedAdminAccessState, "version"> | undefined {
   if (!serialized) return undefined;
   try {
     const parsed: unknown = JSON.parse(serialized);
@@ -265,7 +325,7 @@ function restoreInitialOrPersistedState(): AdminAccessState {
     serialized = null;
   }
   const persisted = parsePersistedState(serialized);
-  return persisted ?? createInitialState();
+  return persisted ? { ...createInitialState(), ...persisted } : createInitialState();
 }
 
 function createPersistedState(state: AdminAccessState): PersistedAdminAccessState {
@@ -298,6 +358,79 @@ export const useAdminAccessStore = defineStore("admin-access", {
     getQualification: (state) => (account: string) => state.qualificationDetails[account]
   },
   actions: {
+    activateApiMode() {
+      this.apiModeActive = true;
+      this.apiLoading = false;
+      this.apiError = null;
+      this.apiAccountRecords = [];
+      this.apiCenters = [];
+      this.apiManagedMembers = [];
+      this.accounts = [];
+      this.qualificationDetails = {};
+      this.auditRecords = [];
+    },
+    async refreshFromApi(gateway: OrganizationGateway): Promise<boolean> {
+      this.apiLoading = true;
+      this.apiError = null;
+      try {
+        const [accounts, centers, members] = await Promise.all([
+          gateway.listAccounts(),
+          gateway.listCenters(),
+          gateway.listManagedMembers(),
+        ]);
+        this.apiAccountRecords = accounts.items;
+        this.apiCenters = centers.items;
+        this.apiManagedMembers = members.items;
+        this.accounts = this.apiAccountRecords.map(apiAccountToStoreAccount);
+        this.qualificationDetails = Object.fromEntries(this.apiAccountRecords.map((account) => [
+          account.username,
+          {
+            configuredBy: "API",
+            configuredAt: account.updatedAt,
+            lastLoginAt: account.lastLoginAt ?? "尚未登录",
+          },
+        ]));
+        return true;
+      } catch (cause) {
+        this.apiError = accessApiError(cause);
+        return false;
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async assignAdminCenterRoleFromApi(
+      username: string,
+      centerRole: AdminCenterRole,
+      gateway: OrganizationGateway,
+    ): Promise<{ status: "success" | "api_error" }> {
+      const account = this.apiAccountRecords.find((candidate) => candidate.username === username);
+      const center = this.apiCenters.find((candidate) => apiCenterRole(candidate.name) === centerRole);
+      if (!account || !center) {
+        this.apiError = { code: "LEADERSHIP_TARGET_NOT_FOUND", message: "Leadership target or center is unavailable" };
+        return { status: "api_error" };
+      }
+      this.apiLoading = true;
+      this.apiError = null;
+      try {
+        const member = this.apiManagedMembers.find((candidate) => candidate.id === account.person.id);
+        if (!member?.membership || member.membership.center.id !== center.id) {
+          this.apiError = { code: "CENTER_MEMBERSHIP_REQUIRED", message: "An active membership in the selected center is required" };
+          return { status: "api_error" };
+        }
+        await gateway.appointCenterMinister(center.id, account.person.id, {
+          expectedAccountVersion: account.version,
+          expectedMembershipVersion: member.membership.version,
+        });
+        await this.refreshFromApi(gateway);
+        if (this.apiError) return { status: "api_error" };
+        return { status: "success" };
+      } catch (cause) {
+        this.apiError = accessApiError(cause);
+        return { status: "api_error" };
+      } finally {
+        this.apiLoading = false;
+      }
+    },
     resolveOwnerActor(actor: AdminQualificationActor): AdminQualificationActor | undefined {
       const account = this.getAccount(actor.account);
       if (!account || account.adminLevel !== "owner" || !account.adminAccessEnabled) return undefined;

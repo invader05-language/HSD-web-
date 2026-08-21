@@ -17,7 +17,8 @@ export const BAIZE_DIRECTIONS = [
 
 export type RecruitmentCenter = (typeof RECRUITMENT_CENTERS)[number];
 export type BaizeDirection = (typeof BAIZE_DIRECTIONS)[number];
-export type LaterChoice = Exclude<RecruitmentCenter, "白泽开发中心">;
+/** @deprecated White-zé may appear at any preference rank. */
+export type LaterChoice = RecruitmentCenter;
 
 export function isBaizeDirection(value: unknown): value is BaizeDirection {
   return typeof value === "string"
@@ -32,8 +33,8 @@ export type RegistrationProfileDraft = Pick<
 export interface RecruitmentApplicationDraft {
   contact: string;
   firstChoice?: RecruitmentCenter;
-  secondChoice?: LaterChoice;
-  thirdChoice?: LaterChoice;
+  secondChoice?: RecruitmentCenter;
+  thirdChoice?: RecruitmentCenter;
   baizeDirection?: BaizeDirection;
   acceptsAdjustment?: boolean;
 }
@@ -73,8 +74,8 @@ export interface SubmittedRecruitmentApplication {
   batchVersionAtSubmission: number;
   batchNameSnapshot: string;
   applicantProfileSnapshot: ApplicantProfileSnapshot;
-  secondChoice?: LaterChoice;
-  thirdChoice?: LaterChoice;
+  secondChoice?: RecruitmentCenter;
+  thirdChoice?: RecruitmentCenter;
   baizeDirection?: BaizeDirection;
   contact: string;
   firstChoice: RecruitmentCenter;

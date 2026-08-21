@@ -1,6 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryLightbox from "../../app/components/GalleryLightbox.vue";
 import GalleryMediaFrame from "../../app/components/GalleryMediaFrame.vue";
 import ContentMediaView from "../../app/components/ContentMediaView.vue";
@@ -24,8 +24,13 @@ const secondAsset: GalleryAsset = {
   imageUrl: firstAsset.imageUrl
 };
 
+beforeEach(() => {
+  vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: true } }));
+});
+
 afterEach(() => {
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
 });
 
 describe("gallery image fallback", () => {

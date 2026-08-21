@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { HOMEPAGE_SLOTS } from "~/data/admin-content";
+import { useContentGateway } from "~/composables/useContentGateway";
 import { usePortalCatalog } from "~/composables/usePortalCatalog";
 import { resolveHomepageProjection } from "~/composables/usePublishedPortal";
+import { useActivitiesStore } from "~/stores/activities";
+import { useGalleryStore } from "~/stores/gallery";
 import { usePortalConfigStore } from "~/stores/portal-config";
+import { useProjectsStore } from "~/stores/projects";
+import { useResourcesStore } from "~/stores/resources";
 import { useSessionStore } from "~/stores/session";
 import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
@@ -20,6 +25,12 @@ const route = useRoute();
 const router = useRouter();
 const configStore = usePortalConfigStore();
 const session = useSessionStore();
+const contentGateway = useContentGateway();
+const runtimeConfig = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const projectsStore = useProjectsStore();
+const activitiesStore = useActivitiesStore();
+const galleryStore = useGalleryStore();
+const resourcesStore = useResourcesStore();
 const catalog = computed(() => usePortalCatalog());
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
@@ -30,8 +41,9 @@ const visualDraft = reactive<{ home: PortalVisualConfig; join: PortalVisualConfi
   home: { ...configStore.draftConfig.visuals.home },
   join: { ...configStore.draftConfig.visuals.join },
 });
-const previewProjection = computed(() => resolveHomepageProjection(configStore.preview().slots, catalog.value));
-const canPublish = computed(() => session.adminLevel === "owner");
+const previewProjection = computed(() => resolveHomepageProjection(configStore.draftConfig.slots, catalog.value));
+const canConfigure = computed(() => session.hasCapability("portal.configure"));
+const canPublish = computed(() => session.hasCapability("portal.publish"));
 const recommendationsTab = ref<HTMLButtonElement | null>(null);
 const visualsTab = ref<HTMLButtonElement | null>(null);
 const previewDialog = ref<HTMLElement | null>(null);
@@ -39,6 +51,24 @@ const previewCloseButton = ref<HTMLButtonElement | null>(null);
 const publishDialog = ref<HTMLElement | null>(null);
 const publishCancelButton = ref<HTMLButtonElement | null>(null);
 let dialogTrigger: HTMLElement | null = null;
+
+watch(() => configStore.draftConfig.visuals, (visuals) => {
+  for (const slot of ["home", "join"] as const) {
+    for (const key of Object.keys(visualDraft[slot])) delete visualDraft[slot][key as keyof PortalVisualConfig];
+    Object.assign(visualDraft[slot], visuals[slot]);
+  }
+}, { deep: true });
+
+onMounted(() => {
+  if (!contentGateway) return;
+  void Promise.all([
+    configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
+    projectsStore.refreshPublicFromApi(contentGateway),
+    activitiesStore.refreshPublicFromApi(contentGateway),
+    galleryStore.refreshPublicFromApi(contentGateway),
+    resourcesStore.refreshPublicFromApi(contentGateway),
+  ]);
+});
 
 function setView(view: PortalConfigView, focus = false) {
   void router.replace({ query: view === "visuals" ? { ...route.query, view } : { ...route.query, view: undefined } }).then(() => {
@@ -91,10 +121,12 @@ function selectReference(slot: PortalSlotId, index: number, event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   const candidate = catalog.value.find((item) => referenceKey(item) === value);
   if (!candidate) return;
-  runDraftAction(() => configStore.replaceReference(slot, index, {
+  const references = [...configStore.draftConfig.slots[slot]];
+  references.splice(index, index === references.length ? 0 : 1, {
     entityType: candidate.entityType,
     sourceId: candidate.sourceId,
-  }, catalog.value));
+  });
+  void runDraftAction({ slots: { [slot]: references } });
 }
 
 function portalErrorMessage(error: unknown) {
@@ -110,9 +142,10 @@ function portalErrorMessage(error: unknown) {
   return "配置操作失败，请检查当前内容和权限后重试。";
 }
 
-function runDraftAction(action: () => unknown) {
+async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]) {
   try {
-    action();
+    if (runtimeConfig.public.useMockApi) configStore.saveDraft(patch);
+    else await configStore.saveDraftForRuntime(runtimeConfig.public, contentGateway, patch);
     if (configStore.persistenceError) {
       errorMessage.value = portalErrorMessage(new Error(configStore.persistenceError));
       statusMessage.value = "";
@@ -127,11 +160,17 @@ function runDraftAction(action: () => unknown) {
 }
 
 function moveReference(slot: PortalSlotId, index: number, direction: "up" | "down") {
-  runDraftAction(() => configStore.moveReference(slot, index, direction));
+  const references = [...configStore.draftConfig.slots[slot]];
+  const target = index + (direction === "up" ? -1 : 1);
+  if (target < 0 || target >= references.length) return;
+  [references[index], references[target]] = [references[target]!, references[index]!];
+  void runDraftAction({ slots: { [slot]: references } });
 }
 
 function removeReference(slot: PortalSlotId, index: number) {
-  runDraftAction(() => configStore.removeReference(slot, index));
+  const references = [...configStore.draftConfig.slots[slot]];
+  references.splice(index, 1);
+  void runDraftAction({ slots: { [slot]: references } });
 }
 
 function saveVisualDraft() {
@@ -153,7 +192,7 @@ function saveVisualDraft() {
     statusMessage.value = "";
     return;
   }
-  runDraftAction(() => configStore.saveDraft({ visuals }));
+  void runDraftAction({ visuals });
 }
 
 function updateVisualMedia(slot: "home" | "join", items: ContentMediaAttachment[]) {
@@ -168,9 +207,10 @@ function visualMedia(slot: "home" | "join") {
   return visualDraft[slot].media ? [visualDraft[slot].media] : [];
 }
 
-function publishConfiguration() {
+async function publishConfiguration() {
   try {
-    configStore.publish(catalog.value, true);
+    if (runtimeConfig.public.useMockApi) configStore.publish(catalog.value, true);
+    else await configStore.publishForRuntime(runtimeConfig.public, contentGateway, true);
     closeDialog("publish");
     errorMessage.value = "";
     statusMessage.value = "门户配置已整份发布，用户端现在读取新版本。";
@@ -181,7 +221,16 @@ function publishConfiguration() {
   }
 }
 
-function openDialog(kind: "preview" | "publish", event: MouseEvent) {
+async function openDialog(kind: "preview" | "publish", event: MouseEvent) {
+  if (kind === "preview" && !runtimeConfig.public.useMockApi) {
+    try {
+      await configStore.previewForRuntime(runtimeConfig.public, contentGateway);
+    } catch (error) {
+      errorMessage.value = portalErrorMessage(error);
+      statusMessage.value = "";
+      return;
+    }
+  }
   dialogTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   if (kind === "preview") showPreview.value = true;
   else showPublishConfirmation.value = true;
@@ -234,11 +283,12 @@ onBeforeUnmount(() => {
   <div class="admin-recruitment-page admin-section-page admin-portal-config">
     <AdminPageHeading eyebrow="Portal Publishing" title="门户配置" description="维护首页推荐位和预定义页面主视觉。所有更改先进入草稿，联盟总负责人确认后整份发布。">
       <template #actions>
-        <button type="button" class="button button--ghost" @click="openDialog('preview', $event)">预览门户草稿</button>
+        <button v-if="canConfigure" type="button" class="button button--ghost" @click="openDialog('preview', $event)">预览门户草稿</button>
         <button v-if="canPublish" type="button" class="button" @click="openDialog('publish', $event)">发布门户配置</button>
       </template>
     </AdminPageHeading>
 
+    <template v-if="canConfigure">
     <div class="admin-portal-tabs" role="tablist" aria-label="门户配置视图">
       <button id="portal-tab-recommendations" ref="recommendationsTab" type="button" role="tab" aria-controls="portal-panel-recommendations" :aria-selected="activeView === 'recommendations'" :tabindex="activeView === 'recommendations' ? 0 : -1" @keydown="handleTabKeydown" @click="setView('recommendations')">首页推荐位</button>
       <button id="portal-tab-visuals" ref="visualsTab" type="button" role="tab" aria-controls="portal-panel-visuals" :aria-selected="activeView === 'visuals'" :tabindex="activeView === 'visuals' ? 0 : -1" @keydown="handleTabKeydown" @click="setView('visuals')">页面主视觉</button>
@@ -246,7 +296,7 @@ onBeforeUnmount(() => {
 
     <p v-if="statusMessage" class="admin-portal-message" role="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="admin-portal-message is-error" role="alert">{{ errorMessage }}</p>
-    <div v-if="!canPublish" class="admin-fixed-notice"><strong>发布权限</strong><p>你可以保存和预览门户草稿；整份发布仅限联盟总负责人。</p></div>
+    <div v-if="canConfigure && !canPublish" class="admin-fixed-notice"><strong>发布权限</strong><p>你可以保存和预览门户草稿；整份发布仅限联盟总负责人。</p></div>
 
     <section v-if="activeView === 'recommendations'" id="portal-panel-recommendations" role="tabpanel" aria-labelledby="portal-tab-recommendations" tabindex="0">
       <section class="admin-home-slots" aria-label="首页固定模块">
@@ -274,10 +324,11 @@ onBeforeUnmount(() => {
         <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
         <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
-        <label>辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
+        <label v-if="runtimeConfig.public.useMockApi">辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>
       <footer><p>招新按钮是否可用仍由招新批次控制，门户配置不能覆盖批次开放状态。</p><button type="button" class="button" @click="saveVisualDraft">保存主视觉草稿</button></footer>
     </section>
+    </template>
 
     <Teleport to="body">
       <div v-if="showPreview" class="admin-drawer-backdrop" @click.self="closeDialog('preview')" @keydown="handleDialogKeydown($event, 'preview')">

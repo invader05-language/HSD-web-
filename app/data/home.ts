@@ -25,28 +25,28 @@ export const PROJECTS = [
   {
     slug: "zhixun-xianfeng",
     title: "智巡先锋",
-    category: "AI × HarmonyOS",
+    category: "SMART_HARDWARE",
     description: "面向校园巡检与应急协同的智能解决方案，将识别、告警和处置流程连接起来。",
     achievement: "重点孵化项目 · 场景验证中"
   },
   {
     slug: "zhixue-linghang",
     title: "智学领航",
-    category: "DeepSeek × HarmonyOS",
+    category: "AI_APPLICATION",
     description: "大学生智能学习系统，提供个性化学习路径、实时答疑和生活提醒。",
     achievement: "学习效率工具"
   },
   {
     slug: "xiaobaiyun",
     title: "小白云",
-    category: "校园服务",
+    category: "CAMPUS_SERVICE",
     description: "聚合课表、通知、二手与路线信息，帮助新生更快适应校园生活。",
     achievement: "服务 1000+ 校园用户"
   },
   {
     slug: "zhineng-banlv",
     title: "智能伴侣",
-    category: "HarmonyOS",
+    category: "INDUSTRY_DIGITALIZATION",
     description: "探索软硬件联动的陪伴型应用，用可感知交互连接校园生活场景。",
     achievement: "原型迭代中"
   }

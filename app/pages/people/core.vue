@@ -2,6 +2,8 @@
 import { CENTER_OPTIONS } from "~/data/centers";
 import { getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
+import { usePublicMembersGateway } from '~/composables/usePublicMembersGateway'
+import { usePublicMembersStore } from '~/stores/public-members'
 
 useHead({ title: "核心人员名录｜白云 HSD 开发者部落" });
 
@@ -9,7 +11,19 @@ const query = ref("");
 const center = ref("all");
 const isHydrated = ref(false);
 const memberRepository = useMemberRepository();
-const corePeople = memberRepository.publicCorePeople;
+const publicMembersGateway = usePublicMembersGateway()
+const publicMembersStore = usePublicMembersStore()
+const publicMembersRequest = publicMembersGateway
+  ? await useAsyncData('public-core-members', async () => {
+      await publicMembersStore.refresh(publicMembersGateway)
+      return [...publicMembersStore.items]
+    })
+  : undefined
+const apiPublicPeople = computed(() => publicMembersRequest?.data.value ?? publicMembersStore.items)
+const corePeople = computed(() => publicMembersGateway
+  ? apiPublicPeople.value.filter((person) => person.isCore)
+  : memberRepository.publicCorePeople.value)
+const visibleHonors = (person: typeof corePeople.value[number]) => publicMembersGateway ? person.honors : getFeaturedHonors(person)
 const pageSize = 12;
 const currentPage = ref(1);
 
@@ -64,6 +78,8 @@ watch(pageCount, (nextPageCount) => {
 
     <section class="section section--warm">
       <div class="shell">
+        <p v-if="publicMembersStore.apiLoading" role="status">正在加载公开核心成员…</p>
+        <p v-else-if="publicMembersStore.apiError" role="alert">{{ publicMembersStore.apiError.message }}</p>
         <div class="directory-toolbar">
           <label>
             <span>搜索核心人员</span>
@@ -96,14 +112,15 @@ watch(pageCount, (nextPageCount) => {
             </div>
             <p class="people-core-grid__role">{{ person.memberDuty }}</p>
             <h2>{{ person.name }}</h2>
+            <p v-if="person.positions?.length" class="people-core-grid__role">{{ person.positions.join("、") }}</p>
             <strong v-if="person.baizeDirection">{{ person.baizeDirection }}</strong>
-            <ul v-if="getFeaturedHonors(person).length" class="featured-honors">
+            <ul v-if="visibleHonors(person).length" class="featured-honors">
               <li
-                v-for="honor in getFeaturedHonors(person)"
+                v-for="honor in visibleHonors(person)"
                 :key="honor.id"
                 data-testid="featured-honor"
               >
-                重点荣誉 · {{ honor.title }}
+                荣誉 · {{ honor.title }}
               </li>
             </ul>
             <p v-if="person.bio">{{ person.bio }}</p>

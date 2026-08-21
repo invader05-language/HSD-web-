@@ -52,6 +52,23 @@ describe("administration platform navigation", () => {
     expect(centerAdminItems.map((item) => item.id)).not.toContain("homepage");
   });
 
+  it("shows portal configuration for a capability holder without granting administrator-account management", () => {
+    const items = getAdminNavigationForAccess({
+      canManageAdminAccounts: false,
+      canConfigurePortal: true,
+    }).flatMap((group) => group.items);
+
+    expect(items.map((item) => item.id)).toContain("homepage");
+    expect(items.map((item) => item.id)).not.toContain("accounts");
+  });
+
+  it("derives portal navigation from the portal capability rather than owner-only account access", () => {
+    const layout = readFileSync("app/layouts/admin.vue", "utf8");
+
+    expect(layout).toContain('canConfigurePortal: session.hasCapability("portal.configure")');
+    expect(layout).not.toContain("canConfigurePortal: session.canManageAdminAccounts");
+  });
+
   it("resolves nested routes to the correct navigation item", () => {
     expect(getAdminNavigationState("/admin/resources")).toEqual({
       groupId: "media-resources",

@@ -2,12 +2,15 @@
 import { computed, ref, watch } from "vue";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { useContentMediaUpload } from "~/composables/useContentMediaUpload";
+import type { ContentMediaUploadOwner } from "~/services/content-media/api-content-media.gateway";
 
 const props = withDefaults(defineProps<{
   modelValue: ContentMediaAttachment[];
   mode: "cover" | "collection";
+  maxItems?: number;
   title?: string;
   description?: string;
+  owner?: Omit<ContentMediaUploadOwner, "role" | "sortOrder">;
 }>(), {
   title: "上传素材",
   description: "支持图片或视频，上传后可在此预览和编辑素材信息。",
@@ -39,11 +42,13 @@ async function addFiles(files: FileList | File[]) {
   if (!selected.length) return;
   isUploading.value = true;
   try {
-    const nextFiles = props.mode === "cover" ? selected.slice(0, 1) : selected;
+    const remaining = props.maxItems === undefined ? selected.length : Math.max(0, props.maxItems - items.value.length);
+    const nextFiles = props.mode === "cover" ? selected.slice(0, 1) : selected.slice(0, remaining);
+    if (props.mode === "collection" && nextFiles.length < selected.length) uploadError.value = `最多可上传 ${props.maxItems} 项详情素材`;
     const uploaded = [];
     for (const file of nextFiles) {
       try {
-        uploaded.push(await upload(file, props.mode, items.value.length + uploaded.length));
+        uploaded.push(await upload(file, props.mode, items.value.length + uploaded.length, props.owner));
       } catch (error) {
         uploadError.value = error instanceof Error ? error.message : "素材上传失败";
       }

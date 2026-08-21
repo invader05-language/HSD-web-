@@ -1,15 +1,25 @@
 import {
   createContentMediaAttachment,
+  detectContentMediaAspect,
   normalizeContentMediaAttachments,
   validateContentMediaFile,
 } from "../utils/content-media";
 import { readContentMediaBlob, saveContentMediaBlob } from "../utils/content-media-storage";
 import type { ContentMediaAttachment } from "../types/content-media";
+import { createApiContentMediaGateway, type ContentMediaUploadOwner } from "../services/content-media/api-content-media.gateway";
 
 export function useContentMediaUpload() {
-  async function upload(file: File, mode: "cover" | "collection", sortOrder = 0) {
+  const config = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
+  const production = config.public.useMockApi ? undefined : createApiContentMediaGateway({ apiBase: config.public.apiBase });
+
+  async function upload(file: File, mode: "cover" | "collection", sortOrder = 0, owner?: Omit<ContentMediaUploadOwner, "role" | "sortOrder">) {
     validateContentMediaFile(file, mode);
-    const attachment = createContentMediaAttachment(file, mode === "cover" ? "cover" : "detail", sortOrder);
+    const aspect = await detectContentMediaAspect(file);
+    if (production) {
+      if (!owner) throw new Error("CONTENT_MEDIA_OWNER_REQUIRED");
+      return production.upload(file, { ...owner, aspect: owner.aspect ?? aspect, role: mode === "cover" ? "cover" : "detail", sortOrder });
+    }
+    const attachment = { ...createContentMediaAttachment(file, mode === "cover" ? "cover" : "detail", sortOrder), aspect };
     try {
       if (attachment.localBlobId && import.meta.client) {
         await saveContentMediaBlob(attachment.localBlobId, file);
@@ -35,5 +45,9 @@ export function useContentMediaUpload() {
     return normalizeContentMediaAttachments(attachments, "detail");
   }
 
-  return { upload, resolvePreviewUrl, updateDetails };
+  async function updateMetadata(attachment: ContentMediaAttachment) {
+    return production ? production.updateMetadata(attachment) : attachment;
+  }
+
+  return { upload, resolvePreviewUrl, updateDetails, updateMetadata };
 }

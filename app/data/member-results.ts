@@ -1,8 +1,4 @@
-export type CenterName =
-  | "白泽开发中心"
-  | "新媒体中心"
-  | "拓维策划中心"
-  | "人才发展中心";
+export type CenterName = string;
 
 export type AdmissionStatus =
   | "pending"
@@ -30,6 +26,7 @@ export interface MemberPreference {
 }
 
 export interface ResponsibleContact {
+  personId?: string;
   role: string;
   name: string;
   contact: string;
@@ -41,19 +38,60 @@ export interface MemberResultRecord {
   status: AdmissionStatus;
   identity: MemberIdentity;
   preferences: MemberPreference[];
-  acceptsTransfer: boolean;
+  acceptsTransfer?: boolean;
   baizeInterestDirection?: string;
   currentStage: AssessmentStage;
   currentConclusion: AssessmentConclusion;
   finalCenter?: CenterName;
   finalDirection?: string;
-  responsibleContact?: ResponsibleContact;
+  responsibleContacts?: ResponsibleContact[];
 }
 
 export interface ResultPresentation {
   badge: string;
   headline: string;
   description: string;
+}
+
+export function memberResultFromApi(result?: MyRecruitmentResultDto): MemberResultRecord {
+  if (!result) {
+    return {
+      batchLabel: "暂无已发布结果",
+      status: "no-application",
+      identity: "预备成员",
+      preferences: [],
+      currentStage: "尚未开始",
+      currentConclusion: "待公布",
+    };
+  }
+  const admitted = result.decision === "ADMITTED";
+  const rank = { FIRST: 1, SECOND: 2, THIRD: 3 } as const;
+  return {
+    batchLabel: result.batch.name,
+    status: admitted
+      ? result.admissionSource === "ADJUSTMENT" ? "adjusted-admission" : "admitted"
+      : "not-admitted",
+    identity: admitted ? "正式成员" : "未录取",
+    preferences: result.preferences
+      .slice()
+      .sort((left, right) => rank[left.rank] - rank[right.rank])
+      .map((preference) => ({ rank: rank[preference.rank], center: preference.center.name })),
+    ...(result.baizeDirection
+      ? { baizeInterestDirection: baizeDirectionLabel(result.baizeDirection) }
+      : {}),
+    currentStage: "考核已结束",
+    currentConclusion: admitted ? "通过" : "未通过",
+    ...(result.finalCenter ? { finalCenter: result.finalCenter.name } : {}),
+    ...(result.responsibleContacts.length
+      ? { responsibleContacts: result.responsibleContacts.map((contact) => ({
+          personId: contact.personId,
+          role: "部长",
+          name: contact.name,
+          contact: "",
+          displayContact: contact.displayContact,
+        })) }
+      : {}),
+  };
 }
 
 /**
@@ -84,12 +122,12 @@ export const DEMO_MEMBER_RESULT: MemberResultRecord = {
   currentConclusion: "通过",
   finalCenter: "白泽开发中心",
   finalDirection: "鸿蒙开发",
-  responsibleContact: {
+  responsibleContacts: [{
     role: "白泽开发中心负责人",
     name: "负责人姓名",
     contact: "13800008899",
     displayContact: "138 **** 8899"
-  }
+  }]
 };
 
 export function getDemoMemberResult(
@@ -111,7 +149,7 @@ export function getDemoMemberResult(
 
   const preferences: MemberPreference[] = application
     ? [application.firstChoice, application.secondChoice, application.thirdChoice]
-        .filter((center): center is CenterName => Boolean(center))
+        .filter((center): center is Exclude<typeof center, undefined> => center !== undefined)
         .map((center, index) => ({ rank: (index + 1) as 1 | 2 | 3, center }))
     : [];
 
@@ -219,3 +257,5 @@ export function describeAssessment(record: MemberResultRecord): ResultPresentati
 }
 import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "./member-profile";
 import type { SubmittedRecruitmentApplication } from "./recruitment-application";
+import type { MyRecruitmentResultDto } from "../../packages/api-client/src";
+import { baizeDirectionLabel } from "../utils/baize-direction-label";

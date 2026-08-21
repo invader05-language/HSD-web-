@@ -15,6 +15,8 @@
     "typecheck": "nuxt typecheck",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:extended": "node scripts/run-e2e-extended.mjs",
+    "test:e2e:real": "playwright test tests/e2e/real-stack-smoke.spec.ts tests/e2e/baize-project-real-data.spec.ts --config playwright.config.real.ts",
     "test": "pnpm run test:unit"
   },
   "dependencies": {

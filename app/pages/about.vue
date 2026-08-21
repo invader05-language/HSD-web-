@@ -2,12 +2,27 @@
 import { CENTERS } from "~/data/home";
 import { resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
+import { usePublicMembersGateway } from "~/composables/usePublicMembersGateway";
+import { usePublicMembersStore } from "~/stores/public-members";
 import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
 const memberRepository = useMemberRepository();
-const corePeople = memberRepository.publicCorePeople;
-const publicMembers = memberRepository.publicMembers;
+const publicMembersGateway = usePublicMembersGateway();
+const publicMembersStore = usePublicMembersStore();
+const publicPeopleRequest = publicMembersGateway
+  ? await useAsyncData("about-public-members", async () => {
+      await publicMembersStore.refresh(publicMembersGateway);
+      return [...publicMembersStore.items];
+    })
+  : undefined;
+const apiPublicPeople = computed(() => publicPeopleRequest?.data.value ?? publicMembersStore.items);
+const corePeople = computed(() => publicMembersGateway
+  ? apiPublicPeople.value.filter((person) => person.isCore)
+  : memberRepository.publicCorePeople.value);
+const publicMembers = computed(() => publicMembersGateway
+  ? apiPublicPeople.value.filter((person) => !person.isCore)
+  : memberRepository.publicMembers.value);
 </script>
 
 <template>

@@ -2,6 +2,8 @@
 import { Field, Form } from "vee-validate";
 import { z } from "zod";
 import { useSessionStore } from "~/stores/session";
+import { useSessionGateway } from "~/composables/useSessionGateway";
+import { SessionApiError } from "~/services/api-session.gateway";
 import {
   buildLoginTarget,
   resolveLoginContinuation,
@@ -12,6 +14,8 @@ import { buildPasswordChangeTarget } from "~/utils/password-change";
 
 const route = useRoute();
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const submitting = ref(false);
 const hydrated = ref(false);
 const serverError = ref("");
@@ -54,13 +58,25 @@ const rules = {
 async function signIn(values: Record<string, unknown>) {
   submitting.value = true;
   serverError.value = "";
-  await new Promise((resolve) => setTimeout(resolve, 450));
-  const result = session.signIn(
-    String(values.account ?? ""),
-    String(values.password ?? ""),
-    { requireAdmin: isAdminMode.value }
-  );
-  submitting.value = false;
+  let result;
+  try {
+    result = await session.signInForRuntime(
+      apiRuntime.public,
+      sessionGateway,
+      String(values.account ?? ""),
+      String(values.password ?? ""),
+      { requireAdmin: isAdminMode.value },
+    );
+  } catch (error) {
+    serverError.value = error instanceof SessionApiError && error.code === "INVALID_CREDENTIALS"
+      ? "账号或密码不正确，请检查后重试。"
+      : error instanceof Error
+        ? `登录失败（${error.message}）`
+        : "登录失败，请稍后重试。";
+    return;
+  } finally {
+    submitting.value = false;
+  }
   if (result.status === "password_change_required") {
     await navigateTo(buildPasswordChangeTarget(redirectTarget.value));
     return;

@@ -1,20 +1,33 @@
 <script setup lang="ts">
 import { findResource, PUBLIC_RESOURCES, resourcePrimaryAction } from "~/data/resources";
+import { useResourcesStore } from "~/stores/resources";
+import { useContentGateway } from "~/composables/useContentGateway";
 import { useSessionStore } from "~/stores/session";
 import { buildLoginTarget } from "~/utils/login-continuation";
 
 const route = useRoute();
 const session = useSessionStore();
-const resource = computed(() => findResource(String(route.params.slug)));
+const gateway = useContentGateway();
+const resourcesStore = useResourcesStore();
+const slug = String(route.params.slug);
+if (gateway) {
+  if (resourcesStore.detail?.slug !== slug) resourcesStore.activateApiMode();
+  await useAsyncData(`public-resource-${slug}`, () => resourcesStore.refreshPublicDetailFromApi(gateway, slug));
+}
+const resource = computed<any>(() => gateway ? resourcesStore.detail : findResource(slug));
 
-if (!resource.value) {
+if (gateway && resourcesStore.apiError) {
+  throw createError({ statusCode: resourcesStore.apiError.status ?? 502, statusMessage: resourcesStore.apiError.message });
+}
+
+if (!gateway && !resource.value) {
   throw createError({ statusCode: 404, statusMessage: "资源不存在" });
 }
 
-const action = computed(() => resourcePrimaryAction(resource.value!));
-const isUnavailable = computed(() => ["not-connected", "offline"].includes(resource.value!.status));
+const action = computed(() => gateway ? (resource.value?.kind === "article" ? "阅读正文" : resource.value?.access === "member" ? "登录后访问" : "查看资源") : resourcePrimaryAction(resource.value!));
+const isUnavailable = computed(() => !gateway && ["not-connected", "offline"].includes(resource.value!.status));
 const loginTarget = computed(() => buildLoginTarget(route.fullPath));
-const relatedResources = computed(() => PUBLIC_RESOURCES.filter((item) => item.slug !== resource.value!.slug).slice(0, 3));
+const relatedResources = computed(() => gateway ? [] : PUBLIC_RESOURCES.filter((item) => item.slug !== resource.value!.slug).slice(0, 3));
 
 useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
 </script>
@@ -37,7 +50,7 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
           <h2>{{ resource.kind === "article" ? "学习步骤" : "内容清单" }}</h2>
           <p v-if="resource.kind === 'article'">按以下步骤完成学习，并结合自己的项目记录实践中的问题与收获。</p>
           <ol class="resource-content-list">
-            <li v-for="(item, index) in resource.contents" :key="item"><span>0{{ index + 1 }}</span>{{ item }}</li>
+            <li v-for="(item, index) in (resource.contents ?? [])" :key="item"><span>0{{ Number(index) + 1 }}</span>{{ item }}</li>
           </ol>
 
           <section class="resource-version-list" aria-labelledby="version-heading">
@@ -66,8 +79,9 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
           </dl>
 
           <button v-if="isUnavailable" class="button" type="button" disabled>{{ action }}</button>
-          <a v-else-if="resource.kind === 'external'" class="button" :href="resource.externalUrl" target="_blank" rel="noopener noreferrer">{{ action }}</a>
+          <a v-else-if="!gateway && resource.kind === 'external'" class="button" :href="resource.externalUrl" target="_blank" rel="noopener noreferrer">{{ action }}</a>
           <a v-else-if="resource.kind === 'article'" class="button" href="#resource-content">{{ action }}</a>
+          <a v-else-if="resource.variant?.url" class="button" :href="resource.variant.url">{{ action }}</a>
 
           <NuxtLink
             v-if="resource.access === 'member' && !session.isAuthenticated"

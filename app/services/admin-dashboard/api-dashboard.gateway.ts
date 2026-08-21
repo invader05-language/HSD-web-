@@ -1,4 +1,5 @@
 import type { AdminDashboardGateway, DashboardSnapshotOptions } from "./dashboard-gateway";
+import { ADMIN_DASHBOARD_PATH } from "../../../packages/api-client/src";
 import {
   DASHBOARD_ACTIONS,
   DASHBOARD_CAPABILITIES,
@@ -28,10 +29,6 @@ function hasTarget(value: unknown): boolean {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
 }
 
 function isDateTime(value: unknown): value is string {
@@ -120,8 +117,8 @@ export function isAdminDashboardSnapshot(value: unknown): value is AdminDashboar
     || !isContentSummary(value.content)
     || !(value.portal === null || (
       isRecord(value.portal)
-      && isPositiveInteger(value.portal.draftRevision)
-      && isPositiveInteger(value.portal.publishedRevision)
+      && isNonNegativeInteger(value.portal.draftRevision)
+      && isNonNegativeInteger(value.portal.publishedRevision)
       && typeof value.portal.isDirty === "boolean"
       && ((value.operator.capabilities as DashboardCapability[]).includes("portal.configure")
         || (value.operator.capabilities as DashboardCapability[]).includes("portal.publish"))
@@ -146,7 +143,7 @@ export function isAdminDashboardSnapshot(value: unknown): value is AdminDashboar
 export class ApiDashboardGateway implements AdminDashboardGateway {
   constructor(
     private readonly fetcher: DashboardApiFetcher,
-    private readonly endpoint = "/api/admin/dashboard",
+    private readonly endpoint = ADMIN_DASHBOARD_PATH,
   ) {}
 
   async getSnapshot(_options?: DashboardSnapshotOptions): Promise<AdminDashboardSnapshot> {

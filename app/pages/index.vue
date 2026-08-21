@@ -4,12 +4,20 @@ import {
   MEMBERS,
   STATS
 } from "~/data/home";
+import { usePublicMembersGateway } from "~/composables/usePublicMembersGateway";
+import { usePublicMembersStore } from "~/stores/public-members";
+import { selectHomepageMembers, type HomepageMemberCard } from "~/utils/homepage-members";
 import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
 import { resolvePortalAssetSource } from "~/data/portal-assets";
 import { resolvePageVisual } from "~/data/page-visuals";
 import ContentMediaView from "~/components/ContentMediaView.vue";
+import { useActivitiesStore } from "~/stores/activities";
+import { useContentGateway } from "~/composables/useContentGateway";
+import { resolveHomepageUpdates } from "~/utils/homepage-updates";
+import { projectPublicPortal, resolvePublicPortalVisual } from "~/utils/public-homepage-portal";
+import type { PortalConfig } from "~/types/portal-config";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
@@ -25,6 +33,83 @@ const heroDescription = "技术研发、品牌传播、活动策划与人才成�
 const heroText = usePretextLayout(heroDescription, 31);
 const route = useRoute();
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
+const activitiesStore = useActivitiesStore();
+const contentGateway = useContentGateway();
+const publicMembersGateway = usePublicMembersGateway();
+const publicMembersStore = usePublicMembersStore();
+const publicMembersRequest = publicMembersGateway
+  ? await useAsyncData("homepage-public-members", async () => {
+      await publicMembersStore.refresh(publicMembersGateway);
+      return [...publicMembersStore.items];
+    })
+  : undefined;
+const apiPublicPeople = computed(() => publicMembersRequest?.data.value ?? publicMembersStore.items);
+const homepageMembers = computed<HomepageMemberCard[]>(() => publicMembersGateway
+  ? selectHomepageMembers(apiPublicPeople.value)
+  : MEMBERS.map((member, index) => ({
+      id: `mock-${index}`,
+      name: member.name,
+      centerName: member.center,
+      grade: member.year,
+      summary: member.quote,
+      avatarUrl: undefined,
+    })));
+if (contentGateway) {
+  await useAsyncData("homepage-public-activities", () => activitiesStore.refreshPublicFromApi(contentGateway));
+}
+const publicPortalData = contentGateway
+  ? await useAsyncData("homepage-public-portal", () => contentGateway.portal.publicConfiguration())
+  : { data: ref(null), error: ref(null) };
+const publicStatsData = contentGateway
+  ? await useAsyncData("homepage-public-stats", () => contentGateway.homepage.stats())
+  : { data: ref(null) };
+const legacyPortal = usePublishedPortal();
+const publicPortal = computed(() => contentGateway
+  ? projectPublicPortal(publicPortalData.data.value ?? { publishedAt: null, entries: [] })
+  : undefined);
+const config = computed<Pick<PortalConfig, "visuals">>(() => contentGateway
+  ? { visuals: { home: resolvePublicPortalVisual("home", publicPortal.value?.visuals.home), join: resolvePublicPortalVisual("join", publicPortal.value?.visuals.join) } }
+  : legacyPortal.config);
+const homepageSlots = computed(() => contentGateway ? publicPortal.value!.slots : legacyPortal.homepageSlots);
+const warnings = computed(() => contentGateway ? [] : legacyPortal.warnings);
+const flashNews = computed(() => homepageSlots.value.flash);
+const configuredNews = computed(() => homepageSlots.value.news.filter((item) => item.entityType === "article" || item.entityType === "notice"));
+const publishedNews = computed(() => resolveHomepageUpdates(
+  configuredNews.value,
+  activitiesStore.getPublicActivities(),
+  Boolean(contentGateway),
+));
+const publishedProjects = computed(() => homepageSlots.value.projects);
+const publishedActivities = computed(() => homepageSlots.value.activities);
+const publishedGallery = computed(() => homepageSlots.value.gallery);
+const publishedResources = computed(() => homepageSlots.value.resources);
+const portalLoadError = computed(() => Boolean(contentGateway && publicPortalData.error.value));
+const emptyProjectionWarnings = computed(() => warnings.value.filter((warning) => warning.code === "empty"));
+/* stale visual derivation retained only as a reference during the merge
+const homeVisualLabel = computed(() => config.value.visuals.home.alt || "官网主视觉素材位");
+const homeVisualDetail = computed(() => config.value.visuals.home.supportingText || (config.value.visuals.home.assetId ? "已发布门户主视觉" : "后续使用单独设计或授权照片"));
+const homeVisualSource = computed(() => resolvePortalAssetSource(config.value.visuals.home.assetId));
+*/
+const homeVisual = computed(() => resolvePageVisual(config.value.visuals.home, "home"));
+const homeVisualLabel = computed(() => homeVisual.value.alt || "官网主视觉素材位");
+const homeVisualDetail = computed(() => homeVisual.value.supportingText || (homeVisual.value.media ? "已发布门户主视觉" : "后续使用单独设计或授权照片"));
+const homeVisualSource = computed(() => homeVisual.value.media?.url ?? resolvePortalAssetSource(homeVisual.value.assetId));
+const homePosterStyle = computed(() => (
+  homeVisualSource.value
+    ? { "--home-poster-image": `url("${homeVisualSource.value}")` }
+    : undefined
+));
+const liveStats = computed(() => {
+  const stats = publicStatsData.data.value;
+  if (!contentGateway || !stats) return STATS;
+  return [
+    { value: String(stats.formalMembers), label: "部落成员" },
+    { value: String(stats.coreMembers), label: "核心成员" },
+    { value: String(stats.activeCenters), label: "活跃中心" },
+    { value: String(stats.publishedProjects), label: "公开项目" },
+  ];
+});
+/* PR-only legacy portal projection is retained for mock mode above.
 const { config, homepageSlots, warnings } = usePublishedPortal();
 const flashNews = homepageSlots.flash;
 const publishedNews = homepageSlots.news.filter((item) => item.entityType === "article" || item.entityType === "notice");
@@ -42,6 +127,7 @@ const homePosterStyle = computed(() => (
     ? { "--home-poster-image": `url("${homeVisualSource.value}")` }
     : undefined
 ));
+*/
 
 function publicDate(value: string) {
   const date = new Date(value);
@@ -134,7 +220,7 @@ watch(
 
     <section class="stats-band" aria-label="部落核心数据">
       <div class="stats-band__grid shell">
-        <div v-for="stat in STATS" :key="stat.label" class="stat-item">
+        <div v-for="stat in liveStats" :key="stat.label" class="stat-item">
           <strong>{{ stat.value }}</strong>
           <span>{{ stat.label }}</span>
         </div>
@@ -152,9 +238,10 @@ watch(
         </div>
         <div v-if="publishedNews.length" class="news-layout">
           <article v-if="publishedNews[0]" class="news-feature">
-            <MediaPlaceholder label="新闻主图素材位" detail="项目协作与活动现场" />
+            <ContentMediaView v-if="publishedNews[0].media" :item="publishedNews[0].media" preview="thumbnail" :controls="false" />
+            <MediaPlaceholder v-else label="新闻主图素材位" detail="项目协作与活动现场" />
             <div>
-              <span>{{ publishedNews[0].entityType === "notice" ? "公开公告" : "新闻" }} · {{ publishedNews[0].publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
+              <span>{{ publishedNews[0].entityType === "activity" ? "活动" : publishedNews[0].entityType === "notice" ? "公开公告" : "新闻" }} · {{ publishedNews[0].publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
               <h3>{{ publishedNews[0].title }}</h3>
               <p>{{ publishedNews[0].summary }}</p>
               <NuxtLink class="text-link" :to="publishedNews[0].to">阅读详情 →</NuxtLink>
@@ -162,7 +249,7 @@ watch(
           </article>
           <div class="news-list">
             <NuxtLink v-for="item in publishedNews.slice(1)" :key="item.sourceId" :to="item.to">
-              <span>{{ item.entityType === "notice" ? "公开公告" : "新闻" }} · {{ item.publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
+              <span>{{ item.entityType === "activity" ? "活动" : item.entityType === "notice" ? "公开公告" : "新闻" }} · {{ item.publishedAt.slice(0, 10).replaceAll('-', '.') }}</span>
               <h3>{{ item.title }}</h3>
               <p>{{ item.summary }}</p>
             </NuxtLink>
@@ -213,7 +300,7 @@ watch(
         </div>
         <div v-if="publishedProjects.length" class="projects-layout">
           <article v-if="publishedProjects[0]" class="featured-project">
-            <ContentMediaView v-if="publishedProjects[0].media" :item="publishedProjects[0].media" preview="thumbnail" :controls="false" class="featured-project__media" />
+            <ContentMediaView v-if="publishedProjects[0].media" :item="publishedProjects[0].media" preview="thumbnail" fit="cover" :controls="false" class="featured-project__media" />
             <MediaPlaceholder v-else :label="`${publishedProjects[0].title}演示素材位`" detail="项目实机、流程或现场验证" dark />
             <div class="featured-project__copy">
               <span>精选项目 · Portal Selection</span>
@@ -239,6 +326,7 @@ watch(
             </NuxtLink>
           </div>
         </div>
+        <EmptyState v-else-if="portalLoadError" title="项目推荐加载失败" description="首页推荐数据暂时无法加载，请刷新重试。" />
         <EmptyState v-else title="暂无精选项目" description="项目发布并配置到首页后会显示在这里。" />
       </div>
     </section>
@@ -258,7 +346,17 @@ watch(
               <strong>{{ publicDate(activity.eventAt ?? activity.publishedAt).day }}</strong>
               <span>{{ publicDate(activity.eventAt ?? activity.publishedAt).month }}</span>
             </div>
-            <span>近期活动</span>
+            <ContentMediaView
+              v-if="activity.media"
+              :item="activity.media"
+              preview="thumbnail"
+              fit="cover"
+              :controls="false"
+              class="activity-row__media"
+              data-testid="homepage-activity-media"
+            />
+            <span v-else class="activity-row__media activity-row__media--empty" data-testid="homepage-activity-media">活动封面</span>
+            <span class="activity-row__type">近期活动</span>
             <div>
               <h3>{{ activity.title }}</h3>
               <p>{{ activity.summary }}</p>
@@ -266,6 +364,7 @@ watch(
             <span class="activity-row__action">查看活动 →</span>
           </NuxtLink>
         </div>
+        <EmptyState v-else-if="portalLoadError" title="近期活动加载失败" description="首页活动数据暂时无法加载，请刷新重试。" />
         <EmptyState v-else title="暂无近期活动" description="活动开放并配置到首页后会显示在这里。" />
       </div>
     </section>
@@ -282,6 +381,7 @@ watch(
         <div v-if="publishedGallery.length" class="gallery-grid gallery-grid--portal" :class="{ 'is-single': publishedGallery.length === 1 }">
           <NuxtLink v-for="item in publishedGallery" :key="item.sourceId" class="gallery-grid__lead" :to="item.to"><ContentMediaView v-if="item.media" :item="item.media" preview="thumbnail" :controls="false" /><MediaPlaceholder v-else :label="item.title" :detail="item.summary" /><strong>{{ item.title }}</strong></NuxtLink>
         </div>
+        <EmptyState v-else-if="portalLoadError" title="媒体专题加载失败" description="首页画廊数据暂时无法加载，请刷新重试。" />
         <EmptyState v-else title="暂无媒体专题" description="画廊专题配置到首页后会显示在这里。" />
         <NuxtLink class="button button--dark" to="/gallery">进入媒体画廊</NuxtLink>
       </div>
@@ -297,12 +397,14 @@ watch(
           <NuxtLink class="text-link" to="/about#members">认识部落成员 →</NuxtLink>
         </div>
         <div class="members-grid">
-          <article v-for="member in MEMBERS" :key="member.name" class="member-story">
-            <HsdAvatar :name="member.name" size="lg" />
-            <p>“{{ member.quote }}”</p>
+          <p v-if="publicMembersStore.apiLoading" class="home-members-status" role="status">正在加载公开成员…</p>
+          <p v-else-if="publicMembersStore.apiError" class="home-members-status" role="alert">公开成员加载失败：{{ publicMembersStore.apiError.message }}</p>
+          <article v-for="member in homepageMembers" :key="member.id" class="member-story">
+            <HsdAvatar :name="member.name" :src="member.avatarUrl" size="lg" />
+            <p>{{ member.summary }}</p>
             <footer>
               <strong>{{ member.name }}</strong>
-              <span>{{ member.center }} · {{ member.year }}</span>
+              <span>{{ member.centerName }}<template v-if="member.grade"> · {{ member.grade }}</template></span>
             </footer>
           </article>
         </div>

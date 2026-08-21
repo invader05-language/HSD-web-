@@ -11,6 +11,10 @@ export type ContentMediaAspect = "landscape" | "portrait" | "wide";
 
 export interface ContentMediaAttachment {
   id: string;
+  /** ID-only record returned by an authenticated admin aggregate response. */
+  serverOwned?: boolean;
+  /** Server optimistic-concurrency version for metadata updates. */
+  version?: number;
   mediaId?: string;
   /** Client-only bridge for data created before direct uploads existed. */
   legacyAssetId?: string;

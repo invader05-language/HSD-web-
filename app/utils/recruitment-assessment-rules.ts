@@ -32,7 +32,7 @@ export function getAssessmentProcessingStatus(
   const rounds = getAssessmentRounds(record.center);
   if (rounds.some((round) => outcomeFor(record, round) === "failed")) {
     return record.acceptsAdjustment
-      ? "offline-adjustment-pending"
+      ? "adjustment-suggestion-pending"
       : "ready-to-publish";
   }
 
