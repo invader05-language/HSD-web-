@@ -11,6 +11,7 @@ export interface ApiSessionGateway {
   login(input: LoginDto): Promise<CurrentSessionResponseDto>;
   currentSession(): Promise<CurrentSessionResponseDto>;
   changePassword(newPassword: string): Promise<CurrentSessionResponseDto>;
+  logout(): Promise<void>;
 }
 
 export interface ApiSessionGatewayOptions {
@@ -90,6 +91,33 @@ export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiS
     return parseResponse("GET /api/v1/auth/session", response);
   }
 
+  function requireCsrfToken(operation: string): string {
+    const csrfToken = readCookie("hsd_csrf");
+    if (!csrfToken) {
+      throw new SessionApiError({
+        status: 403,
+        code: "SESSION_CSRF_TOKEN_MISSING",
+        message: `${operation} request could not be verified`,
+      });
+    }
+    return decodeURIComponent(csrfToken);
+  }
+
+  async function throwResponseError(response: Response): Promise<never> {
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = undefined;
+    }
+    throw new SessionApiError({
+      status: response.status,
+      code: isErrorResponse(payload) ? payload.code : "SESSION_API_REQUEST_FAILED",
+      message: isErrorResponse(payload) ? payload.message : "Session API request failed",
+      ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
+    });
+  }
+
   return {
     async login(input) {
       const response = await fetcher(`${apiBase}/api/v1/auth/login`, {
@@ -105,26 +133,31 @@ export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiS
       return currentSession();
     },
     async changePassword(newPassword) {
-      const csrfToken = readCookie("hsd_csrf");
-      if (!csrfToken) {
-        throw new SessionApiError({
-          status: 403,
-          code: "SESSION_CSRF_TOKEN_MISSING",
-          message: "Password change request could not be verified",
-        });
-      }
+      const csrfToken = requireCsrfToken("Password change");
       const response = await fetcher(`${apiBase}/api/v1/auth/change-password`, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRF-Token": decodeURIComponent(csrfToken),
+          "X-CSRF-Token": csrfToken,
           "X-Request-ID": createRequestId(),
         },
         body: JSON.stringify({ newPassword }),
       });
       await parseResponse("POST /api/v1/auth/change-password", response);
       return currentSession();
+    },
+    async logout() {
+      const csrfToken = requireCsrfToken("Logout");
+      const response = await fetcher(`${apiBase}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "X-CSRF-Token": csrfToken,
+          "X-Request-ID": createRequestId(),
+        },
+      });
+      if (!response.ok) await throwResponseError(response);
     },
     currentSession,
   };

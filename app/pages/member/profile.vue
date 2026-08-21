@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useSessionStore } from "~/stores/session";
+import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import {
   isSupportedAvatar,
@@ -12,6 +13,8 @@ definePageMeta({ middleware: "member" });
 useHead({ title: "编辑个人资料｜白云 HSD 开发者部落" });
 
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const currentMember = useCurrentMember();
 const currentProfile = currentMember.profile;
 const draft = reactive(currentMember.createDraft());
@@ -98,6 +101,12 @@ async function saveProfile() {
   await nextTick();
 }
 
+async function signOut() {
+  if (await session.signOutForRuntime(apiRuntime.public, sessionGateway)) {
+    await navigateTo("/");
+  }
+}
+
 onBeforeUnmount(() => {
   releaseDraftObjectUrl();
 });
@@ -125,8 +134,9 @@ onBeforeUnmount(() => {
           <NuxtLink to="/member/results">结果中心</NuxtLink>
           <a href="/member#activities">活动与比赛</a>
           <a class="is-active" href="#profile-form" aria-current="page">个人资料</a>
-          <button type="button" @click="session.signOut(); navigateTo('/')">退出登录</button>
+          <button type="button" @click="signOut">退出登录</button>
         </nav>
+        <p v-if="session.signOutError" role="alert">{{ session.signOutError }}</p>
       </aside>
 
       <main id="profile-form" class="member-profile-main">

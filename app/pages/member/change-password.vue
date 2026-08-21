@@ -58,8 +58,12 @@ async function submitPasswordChange() {
 }
 
 async function signOut() {
-  session.signOut();
-  await navigateTo("/login", { replace: true });
+  formError.value = "";
+  if (await session.signOutForRuntime(apiRuntime.public, sessionGateway)) {
+    await navigateTo("/login", { replace: true });
+  } else {
+    formError.value = session.signOutError ?? "退出登录失败，请检查网络后重试。";
+  }
 }
 </script>
 

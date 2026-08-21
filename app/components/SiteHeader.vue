@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { SITE_CONFIG } from "~/data/site";
 import { useSessionStore } from "~/stores/session";
+import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useMemberProfileStore } from "~/stores/member-profile";
 
 const route = useRoute();
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const profileStore = useMemberProfileStore();
 const currentMember = computed(() => profileStore.profiles[session.currentMemberId]);
 const currentMemberName = computed(() => currentMember.value?.name ?? session.currentAccount?.name ?? "成员");
@@ -29,10 +32,13 @@ function handleMemberMenuKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") memberMenuOpen.value = false;
 }
 
-function signOut() {
+async function signOut() {
   memberMenuOpen.value = false;
-  session.signOut();
-  navigateTo("/");
+  if (await session.signOutForRuntime(apiRuntime.public, sessionGateway)) {
+    await navigateTo("/");
+  } else {
+    memberMenuOpen.value = true;
+  }
 }
 
 onMounted(() => {
@@ -95,6 +101,7 @@ onBeforeUnmount(() => {
             <NuxtLink v-if="session.canAccessAdmin" role="menuitem" to="/admin">进入管理端</NuxtLink>
             <hr>
             <button role="menuitem" type="button" @click="signOut">退出登录</button>
+            <small v-if="session.signOutError" role="alert">{{ session.signOutError }}</small>
           </nav>
         </div>
       </nav>
