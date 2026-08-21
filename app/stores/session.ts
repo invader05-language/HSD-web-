@@ -158,6 +158,7 @@ export const useSessionStore = defineStore("session", {
     apiSession: undefined as CurrentSessionResponseDto | undefined,
     isHydrated: false,
     signOutError: undefined as string | undefined,
+    isSigningOut: false,
   }),
   getters: {
     currentAccount(state): SessionAccountProjection | undefined {
@@ -208,10 +209,12 @@ export const useSessionStore = defineStore("session", {
         this.signOut();
         return true;
       }
+      if (this.isSigningOut) return false;
       if (!gateway) {
         this.signOutError = "退出登录失败，请检查网络后重试。";
         return false;
       }
+      this.isSigningOut = true;
       try {
         await gateway.logout();
         this.clearProductionSession();
@@ -219,6 +222,8 @@ export const useSessionStore = defineStore("session", {
       } catch {
         this.signOutError = "退出登录失败，请检查网络后重试。";
         return false;
+      } finally {
+        this.isSigningOut = false;
       }
     },
     async signInForRuntime(

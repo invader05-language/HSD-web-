@@ -14,7 +14,6 @@ const route = useRoute();
 const session = useSessionStore();
 const sessionGateway = useSessionGateway();
 const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
-const signingOut = ref(false);
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess({
@@ -78,10 +77,7 @@ function toggleGroup(groupId: string) {
 }
 
 async function signOut() {
-  if (signingOut.value) return;
-  signingOut.value = true;
   const signedOut = await session.signOutForRuntime(apiRuntime.public, sessionGateway);
-  signingOut.value = false;
   if (signedOut) await navigateTo("/");
 }
 </script>
@@ -154,7 +150,7 @@ async function signOut() {
             aria-label="打开管理导航"
             @click="mobileNavigationOpen = !mobileNavigationOpen"
           ><span aria-hidden="true">&#9776;</span></button>
-          <button type="button" :disabled="signingOut" @click="signOut">{{ signingOut ? "退出中…" : "退出" }}</button>
+          <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出" }}</button>
           <span v-if="session.signOutError" class="admin-signout-error" role="alert">{{ session.signOutError }}</span>
         </div>
       </header>

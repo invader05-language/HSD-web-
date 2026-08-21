@@ -158,6 +158,13 @@ export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiS
         },
       });
       if (!response.ok) await throwResponseError(response);
+      if (response.status !== 204) {
+        throw new SessionApiError({
+          status: response.status,
+          code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
+          message: "Logout response did not prove session revocation",
+        });
+      }
     },
     currentSession,
   };

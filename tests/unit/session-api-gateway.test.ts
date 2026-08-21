@@ -161,4 +161,19 @@ describe("production session API gateway", () => {
     });
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it("rejects an unexpected successful logout status because revocation is not proven", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: (name) => name === "hsd_csrf" ? "logout-csrf" : undefined,
+    });
+
+    await expect(gateway.logout()).rejects.toMatchObject({
+      name: "SessionApiError",
+      code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
+    });
+  });
 });

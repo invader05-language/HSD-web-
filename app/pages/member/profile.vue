@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
           <NuxtLink to="/member/results">结果中心</NuxtLink>
           <a href="/member#activities">活动与比赛</a>
           <a class="is-active" href="#profile-form" aria-current="page">个人资料</a>
-          <button type="button" @click="signOut">退出登录</button>
+          <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出登录" }}</button>
         </nav>
         <p v-if="session.signOutError" role="alert">{{ session.signOutError }}</p>
       </aside>

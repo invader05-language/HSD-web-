@@ -215,4 +215,27 @@ describe("production session store", () => {
     expect(session.currentAccountId).toBe("account-owner");
     expect(session.signOutError).toBe("退出登录失败，请检查网络后重试。");
   });
+
+  it("allows only one production logout request at a time", async () => {
+    let releaseLogout!: () => void;
+    const logoutPending = new Promise<void>((resolve) => { releaseLogout = resolve; });
+    const gateway = {
+      login: vi.fn(),
+      currentSession: vi.fn(),
+      changePassword: vi.fn(),
+      logout: vi.fn().mockReturnValue(logoutPending),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    const firstAttempt = session.signOutForRuntime({ useMockApi: false }, gateway);
+    expect(session.isSigningOut).toBe(true);
+    await expect(session.signOutForRuntime({ useMockApi: false }, gateway)).resolves.toBe(false);
+    expect(gateway.logout).toHaveBeenCalledOnce();
+
+    releaseLogout();
+    await expect(firstAttempt).resolves.toBe(true);
+    expect(session.isSigningOut).toBe(false);
+    expect(session.signOutError).toBeUndefined();
+  });
 });

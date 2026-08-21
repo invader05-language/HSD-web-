@@ -108,7 +108,7 @@ async function signOut() {
         </button>
       </form>
 
-      <button class="password-change-signout" type="button" @click="signOut">退出当前账号</button>
+      <button class="password-change-signout" type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出当前账号" }}</button>
       <p class="password-change-boundary">为保护账号安全，新密码会由服务端加密保存，并在修改成功后刷新当前登录会话。</p>
     </section>
   </main>

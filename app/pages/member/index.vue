@@ -25,7 +25,7 @@ async function signOut() {
     <aside>
       <div class="member-space__identity"><HsdAvatar :name="profile.name" :src="profile.avatarUrl" size="md" /><div><strong>{{ profile.name }}</strong><span>{{ profile.identity }}</span></div></div>
       <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><NuxtLink to="/member/growth">成长记录</NuxtLink><NuxtLink to="/member/honors">我的荣誉</NuxtLink><a href="#activities">活动与比赛</a><NuxtLink to="/member/profile">编辑个人资料</NuxtLink></nav>
-      <button type="button" @click="signOut">退出登录</button>
+      <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出登录" }}</button>
       <p v-if="session.signOutError" role="alert">{{ session.signOutError }}</p>
     </aside>
     <main id="overview">

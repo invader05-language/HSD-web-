@@ -100,7 +100,7 @@ onBeforeUnmount(() => {
             <NuxtLink role="menuitem" to="/member/results">结果中心</NuxtLink>
             <NuxtLink v-if="session.canAccessAdmin" role="menuitem" to="/admin">进入管理端</NuxtLink>
             <hr>
-            <button role="menuitem" type="button" @click="signOut">退出登录</button>
+            <button role="menuitem" type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出登录" }}</button>
             <small v-if="session.signOutError" role="alert">{{ session.signOutError }}</small>
           </nav>
         </div>
