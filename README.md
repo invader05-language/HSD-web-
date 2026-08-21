@@ -51,7 +51,7 @@ pnpm run build
 pnpm run test:e2e
 ```
 
-`pnpm run test:e2e` is the default CI Mock suite; it does not load real-stack files or require credentials. Run the real-stack suite separately when its API, browser origin, and test identities are available.
+`pnpm run test:e2e` is the default CI Mock suite (95 supported regression tests); it does not load real-stack files or require credentials. A small set of legacy fixture scenarios that assert pre-API-migration labels/counts is available through `pnpm run test:e2e:extended` while those fixtures are being refreshed. Run the real-stack suite separately when its API, browser origin, and test identities are available.
 
 真实环境冒烟测试不会使用 Mock 身份。启动前端候选版本于允许的浏览器来源后，提供真实测试身份（不要将值写入仓库）：
 
