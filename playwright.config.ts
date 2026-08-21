@@ -9,6 +9,10 @@ const webServerCommand = process.env.CI
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: [
+    "**/real-stack-smoke.spec.ts",
+    "**/baize-project-real-data.spec.ts",
+  ],
   timeout: 30_000,
   workers: 1,
   use: {

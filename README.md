@@ -51,6 +51,8 @@ pnpm run build
 pnpm run test:e2e
 ```
 
+`pnpm run test:e2e` is the default CI Mock suite; it does not load real-stack files or require credentials. Run the real-stack suite separately when its API, browser origin, and test identities are available.
+
 真实环境冒烟测试不会使用 Mock 身份。启动前端候选版本于允许的浏览器来源后，提供真实测试身份（不要将值写入仓库）：
 
 ```powershell
@@ -63,4 +65,4 @@ $env:HSD_E2E_ADMIN_PASSWORD = "<admin-password>"
 pnpm run test:e2e:real
 ```
 
-该套件验证真实认证、权限边界、门户、项目/活动/画廊/成员数据、媒体读取、客户端 hydration 与浏览器导航。
+`pnpm run test:e2e:real` explicitly runs `real-stack-smoke.spec.ts` and `baize-project-real-data.spec.ts`. It validates real authentication, permission boundaries, portal, project/activity/gallery/member data, media reads, client hydration, and browser navigation.
