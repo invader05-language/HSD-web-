@@ -7,10 +7,13 @@ import {
 import { RELEASE_FEATURES } from "~/config/release-features";
 import { getAdminQualificationLabel } from "~/data/admin-system";
 import { useSessionStore } from "~/stores/session";
+import { useSessionGateway } from "~/composables/useSessionGateway";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
 
 const route = useRoute();
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess({
@@ -71,6 +74,11 @@ function toggleGroup(groupId: string) {
     next.add(groupId);
   }
   expandedGroups.value = next;
+}
+
+async function signOut() {
+  const signedOut = await session.signOutForRuntime(apiRuntime.public, sessionGateway);
+  if (signedOut) await navigateTo("/");
 }
 </script>
 
@@ -142,7 +150,8 @@ function toggleGroup(groupId: string) {
             aria-label="打开管理导航"
             @click="mobileNavigationOpen = !mobileNavigationOpen"
           ><span aria-hidden="true">&#9776;</span></button>
-          <button type="button" @click="session.signOut(); navigateTo('/')">退出</button>
+          <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出" }}</button>
+          <span v-if="session.signOutError" class="admin-signout-error" role="alert">{{ session.signOutError }}</span>
         </div>
       </header>
 

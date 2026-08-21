@@ -113,6 +113,25 @@ test.describe("real Nuxt + NestJS integration", () => {
     await expect(page.locator("main button").first()).toBeVisible();
   });
 
+  test("owner UI logout revokes the server session", async ({ page }) => {
+    await signInAs(page, e2eCredentials.owner.account, e2eCredentials.owner.password);
+    const logoutResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/v1/auth/logout"
+        && response.request().method() === "POST";
+    });
+
+    await page.getByRole("button", { name: "退出", exact: true }).click();
+
+    expect((await logoutResponse).status()).toBe(204);
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+    const sessionStatus = await page.evaluate(async (base) => (
+      await fetch(`${base}/api/v1/auth/session`, { credentials: "include" })
+    ).status, apiBase);
+    expect(sessionStatus).toBe(401);
+    await expect(page.getByRole("link", { name: "登录", exact: true })).toBeVisible();
+  });
+
   test("center administrator has dashboard access but no portal capability", async ({ page }) => {
     await signInAs(page, e2eCredentials.admin.account, e2eCredentials.admin.password);
     await expect(page.locator("main h1")).toBeVisible();

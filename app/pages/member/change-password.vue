@@ -58,8 +58,12 @@ async function submitPasswordChange() {
 }
 
 async function signOut() {
-  session.signOut();
-  await navigateTo("/login", { replace: true });
+  formError.value = "";
+  if (await session.signOutForRuntime(apiRuntime.public, sessionGateway)) {
+    await navigateTo("/login", { replace: true });
+  } else {
+    formError.value = session.signOutError ?? "退出登录失败，请检查网络后重试。";
+  }
 }
 </script>
 
@@ -104,7 +108,7 @@ async function signOut() {
         </button>
       </form>
 
-      <button class="password-change-signout" type="button" @click="signOut">退出当前账号</button>
+      <button class="password-change-signout" type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出当前账号" }}</button>
       <p class="password-change-boundary">为保护账号安全，新密码会由服务端加密保存，并在修改成功后刷新当前登录会话。</p>
     </section>
   </main>

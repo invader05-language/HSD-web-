@@ -124,4 +124,56 @@ describe("production session API gateway", () => {
     });
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it("revokes the server session through the CSRF-protected logout endpoint", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: (name) => name === "hsd_csrf" ? "logout-csrf%2Bvalue" : undefined,
+      createRequestId: () => "request-logout-1",
+    });
+
+    await expect(gateway.logout()).resolves.toBeUndefined();
+
+    expect(fetcher).toHaveBeenCalledWith("https://api.example.test/api/v1/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "X-CSRF-Token": "logout-csrf+value",
+        "X-Request-ID": "request-logout-1",
+      },
+    });
+  });
+
+  it("rejects logout before a request when the readable CSRF cookie is unavailable", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>();
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: () => undefined,
+    });
+
+    await expect(gateway.logout()).rejects.toMatchObject({
+      name: "SessionApiError",
+      code: "SESSION_CSRF_TOKEN_MISSING",
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unexpected successful logout status because revocation is not proven", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: (name) => name === "hsd_csrf" ? "logout-csrf" : undefined,
+    });
+
+    await expect(gateway.logout()).rejects.toMatchObject({
+      name: "SessionApiError",
+      code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
+    });
+  });
 });

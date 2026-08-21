@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { useSessionStore } from "~/stores/session";
+import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 
 useHead({ title: "成员空间｜白云 HSD 开发者部落" });
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const memberRepository = useMemberRepository();
 const profile = memberRepository.currentProfile;
 const applicationStore = useRecruitmentApplicationStore();
 const memberStatus = computed(() => applicationStore.memberStatus);
+
+async function signOut() {
+  if (await session.signOutForRuntime(apiRuntime.public, sessionGateway)) {
+    await navigateTo("/");
+  }
+}
 </script>
 
 <template>
@@ -16,7 +25,8 @@ const memberStatus = computed(() => applicationStore.memberStatus);
     <aside>
       <div class="member-space__identity"><HsdAvatar :name="profile.name" :src="profile.avatarUrl" size="md" /><div><strong>{{ profile.name }}</strong><span>{{ profile.identity }}</span></div></div>
       <nav aria-label="成员空间导航"><a href="#overview">个人概览</a><a href="#application">申请进度</a><NuxtLink to="/member/results">结果中心</NuxtLink><NuxtLink to="/member/growth">成长记录</NuxtLink><NuxtLink to="/member/honors">我的荣誉</NuxtLink><a href="#activities">活动与比赛</a><NuxtLink to="/member/profile">编辑个人资料</NuxtLink></nav>
-      <button type="button" @click="session.signOut(); navigateTo('/')">退出登录</button>
+      <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出登录" }}</button>
+      <p v-if="session.signOutError" role="alert">{{ session.signOutError }}</p>
     </aside>
     <main id="overview">
       <p class="eyebrow">Member Workspace</p><h1>你好，{{ profile.name }}</h1><p>这里集中展示与你个人相关的信息；公开内容仍可从官网导航直接访问。</p>

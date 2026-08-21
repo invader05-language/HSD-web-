@@ -42,6 +42,7 @@ describe("production session store", () => {
       login: vi.fn(),
       currentSession: vi.fn().mockResolvedValue(ownerSession),
       changePassword: vi.fn(),
+      logout: vi.fn(),
     };
     const session = useSessionStore();
 
@@ -67,6 +68,7 @@ describe("production session store", () => {
       login: vi.fn(),
       currentSession: vi.fn().mockResolvedValue(centerAdminSession),
       changePassword: vi.fn(),
+      logout: vi.fn(),
     };
     const session = useSessionStore();
 
@@ -93,6 +95,7 @@ describe("production session store", () => {
       login: vi.fn(),
       currentSession: vi.fn().mockRejectedValue(new Error("Authentication is required")),
       changePassword: vi.fn(),
+      logout: vi.fn(),
     };
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -130,6 +133,7 @@ describe("production session store", () => {
         account: { ...ownerSession.account, adminLevel: "MEMBER" as const, capabilities: [] },
         mustChangePassword: false,
       }),
+      logout: vi.fn(),
     } satisfies ApiSessionGateway;
     const session = useSessionStore();
     await session.restoreForRuntime({ useMockApi: false }, gateway);
@@ -154,6 +158,7 @@ describe("production session store", () => {
         mustChangePassword: true,
       }),
       changePassword: vi.fn().mockRejectedValue(new Error("network unavailable")),
+      logout: vi.fn(),
     } satisfies ApiSessionGateway;
     const session = useSessionStore();
     await session.restoreForRuntime({ useMockApi: false }, gateway);
@@ -169,5 +174,68 @@ describe("production session store", () => {
     });
 
     expect(session.mustChangePassword).toBe(true);
+  });
+
+  it("revokes the production session before clearing the local identity", async () => {
+    const gateway = {
+      login: vi.fn(),
+      currentSession: vi.fn(),
+      changePassword: vi.fn(),
+      logout: vi.fn().mockResolvedValue(undefined),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    await expect(session.signOutForRuntime(
+      { useMockApi: false },
+      gateway,
+    )).resolves.toBe(true);
+
+    expect(gateway.logout).toHaveBeenCalledOnce();
+    expect(session.isAuthenticated).toBe(false);
+    expect(session.currentAccountId).toBeUndefined();
+  });
+
+  it("keeps the local production identity when server logout fails so the user can retry", async () => {
+    const gateway = {
+      login: vi.fn(),
+      currentSession: vi.fn(),
+      changePassword: vi.fn(),
+      logout: vi.fn().mockRejectedValue(new Error("network unavailable")),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    await expect(session.signOutForRuntime(
+      { useMockApi: false },
+      gateway,
+    )).resolves.toBe(false);
+
+    expect(session.isAuthenticated).toBe(true);
+    expect(session.currentAccountId).toBe("account-owner");
+    expect(session.signOutError).toBe("退出登录失败，请检查网络后重试。");
+  });
+
+  it("allows only one production logout request at a time", async () => {
+    let releaseLogout!: () => void;
+    const logoutPending = new Promise<void>((resolve) => { releaseLogout = resolve; });
+    const gateway = {
+      login: vi.fn(),
+      currentSession: vi.fn(),
+      changePassword: vi.fn(),
+      logout: vi.fn().mockReturnValue(logoutPending),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    const firstAttempt = session.signOutForRuntime({ useMockApi: false }, gateway);
+    expect(session.isSigningOut).toBe(true);
+    await expect(session.signOutForRuntime({ useMockApi: false }, gateway)).resolves.toBe(false);
+    expect(gateway.logout).toHaveBeenCalledOnce();
+
+    releaseLogout();
+    await expect(firstAttempt).resolves.toBe(true);
+    expect(session.isSigningOut).toBe(false);
+    expect(session.signOutError).toBeUndefined();
   });
 });

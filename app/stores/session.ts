@@ -157,6 +157,8 @@ export const useSessionStore = defineStore("session", {
     currentMemberId: DEMO_MEMBER_PROFILE.id,
     apiSession: undefined as CurrentSessionResponseDto | undefined,
     isHydrated: false,
+    signOutError: undefined as string | undefined,
+    isSigningOut: false,
   }),
   getters: {
     currentAccount(state): SessionAccountProjection | undefined {
@@ -197,6 +199,32 @@ export const useSessionStore = defineStore("session", {
       this.currentAccountId = undefined;
       this.currentMemberId = DEMO_MEMBER_PROFILE.id;
       getSessionStorage()?.removeItem(SESSION_STORAGE_KEY);
+    },
+    async signOutForRuntime(
+      config: SessionRuntimeConfig,
+      gateway: ApiSessionGateway | undefined,
+    ): Promise<boolean> {
+      this.signOutError = undefined;
+      if (config.useMockApi) {
+        this.signOut();
+        return true;
+      }
+      if (this.isSigningOut) return false;
+      if (!gateway) {
+        this.signOutError = "退出登录失败，请检查网络后重试。";
+        return false;
+      }
+      this.isSigningOut = true;
+      try {
+        await gateway.logout();
+        this.clearProductionSession();
+        return true;
+      } catch {
+        this.signOutError = "退出登录失败，请检查网络后重试。";
+        return false;
+      } finally {
+        this.isSigningOut = false;
+      }
     },
     async signInForRuntime(
       config: SessionRuntimeConfig,
@@ -370,6 +398,7 @@ export const useSessionStore = defineStore("session", {
       }
     },
     signOut() {
+      this.signOutError = undefined;
       this.apiSession = undefined;
       this.isAuthenticated = false;
       this.currentAccountId = undefined;
