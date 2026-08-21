@@ -8,8 +8,8 @@ export interface ReleaseFeatures {
 
 export const RELEASE_FEATURES: ReleaseFeatures = {
   auditLog: false,
-  recycleBin: false,
+  recycleBin: true,
   uploadTasks: false,
   recruitmentBatches: true,
-  helpCenter: false
+  helpCenter: true
 };

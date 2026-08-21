@@ -14,6 +14,7 @@ import { DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
 import { useMemberRepository } from "../../app/composables/useMemberRepository";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 import { useAdminAccessStore } from "../../app/stores/admin-access";
+import { toPublicPerson } from "../../app/stores/public-members";
 
 describe("public people and center directory", () => {
   beforeEach(() => {
@@ -202,5 +203,22 @@ describe("public people and center directory", () => {
     }
 
     expect(findPublicPerson("missing")).toBeUndefined();
+  });
+
+  it("projects all fixed public positions without turning a regular member into a core member", () => {
+    const person = toPublicPerson({
+      publicId: "public-member",
+      name: "职务成员",
+      grade: "2026",
+      className: "软件工程 1 班",
+      avatar: { kind: "default", variant: "white-hsd" },
+      center: { publicSlug: "new-media", name: "新媒体中心" },
+      duty: "REGULAR",
+      honors: [],
+      positions: [{ type: "PROJECT_LEAD" }, { type: "CENTER_MINISTER", centerPublicSlug: "new-media" }],
+    });
+
+    expect(person.positions).toEqual(["项目负责人", "部长"]);
+    expect(person.isCore).toBe(false);
   });
 });

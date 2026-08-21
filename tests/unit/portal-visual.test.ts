@@ -40,7 +40,8 @@ describe("published portal visuals", () => {
     const joinSource = readFileSync("app/pages/join.vue", "utf8");
     const bannerSource = readFileSync("app/components/PageBanner.vue", "utf8");
 
-    expect(homeSource).toContain('resolvePageVisual(config.visuals.home, "home")');
+    expect(homeSource).toContain("resolvePortalAssetSource(config.value.visuals.home.assetId)");
+    expect(homeSource).toContain('resolvePageVisual(config.value.visuals.home, "home")');
     expect(homeSource).toContain(':src="homeVisualSource"');
     expect(homeSource).toContain("home-hero__media--poster");
     expect(homeSource).toContain('data-visual-stage="poster"');

@@ -166,6 +166,30 @@ describe("portal configuration store", () => {
     expect(store.publish(catalog, true).slots.news[0]?.sourceId).toBe("news-b");
   });
 
+  it("requires portal.configure for draft commands and portal.publish for publication", () => {
+    const session = useSessionStore();
+    session.signIn("media-admin", { requireAdmin: true });
+    const store = usePortalConfigStore();
+
+    expect(() => store.saveDraft({ slots: { news: [] } }))
+      .toThrow("PORTAL_CONTENT_PERMISSION_REQUIRED");
+    expect(() => store.replaceReference("news", 0, { entityType: "article", sourceId: "news-a" }, catalog))
+      .toThrow("PORTAL_CONTENT_PERMISSION_REQUIRED");
+    expect(() => store.removeReference("news", 0))
+      .toThrow("PORTAL_CONTENT_PERMISSION_REQUIRED");
+    expect(() => store.moveReference("news", 0, "down"))
+      .toThrow("PORTAL_CONTENT_PERMISSION_REQUIRED");
+    expect(() => store.publish(catalog, true))
+      .toThrow("PORTAL_CONTENT_PERMISSION_REQUIRED");
+  });
+
+  it("keeps the portal editor controls and visual draft synchronized with the capability-scoped API draft", () => {
+    const page = readFileSync("app/pages/admin/content/home.vue", "utf8");
+
+    expect(page).toContain('watch(() => configStore.draftConfig.visuals');
+    expect(page).toContain('<template v-if="canConfigure">');
+  });
+
   it("records and restores a complete portal publication audit entry", () => {
     const session = useSessionStore();
     session.signIn("admin-alliance", { requireAdmin: true });
@@ -413,11 +437,13 @@ describe("portal configuration surfaces", () => {
     const legacySource = readFileSync("app/pages/admin/content/banners.vue", "utf8");
 
     expect(source).toContain("usePortalCatalog");
-    expect(source).toContain("replaceReference");
+    expect(source).toContain("saveDraftForRuntime");
     expect(source).toContain("moveReference");
     expect(source).toContain("removeReference");
     expect(source).toContain("页面主视觉");
     expect(source).toContain("确认整份发布");
+    expect(source).toContain('session.hasCapability("portal.publish")');
+    expect(source).not.toContain('session.adminLevel === "owner"');
     expect(legacySource).toContain('query: { view: "visuals" }');
     expect(legacySource).not.toContain("const banners");
   });
@@ -427,10 +453,10 @@ describe("portal configuration surfaces", () => {
     const joinSource = readFileSync("app/pages/join.vue", "utf8");
     const bannerSource = readFileSync("app/components/PageBanner.vue", "utf8");
 
-    expect(homeSource).toContain("homepageSlots.projects");
-    expect(homeSource).toContain("homepageSlots.activities");
-    expect(homeSource).toContain("homepageSlots.gallery");
-    expect(homeSource).toContain("homepageSlots.resources");
+    expect(homeSource).toContain("publishedProjects");
+    expect(homeSource).toContain("publishedActivities");
+    expect(homeSource).toContain("publishedGallery");
+    expect(homeSource).toContain("publishedResources");
     expect(homeSource).toContain("config.visuals.home");
     expect(joinSource).toContain("config.visuals.join");
     expect(bannerSource).toContain("visual");

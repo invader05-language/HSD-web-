@@ -2,31 +2,33 @@
 import type { AdminMember } from "~/data/admin-members";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { useMemberAdministrationStore } from "~/stores/member-administration";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
+import { organizationMemberLabel } from "~/utils/organization-member-display";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "核心人员配置｜HSD 管理台" });
 
-const memberRepository = useMemberRepository();
 const memberAdministration = useMemberAdministrationStore();
+const organizationGateway = useOrganizationGateway();
+if (organizationGateway) memberAdministration.activateApiMode();
+const memberRepository = useMemberRepository();
 const showAddDialog = ref(false);
 const selectedMemberId = ref("");
 const candidateQuery = ref("");
-const addStatus = ref<"idle" | "storage-error">("idle");
+const addStatus = ref<"idle" | "storage-error" | "api-error">("idle");
+
+onMounted(async () => {
+  if (organizationGateway) await memberAdministration.refreshFromApi(organizationGateway);
+});
 
 function isDerivedCore(member: AdminMember) {
-  return member.isCore ?? (
-    member.memberDuty === "核心人员" || Boolean(member.centerLeadership)
-  );
+  return member.isCore ?? member.memberDuty === "核心人员";
 }
 
 const coreMembers = computed(() => memberRepository.adminMembers.value
   .filter((member) => member.identity === "正式成员" && isDerivedCore(member))
-  .sort((left, right) => {
-    const leadershipOrder = Number(Boolean(right.centerLeadership)) - Number(Boolean(left.centerLeadership));
-    if (leadershipOrder) return leadershipOrder;
-    return memberRepository.adminMembers.value.indexOf(left)
-      - memberRepository.adminMembers.value.indexOf(right);
-  }));
+  .sort((left, right) => memberRepository.adminMembers.value.indexOf(left)
+    - memberRepository.adminMembers.value.indexOf(right)));
 
 const candidates = computed(() => {
   const query = candidateQuery.value.trim().toLocaleLowerCase();
@@ -42,7 +44,7 @@ const candidates = computed(() => {
 const selectedMember = computed(() => candidates.value.find((member) => member.id === selectedMemberId.value));
 
 function coreLabel(member: AdminMember) {
-  return member.centerLeadership ? "核心人员 · 中心负责人" : "核心人员";
+  return organizationMemberLabel(member);
 }
 
 function openAddDialog() {
@@ -59,11 +61,17 @@ function closeAddDialog() {
   addStatus.value = "idle";
 }
 
-function confirmAdd() {
+async function confirmAdd() {
   if (!selectedMember.value) return;
-  const result = memberAdministration.promoteFormalMemberToCore(selectedMember.value.id);
+  const result = organizationGateway
+    ? await memberAdministration.promoteFormalMemberToCoreFromApi(selectedMember.value.id, organizationGateway)
+    : memberAdministration.promoteFormalMemberToCore(selectedMember.value.id);
   if (result.status === "storage_unavailable") {
     addStatus.value = "storage-error";
+    return;
+  }
+  if (result.status === "api_error") {
+    addStatus.value = "api-error";
     return;
   }
   if (result.status === "success" || result.status === "already_core") closeAddDialog();
@@ -75,10 +83,13 @@ function confirmAdd() {
     <AdminPageHeading
       eyebrow="Core People"
       title="核心人员配置"
-      description="中心负责人自动纳入核心人员；也可以从其他正式成员中添加核心人员，不改变其帐号或管理员资格。"
+      description="核心成员由成员等级单独维护；可从其他正式成员中添加，不改变其帐号、组织职务或管理员资格。"
     >
       <template #actions><button class="button" type="button" @click="openAddDialog">添加核心人员</button></template>
     </AdminPageHeading>
+
+    <p v-if="memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步核心人员…</p>
+    <p v-else-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
 
     <section class="admin-list-card">
       <header><div><span>Core Members</span><h2>核心人员名单</h2></div><p>共 {{ coreMembers.length }} 人</p></header>
@@ -114,9 +125,10 @@ function confirmAdd() {
             <p v-if="candidates.length === 0" class="admin-empty-row">没有可添加的正式成员</p>
           </div>
           <p v-if="addStatus === 'storage-error'" class="member-profile-error" role="alert">浏览器存储暂不可用，未添加核心人员。</p>
+          <p v-else-if="addStatus === 'api-error'" class="member-profile-error" role="alert">{{ memberAdministration.apiError?.message ?? "核心人员更新失败，请刷新后重试。" }}</p>
           <footer>
             <button type="button" class="button button--ghost" @click="closeAddDialog">取消</button>
-            <button type="button" class="button" :disabled="!selectedMember" @click="confirmAdd">确认添加</button>
+            <button type="button" class="button" :disabled="!selectedMember || memberAdministration.apiLoading" @click="confirmAdd">确认添加</button>
           </footer>
         </section>
       </div>

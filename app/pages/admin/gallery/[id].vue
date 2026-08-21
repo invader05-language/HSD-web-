@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { useGalleryStore } from "~/stores/gallery";
+import { useContentGateway } from "~/composables/useContentGateway";
 import GalleryEditor from "~/components/admin/GalleryEditor.vue";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const galleryStore = useGalleryStore();
+const gateway = useContentGateway();
 const albumId = computed(() => decodeURIComponent(String(route.params.id)));
-if (import.meta.client) galleryStore.hydrate();
+if (gateway) galleryStore.activateApiMode();
+if (import.meta.client && !gateway) galleryStore.hydrate();
+onMounted(() => { if (gateway) void galleryStore.refreshFromApi(gateway); });
 
 const sourceAlbum = computed(() => galleryStore.getById(albumId.value));
 const canEdit = computed(() => Boolean(sourceAlbum.value && galleryStore.canManageAlbum(albumId.value)));
@@ -26,6 +30,10 @@ function onPublished() {
   void navigateTo("/admin/gallery");
 }
 
+function onOffline() {
+  void navigateTo("/admin/gallery");
+}
+
 function onCancelled() {
   void navigateTo("/admin/gallery");
 }
@@ -33,6 +41,8 @@ function onCancelled() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
+    <p v-if="galleryStore.apiError" role="alert">{{ galleryStore.apiError.message }}（{{ galleryStore.apiError.code }}）</p>
+    <p v-if="galleryStore.apiLoading" role="status">正在加载画廊…</p>
     <AdminPageHeading
       eyebrow="Gallery Stories"
       :title="album?.title || (sourceAlbum ? '编辑画廊专题' : '画廊专题不存在')"
@@ -44,7 +54,7 @@ function onCancelled() {
       </template>
     </AdminPageHeading>
 
-    <GalleryEditor v-if="album" mode="edit" :album="album" :initial-notice="savedNotice" @published="onPublished" @cancelled="onCancelled" />
+    <GalleryEditor v-if="album" mode="edit" :album="album" :initial-notice="savedNotice" @published="onPublished" @offline="onOffline" @cancelled="onCancelled" />
     <section v-else class="admin-list-card admin-empty" aria-live="polite">
       <strong>找不到画廊专题</strong>
       <p>请返回画廊专题列表重新选择，或确认当前账号具有对应中心的管理权限。</p>

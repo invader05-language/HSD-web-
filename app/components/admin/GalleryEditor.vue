@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
 import { useGalleryStore } from "~/stores/gallery";
+import { useContentGateway } from "~/composables/useContentGateway";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import type { GalleryAsset } from "~/data/gallery";
-import type { GalleryCategory, GalleryDraftInput, ManagedGalleryAlbum } from "~/types/gallery";
+import { GALLERY_CATEGORY_CODES, galleryCategoryLabel, normalizeGalleryCategory, type GalleryCategory, type GalleryDraftInput, type ManagedGalleryAlbum } from "~/types/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 
 const props = defineProps<{
@@ -18,10 +20,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   saved: [id: string];
   published: [id: string];
+  offline: [id: string];
   cancelled: [];
 }>();
 
-const CATEGORY_OPTIONS: GalleryCategory[] = ["活动摄影", "海报设计", "短视频", "人物专访"];
+const CATEGORY_OPTIONS = [...GALLERY_CATEGORY_CODES];
 const CENTER_OPTIONS = [
   { id: "baize-development", label: "白泽开发中心" },
   { id: "new-media", label: "新媒体中心" },
@@ -30,9 +33,13 @@ const CENTER_OPTIONS = [
 ] as const;
 
 const galleryStore = useGalleryStore();
+const gateway = useContentGateway();
+const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
 
 function defaultOwnerCenterId() {
+  if (session.currentAccount?.adminCenterId) return session.currentAccount.adminCenterId;
+  if (gateway) return "";
   if (session.adminLevel === "owner") return "new-media";
   const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
   return scope ? getRecruitmentCenterId(scope) : "";
@@ -40,17 +47,32 @@ function defaultOwnerCenterId() {
 
 const form = reactive<GalleryDraftInput>({
   title: "",
-  category: "活动摄影",
+  category: "event_documentary",
   year: "2026",
   summary: "",
   team: "",
   ownerCenterId: defaultOwnerCenterId(),
+  cover: null,
   assets: [],
 });
+const coverItems = computed<ContentMediaAttachment[]>({
+  get: () => form.cover ? [{ id: form.cover.id, localBlobId: form.cover.localBlobId, role: "cover" as const, kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, alt: form.cover.alt, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready", errorMessage: form.cover.errorMessage, serverOwned: form.cover.serverOwned, version: form.cover.version }] : [],
+  set: (items: ContentMediaAttachment[]) => {
+    const item = items[0];
+    form.cover = item ? { id: item.id, title: item.title, caption: item.caption, alt: item.alt, aspect: item.aspect, imageUrl: item.url, localBlobId: item.localBlobId, thumbnailUrl: item.thumbnailUrl, role: "cover", kind: item.kind, status: item.status, sortOrder: 0, errorMessage: item.errorMessage, serverOwned: item.serverOwned, version: item.version } : null;
+  },
+});
+const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
 const notice = ref("");
 const formError = ref("");
 const isSaving = ref(false);
 const isPublishing = ref(false);
+const isOfflining = ref(false);
+const mediaOwner = computed(() => props.album ? {
+  centerId: props.album.ownerCenterId,
+  ownerType: "gallery" as const,
+  ownerId: props.album.id,
+} : undefined);
 const mediaItems = computed<ContentMediaAttachment[]>({
   get: () => form.assets.map((asset, index) => ({
     id: asset.id,
@@ -66,6 +88,8 @@ const mediaItems = computed<ContentMediaAttachment[]>({
     thumbnailUrl: asset.thumbnailUrl,
     status: asset.status ?? "ready",
     errorMessage: asset.errorMessage,
+    serverOwned: asset.serverOwned,
+    version: asset.version,
   })),
   set: (items: ContentMediaAttachment[]) => {
     form.assets = items.map((item): GalleryAsset => ({
@@ -82,6 +106,8 @@ const mediaItems = computed<ContentMediaAttachment[]>({
       status: item.status,
       sortOrder: item.sortOrder,
       errorMessage: item.errorMessage,
+      serverOwned: item.serverOwned,
+      version: item.version,
     }));
   },
 });
@@ -94,8 +120,23 @@ const missingFields = computed(() => {
   if (!form.ownerCenterId.trim()) missing.push("归属中心");
   if (!form.summary.trim()) missing.push("摘要");
   if (!form.team.trim()) missing.push("制作团队");
+  if (!form.cover) missing.push("独立封面");
   if (!form.assets.length) missing.push("专题素材");
-  if (form.assets.some((asset) => !isContentMediaAttachmentComplete({
+  if (form.assets.some((asset) => !isRetainedServerContentMediaAttachment({
+    id: asset.id,
+    role: "detail",
+    kind: asset.kind ?? "image",
+    title: asset.title,
+    caption: asset.caption,
+    alt: asset.alt,
+    aspect: asset.aspect,
+    sortOrder: asset.sortOrder ?? 0,
+    url: asset.imageUrl,
+    localBlobId: asset.localBlobId,
+    thumbnailUrl: asset.thumbnailUrl,
+    status: asset.status ?? "ready",
+    serverOwned: asset.serverOwned,
+  }) && !isContentMediaAttachmentComplete({
     id: asset.id,
     role: "detail",
     kind: asset.kind ?? "image",
@@ -109,29 +150,45 @@ const missingFields = computed(() => {
     thumbnailUrl: asset.thumbnailUrl,
     status: asset.status ?? "ready",
   }))) missing.push("专题素材信息");
+  if (form.cover && !isContentMediaAttachmentComplete({ id: form.cover.id, role: "cover", kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, alt: form.cover.alt, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, localBlobId: form.cover.localBlobId, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready" })) missing.push("封面信息");
   return missing;
 });
 const isComplete = computed(() => missingFields.value.length === 0);
 const ownerOptions = computed(() => session.adminLevel === "owner"
-  ? CENTER_OPTIONS
-  : CENTER_OPTIONS.filter((center) => center.id === form.ownerCenterId));
+  ? centerOptions.value
+  : centerOptions.value.filter((center) => center.id === (session.currentAccount?.adminCenterId ?? form.ownerCenterId)));
+
+onMounted(async () => {
+  if (!organizationGateway) return;
+  try {
+    const response = await organizationGateway.listCenters();
+    centerOptions.value = response.items.map((center) => ({ id: center.id, label: center.name }));
+    const assignedCenterId = session.currentAccount?.adminCenterId;
+    if (assignedCenterId) form.ownerCenterId = assignedCenterId;
+    else if (props.mode === "create" && !centerOptions.value.some((center) => center.id === form.ownerCenterId)) form.ownerCenterId = centerOptions.value[0]?.id ?? "";
+  } catch (caught) {
+    formError.value = caught instanceof Error ? `中心加载失败：${caught.message}` : "中心加载失败。";
+  }
+});
 
 function loadAlbum(album?: ManagedGalleryAlbum) {
   Object.assign(form, album ? {
     title: album.title,
-    category: album.category,
+    category: normalizeGalleryCategory(album.category),
     year: album.year,
     summary: album.summary,
     team: album.team,
     ownerCenterId: album.ownerCenterId,
+    cover: album.cover ? { ...album.cover } : null,
     assets: album.assets.map((asset) => ({ ...asset })),
   } : {
     title: "",
-    category: "活动摄影" as GalleryCategory,
+    category: "event_documentary" as GalleryCategory,
     year: "2026",
     summary: "",
     team: "",
     ownerCenterId: defaultOwnerCenterId(),
+    cover: null,
     assets: [],
   });
   formError.value = "";
@@ -148,6 +205,7 @@ function toPayload(): GalleryDraftInput {
     summary: form.summary,
     team: form.team,
     ownerCenterId: form.ownerCenterId,
+    cover: form.cover ? { ...form.cover } : null,
     assets: form.assets.map((asset) => ({ ...asset })),
   };
 }
@@ -157,19 +215,60 @@ function validateForm() {
   return !formError.value;
 }
 
-function persistDraft() {
+async function persistMediaMetadata() {
+  if (!gateway?.media) return;
+  const attachments = [
+    ...(form.cover ? [{ ...form.cover, role: "cover" as const, kind: form.cover.kind ?? "image" as const, status: form.cover.status ?? "ready" as const, sortOrder: 0, url: form.cover.imageUrl }] : []),
+    ...form.assets.map((asset) => ({ ...asset, role: "detail" as const, kind: asset.kind ?? "image" as const, status: asset.status ?? "ready" as const, sortOrder: asset.sortOrder ?? 0, url: asset.imageUrl })),
+  ];
+  for (const item of attachments.filter((candidate) => candidate.serverOwned && candidate.version)) {
+    const updated = await gateway.media.update(item.id, {
+      expectedVersion: item.version!,
+      title: item.title,
+      caption: item.caption,
+      alt: item.alt,
+      aspect: item.aspect,
+      sortOrder: item.sortOrder,
+    });
+    const next = {
+      ...item,
+      version: updated.version,
+      title: updated.title,
+      caption: updated.caption,
+      alt: updated.alt,
+      aspect: updated.aspect as ContentMediaAttachment["aspect"],
+      sortOrder: updated.sortOrder,
+      status: updated.status as ContentMediaAttachment["status"],
+      url: updated.url,
+      thumbnailUrl: updated.thumbnailUrl,
+    } satisfies ContentMediaAttachment;
+    if (form.cover?.id === next.id) {
+      form.cover = { ...form.cover, ...next, imageUrl: next.url, thumbnailUrl: next.thumbnailUrl, version: next.version };
+    } else {
+      form.assets = form.assets.map((asset) => asset.id === next.id
+        ? { ...asset, ...next, imageUrl: next.url, thumbnailUrl: next.thumbnailUrl, version: next.version }
+        : asset);
+    }
+  }
+}
+
+async function persistDraft() {
   const payload = toPayload();
+  if (gateway) return props.mode === "edit" && props.album
+    ? galleryStore.updateDraftFromApi(gateway, props.album.id, payload)
+    : galleryStore.createDraftFromApi(gateway, payload);
   return props.mode === "edit" && props.album
     ? galleryStore.updateDraft(props.album.id, payload)
     : galleryStore.createDraft(payload);
 }
 
-function saveDraft() {
-  if (isSaving.value || isPublishing.value) return;
+async function saveDraft() {
+  if (isSaving.value || isPublishing.value || isOfflining.value) return;
   isSaving.value = true;
   formError.value = "";
   try {
-    const saved = persistDraft();
+    await persistMediaMetadata();
+    const saved = await persistDraft();
     notice.value = "画廊草稿已保存，用户端仍保持原公开版本。";
     emit("saved", saved.id);
   } catch (caught) {
@@ -179,12 +278,14 @@ function saveDraft() {
   }
 }
 
-function publishGallery() {
-  if (isSaving.value || isPublishing.value || !validateForm()) return;
+async function publishGallery() {
+  if (isSaving.value || isPublishing.value || isOfflining.value || !validateForm()) return;
   isPublishing.value = true;
   try {
-    const saved = persistDraft();
-    galleryStore.publish(saved.id);
+    await persistMediaMetadata();
+    const saved = await persistDraft();
+    if (gateway) await galleryStore.publishFromApi(gateway, saved.id);
+    else galleryStore.publish(saved.id);
     notice.value = "画廊专题已发布，用户端将渲染最新公开快照。";
     emit("published", saved.id);
   } catch (caught) {
@@ -193,32 +294,50 @@ function publishGallery() {
     isPublishing.value = false;
   }
 }
+
+async function offlineGallery() {
+  if (!props.album || isSaving.value || isPublishing.value || isOfflining.value) return;
+  isOfflining.value = true;
+  formError.value = "";
+  try {
+    if (gateway) await galleryStore.offlineFromApi(gateway, props.album.id, "管理员下线");
+    else galleryStore.unpublish(props.album.id, "管理员下线");
+    notice.value = "画廊专题已下线，公开页面不再显示该专题。";
+    emit("offline", props.album.id);
+  } catch (caught) {
+    formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。";
+  } finally {
+    isOfflining.value = false;
+  }
+}
 </script>
 
 <template>
   <section class="admin-list-card admin-gallery-editor" aria-label="画廊编辑器">
     <header>
       <div><span>{{ mode === "create" ? "Draft Editor" : "Gallery Editor" }}</span><h2>{{ mode === "create" ? "新建画廊专题" : "编辑画廊专题" }}</h2></div>
-      <p>第一项专题素材会作为画廊列表封面；保存草稿不会改变用户端。</p>
+      <p>封面和详情素材分开保存；封面不计入详情素材 20 张上限，保存草稿不会改变用户端。</p>
     </header>
     <div class="admin-gallery-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
       <p v-else-if="notice" class="admin-save-message" role="status">{{ notice }}</p>
       <div class="admin-editor-grid">
         <label>标题<input v-model="form.title" type="text"></label>
-        <label>分类<select v-model="form.category"><option v-for="option in CATEGORY_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
+        <label>分类<select v-model="form.category"><option v-for="option in CATEGORY_OPTIONS" :key="option" :value="option">{{ galleryCategoryLabel(option) }}</option></select></label>
         <label>年份<input v-model="form.year" type="text" inputmode="numeric"></label>
         <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>
         <label class="is-wide">摘要<textarea v-model="form.summary" rows="3"></textarea></label>
         <label class="is-wide">制作团队<input v-model="form.team" type="text"></label>
       </div>
-      <ContentMediaUploader v-model="mediaItems" mode="collection" title="专题素材" description="可直接上传图片或视频；每项都可预览、排序和编辑公开说明。" />
+      <ContentMediaUploader v-model="coverItems" mode="cover" :owner="mediaOwner" title="画廊独立封面" description="封面单独上传，不占用详情素材 20 张上限。" />
+      <ContentMediaUploader v-model="mediaItems" mode="collection" :max-items="20" :owner="mediaOwner" title="画廊详情素材" description="上传 1–20 张详情照片；详情素材与封面独立保存。" />
     </div>
     <footer class="admin-drawer__footer">
       <span>{{ isComplete ? "必填信息和素材已完整，可直接发布。" : "草稿可暂存，直接发布前需补齐全部信息和素材。" }}</span>
-      <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="emit('cancelled')">取消</button>
-      <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="saveDraft">保存草稿</button>
-      <button type="button" class="button" :disabled="!isComplete || isSaving || isPublishing" @click="publishGallery">{{ isPublishing ? "发布中…" : "直接发布" }}</button>
+      <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing || isOfflining" @click="emit('cancelled')">取消</button>
+      <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing || isOfflining" @click="saveDraft">保存草稿</button>
+      <button v-if="mode === 'edit' && album?.publishedState === 'published'" type="button" class="button button--ghost" :disabled="isSaving || isPublishing || isOfflining" @click="offlineGallery">{{ isOfflining ? "下线中…" : "下线专题" }}</button>
+      <button type="button" class="button" :disabled="!isComplete || isSaving || isPublishing || isOfflining" @click="publishGallery">{{ isPublishing ? "发布中…" : "直接发布" }}</button>
     </footer>
   </section>
 </template>

@@ -1,19 +1,25 @@
 <script setup lang="ts">
 import { PROJECT_FILTERS } from "~/data/projects";
+import { projectCategoryFromLabel, projectCategoryLabel } from "~/types/project";
 import { useProjectsStore } from "~/stores/projects";
+import { useContentGateway } from "~/composables/useContentGateway";
 import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "项目成果｜白云 HSD 开发者部落" });
 
 const activeFilter = ref("全部");
 const projectsStore = useProjectsStore();
-if (import.meta.client) projectsStore.hydrate();
+const gateway = useContentGateway();
+if (gateway) projectsStore.activateApiMode();
+if (import.meta.client && !gateway) projectsStore.hydrate();
+onMounted(() => { if (gateway) void projectsStore.refreshPublicFromApi(gateway); });
 const pageSize = 6;
 const currentPage = ref(1);
 const filteredProjects = computed(() => {
   const projects = projectsStore.getPublicProjects();
   if (activeFilter.value === "全部") return projects;
-  return projects.filter((project) => project.category.includes(activeFilter.value));
+  const category = projectCategoryFromLabel(activeFilter.value);
+  return category ? projects.filter((project) => project.category === category) : projects;
 });
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredProjects.value.length / pageSize)));
 const visibleProjects = computed(() => {
@@ -43,13 +49,15 @@ watch(activeFilter, () => {
     />
     <section class="section section--cool">
       <div class="shell">
+        <p v-if="projectsStore.apiError" role="alert">{{ projectsStore.apiError.message }}（{{ projectsStore.apiError.code }}）</p>
+        <p v-if="projectsStore.apiLoading" role="status">正在加载公开项目…</p>
         <FilterToolbar v-model="activeFilter" :filters="PROJECT_FILTERS" :result-label="`共 ${filteredProjects.length} 个项目`" />
         <div v-if="visibleProjects.length" class="catalog-grid">
           <NuxtLink v-for="project in visibleProjects" :key="project.slug" :to="`/projects/${project.slug}`" class="catalog-card">
-            <ContentMediaView v-if="project.cover" :item="project.cover" preview="thumbnail" :controls="false" />
+            <ContentMediaView v-if="project.cover" :item="project.cover" preview="thumbnail" fit="contain" :controls="false" />
             <MediaPlaceholder v-else :label="`${project.title} 项目素材位`" />
             <div>
-              <span>{{ project.year }} · {{ project.category }}</span>
+              <span>{{ project.year }} · {{ projectCategoryLabel(project.category) }}</span>
               <h2>{{ project.title }}</h2>
               <p>{{ project.description }}</p>
               <strong>{{ project.projectStage }} →</strong>

@@ -10,6 +10,8 @@ export interface PortalReference {
 
 export interface PortalVisualConfig {
   assetId?: string;
+  /** Authenticated portal draft attachment ID returned by the production API. */
+  attachmentId?: string;
   media?: ContentMediaAttachment;
   alt: string;
   supportingText?: string;

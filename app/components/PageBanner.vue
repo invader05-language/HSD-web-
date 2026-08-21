@@ -12,8 +12,12 @@ const props = withDefaults(defineProps<{
   mediaLabel?: string;
   visual?: PortalVisualConfig;
   media?: ContentMediaAttachment;
+  mediaFit?: "cover" | "contain";
+  mediaPreview?: "full" | "thumbnail";
 }>(), {
   tone: "dark",
+  mediaFit: "cover",
+  mediaPreview: "thumbnail",
   mediaLabel: "页面主题视觉素材位"
 });
 
@@ -33,8 +37,8 @@ const visualSource = computed(() => resolvePortalAssetSource(props.visual?.asset
           <slot name="actions" />
         </div>
       </div>
-      <ContentMediaView v-if="media" :item="media" preview="thumbnail" :controls="false" class="page-banner__media" />
-      <ContentMediaView v-else-if="visual?.media" :item="visual.media" preview="thumbnail" :controls="false" class="page-banner__media" />
+      <ContentMediaView v-if="media" :item="media" :preview="mediaPreview" :fit="mediaFit" :controls="false" class="page-banner__media" />
+      <ContentMediaView v-else-if="visual?.media" :item="visual.media" :preview="mediaPreview" :fit="mediaFit" :controls="false" class="page-banner__media" />
       <MediaPlaceholder v-else :label="visualLabel" :detail="visualDetail" :src="visualSource" :alt="visual?.alt" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
     </div>
   </section>

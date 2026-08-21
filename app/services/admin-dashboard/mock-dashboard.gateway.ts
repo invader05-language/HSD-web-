@@ -182,12 +182,12 @@ function buildReadOnlyAssessmentSummary(
     const records = existing.records.filter((record) => !centerScope || record.center === centerScope);
     const processing = records.map(getAssessmentProcessingStatus);
     const pending = processing.filter((status) => (
-      status === "assessing" || status === "offline-adjustment-pending"
+      status === "assessing" || status === "adjustment-suggestion-pending"
     )).length;
     return {
       total: records.length,
       pending,
-      adjustmentPending: processing.filter((status) => status === "offline-adjustment-pending").length,
+      adjustmentPending: processing.filter((status) => status === "adjustment-suggestion-pending").length,
       canPublish: existing.status === "ready-to-publish" && pending === 0,
     };
   }

@@ -4,6 +4,7 @@ import { useActivitiesStore } from "../stores/activities";
 import { useGalleryStore } from "../stores/gallery";
 import { useProjectsStore } from "../stores/projects";
 import { usePortalContentStore } from "../stores/portal-content";
+import { useResourcesStore } from "../stores/resources";
 
 const toIso = (date: string) => `${date}T00:00:00.000Z`;
 
@@ -11,12 +12,19 @@ export function usePortalCatalog(): PortalCatalogItem[] {
   const activitiesStore = useActivitiesStore();
   const galleryStore = useGalleryStore();
   const projectsStore = useProjectsStore();
+  const resourcesStore = useResourcesStore();
+  const productionCatalog = projectsStore.apiModeActive
+    || activitiesStore.apiModeActive
+    || galleryStore.apiModeActive
+    || resourcesStore.apiModeActive;
   if (import.meta.client) {
-    activitiesStore.hydrate();
-    galleryStore.hydrate();
-    projectsStore.hydrate();
+    if (!productionCatalog) {
+      activitiesStore.hydrate();
+      galleryStore.hydrate();
+      projectsStore.hydrate();
+    }
   }
-  const content = usePortalContentStore().getPublicRecords().map((record): PortalCatalogItem => ({
+  const content = productionCatalog ? [] : usePortalContentStore().getPublicRecords().map((record): PortalCatalogItem => ({
     entityType: record.kind,
     sourceId: record.id,
     title: record.title,
@@ -83,7 +91,18 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     eligibleSlots: ["gallery"],
     available: album.assets.length > 0 && album.assets.some((asset) => (asset.status ?? "ready") === "ready"),
   }));
-  const resources = PUBLIC_RESOURCES.map((resource): PortalCatalogItem => ({
+  const resources = productionCatalog
+    ? resourcesStore.items.map((resource): PortalCatalogItem => ({
+      entityType: "resource",
+      sourceId: resource.slug,
+      title: resource.title,
+      summary: resource.summary,
+      to: `/resources/${resource.slug}`,
+      publishedAt: "1970-01-01T00:00:00.000Z",
+      eligibleSlots: ["resources"],
+      available: resource.access === "public",
+    }))
+    : PUBLIC_RESOURCES.map((resource): PortalCatalogItem => ({
     entityType: "resource",
     sourceId: resource.slug,
     title: resource.title,
@@ -92,6 +111,6 @@ export function usePortalCatalog(): PortalCatalogItem[] {
     publishedAt: toIso(resource.updatedAt),
     eligibleSlots: ["resources"],
     available: resource.status !== "offline",
-  }));
+    }));
   return [...content, ...projects, ...activities, ...gallery, ...resources];
 }

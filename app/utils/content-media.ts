@@ -72,6 +72,10 @@ export function isContentMediaAttachmentComplete(attachment: ContentMediaAttachm
   return Boolean(attachment.title.trim() && attachment.caption.trim() && attachment.aspect);
 }
 
+export function isRetainedServerContentMediaAttachment(attachment: ContentMediaAttachment) {
+  return attachment.serverOwned === true && attachment.status === "processing" && !attachment.url && !attachment.thumbnailUrl && !attachment.localBlobId && !attachment.legacyAssetId;
+}
+
 export function normalizeContentMediaAttachments(
   attachments: readonly ContentMediaAttachment[],
   role?: ContentMediaRole,
@@ -89,4 +93,58 @@ export function inferContentMediaAspect(width: number, height: number): ContentM
   if (ratio >= 1.8) return "wide";
   if (ratio <= 0.8) return "portrait";
   return "landscape";
+}
+
+interface ContentMediaDimensions {
+  width: number;
+  height: number;
+}
+
+async function readBrowserMediaDimensions(file: File, kind: ContentMediaKind): Promise<ContentMediaDimensions | undefined> {
+  if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") return undefined;
+  const source = URL.createObjectURL(file);
+  try {
+    if (kind === "image") {
+      const createBitmap = globalThis.createImageBitmap;
+      if (typeof createBitmap === "function") {
+        const bitmap = await createBitmap(file);
+        try {
+          return { width: bitmap.width, height: bitmap.height };
+        } finally {
+          bitmap.close();
+        }
+      }
+      if (typeof Image === "undefined") return undefined;
+      return await new Promise<ContentMediaDimensions | undefined>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => resolve(undefined);
+        image.src = source;
+      });
+    }
+
+    if (typeof document === "undefined") return undefined;
+    const video = document.createElement("video");
+    return await new Promise<ContentMediaDimensions | undefined>((resolve) => {
+      video.onloadedmetadata = () => resolve({ width: video.videoWidth, height: video.videoHeight });
+      video.onerror = () => resolve(undefined);
+      video.src = source;
+      video.load();
+    });
+  } catch {
+    return undefined;
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
+
+/**
+ * Derive the public layout direction from the uploaded media itself.
+ * Metadata is best-effort here; CSS still enforces a hard no-overflow boundary
+ * when a browser cannot inspect a file before upload.
+ */
+export async function detectContentMediaAspect(file: File): Promise<ContentMediaAspect> {
+  const kind = getContentMediaKind(file);
+  const dimensions = await readBrowserMediaDimensions(file, kind);
+  return dimensions ? inferContentMediaAspect(dimensions.width, dimensions.height) : "landscape";
 }

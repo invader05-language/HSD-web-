@@ -186,17 +186,13 @@ describe("recruitment application domain", () => {
     )).toMatchObject({ contact: expect.any(String) });
   });
 
-  it("requires a first choice, unique non-Baize later choices, and a Baize direction", () => {
+  it("allows Baize in any distinct preference and requires its direction whenever selected", () => {
     expect(validateApplicationDraft({
-      ...createRecruitmentApplicationDraft(),
-      contact: "demo@example.com",
-      secondChoice: "白泽开发中心" as never,
-      thirdChoice: "白泽开发中心" as never,
-    })).toMatchObject({
-      firstChoice: expect.any(String),
-      secondChoice: expect.any(String),
-      thirdChoice: expect.any(String),
-    });
+      ...validApplicationDraft(),
+      firstChoice: "新媒体中心",
+      secondChoice: "白泽开发中心",
+      thirdChoice: "人才发展中心",
+    })).toEqual({});
 
     expect(validateApplicationDraft({
       ...validApplicationDraft(),
@@ -206,6 +202,8 @@ describe("recruitment application domain", () => {
 
     expect(validateApplicationDraft({
       ...validApplicationDraft(),
+      firstChoice: "新媒体中心",
+      secondChoice: "白泽开发中心",
       baizeDirection: undefined,
     })).toMatchObject({ baizeDirection: expect.any(String) });
 
@@ -215,16 +213,18 @@ describe("recruitment application domain", () => {
     })).toMatchObject({ secondChoice: expect.any(String) });
   });
 
-  it("clears a Baize direction when the first choice changes away from Baize", () => {
+  it("keeps a Baize direction when the first choice changes but another preference remains Baize", () => {
     const applicationStore = useRecruitmentApplicationStore();
     const draft = validApplicationDraft();
+    draft.secondChoice = "白泽开发中心";
+    draft.thirdChoice = "人才发展中心";
 
     applicationStore.setFirstChoice(draft, "新媒体中心");
 
-    expect(draft.baizeDirection).toBeUndefined();
+    expect(draft.baizeDirection).toBe("鸿蒙开发");
   });
 
-  it("drops a stale Baize direction when a non-Baize application is submitted", () => {
+  it("keeps a Baize direction when a non-first preference selects Baize", () => {
     const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
@@ -234,14 +234,14 @@ describe("recruitment application domain", () => {
       {
         ...validApplicationDraft(),
         firstChoice: "新媒体中心",
-        secondChoice: "人才发展中心",
+        secondChoice: "白泽开发中心",
         thirdChoice: "拓维策划中心",
         baizeDirection: "鸿蒙开发",
       },
       true,
     );
 
-    expect(applicationStore.submittedApplication?.baizeDirection).toBeUndefined();
+    expect(applicationStore.submittedApplication?.baizeDirection).toBe("鸿蒙开发");
   });
 
   it("requires the truthfulness confirmation and prevents duplicate in-session submissions", () => {

@@ -112,8 +112,8 @@ test("draft publish readiness explains schedule conflicts and successful publish
   await page.getByRole("button", { name: "新建招新批次" }).click();
   const drawer = page.getByRole("dialog", { name: "新建招新批次" });
   await drawer.getByLabel("批次名称").fill("111");
-  await drawer.getByLabel("报名开始时间").fill("2026-08-10");
-  await drawer.getByLabel("报名截止时间").fill("2026-08-28");
+  await drawer.getByLabel("报名开始时间").fill("2026-09-10");
+  await drawer.getByLabel("报名截止时间").fill("2026-09-30");
   await drawer.getByRole("button", { name: "保存草稿" }).click();
 
   const draftRow = page.getByRole("article").filter({ hasText: "111" });

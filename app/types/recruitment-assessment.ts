@@ -6,11 +6,19 @@ export type AssessmentOutcome = "pending" | "passed" | "failed";
 
 export type AssessmentFinalDecision = "admitted" | "not-admitted";
 
+export interface AssessmentCenterIdentity {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export type AssessmentProcessingStatus =
   | "assessing"
-  | "offline-adjustment-pending"
+  | "adjustment-suggestion-pending"
   | "ready-to-publish"
   | "completed";
+
+export type AdjustmentDestination = Exclude<RecruitmentCenter, "白泽开发中心">;
 
 export interface RecruitmentAssessmentRecord {
   batchId: string;
@@ -21,6 +29,9 @@ export interface RecruitmentAssessmentRecord {
   roundOutcomes: Partial<Record<AssessmentRoundNumber, AssessmentOutcome>>;
   finalDecision?: AssessmentFinalDecision;
   finalCenter?: RecruitmentCenter;
+  finalCenterIdentity?: AssessmentCenterIdentity;
+  adjustmentSuggestion?: AdjustmentDestination;
+  adjustmentSuggestionIdentity?: AssessmentCenterIdentity;
   internalNote?: string;
   updatedAt?: string;
   publishedAt?: string;

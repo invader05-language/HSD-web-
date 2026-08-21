@@ -45,6 +45,17 @@ describe("gallery publishing workflow", () => {
     });
   });
 
+  it("keeps the production team field out of every mock public gallery snapshot", () => {
+    useSessionStore().signIn("media-admin", { requireAdmin: true });
+    const store = useGalleryStore();
+    const created = store.createDraft(galleryInput(), NOW);
+
+    store.publish(created.id, NOW);
+
+    expect(store.getPublicBySlug(created.slug)).not.toHaveProperty("team");
+    expect(store.getPublicAlbums().every((album) => !("team" in album))).toBe(true);
+  });
+
   it("scopes center administrators and validates approved asset references", () => {
     useSessionStore().signIn("media-admin", { requireAdmin: true });
     const store = useGalleryStore();

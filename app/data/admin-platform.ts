@@ -15,6 +15,7 @@ export interface AdminNavigationGroup {
 
 export interface AdminNavigationAccess {
   canManageAdminAccounts: boolean;
+  canManageOrganizationPersonnel?: boolean;
   canConfigurePortal?: boolean;
 }
 
@@ -90,12 +91,15 @@ export function getAdminNavigationForAccess(
   access: AdminNavigationAccess,
   features: ReleaseFeatures = RELEASE_FEATURES
 ) {
+  const canManageOrganizationPersonnel = access.canManageOrganizationPersonnel ?? access.canManageAdminAccounts;
   const canConfigurePortal = access.canConfigurePortal ?? access.canManageAdminAccounts;
   return ADMIN_NAVIGATION.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) => (item.id !== "accounts" || access.canManageAdminAccounts)
+        && (!["members", "core-members", "centers"].includes(item.id) || canManageOrganizationPersonnel)
         && (item.id !== "homepage" || canConfigurePortal)
+        && (item.id !== "help" || canConfigurePortal)
         && (item.feature === undefined || features[item.feature])
     )
   })).filter((group) => group.items.length > 0);

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalCatalogItem } from "~/types/portal-content";
 import { usePortalCatalog } from "~/composables/usePortalCatalog";
+import { useActivitiesStore } from "~/stores/activities";
+import { useContentGateway } from "~/composables/useContentGateway";
 import { PAGE_VISUALS } from "~/data/page-visuals";
 
 type PublicView = "all" | "activities" | "articles" | "notices";
@@ -14,6 +16,11 @@ const views = [
 ] as const;
 const route = useRoute();
 const catalog = usePortalCatalog();
+const activitiesStore = useActivitiesStore();
+const gateway = useContentGateway();
+if (gateway) activitiesStore.activateApiMode();
+if (import.meta.client && !gateway) activitiesStore.hydrate();
+onMounted(() => { if (gateway) void activitiesStore.refreshPublicFromApi(gateway); });
 function timelineDate(item: TimelineItem) {
   return item.entityType === "activity" ? item.eventAt ?? item.publishedAt : item.publishedAt;
 }
@@ -21,7 +28,9 @@ const activeView = computed<PublicView>(() => {
   const value = String(route.query.view ?? "all");
   return views.some((view) => view.value === value) ? value as PublicView : "all";
 });
-const timeline = computed<TimelineItem[]>(() => catalog
+const timeline = computed<TimelineItem[]>(() => (gateway
+  ? activitiesStore.getPublicActivities().map((activity) => ({ entityType: "activity" as const, sourceId: activity.id, title: activity.title, summary: activity.summary, to: `/activities/${activity.slug}`, publishedAt: activity.publishedAt || `${activity.date}T00:00:00.000Z`, eventAt: `${activity.date}T00:00:00.000Z`, available: true, media: activity.cover ?? undefined }))
+  : catalog)
   .filter((item): item is TimelineItem => item.available && ["activity", "article", "notice"].includes(item.entityType))
   .filter((item) => activeView.value === "all"
     || (activeView.value === "activities" && item.entityType === "activity")
@@ -44,6 +53,8 @@ useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
     />
     <section class="section">
       <div class="shell">
+        <p v-if="activitiesStore.apiError" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
+        <p v-if="activitiesStore.apiLoading" role="status">正在加载公开活动…</p>
         <nav class="filter-toolbar" aria-label="动态类型">
           <div class="filter-toolbar__options">
             <NuxtLink

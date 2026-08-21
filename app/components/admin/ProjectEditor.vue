@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
 import { useProjectsStore } from "~/stores/projects";
+import { useContentGateway } from "~/composables/useContentGateway";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
-import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import type { ManagedProject, ProjectDraftInput } from "~/types/project";
+import { PROJECT_CATEGORY_LABELS, type ManagedProject, type ProjectCategory, type ProjectDraftInput, type ProjectMember } from "~/types/project";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
+import { ADMIN_MEMBERS } from "~/data/admin-members";
 
 const props = defineProps<{
   project?: ManagedProject;
@@ -17,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   saved: [id: string];
   published: [id: string];
+  offline: [id: string];
   cancelled: [];
 }>();
 
@@ -26,33 +30,37 @@ const CENTER_OPTIONS = [
   { id: "tuowei-planning", label: "拓维策划中心" },
   { id: "talent-development", label: "人才发展中心" },
 ] as const;
-const CATEGORY_OPTIONS = ["AI × HarmonyOS", "DeepSeek × HarmonyOS", "校园服务", "软硬件", "媒体创作"] as const;
+const CATEGORY_OPTIONS = Object.entries(PROJECT_CATEGORY_LABELS) as Array<[ProjectCategory, string]>;
+const DEFAULT_PROJECT_CATEGORY: ProjectCategory = "CAMPUS_SERVICE";
 
 const projectsStore = useProjectsStore();
+const gateway = useContentGateway();
+const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
 function defaultOwnerCenterId() {
+  if (session.currentAccount?.adminCenterId) return session.currentAccount.adminCenterId;
+  if (gateway) return "";
   if (session.adminLevel === "owner") return "baize-development";
   const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
   return scope ? getRecruitmentCenterId(scope) : "";
 }
 
-type ProjectForm = Omit<ProjectDraftInput, "slug" | "technologies" | "cover" | "details"> & {
-  technologies: string;
+type ProjectForm = Omit<ProjectDraftInput, "slug" | "members" | "cover" | "details"> & {
   cover: ContentMediaAttachment | null;
   details: ContentMediaAttachment[];
 };
 
 const form = reactive<ProjectForm>({
   title: "",
-  category: CATEGORY_OPTIONS[0],
+  category: DEFAULT_PROJECT_CATEGORY,
   year: "2026",
   description: "",
   achievement: "",
   projectStage: "",
   challenge: "",
   solution: "",
-  technologies: "",
-  memberCount: 1,
+  memberPersonIds: [],
+  displayOrder: 9999,
   ownerCenterId: defaultOwnerCenterId(),
   cover: null,
   details: [],
@@ -61,17 +69,25 @@ const notice = ref("");
 const formError = ref("");
 const isSaving = ref(false);
 const isPublishing = ref(false);
+const isOfflining = ref(false);
 const coverItems = computed<ContentMediaAttachment[]>({
   get: () => form.cover ? [form.cover] : [],
   set: (value) => { form.cover = value[0] ?? null; },
 });
 const detailItems = computed<ContentMediaAttachment[]>({
   get: () => form.details,
-  set: (value) => { form.details = value; },
+  set: (value) => { form.details = value.slice(0, 12); },
 });
+const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
+const memberOptions = ref<Array<{ id: string; name: string }>>([]);
+const selectedMembers = computed<ProjectMember[]>(() => form.memberPersonIds.flatMap((personId) => {
+  const member = memberOptions.value.find((item) => item.id === personId);
+  return member ? [{ personId: member.id, name: member.name }] : [];
+}));
+const mediaOwner = computed(() => props.project ? { centerId: props.project.ownerCenterId, ownerType: "project" as const, ownerId: props.project.id } : undefined);
 
 function completeDetail(item: ContentMediaAttachment) {
-  return item.role === "detail" && isContentMediaAttachmentComplete(item);
+  return item.role === "detail" && (isRetainedServerContentMediaAttachment(item) || isContentMediaAttachmentComplete(item));
 }
 
 const missingFields = computed(() => {
@@ -85,18 +101,41 @@ const missingFields = computed(() => {
     [form.projectStage, "项目阶段"],
     [form.challenge, "问题"],
     [form.solution, "解决方案"],
-    [form.technologies, "核心技术"],
     [form.ownerCenterId, "归属中心"],
   ] as const) if (!String(value).trim()) missing.push(label);
-  if (form.memberCount < 1) missing.push("项目成员数");
-  if (!form.cover || form.cover.role !== "cover" || form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)) missing.push("项目封面");
+  if (!form.memberPersonIds.length) missing.push("项目成员");
+  if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("项目封面");
   if (form.details.some((item) => !completeDetail(item))) missing.push("详情素材信息");
   return missing;
 });
 const isComplete = computed(() => missingFields.value.length === 0);
 const ownerOptions = computed(() => session.adminLevel === "owner"
-  ? CENTER_OPTIONS
-  : CENTER_OPTIONS.filter((center) => center.id === form.ownerCenterId));
+  ? centerOptions.value
+  : centerOptions.value.filter((center) => center.id === (session.currentAccount?.adminCenterId ?? form.ownerCenterId)));
+
+onMounted(async () => {
+  if (!organizationGateway) {
+    memberOptions.value = ADMIN_MEMBERS
+      .filter((member) => member.identity === "正式成员")
+      .map((member) => ({ id: member.id, name: member.name }));
+    return;
+  }
+  try {
+    const response = await organizationGateway.listCenters();
+    centerOptions.value = response.items.map((center) => ({ id: center.id, label: center.name }));
+    const assignedCenterId = session.currentAccount?.adminCenterId;
+    if (assignedCenterId) form.ownerCenterId = assignedCenterId;
+    else if (props.mode === "create" && !centerOptions.value.some((center) => center.id === form.ownerCenterId)) form.ownerCenterId = centerOptions.value[0]?.id ?? "";
+  } catch (caught) { formError.value = caught instanceof Error ? `中心加载失败：${caught.message}` : "中心加载失败。"; }
+  try {
+    const response = await organizationGateway.listManagedMembers();
+    memberOptions.value = response.items
+      .filter((member) => member.status === "FORMAL_MEMBER" && member.membership)
+      .map((member) => ({ id: member.id, name: member.name }));
+  } catch {
+    memberOptions.value = [];
+  }
+});
 
 function loadProject(project?: ManagedProject) {
   Object.assign(form, project ? {
@@ -108,8 +147,8 @@ function loadProject(project?: ManagedProject) {
     projectStage: project.projectStage,
     challenge: project.challenge,
     solution: project.solution,
-    technologies: project.technologies.join("\n"),
-    memberCount: project.memberCount,
+    memberPersonIds: [...project.memberPersonIds],
+    displayOrder: project.displayOrder,
     ownerCenterId: project.ownerCenterId,
     // Pinia exposes reactive proxies; JSON cloning keeps the form independent
     // from the store and works in browsers where structuredClone rejects them.
@@ -117,15 +156,15 @@ function loadProject(project?: ManagedProject) {
     details: project.details.map((item) => JSON.parse(JSON.stringify(item)) as ContentMediaAttachment),
   } : {
     title: "",
-    category: CATEGORY_OPTIONS[0],
+    category: DEFAULT_PROJECT_CATEGORY,
     year: "2026",
     description: "",
     achievement: "",
     projectStage: "",
     challenge: "",
     solution: "",
-    technologies: "",
-    memberCount: 1,
+    memberPersonIds: [],
+    displayOrder: 9999,
     ownerCenterId: defaultOwnerCenterId(),
     cover: null,
     details: [],
@@ -146,8 +185,9 @@ function toPayload(): ProjectDraftInput {
     projectStage: form.projectStage,
     challenge: form.challenge,
     solution: form.solution,
-    technologies: form.technologies.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
-    memberCount: form.memberCount,
+    memberPersonIds: [...form.memberPersonIds],
+    members: selectedMembers.value,
+    displayOrder: form.displayOrder,
     ownerCenterId: form.ownerCenterId,
     cover: form.cover ? JSON.parse(JSON.stringify(form.cover)) as ContentMediaAttachment : null,
     details: form.details.map((item) => JSON.parse(JSON.stringify(item)) as ContentMediaAttachment),
@@ -159,19 +199,22 @@ function validateForm() {
   return !formError.value;
 }
 
-function persistDraft() {
+async function persistDraft() {
   const payload = toPayload();
+  if (gateway) return props.mode === "edit" && props.project
+    ? projectsStore.updateDraftFromApi(gateway, props.project.id, payload)
+    : projectsStore.createDraftFromApi(gateway, payload);
   return props.mode === "edit" && props.project
     ? projectsStore.updateDraft(props.project.id, payload)
     : projectsStore.createDraft(payload);
 }
 
-function saveDraft() {
+async function saveDraft() {
   if (isSaving.value || isPublishing.value) return;
   isSaving.value = true;
   formError.value = "";
   try {
-    const saved = persistDraft();
+    const saved = await persistDraft();
     notice.value = "项目草稿已保存，用户端仍保持原公开版本。";
     emit("saved", saved.id);
   } catch (caught) {
@@ -181,12 +224,13 @@ function saveDraft() {
   }
 }
 
-function publishProject() {
+async function publishProject() {
   if (isSaving.value || isPublishing.value || !validateForm()) return;
   isPublishing.value = true;
   try {
-    const saved = persistDraft();
-    projectsStore.publish(saved.id);
+    const saved = await persistDraft();
+    if (gateway) await projectsStore.publishFromApi(gateway, saved.id);
+    else projectsStore.publish(saved.id);
     notice.value = "项目已发布，用户端将显示最新公开快照。";
     emit("published", saved.id);
   } catch (caught) {
@@ -194,6 +238,18 @@ function publishProject() {
   } finally {
     isPublishing.value = false;
   }
+}
+
+async function offlineProject() {
+  if (!props.project || isSaving.value || isPublishing.value || isOfflining.value) return;
+  isOfflining.value = true; formError.value = "";
+  try {
+    if (gateway) await projectsStore.offlineFromApi(gateway, props.project.id, "管理员下线");
+    else projectsStore.unpublish(props.project.id, "管理员下线");
+    notice.value = "项目已下线，公开页面不再显示该项目。";
+    emit("offline", props.project.id);
+  } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
+  finally { isOfflining.value = false; }
 }
 </script>
 
@@ -208,19 +264,24 @@ function publishProject() {
       <p v-else-if="notice" class="admin-save-message" role="status">{{ notice }}</p>
       <div class="admin-editor-grid">
         <label>标题<input v-model="form.title" type="text"></label>
-        <label>分类<select v-model="form.category"><option v-for="option in CATEGORY_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
+        <label>分类<select v-model="form.category"><option v-for="[code, label] in CATEGORY_OPTIONS" :key="code" :value="code">{{ label }}</option></select></label>
         <label>年份<input v-model="form.year" type="text" inputmode="numeric"></label>
         <label>项目阶段<input v-model="form.projectStage" type="text"></label>
         <label>当前成果<input v-model="form.achievement" type="text"></label>
-        <label>项目成员数<input v-model.number="form.memberCount" type="number" min="1"></label>
+        <label class="is-wide">项目成员
+          <select v-model="form.memberPersonIds" multiple aria-label="项目成员选择">
+            <option v-for="member in memberOptions" :key="member.id" :value="member.id">{{ member.name }}</option>
+          </select>
+          <small>仅可选择正式成员；公开页面只展示姓名。</small>
+        </label>
+        <label>展示排序<input v-model.number="form.displayOrder" data-testid="project-display-order" type="number" min="0"></label>
         <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>
         <label class="is-wide">项目简介<textarea v-model="form.description" rows="3"></textarea></label>
         <label class="is-wide">问题<textarea v-model="form.challenge" rows="3"></textarea></label>
         <label class="is-wide">解决方案<textarea v-model="form.solution" rows="3"></textarea></label>
-        <label class="is-wide">核心技术<textarea v-model="form.technologies" rows="3" placeholder="每行一个技术方向"></textarea></label>
       </div>
-      <ContentMediaUploader v-model="coverItems" mode="cover" title="项目封面" description="项目封面会显示在项目列表、详情页和首页项目槽位。" />
-      <ContentMediaUploader v-model="detailItems" mode="collection" title="项目详情素材" description="可选。用于项目成果、过程记录和现场展示。" />
+      <ContentMediaUploader v-model="coverItems" mode="cover" :owner="mediaOwner" title="项目封面" description="项目封面会显示在项目列表、详情页和首页项目槽位。" />
+      <ContentMediaUploader v-model="detailItems" mode="collection" :owner="mediaOwner" title="项目详情素材" description="可选。用于项目成果、过程记录和现场展示。" />
       <section class="admin-project-editor__preview" aria-label="项目公开预览">
         <div><span class="eyebrow">PUBLIC PREVIEW</span><h3>{{ form.title || "项目标题预览" }}</h3><p>{{ form.description || "项目简介会显示在用户端项目卡片。" }}</p></div>
         <ContentMediaView v-if="form.cover" :item="form.cover" preview="thumbnail" :controls="false" />
@@ -231,6 +292,7 @@ function publishProject() {
       <span>{{ isComplete ? "必填信息和封面已完整，可直接发布。" : "草稿可暂存，直接发布前需补齐全部信息和素材。" }}</span>
       <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="emit('cancelled')">取消</button>
       <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="saveDraft">保存草稿</button>
+      <button v-if="mode === 'edit' && project?.publicationStatus === 'published'" type="button" class="button button--ghost" :disabled="isSaving || isPublishing || isOfflining" @click="offlineProject">{{ isOfflining ? "下线中…" : "下线项目" }}</button>
       <button type="button" class="button" :disabled="!isComplete || isSaving || isPublishing" @click="publishProject">{{ isPublishing ? "发布中…" : "直接发布" }}</button>
     </footer>
   </section>

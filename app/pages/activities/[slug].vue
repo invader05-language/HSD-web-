@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import { useActivitiesStore } from "~/stores/activities";
-import { ACTIVITIES_PUBLISHED_SLUGS_COOKIE } from "~/stores/activities";
-import { ACTIVITY_DETAILS } from "~/data/activities";
 import { useSessionStore } from "~/stores/session";
 import { resolveLoginAwareTarget } from "~/utils/login-continuation";
+import { useContentGateway } from "~/composables/useContentGateway";
 
 const route = useRoute();
 const session = useSessionStore();
 const activitiesStore = useActivitiesStore();
+const gateway = useContentGateway();
+if (gateway) activitiesStore.activateApiMode();
 const slug = String(route.params.slug);
-const publishedSlugsCookie = useCookie<string[]>(ACTIVITIES_PUBLISHED_SLUGS_COOKIE, { default: () => [] });
-if (import.meta.client) activitiesStore.hydrate();
+if (import.meta.client && !gateway) activitiesStore.hydrate();
+onMounted(async () => { if (gateway) { await activitiesStore.refreshPublicDetailFromApi(gateway, slug); if (session.isAuthenticated && activity.value) await activitiesStore.refreshMyRegistrationFromApi(gateway, activity.value); } });
 const activity = computed(() => activitiesStore.getPublicBySlug(slug));
-const registration = computed(() => activity.value ? activitiesStore.getCurrentRegistration(activity.value.id) : undefined);
+const registration = computed(() => gateway ? activitiesStore.getMyRegistrationForSlug(slug) : (activity.value ? activitiesStore.getCurrentRegistration(activity.value.id) : undefined));
 const actionNotice = ref("");
-if (import.meta.server && !activity.value && !ACTIVITY_DETAILS.some((item) => item.slug === slug) && !publishedSlugsCookie.value.includes(slug)) {
-  throw createError({ statusCode: 404, statusMessage: "活动不存在" });
-}
-
 const signupTarget = computed(() => resolveLoginAwareTarget(`${route.path}?signup=1`, session.isAuthenticated));
 const signupLabel = computed(() => !session.isAuthenticated ? "登录后报名" : registration.value?.status === "cancelled" ? "重新报名" : registration.value ? "取消报名" : "立即报名");
 const signupSubmitLabel = computed(() => !session.isAuthenticated ? "登录后提交报名" : registration.value?.status === "cancelled" ? "重新报名" : registration.value ? "取消我的报名" : "立即报名");
@@ -36,10 +33,12 @@ async function submitRegistration() {
   }
   try {
     if (registration.value && registration.value.status !== "cancelled") {
-      activitiesStore.cancelRegistration(registration.value.id);
+      if (gateway) await activitiesStore.cancelRegistrationFromApi(gateway, registration.value.id);
+      else activitiesStore.cancelRegistration(registration.value.id);
       actionNotice.value = "已取消本次活动报名。";
     } else {
-      activitiesStore.registerCurrentUser(activity.value.id);
+      if (gateway) await activitiesStore.registerFromApi(gateway, activity.value);
+      else activitiesStore.registerCurrentUser(activity.value.id);
       actionNotice.value = "报名已提交，等待管理端审核。";
     }
   } catch (caught) {
@@ -57,6 +56,8 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
 
 <template>
   <div v-if="activity">
+    <p v-if="activitiesStore.apiError" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
+    <p v-if="activitiesStore.apiLoading" role="status">正在加载活动…</p>
     <PageBanner
       :eyebrow="`${activity.type} · ${activity.date}`"
       :title="activity.title"
@@ -81,7 +82,7 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
             <li v-for="(item, index) in activity.agenda" :key="item"><span>0{{ index + 1 }}</span>{{ item }}</li>
           </ol>
           <div v-if="activity.details.length" class="activity-detail-media" aria-label="活动详情素材">
-            <ContentMediaView v-for="item in activity.details" :key="item.id" :item="item" controls />
+            <ContentMediaView v-for="item in activity.details" :key="item.id" :item="item" fit="contain" preview="full" controls />
           </div>
         </article>
         <aside class="detail-aside detail-aside--sticky">
@@ -103,7 +104,10 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
 
   <section v-else class="section section--cool">
     <div class="shell">
+      <p v-if="activitiesStore.apiLoading" role="status">正在加载活动…</p>
+      <p v-else-if="activitiesStore.apiError && activitiesStore.apiError.status !== 404" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
       <EmptyState
+        v-else
         title="活动不存在"
         description="该活动可能尚未发布，或已被下线。"
       >

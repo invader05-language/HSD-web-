@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useSessionStore } from "~/stores/session";
 import { normalizePasswordChangeContinuation } from "~/utils/password-change";
 
@@ -7,6 +8,8 @@ useHead({ title: "首次修改密码｜白云 HSD 开发者部落" });
 
 const route = useRoute();
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const newPassword = ref("");
 const confirmation = ref("");
 const passwordError = ref("");
@@ -26,7 +29,12 @@ async function submitPasswordChange() {
   confirmationError.value = "";
   formError.value = "";
   submitting.value = true;
-  const result = session.completePasswordChange(newPassword.value, confirmation.value);
+  const result = await session.completePasswordChangeForRuntime(
+    apiRuntime.public,
+    sessionGateway,
+    newPassword.value,
+    confirmation.value,
+  );
   submitting.value = false;
 
   if (result.status === "invalid_input") {
@@ -36,6 +44,10 @@ async function submitPasswordChange() {
   }
   if (result.status === "storage_unavailable") {
     formError.value = "浏览器存储暂不可用，密码修改状态尚未保存，请稍后重试。";
+    return;
+  }
+  if (result.status === "api_error") {
+    formError.value = result.message;
     return;
   }
   if (result.status === "not_required") {
@@ -93,7 +105,7 @@ async function signOut() {
       </form>
 
       <button class="password-change-signout" type="button" @click="signOut">退出当前账号</button>
-      <p class="password-change-boundary">当前页面仅演示首次改密流程；正式上线后由服务端完成密码加密、验证与会话管理。</p>
+      <p class="password-change-boundary">为保护账号安全，新密码会由服务端加密保存，并在修改成功后刷新当前登录会话。</p>
     </section>
   </main>
 </template>

@@ -3,11 +3,12 @@ import { computed } from "vue";
 import type { GalleryAsset } from "~/data/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
 
-const props = defineProps<{ item: GalleryAsset; featured?: boolean }>();
+const props = withDefaults(defineProps<{ item: GalleryAsset; featured?: boolean; interactive?: boolean }>(), { interactive: true });
 defineEmits<{ open: [] }>();
 
 const mediaItem = computed<ContentMediaAttachment>(() => ({
   id: props.item.id,
+  version: props.item.version,
   localBlobId: props.item.localBlobId,
   role: "detail",
   kind: props.item.kind ?? "image",
@@ -25,18 +26,21 @@ const mediaItem = computed<ContentMediaAttachment>(() => ({
 </script>
 
 <template>
-  <button
-    type="button"
+  <div
     class="gallery-media-frame"
     :class="[`gallery-media-frame--${item.aspect}`, { 'is-featured': featured }]"
     data-testid="gallery-media"
+    :role="interactive ? 'button' : undefined"
+    :tabindex="interactive ? 0 : undefined"
     :aria-label="`查看照片：${item.title}`"
-    @click="$emit('open')"
+    @click="interactive && $emit('open')"
+    @keydown.enter.prevent="interactive && $emit('open')"
+    @keydown.space.prevent="interactive && $emit('open')"
   >
     <ContentMediaView :item="mediaItem" preview="thumbnail" :controls="false" />
     <span class="gallery-media-frame__overlay">
       <strong>{{ item.title }}</strong>
       <small>{{ item.caption }}</small>
     </span>
-  </button>
+  </div>
 </template>

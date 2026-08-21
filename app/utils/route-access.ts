@@ -5,6 +5,7 @@ export interface RouteAccessSession {
   isAuthenticated: boolean;
   canAccessAdmin: boolean;
   canManageAdminAccounts: boolean;
+  hasCapability?: (capability: string) => boolean;
   mustChangePassword?: boolean;
 }
 
@@ -27,7 +28,8 @@ function buildAdminForbiddenTarget(path: string): string {
 }
 
 export function getRequiredAdminAccess(source: unknown): "admin" | "owner" {
-  return typeof source === "string" && normalizeRoutePath(source) === "/admin/accounts"
+  return typeof source === "string" && ["/admin/accounts", "/admin/members", "/admin/core-members", "/admin/centers"]
+    .includes(normalizeRoutePath(source))
     ? "owner"
     : "admin";
 }
@@ -52,10 +54,12 @@ export function resolveProtectedRouteTarget(
       ? "/admin/accounts"
       : buildAdminForbiddenTarget("/admin/accounts");
   }
-  if (normalizedPath === "/admin/accounts" && !session.canManageAdminAccounts) {
+  if (["/admin/accounts", "/admin/members", "/admin/core-members", "/admin/centers"].includes(normalizedPath)
+    && !session.canManageAdminAccounts) {
     return buildAdminForbiddenTarget(normalizedPath);
   }
-  if (normalizedPath.startsWith("/admin/content/home") && !session.canManageAdminAccounts) {
+  if ((normalizedPath.startsWith("/admin/content/home") || normalizedPath.startsWith("/admin/content/help"))
+    && !session.hasCapability?.("portal.configure")) {
     return buildAdminForbiddenTarget(normalizedPath);
   }
   return undefined;

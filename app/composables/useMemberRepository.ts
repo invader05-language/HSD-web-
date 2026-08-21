@@ -16,13 +16,15 @@ import {
 import { useCurrentMember } from "./useCurrentMember";
 import { useMemberProfileStore } from "../stores/member-profile";
 import { useAdminAccessStore } from "../stores/admin-access";
+import { useMemberAdministrationStore } from "../stores/member-administration";
 import { getCenterSlug } from "../utils/member-account-form";
+import { usePublicMembersStore } from '../stores/public-members'
 
 function deriveAdminMemberCoreState(member: AdminMember): AdminMember {
   const linkedStaticPerson = findStaticPublicPersonForMember(member.id);
   const isCore = member.memberDuty === "核心人员"
-    || Boolean(member.centerLeadership)
-    || linkedStaticPerson?.memberDuty === "核心人员";
+    || linkedStaticPerson?.memberDuty === "核心人员"
+    || member.organizationPositions?.includes("CENTER_MINISTER") === true;
 
   return {
     ...member,
@@ -35,29 +37,37 @@ export function useMemberRepository() {
   const { profile: currentProfile } = useCurrentMember();
   const profileStore = useMemberProfileStore();
   const adminAccessStore = useAdminAccessStore();
+  const memberAdministrationStore = useMemberAdministrationStore();
+  const publicMembersApiStore = usePublicMembersStore();
   const storedProfiles = computed(() => Object.values(profileStore.profiles));
   const formalProfiles = computed(() =>
     storedProfiles.value.filter(isFormalMemberProfile)
   );
   const adminMembers = computed(() => {
-    const addCenterLeadership = (member: AdminMember): AdminMember => {
+    if (memberAdministrationStore.apiModeActive) return memberAdministrationStore.apiAdminMembers;
+    const addMockOrganizationPositions = (member: AdminMember): AdminMember => {
       const qualification = adminAccessStore.accounts.find((account) => (
         account.memberId === member.id
         && account.adminLevel === "admin"
         && account.adminAccessEnabled
         && account.adminCenterRole
       ));
-      const qualifiedMember = {
+      return {
         ...member,
-        centerLeadership: qualification?.adminCenterRole,
+        ...(qualification
+          ? {
+              organizationPositions: ["CENTER_MINISTER"] as const,
+              centerLeadership: qualification.adminCenterRole,
+            }
+          : {
+              organizationPositions: [],
+              centerLeadership: undefined,
+            }),
       };
-      if (!qualifiedMember.centerLeadership) delete qualifiedMember.centerLeadership;
-
-      return qualifiedMember;
     };
 
     const staticMembers = ADMIN_MEMBERS.map((member) => {
-      const qualifiedMember = addCenterLeadership(member);
+      const qualifiedMember = addMockOrganizationPositions(member);
 
       const profile = formalProfiles.value.find((item) => item.id === member.id);
       return deriveAdminMemberCoreState(
@@ -67,7 +77,7 @@ export function useMemberRepository() {
     const staticMemberIds = new Set(ADMIN_MEMBERS.map((member) => member.id));
     const createdMembers = formalProfiles.value
       .filter((profile) => !staticMemberIds.has(profile.id))
-      .map((profile) => deriveAdminMemberCoreState(projectMemberToAdmin(profile, addCenterLeadership({
+      .map((profile) => deriveAdminMemberCoreState(projectMemberToAdmin(profile, addMockOrganizationPositions({
           id: profile.id,
           name: profile.name,
           studentId: profile.studentId,
@@ -84,6 +94,7 @@ export function useMemberRepository() {
     return [...staticMembers, ...createdMembers];
   });
   const allPublicPeople = computed<readonly PublicPerson[]>(() => {
+    if (publicMembersApiStore.apiModeActive) return publicMembersApiStore.items;
     const staticPeople = [...CORE_PEOPLE, ...PUBLIC_MEMBERS];
     const projectedStaticPeople = staticPeople.flatMap((person) => {
       const linkedMemberId = getStaticMemberIdForPublicPerson(person.id);
@@ -103,6 +114,7 @@ export function useMemberRepository() {
         }];
       }
       if (!isFormalMemberProfile(storedProfile)) return [];
+      if (storedProfile.publicDirectoryVisible === false) return [];
       const adminMember = adminMembers.value.find((item) => item.id === storedProfile.id);
       return [projectMemberToPublic(
         { ...storedProfile, publicId: person.id },

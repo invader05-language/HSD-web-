@@ -12,6 +12,7 @@ import {
   useAdminAccessStore
 } from "~/stores/admin-access";
 import { useSessionStore } from "~/stores/session";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "管理员资格配置｜HSD 管理台" });
@@ -24,6 +25,8 @@ type PendingChange = {
 };
 
 const access = useAdminAccessStore();
+const organizationGateway = useOrganizationGateway();
+if (organizationGateway) access.activateApiMode();
 const session = useSessionStore();
 const qualificationDialog = ref<QualificationDialog>(null);
 const selectedCandidate = ref("");
@@ -92,12 +95,19 @@ function closeAddDialog() {
   candidateQuery.value = "";
 }
 
-function confirmAdd() {
+async function confirmAdd() {
   if (!actor.value || !selectedCandidateAccount.value) return;
   if (qualificationDialog.value === "owner") {
-    access.promoteToOwner(selectedCandidateAccount.value.account, actor.value);
+    if (!organizationGateway) {
+      access.promoteToOwner(selectedCandidateAccount.value.account, actor.value);
+    }
   } else if (qualificationDialog.value === "admin") {
-    access.assignAdminCenterRole(selectedCandidateAccount.value.account, selectedRole.value, actor.value);
+    if (organizationGateway) {
+      const result = await access.assignAdminCenterRoleFromApi(selectedCandidateAccount.value.account, selectedRole.value, organizationGateway);
+      if (result.status === "api_error") return;
+    } else {
+      access.assignAdminCenterRole(selectedCandidateAccount.value.account, selectedRole.value, actor.value);
+    }
   }
   closeAddDialog();
 }
@@ -114,15 +124,23 @@ function closeConfirmation() {
   pendingChange.value = null;
 }
 
-function confirmChange() {
+async function confirmChange() {
   if (!pendingChange.value || !actor.value) return;
   if (pendingChange.value.change === "demote-owner") {
-    access.demoteOwner(pendingChange.value.account, actor.value);
+    if (!organizationGateway) {
+      access.demoteOwner(pendingChange.value.account, actor.value);
+    }
   } else {
-    access.changeAdminQualification(pendingChange.value.account, pendingChange.value.change, actor.value);
+    if (!organizationGateway) {
+      access.changeAdminQualification(pendingChange.value.account, pendingChange.value.change, actor.value);
+    }
   }
   closeConfirmation();
 }
+
+onMounted(async () => {
+  if (organizationGateway) await access.refreshFromApi(organizationGateway);
+});
 </script>
 
 <template>
@@ -132,6 +150,9 @@ function confirmChange() {
       title="管理员资格配置"
       description="联盟总负责人管理平台管理员资格。管理员可处理平台事务，但不能修改管理员资格配置。"
     />
+
+    <p v-if="access.apiLoading" class="admin-empty-row" role="status">正在同步管理员资格…</p>
+    <p v-else-if="access.apiError" class="member-profile-error" role="alert">{{ access.apiError.message }}</p>
 
     <section class="admin-list-card admin-owner-card">
       <header>

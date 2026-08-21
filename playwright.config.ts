@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = process.env.HSD_E2E_PORT ?? "49852";
+const port = process.env.HSD_E2E_PORT ?? "50100";
 const baseURL = `http://127.0.0.1:${port}`;
 const localChromiumPath = process.env.HSD_E2E_CHROMIUM_PATH;
 const webServerCommand = process.env.CI
@@ -25,7 +25,9 @@ export default defineConfig({
       NITRO_HOST: "127.0.0.1",
       NITRO_PORT: port,
       NUXT_TELEMETRY_DISABLED: "1",
-      NUXT_IGNORE_LOCK: "1"
+      NUXT_IGNORE_LOCK: "1",
+      HSD_E2E_TEST_ONLY: "true",
+      NUXT_PUBLIC_USE_MOCK_API: "true"
     },
     reuseExistingServer: false,
     timeout: 240_000

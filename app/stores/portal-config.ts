@@ -4,12 +4,16 @@ import type { PortalConfig, PortalConfigAuditRecord, PortalConfigPatch, PortalRe
 import { canUseAssetForPortalContent } from "../data/admin-assets";
 import { createLegacyContentMediaAttachment, isContentMediaAttachmentComplete } from "../utils/content-media";
 import { useSessionStore } from "./session";
+import type { AdminPortalConfigurationResponseDto, HsdApiClient, PortalResolvedEntryResponseDto } from "../../packages/api-client/src";
+
+export interface PortalConfigRuntimeConfig { useMockApi: boolean; }
+type PortalConfigGateway = Pick<HsdApiClient, "portal">;
 
 export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
 export const PORTAL_CONFIG_STORAGE_VERSION = 4;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
-export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 1, resources: 3 } as const;
+export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 3, resources: 3 } as const;
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
@@ -44,6 +48,73 @@ function getStorage(): Storage | undefined {
   try { return typeof localStorage === "undefined" ? undefined : localStorage; } catch { return undefined; }
 }
 
+function runtimeUsesMockApi() {
+  try {
+    return (useRuntimeConfig() as { public?: { useMockApi?: boolean } }).public?.useMockApi !== false;
+  } catch {
+    // Unit-only direct store use remains the explicit legacy Mock contract.
+    return true;
+  }
+}
+
+function errorFrom(error: unknown) {
+  return {
+    code: typeof (error as { code?: unknown })?.code === "string"
+      ? (error as { code: string }).code
+      : error instanceof Error && /^PORTAL_[A-Z_]+$/.test(error.message)
+        ? error.message
+        : "PORTAL_CONFIG_API_REQUEST_FAILED",
+    message: error instanceof Error ? error.message : "Portal configuration request failed",
+    status: typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : undefined,
+    requestId: typeof (error as { requestId?: unknown })?.requestId === "string" ? (error as { requestId: string }).requestId : undefined,
+  };
+}
+
+function apiEntryToReference(entry: PortalResolvedEntryResponseDto): { slot: typeof PORTAL_SLOT_IDS[number]; reference: PortalReference } | undefined {
+  if (!entry.content) return undefined;
+  const content = entry.content as Record<string, unknown>;
+  const sourceId = typeof content.slug === "string" ? content.slug : undefined;
+  if (!sourceId || !PORTAL_SLOT_IDS.includes(entry.slot)) return undefined;
+  const entityType = entry.slot === "flash" ? "flash"
+    : entry.slot === "news" ? (content.kind === "notice" ? "notice" : "article")
+      : entry.slot === "projects" ? "project"
+        : entry.slot === "activities" ? "activity"
+          : entry.slot === "gallery" ? "gallery" : "resource";
+  return { slot: entry.slot, reference: { entityType, sourceId } as PortalReference };
+}
+
+function configFromApi(response: AdminPortalConfigurationResponseDto): PortalConfig {
+  const slots = emptySlots();
+  for (const entry of response.entries.slice().sort((left, right) => left.position - right.position)) {
+    const normalized = apiEntryToReference(entry);
+    if (normalized) slots[normalized.slot].push(normalized.reference);
+  }
+  const rawVisuals = response.visuals as Record<string, unknown>;
+  const visual = (slot: "home" | "join"): PortalVisualConfig => {
+    const candidate = rawVisuals[slot] as Record<string, unknown> | undefined;
+    return {
+      ...(typeof candidate?.attachmentId === "string" ? { attachmentId: candidate.attachmentId } : {}),
+      alt: typeof candidate?.alt === "string" ? candidate.alt : "",
+    };
+  };
+  return { revision: response.version, slots, visuals: { home: visual("home"), join: visual("join") }, updatedAt: new Date().toISOString(), updatedBy: "api" };
+}
+
+function savePayload(config: PortalConfig) {
+  const entries = PORTAL_SLOT_IDS.flatMap((slot) => config.slots[slot].map((reference, index) => ({
+    slot,
+    position: index + 1,
+    ...(reference.entityType === "flash" || reference.entityType === "article" || reference.entityType === "notice"
+      ? { contentSlug: reference.sourceId }
+      : { entityType: reference.entityType, sourceId: reference.sourceId }),
+  })));
+  const visual = (value: PortalVisualConfig) => ({
+    ...(value.attachmentId || value.media?.id ? { attachmentId: value.attachmentId ?? value.media?.id } : {}),
+    ...(value.alt ? { alt: value.alt } : {}),
+  });
+  return { expectedVersion: config.revision, entries, visuals: { home: visual(config.visuals.home), join: visual(config.visuals.join) } };
+}
+
 function writePersistedConfigs(
   draftConfig: PortalConfig,
   publishedConfig: PortalConfig,
@@ -68,7 +139,8 @@ function isConfig(value: unknown): value is PortalConfig {
   const visuals = config.visuals as Record<string, unknown>;
   const hasVisual = (visual: unknown) => typeof visual === "object" && visual !== null
     && typeof (visual as Record<string, unknown>).alt === "string"
-    && ((visual as Record<string, unknown>).assetId === undefined || typeof (visual as Record<string, unknown>).assetId === "string");
+    && ((visual as Record<string, unknown>).assetId === undefined || typeof (visual as Record<string, unknown>).assetId === "string")
+    && ((visual as Record<string, unknown>).attachmentId === undefined || typeof (visual as Record<string, unknown>).attachmentId === "string");
   const validReference = (reference: unknown) => typeof reference === "object" && reference !== null
     && ["flash", "article", "notice", "project", "activity", "gallery", "resource"].includes((reference as Record<string, unknown>).entityType as string)
     && typeof (reference as Record<string, unknown>).sourceId === "string";
@@ -144,17 +216,9 @@ function restorePersistedConfigs(): { draftConfig: PortalConfig; publishedConfig
   }
 }
 
-function ownerId() {
+function capabilityActorId(capability: "portal.configure" | "portal.publish") {
   const session = useSessionStore();
-  if (!session.isAuthenticated || session.adminLevel !== "owner" || !session.currentAccount) {
-    throw new Error("PORTAL_CONTENT_PERMISSION_REQUIRED");
-  }
-  return session.currentAccount.account;
-}
-
-function adminId() {
-  const session = useSessionStore();
-  if (!session.isAuthenticated || !session.canAccessAdmin || !session.currentAccount) {
+  if (!session.isAuthenticated || !session.hasCapability(capability) || !session.currentAccount) {
     throw new Error("PORTAL_CONTENT_PERMISSION_REQUIRED");
   }
   return session.currentAccount.account;
@@ -185,16 +249,73 @@ function validate(config: PortalConfig, catalog: readonly PortalCatalogItem[]) {
 
 export const usePortalConfigStore = defineStore("portal-config", {
   state: () => {
-    const persisted = restorePersistedConfigs();
+    const persisted = runtimeUsesMockApi() ? restorePersistedConfigs() : undefined;
     return {
       draftConfig: persisted?.draftConfig ?? initialConfig(),
       publishedConfig: persisted?.publishedConfig ?? initialConfig(),
       auditRecords: persisted?.auditRecords ?? [] as PortalConfigAuditRecord[],
       persistenceError: undefined as string | undefined,
+      requestError: null as ReturnType<typeof errorFrom> | null,
+      loading: false,
+      apiModeActive: !runtimeUsesMockApi(),
     };
   },
   actions: {
+    async initializeForRuntime(config: PortalConfigRuntimeConfig, gateway: PortalConfigGateway | undefined) {
+      this.apiModeActive = !config.useMockApi;
+      this.requestError = null;
+      if (config.useMockApi) return this.preview();
+      if (!gateway) {
+        const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE");
+        this.requestError = errorFrom(error);
+        throw error;
+      }
+      capabilityActorId("portal.configure");
+      this.loading = true;
+      try {
+        const draft = configFromApi(await gateway.portal.draft());
+        this.draftConfig = draft;
+        this.publishedConfig = clone(draft);
+        this.persistenceError = undefined;
+        return clone(draft);
+      } catch (error) {
+        this.requestError = errorFrom(error);
+        throw error;
+      } finally { this.loading = false; }
+    },
+    async previewForRuntime(config: PortalConfigRuntimeConfig, gateway: PortalConfigGateway | undefined) {
+      if (config.useMockApi) return this.preview();
+      if (!gateway) { const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE"); this.requestError = errorFrom(error); throw error; }
+      capabilityActorId("portal.configure");
+      this.requestError = null; this.loading = true;
+      try { const draft = configFromApi(await gateway.portal.preview()); this.draftConfig = draft; return clone(draft); }
+      catch (error) { this.requestError = errorFrom(error); throw error; }
+      finally { this.loading = false; }
+    },
+    async saveDraftForRuntime(config: PortalConfigRuntimeConfig, gateway: PortalConfigGateway | undefined, patch: PortalConfigPatch) {
+      if (config.useMockApi) return this.saveDraft(patch);
+      if (!gateway) { const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE"); this.requestError = errorFrom(error); throw error; }
+      capabilityActorId("portal.configure");
+      const next = clone(this.draftConfig);
+      if (patch.slots) for (const slot of PORTAL_SLOT_IDS) if (patch.slots[slot]) next.slots[slot] = clone(patch.slots[slot]!);
+      if (patch.visuals) next.visuals = { ...next.visuals, ...clone(patch.visuals) };
+      this.requestError = null; this.loading = true;
+      try { const saved = configFromApi(await gateway.portal.saveDraft(savePayload(next))); this.draftConfig = saved; return clone(saved); }
+      catch (error) { this.requestError = errorFrom(error); throw error; }
+      finally { this.loading = false; }
+    },
+    async publishForRuntime(config: PortalConfigRuntimeConfig, gateway: PortalConfigGateway | undefined, confirmed: boolean) {
+      if (config.useMockApi) return this.publish([], confirmed);
+      if (!gateway) { const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE"); this.requestError = errorFrom(error); throw error; }
+      capabilityActorId("portal.publish");
+      if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
+      this.requestError = null; this.loading = true;
+      try { const published = configFromApi(await gateway.portal.publish({ expectedVersion: this.draftConfig.revision, confirmed })); this.draftConfig = published; this.publishedConfig = clone(published); return clone(published); }
+      catch (error) { this.requestError = errorFrom(error); throw error; }
+      finally { this.loading = false; }
+    },
     persist() {
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
       try {
         writePersistedConfigs(this.draftConfig, this.publishedConfig, this.auditRecords);
         this.persistenceError = undefined;
@@ -203,7 +324,8 @@ export const usePortalConfigStore = defineStore("portal-config", {
       }
     },
     saveDraft(patch: PortalConfigPatch, now: Date = new Date()) {
-      const actor = adminId();
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      const actor = capabilityActorId("portal.configure");
       const draft = clone(this.draftConfig);
       if (patch.slots) {
         for (const slot of PORTAL_SLOT_IDS) {
@@ -231,6 +353,8 @@ export const usePortalConfigStore = defineStore("portal-config", {
       catalog: readonly PortalCatalogItem[],
       now: Date = new Date(),
     ) {
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      capabilityActorId("portal.configure");
       if (!Number.isInteger(index) || index < 0 || index >= PORTAL_SLOT_CAPACITY[slot]) {
         throw new Error("PORTAL_CONFIG_INVALID_REFERENCE");
       }
@@ -251,6 +375,8 @@ export const usePortalConfigStore = defineStore("portal-config", {
       return this.saveDraft({ slots: { [slot]: references } }, now);
     },
     removeReference(slot: typeof PORTAL_SLOT_IDS[number], index: number, now: Date = new Date()) {
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      capabilityActorId("portal.configure");
       if (!Number.isInteger(index) || index < 0 || index >= this.draftConfig.slots[slot].length) {
         throw new Error("PORTAL_CONFIG_INVALID_REFERENCE");
       }
@@ -264,6 +390,8 @@ export const usePortalConfigStore = defineStore("portal-config", {
       direction: "up" | "down",
       now: Date = new Date(),
     ) {
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      capabilityActorId("portal.configure");
       const target = index + (direction === "up" ? -1 : 1);
       const references = clone(this.draftConfig.slots[slot]);
       if (!Number.isInteger(index) || index < 0 || index >= references.length || target < 0 || target >= references.length) {
@@ -272,14 +400,19 @@ export const usePortalConfigStore = defineStore("portal-config", {
       [references[index], references[target]] = [references[target]!, references[index]!];
       return this.saveDraft({ slots: { [slot]: references } }, now);
     },
-    preview() { return clone(this.draftConfig); },
+    preview() {
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      capabilityActorId("portal.configure");
+      return clone(this.draftConfig);
+    },
     publish(
       catalog: readonly PortalCatalogItem[],
       confirmed: boolean,
       now: Date = new Date(),
       reason = "publish portal configuration",
     ) {
-      const actor = ownerId();
+      if (this.apiModeActive) throw new Error("PORTAL_CONFIG_API_REQUIRED");
+      const actor = capabilityActorId("portal.publish");
       if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
       validate(this.draftConfig, catalog);
       const next = clone(this.draftConfig);

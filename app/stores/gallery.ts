@@ -4,7 +4,7 @@ import { GALLERY_ALBUMS, type GalleryAsset, type GalleryAlbum } from "../data/ga
 import { isContentMediaAttachmentComplete } from "../utils/content-media";
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
-import type { GalleryCategory, GalleryDraftInput, ManagedGalleryAlbum, PublishedGalleryAlbum } from "../types/gallery";
+import { normalizeGalleryCategory, type GalleryCategory, type GalleryDraftInput, type ManagedGalleryAlbum, type PublishedGalleryAlbum } from "../types/gallery";
 
 export type { GalleryCategory, GalleryDraftInput, ManagedGalleryAlbum, PublishedGalleryAlbum } from "../types/gallery";
 
@@ -42,18 +42,19 @@ function seedAlbum(album: GalleryAlbum, index: number): ManagedGalleryAlbum {
     id: album.slug,
     slug: album.slug,
     title: album.title,
-    category: album.category,
+    category: normalizeGalleryCategory(album.category),
     year: album.year,
     summary: album.summary,
-    team: album.team,
     ownerCenterId: "new-media",
     assets: normalizeAssets(album.assets),
+    cover: asCover(normalizeAssets(album.assets)[0]),
     to: `/gallery/${album.slug}`,
     publishedAt,
     revision: 1,
   };
   return {
     ...snapshot,
+    team: album.team,
     status: "published",
     publishedState: "published",
     version: index + 1,
@@ -69,17 +70,21 @@ function seedAlbums() {
 }
 
 function isGalleryCategory(value: unknown): value is GalleryCategory {
-  return value === "活动摄影" || value === "海报设计" || value === "短视频" || value === "人物专访";
+  return typeof value === "string" && ["event_documentary", "visual_creation", "video_work", "people_stories", "活动摄影", "海报设计", "短视频", "人物专访"].includes(value);
 }
 
-function normalizeAssets(assets: readonly GalleryAsset[]) {
-  return assets.map((asset, index) => ({
+function normalizeAssets(assets: readonly GalleryAsset[]): GalleryAsset[] {
+  return assets.map((asset, index): GalleryAsset => ({
     ...asset,
     role: asset.role ?? "detail",
     kind: asset.kind ?? "image",
     status: asset.status ?? "ready",
     sortOrder: asset.sortOrder ?? index,
   }));
+}
+
+function asCover(asset: GalleryAsset | undefined): GalleryAsset | null {
+  return asset ? { ...asset, role: "cover" } : null;
 }
 
 function migratePersistedState(value: unknown): PersistedGalleryState | undefined {
@@ -102,9 +107,11 @@ function migratePersistedState(value: unknown): PersistedGalleryState | undefine
     version: GALLERY_STORAGE_VERSION,
     albums: (state.albums as ManagedGalleryAlbum[]).map((album) => ({
       ...album,
+      category: normalizeGalleryCategory(album.category),
       assets: normalizeAssets(album.assets),
+      cover: album.cover ? asCover(normalizeAssets([album.cover])[0]) : asCover(normalizeAssets(album.assets)[0]),
       publishedSnapshot: album.publishedSnapshot
-        ? { ...album.publishedSnapshot, assets: normalizeAssets(album.publishedSnapshot.assets) }
+        ? { ...album.publishedSnapshot, category: normalizeGalleryCategory(album.publishedSnapshot.category), assets: normalizeAssets(album.publishedSnapshot.assets), cover: album.publishedSnapshot.cover ? asCover(normalizeAssets([album.publishedSnapshot.cover])[0]) : asCover(normalizeAssets(album.publishedSnapshot.assets)[0]) }
         : undefined,
     })),
   };
@@ -148,6 +155,7 @@ function requireAdminActor() {
 
 function canManage(session: ReturnType<typeof useSessionStore>, album: ManagedGalleryAlbum) {
   if (session.adminLevel === "owner") return true;
+  if (session.currentAccount?.adminCenterId) return album.ownerCenterId === session.currentAccount.adminCenterId;
   const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
   return Boolean(scope && album.ownerCenterId === getRecruitmentCenterId(scope));
 }
@@ -159,6 +167,7 @@ function assertCanManage(album: ManagedGalleryAlbum) {
 }
 
 function validateAssets(assets: GalleryAsset[], requireComplete = false) {
+  if (assets.length > 20) throw new Error("GALLERY_DETAILS_LIMIT_EXCEEDED");
   if (!assets.length && requireComplete) throw new Error("GALLERY_ASSET_REQUIRED");
   for (const asset of assets) {
     if (asset.assetId) {
@@ -177,6 +186,8 @@ function assertCompleteGallery(album: ManagedGalleryAlbum) {
     throw new Error("GALLERY_INCOMPLETE");
   }
   validateAssets(album.assets, true);
+  if (!album.cover) throw new Error("GALLERY_COVER_REQUIRED");
+  if (!isContentMediaAttachmentComplete({ ...album.cover, role: "cover", kind: album.cover.kind ?? "image", status: album.cover.status ?? "ready", sortOrder: album.cover.sortOrder ?? 0, url: album.cover.imageUrl })) throw new Error("GALLERY_COVER_METADATA_REQUIRED");
   for (const asset of album.assets) {
     const complete = isContentMediaAttachmentComplete({
       id: asset.id,
@@ -202,10 +213,96 @@ export const useGalleryStore = defineStore("gallery", {
     const persisted = readPersistedState();
     return {
       albums: persisted?.albums ?? seedAlbums(),
+      publicDetails: {} as Record<string, PublishedGalleryAlbum>,
+      apiModeActive: false,
+      apiLoading: false,
+      apiMutating: false,
+      apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
       persistenceError: undefined as string | undefined,
     };
   },
   actions: {
+    activateApiMode(clearData = true) {
+      const wasActive = this.apiModeActive;
+      this.apiModeActive = true;
+      if (clearData || !wasActive) this.albums = [];
+      this.apiError = null;
+    },
+    async refreshPublicFromApi(gateway: { galleries: { listPublic(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
+      this.activateApiMode();
+      this.apiLoading = true;
+      try {
+        const response = await gateway.galleries.listPublic();
+        this.albums = response.items.map(galleryFromPublicApi);
+        this.publicDetails = {};
+      } catch (error) {
+        this.apiError = galleryApiError(error);
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async refreshPublicDetailFromApi(gateway: { gallery(slug: string): Promise<Record<string, unknown>> }, slug: string) {
+      this.activateApiMode(false);
+      this.apiLoading = true;
+      try {
+        const gallery = galleryFromPublicApi(await gateway.gallery(slug));
+        this.publicDetails[slug] = gallery.publishedSnapshot!;
+        return gallery;
+      } catch (error) {
+        this.apiError = galleryApiError(error);
+        return undefined;
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async refreshFromApi(gateway: { galleries: { listAdmin(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
+      this.activateApiMode();
+      this.apiLoading = true;
+      try {
+        const response = await gateway.galleries.listAdmin();
+        this.albums = response.items.map(galleryFromAdminApi);
+        this.publicDetails = {};
+      } catch (error) {
+        this.apiError = galleryApiError(error);
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async createDraftFromApi(gateway: any, input: GalleryDraftInput) {
+      this.activateApiMode(); this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = galleryFromAdminApi(await gateway.galleries.create(galleryCreatePayload(input)));
+        this.albums = [saved, ...this.albums.filter((album) => album.id !== saved.id)];
+        return saved;
+      } catch (error) { this.apiError = galleryApiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async updateDraftFromApi(gateway: any, albumId: string, input: GalleryDraftInput) {
+      const current = this.getById(albumId); if (!current) throw new Error("GALLERY_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = galleryFromAdminApi(await gateway.galleries.update(albumId, { ...galleryUpdatePayload(input, current.slug), expectedVersion: current.version }));
+        this.albums = this.albums.map((album) => album.id === saved.id ? saved : album);
+        return saved;
+      } catch (error) { this.apiError = galleryApiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async publishFromApi(gateway: any, albumId: string) {
+      const current = this.getById(albumId); if (!current) throw new Error("GALLERY_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = galleryFromAdminApi(await gateway.galleries.publish(albumId, { expectedVersion: current.version }));
+        this.albums = this.albums.map((album) => album.id === saved.id ? saved : album);
+        return saved;
+      } catch (error) { this.apiError = galleryApiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async offlineFromApi(gateway: any, albumId: string, reason: string) {
+      const current = this.getById(albumId); if (!current) throw new Error("GALLERY_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = galleryFromAdminApi(await gateway.galleries.offline(albumId, { expectedVersion: current.version, reason }));
+        this.albums = this.albums.map((album) => album.id === saved.id ? saved : album);
+        return saved;
+      } catch (error) { this.apiError = galleryApiError(error); throw error; } finally { this.apiMutating = false; }
+    },
     hydrate() {
       const persisted = readPersistedState();
       if (persisted) this.albums = persisted.albums;
@@ -233,6 +330,7 @@ export const useGalleryStore = defineStore("gallery", {
       return this.albums.filter((album) => album.publishedState === "published" && album.publishedSnapshot).map((album) => clone(album.publishedSnapshot!));
     },
     getPublicBySlug(slug: string) {
+      if (this.publicDetails[slug]) return clone(this.publicDetails[slug]);
       const album = this.albums.find((item) => item.slug === slug && item.publishedState === "published" && item.publishedSnapshot);
       return album?.publishedSnapshot ? clone(album.publishedSnapshot) : undefined;
     },
@@ -247,6 +345,9 @@ export const useGalleryStore = defineStore("gallery", {
       }
       const assets = clone(input.assets);
       validateAssets(assets);
+      const cover = input.cover ? clone(input.cover) : assets[0] ? { ...clone(assets[0]), role: "cover" as const } : null;
+      if (cover) cover.role = "cover";
+      for (const asset of assets) asset.role = "detail";
       const timestamp = now.toISOString();
       const album: ManagedGalleryAlbum = {
         id: `gallery-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -257,6 +358,7 @@ export const useGalleryStore = defineStore("gallery", {
         summary: input.summary.trim(),
         team: input.team.trim(),
         ownerCenterId,
+        cover,
         assets,
         to: `/gallery/${slug}`,
         publishedAt: timestamp,
@@ -301,6 +403,7 @@ export const useGalleryStore = defineStore("gallery", {
         next.assets = clone(next.assets);
         validateAssets(next.assets as GalleryAsset[]);
       }
+      if (next.cover && typeof next.cover === "object") next.cover = { ...(next.cover as GalleryAsset), role: "cover" };
       Object.assign(album, next);
       album.title = album.title.trim();
       album.summary = album.summary.trim();
@@ -328,8 +431,8 @@ export const useGalleryStore = defineStore("gallery", {
         category: album.category,
         year: album.year,
         summary: album.summary,
-        team: album.team,
         ownerCenterId: album.ownerCenterId,
+        cover: clone(album.cover),
         assets: clone([...album.assets]),
         to: `/gallery/${album.slug}`,
         publishedAt: now.toISOString(),
@@ -369,3 +472,77 @@ export const useGalleryStore = defineStore("gallery", {
     },
   },
 });
+
+function galleryApiError(error: unknown) {
+  const api = error as { status?: unknown; code?: unknown; requestId?: unknown };
+  return error instanceof Error
+    ? { status: typeof api.status === "number" ? api.status : undefined, code: typeof api.code === "string" ? api.code : "GALLERY_API_REQUEST_FAILED", message: error.message, requestId: typeof api.requestId === "string" ? api.requestId : undefined }
+    : { code: "GALLERY_API_REQUEST_FAILED", message: "Gallery API request failed" };
+}
+
+function galleryFromPublicApi(item: Record<string, unknown>): ManagedGalleryAlbum {
+  const slug = String(item.slug);
+  const assets = Array.isArray(item.details)
+    ? item.details.flatMap((asset, index) => publicGalleryAsset(asset, `gallery-detail-${slug}-${index}`, index))
+    : [];
+  const base: PublishedGalleryAlbum = {
+    id: slug,
+    slug,
+    title: String(item.title),
+    category: normalizeGalleryCategory(item.category),
+    year: typeof item.year === "string" ? item.year : "",
+    summary: typeof item.description === "string" ? item.description : "",
+    ownerCenterId: "",
+    assets,
+    cover: publicGalleryAsset(item.cover, `gallery-cover-${slug}`, -1)[0] ?? null,
+    to: `/gallery/${slug}`,
+    publishedAt: "",
+    revision: 1,
+  };
+  return { ...base, team: "", status: "published", publishedState: "published", version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedSnapshot: base };
+}
+
+function galleryFromAdminApi(item: Record<string, unknown>): ManagedGalleryAlbum {
+  const status = item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft";
+  return {
+    id: String(item.id), slug: String(item.slug), title: String(item.title), category: normalizeGalleryCategory(item.category), year: typeof item.year === "string" ? item.year : "",
+    summary: typeof item.description === "string" ? item.description : "", team: typeof item.team === "string" ? item.team : "",
+    ownerCenterId: String(item.centerId), cover: adminGalleryAsset(item.cover, "cover", 0), assets: Array.isArray(item.details) ? item.details.flatMap((value, index) => adminGalleryAsset(value, "detail", index) ? [adminGalleryAsset(value, "detail", index)!] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => ({ id, role: "detail" as const, kind: "image" as const, title: "", caption: "", alt: "", aspect: "landscape" as const, sortOrder: index, status: "processing" as const, serverOwned: true })) : [],
+    to: `/gallery/${String(item.slug)}`, publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), status, publishedState: status === "published" ? "published" : "unpublished", version: Number(item.version), createdAt: "", updatedAt: "", createdBy: "",
+  };
+}
+
+function galleryCreatePayload(input: GalleryDraftInput) {
+  return { expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title, category: normalizeGalleryCategory(input.category), year: input.year, description: input.summary, team: input.team, ...(input.cover ? { coverAttachmentId: input.cover.id } : {}), detailAttachmentIds: input.assets.map((asset) => asset.id) };
+}
+
+function galleryUpdatePayload(input: GalleryDraftInput, currentSlug: string) {
+  return { centerId: input.ownerCenterId, slug: input.slug?.trim() ? slugify(input.slug) : currentSlug, title: input.title, category: normalizeGalleryCategory(input.category), year: input.year, description: input.summary, team: input.team, ...(input.cover ? { coverAttachmentId: input.cover.id } : { coverAttachmentId: null }), detailAttachmentIds: input.assets.map((asset) => asset.id) };
+}
+
+function publicGalleryAsset(value: unknown, id: string, sortOrder: number): GalleryAsset[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const media = value as Record<string, unknown>;
+  return [{
+    id,
+    title: typeof media.title === "string" ? media.title : "",
+    caption: typeof media.caption === "string" ? media.caption : "",
+    alt: typeof media.alt === "string" ? media.alt : "",
+    aspect: media.aspect === "wide" || media.aspect === "portrait" ? media.aspect : "landscape",
+    role: media.role === "cover" ? "cover" : "detail",
+    kind: media.kind === "video" ? "video" : "image",
+    status: "ready",
+    sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder,
+    ...(typeof media.url === "string" ? { imageUrl: media.url } : {}),
+    ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}),
+  }];
+}
+
+function adminGalleryAsset(value: unknown, role: "cover" | "detail", sortOrder: number): GalleryAsset | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const media = value as Record<string, unknown>;
+  if (typeof media.id !== "string") return null;
+  return {
+    id: media.id, role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "wide" || media.aspect === "portrait" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, status: media.status === "ready" ? "ready" : "processing", serverOwned: true, version: typeof media.version === "number" ? media.version : undefined, imageUrl: typeof media.url === "string" ? media.url : undefined, thumbnailUrl: typeof media.thumbnailUrl === "string" ? media.thumbnailUrl : undefined,
+  };
+}

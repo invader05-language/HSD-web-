@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
+import { usePublicMembersGateway } from '~/composables/usePublicMembersGateway'
+import { usePublicMembersStore } from '~/stores/public-members'
 
 const route = useRoute();
 const memberRepository = useMemberRepository();
-const person = computed(() => memberRepository.findPublicPerson(String(route.params.id)));
+const publicMembersGateway = usePublicMembersGateway()
+const publicMembersStore = usePublicMembersStore()
+const publicId = String(route.params.id)
+if (publicMembersGateway) await useAsyncData(`public-member-${publicId}`, () => publicMembersStore.refreshDetail(publicMembersGateway, publicId))
+const person = computed(() => publicMembersGateway ? publicMembersStore.detail : memberRepository.findPublicPerson(publicId));
 
 if (!person.value) {
-  throw createError({ statusCode: 404, statusMessage: "成员不存在" });
+  const status = publicMembersStore.apiError && (publicMembersStore.apiError as any).status !== 404 ? 503 : 404
+  throw createError({ statusCode: status, statusMessage: status === 404 ? "成员不存在" : '公开成员资料暂时不可用' });
 }
 
-const honors = computed(() => [...person.value!.honors].sort((a, b) => a.order - b.order));
+const honors = computed(() => [...person.value!.honors].sort((a, b) => b.awardedAt.localeCompare(a.awardedAt)));
 
 useHead(() => ({
   title: `${person.value?.name}｜公开成员详情｜白云 HSD 开发者部落`,
@@ -49,6 +56,7 @@ useHead(() => ({
                 <dt>实践方向</dt>
                 <dd>{{ person.baizeDirection }}</dd>
               </div>
+              <div v-if="person.positions?.length"><dt>组织职务</dt><dd>{{ person.positions.join("、") }}</dd></div>
             </dl>
           </div>
         </article>

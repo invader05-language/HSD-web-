@@ -24,6 +24,12 @@ export interface AdminMember {
    * formal member a core person.
    */
   isCore?: boolean;
+  /**
+   * Authoritative organization positions when this record comes from the API.
+   * Mock records may retain `centerLeadership` for backward-compatible demos,
+   * but that legacy field must never be inferred from an account admin level.
+   */
+  organizationPositions?: Array<"ALLIANCE_OWNER" | "CENTER_MINISTER" | "PROJECT_LEAD">;
   baizeDirection?: BaizeDirection;
   centerLeadership?: AdminCenterLeadership;
   avatarUrl: string | null;

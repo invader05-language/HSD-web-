@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { useActivitiesStore } from "~/stores/activities";
+import { useContentGateway } from "~/composables/useContentGateway";
 import ActivityEditor from "~/components/admin/ActivityEditor.vue";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const activitiesStore = useActivitiesStore();
+const gateway = useContentGateway();
+if (gateway) activitiesStore.activateApiMode();
 const activityId = computed(() => decodeURIComponent(String(route.params.id)));
-if (import.meta.client) activitiesStore.hydrate();
+if (import.meta.client && !gateway) activitiesStore.hydrate();
+onMounted(() => { if (gateway) void activitiesStore.refreshFromApi(gateway); });
 
 const sourceActivity = computed(() => activitiesStore.getById(activityId.value));
 const canEdit = computed(() => Boolean(sourceActivity.value && activitiesStore.canManageActivity(activityId.value)));
@@ -37,6 +41,8 @@ function onCancelled() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
+    <p v-if="activitiesStore.apiError" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
+    <p v-if="activitiesStore.apiLoading" role="status">正在加载活动…</p>
     <AdminPageHeading
       eyebrow="Activities"
       :title="activity?.title || (sourceActivity ? '编辑活动' : '活动不存在')"

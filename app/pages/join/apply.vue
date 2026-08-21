@@ -54,7 +54,11 @@ const showWithdrawConfirmation = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 let draftObjectUrl: string | undefined;
 
-const isBaizeFirstChoice = computed(() => applicationDraft.firstChoice === "白泽开发中心");
+const hasBaizePreference = computed(() => [
+  applicationDraft.firstChoice,
+  applicationDraft.secondChoice,
+  applicationDraft.thirdChoice,
+].includes("白泽开发中心"));
 const avatarSource = computed(() => profileDraft.avatarUrl || undefined);
 const currentBatchApplication = computed(() => activeBatch.value
   ? applicationStore.getApplication(activeBatch.value.id, currentProfile.value.id)
@@ -329,12 +333,12 @@ onBeforeUnmount(() => {
               </section>
 
               <section v-show="step === 2" aria-labelledby="application-choice-heading">
-                <header class="recruitment-section-heading"><span>02</span><div><h2 id="application-choice-heading">填写报名志愿</h2><p>按真实意愿排序。白泽开发中心只能作为第一志愿。</p></div></header>
+                <header class="recruitment-section-heading"><span>02</span><div><h2 id="application-choice-heading">填写报名志愿</h2><p>按真实意愿排序；白泽开发中心可填任一志愿，选择后请补充一个实践方向。</p></div></header>
                 <div class="registration-fields">
                   <label data-field="firstChoice"><span>第一志愿</span><select :value="applicationDraft.firstChoice || ''" :aria-invalid="Boolean(errors.firstChoice)" :aria-describedby="errors.firstChoice ? 'first-choice-error' : undefined" @change="updateFirstChoice"><option value="">请选择第一志愿</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.firstChoice" id="first-choice-error" class="form-error">{{ errors.firstChoice }}</small></label>
-                  <label data-field="secondChoice"><span>第二志愿（可选）</span><select v-model="applicationDraft.secondChoice" :aria-invalid="Boolean(errors.secondChoice)" :aria-describedby="errors.secondChoice ? 'second-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS.filter((item) => item !== '白泽开发中心')" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.secondChoice" id="second-choice-error" class="form-error">{{ errors.secondChoice }}</small></label>
-                  <label data-field="thirdChoice"><span>第三志愿（可选）</span><select v-model="applicationDraft.thirdChoice" :aria-invalid="Boolean(errors.thirdChoice)" :aria-describedby="errors.thirdChoice ? 'third-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS.filter((item) => item !== '白泽开发中心')" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.thirdChoice" id="third-choice-error" class="form-error">{{ errors.thirdChoice }}</small></label>
-                  <label v-if="isBaizeFirstChoice" data-field="baizeDirection" class="registration-fields__wide"><span>白泽意向方向</span><select v-model="applicationDraft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" :aria-describedby="errors.baizeDirection ? 'baize-direction-error' : undefined"><option value="">请选择方向</option><option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option></select><small v-if="errors.baizeDirection" id="baize-direction-error" class="form-error">{{ errors.baizeDirection }}</small></label>
+                  <label data-field="secondChoice"><span>第二志愿（可选）</span><select v-model="applicationDraft.secondChoice" :aria-invalid="Boolean(errors.secondChoice)" :aria-describedby="errors.secondChoice ? 'second-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.secondChoice" id="second-choice-error" class="form-error">{{ errors.secondChoice }}</small></label>
+                  <label data-field="thirdChoice"><span>第三志愿（可选）</span><select v-model="applicationDraft.thirdChoice" :aria-invalid="Boolean(errors.thirdChoice)" :aria-describedby="errors.thirdChoice ? 'third-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.thirdChoice" id="third-choice-error" class="form-error">{{ errors.thirdChoice }}</small></label>
+                  <label v-if="hasBaizePreference" data-field="baizeDirection" class="registration-fields__wide"><span>白泽意向方向</span><select v-model="applicationDraft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" :aria-describedby="errors.baizeDirection ? 'baize-direction-error' : undefined"><option value="">请选择方向</option><option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option></select><small v-if="errors.baizeDirection" id="baize-direction-error" class="form-error">{{ errors.baizeDirection }}</small></label>
                 </div>
                 <fieldset data-field="acceptsAdjustment" class="registration-adjustment" :aria-describedby="errors.acceptsAdjustment ? 'adjustment-error' : undefined"><legend>是否接受调剂</legend><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="true">接受调剂</label><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="false">不接受调剂</label><small v-if="errors.acceptsAdjustment" id="adjustment-error" class="form-error">{{ errors.acceptsAdjustment }}</small></fieldset>
               </section>

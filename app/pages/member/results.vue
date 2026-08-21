@@ -2,6 +2,7 @@
 import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
+  memberResultFromApi,
   describeAdmission,
   describeAssessment
 } from "~/data/member-results";
@@ -10,6 +11,7 @@ import { useRecruitmentApplicationStore } from "~/stores/recruitment-application
 import { copyTextToClipboard } from "~/utils/clipboard";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
+import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 
 type ResultTab = "admission" | "assessment";
 
@@ -19,7 +21,21 @@ const { profile: currentMember } = useCurrentMember();
 const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
+const recruitmentGateway = useRecruitmentGateway();
+if (recruitmentGateway) assessmentStore.enableApiMode();
+const resultsError = computed(() => assessmentStore.myResultsError);
+
+onMounted(async () => {
+  if (!recruitmentGateway) return;
+  try {
+    await assessmentStore.refreshMyResults(recruitmentGateway);
+  } catch {
+    // The store exposes the server failure in-page; production never falls back to demo data.
+  }
+});
+
 const publishedAssessment = computed(() => {
+  if (recruitmentGateway) return undefined;
   const published = batchStore.batches.flatMap((batch) => (
     assessmentStore.getCandidates(batch.id)
       .filter((candidate) => candidate.memberId === currentMember.value.id && Boolean(candidate.publishedAt))
@@ -36,16 +52,16 @@ const publishedAssessment = computed(() => {
     Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "")
   ))[0];
 });
-const result = computed(() =>
-  applyPublishedAssessmentProjection(
-    getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication),
-    publishedAssessment.value,
-  )
-);
+const result = computed(() => recruitmentGateway
+  ? memberResultFromApi(assessmentStore.myResults[0])
+  : applyPublishedAssessmentProjection(
+      getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication),
+      publishedAssessment.value,
+    ));
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
 const activeTab = ref<ResultTab>("admission");
-const copyStatus = ref<"idle" | "success" | "error">("idle");
+const copyStatus = ref<Record<string, "idle" | "success" | "error">>({});
 let copyResetTimer: number | undefined;
 
 function activateTab(tab: ResultTab) {
@@ -61,13 +77,19 @@ async function moveTab(event: KeyboardEvent, current: ResultTab) {
   document.querySelector<HTMLButtonElement>(`#result-tab-${nextTab}`)?.focus();
 }
 
-async function copyContact() {
-  if (!result.value.responsibleContact) return;
+async function copyContact(contact: { personId?: string; contact: string; name: string }) {
   if (copyResetTimer) window.clearTimeout(copyResetTimer);
-  const succeeded = await copyTextToClipboard(result.value.responsibleContact.contact);
-  copyStatus.value = succeeded ? "success" : "error";
+  try {
+    const complete = recruitmentGateway && contact.personId && assessmentStore.myResults[0]
+      ? await recruitmentGateway.getMyResponsibleContact(assessmentStore.myResults[0].id, contact.personId)
+      : { contact: contact.contact };
+    const succeeded = await copyTextToClipboard(complete.contact);
+    copyStatus.value = { ...copyStatus.value, [contact.personId ?? contact.name]: succeeded ? "success" : "error" };
+  } catch {
+    copyStatus.value = { ...copyStatus.value, [contact.personId ?? contact.name]: "error" };
+  }
   copyResetTimer = window.setTimeout(() => {
-    copyStatus.value = "idle";
+    copyStatus.value = {};
   }, 1800);
 }
 
@@ -122,7 +144,9 @@ onBeforeUnmount(() => {
           >
             阶段考核
           </button>
-          <span>当前为前端演示数据</span>
+          <span v-if="assessmentStore.myResultsLoading" role="status">正在加载服务器结果…</span>
+          <span v-else-if="resultsError" role="alert">结果加载失败（{{ resultsError }}）</span>
+          <span v-else>{{ recruitmentGateway ? "仅显示服务器已发布结果" : "当前为前端演示数据" }}</span>
         </div>
 
         <section
@@ -155,7 +179,7 @@ onBeforeUnmount(() => {
               <footer class="member-result-card__footer">
                 <NuxtLink class="button" to="/member">返回成员空间</NuxtLink>
                 <a
-                  v-if="result.responsibleContact"
+                  v-if="result.responsibleContacts?.length"
                   class="button button--ghost"
                   href="#member-result-contact"
                 >
@@ -177,22 +201,22 @@ onBeforeUnmount(() => {
                 </ol>
                 <dl class="member-result-preference-meta">
                   <div><dt>白泽意向方向</dt><dd>{{ result.baizeInterestDirection ?? "未选择" }}</dd></div>
-                  <div><dt>调剂意愿</dt><dd>{{ result.acceptsTransfer ? "接受调剂" : "不接受调剂" }}</dd></div>
+                  <div><dt>调剂意愿</dt><dd>{{ result.acceptsTransfer === undefined ? "结果投影未提供" : result.acceptsTransfer ? "接受调剂" : "不接受调剂" }}</dd></div>
                 </dl>
               </section>
 
               <section
-                v-if="result.responsibleContact"
+                v-if="result.responsibleContacts?.length"
                 id="member-result-contact"
                 class="member-result-panel member-result-contact"
               >
                 <header><h2>对应负责人</h2><span>演示数据</span></header>
-                <p>{{ result.responsibleContact.role }}</p>
-                <h3>{{ result.responsibleContact.name }}</h3>
-                <div>
-                  <span>{{ result.responsibleContact.displayContact }}</span>
-                  <button type="button" @click="copyContact">
-                    {{ copyStatus === "success" ? "已复制" : copyStatus === "error" ? "复制失败，请重试" : "复制联系方式" }}
+                <div v-for="contact in result.responsibleContacts" :key="contact.personId ?? contact.name">
+                  <p>{{ contact.role }}</p>
+                  <h3>{{ contact.name }}</h3>
+                  <span>{{ contact.displayContact }}</span>
+                  <button type="button" @click="copyContact(contact)">
+                    {{ copyStatus[contact.personId ?? contact.name] === "success" ? "已复制" : copyStatus[contact.personId ?? contact.name] === "error" ? "复制失败，请重试" : "复制联系方式" }}
                   </button>
                 </div>
               </section>

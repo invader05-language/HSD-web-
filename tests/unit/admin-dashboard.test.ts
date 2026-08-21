@@ -227,6 +227,13 @@ describe("API dashboard gateway", () => {
     expect(isAdminDashboardSnapshot(noPortalCapability)).toBe(true);
   });
 
+  it("accepts an authoritative empty portal summary before any revision exists", () => {
+    const emptyPortal = createSnapshot();
+    emptyPortal.portal = { draftRevision: 0, publishedRevision: 0, isDirty: false };
+
+    expect(isAdminDashboardSnapshot(emptyPortal)).toBe(true);
+  });
+
   it("rejects an invalid API response instead of treating it as a dashboard snapshot", async () => {
     const gateway = new ApiDashboardGateway(async () => ({ schemaVersion: 1 }));
 
@@ -299,7 +306,7 @@ describe("API dashboard gateway", () => {
     malformedSnapshots.push(unauthorizedTaskCapability);
 
     const invalidRevision = createSnapshot();
-    invalidRevision.portal.draftRevision = 0;
+    invalidRevision.portal.draftRevision = -1;
     malformedSnapshots.push(invalidRevision);
 
     for (const malformed of malformedSnapshots) {
@@ -339,7 +346,7 @@ describe("API dashboard gateway", () => {
   it("returns a validated API snapshot", async () => {
     const expected = createSnapshot();
     const gateway = new ApiDashboardGateway(async (path, options) => {
-      expect(path).toBe("/api/admin/dashboard");
+      expect(path).toBe("/api/v1/admin/dashboard");
       expect(options).toEqual({ method: "GET" });
       return expected;
     });

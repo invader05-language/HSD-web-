@@ -1,4 +1,10 @@
 import { defineStore } from "pinia";
+import type {
+  AssessmentBatchResponseDto,
+  AssessmentAdjustmentTargetCatalogResponseDto,
+  AssessmentCandidateDto,
+  MyRecruitmentResultDto,
+} from "../../packages/api-client/src";
 import { ADMIN_MEMBERS } from "../data/admin-members";
 import {
   ADMIN_CANDIDATES,
@@ -12,6 +18,7 @@ import {
 } from "../data/recruitment-application";
 import type {
   AssessmentFinalDecision,
+  AdjustmentDestination,
   AssessmentOutcome,
   AssessmentProcessingStatus,
   AssessmentRoundNumber,
@@ -24,6 +31,8 @@ import {
   isAssessmentRoundEditable,
 } from "../utils/recruitment-assessment-rules";
 import { getEffectiveRecruitmentBatchStatus } from "../utils/recruitment-batch-rules";
+import { baizeDirectionLabel } from "../utils/baize-direction-label";
+import type { RecruitmentGateway } from "../services/recruitment/recruitment-gateway";
 import { useAdminAccessStore } from "./admin-access";
 import { useMemberAdministrationStore } from "./member-administration";
 import { MEMBER_PROFILE_STORAGE_KEY, useMemberProfileStore } from "./member-profile";
@@ -38,7 +47,7 @@ type AssessmentBatchStatus = "assessing" | "ready-to-publish" | "published";
 
 interface AssessmentAuditRecord {
   id: string;
-  action: "save-round" | "record-adjustment" | "advance-round" | "publish";
+  action: "save-round" | "record-adjustment-suggestion" | "record-adjustment" | "advance-round" | "publish";
   actorId: string;
   actualAt: string;
   reason?: string;
@@ -76,13 +85,17 @@ interface PersistedAssessmentState {
   batches: Record<string, RecruitmentAssessmentBatchState>;
 }
 
-export type AssessmentAdjustmentDecision = RecruitmentCenter | "not-admitted";
+export type AssessmentAdjustmentDecision = AdjustmentDestination | "not-admitted";
 
 const REGULAR_ADJUSTMENT_CENTERS = [
   "新媒体中心",
   "拓维策划中心",
   "人才发展中心",
 ] as const;
+
+function isRegularAdjustmentCenter(value: unknown): value is AdjustmentDestination {
+  return (REGULAR_ADJUSTMENT_CENTERS as readonly string[]).includes(value as string);
+}
 
 const ROUND_LABELS: Record<AssessmentRoundNumber, RecruitmentAssessmentCandidate["currentPhase"]> = {
   1: "第一轮考核",
@@ -98,6 +111,10 @@ function cloneAssessmentRecord(record: RecruitmentAssessmentRecord): Recruitment
   return {
     ...record,
     roundOutcomes: { ...record.roundOutcomes },
+    ...(record.finalCenterIdentity ? { finalCenterIdentity: { ...record.finalCenterIdentity } } : {}),
+    ...(record.adjustmentSuggestionIdentity
+      ? { adjustmentSuggestionIdentity: { ...record.adjustmentSuggestionIdentity } }
+      : {}),
   };
 }
 
@@ -135,6 +152,9 @@ function isAssessmentRecord(
   }
   if (value.finalCenter !== undefined
     && !RECRUITMENT_CENTERS.includes(value.finalCenter as RecruitmentCenter)) {
+    return false;
+  }
+  if (value.adjustmentSuggestion !== undefined && !isRegularAdjustmentCenter(value.adjustmentSuggestion)) {
     return false;
   }
   return ["internalNote", "updatedAt", "publishedAt"].every((key) => (
@@ -205,6 +225,7 @@ function newRecord(candidate: AdminCandidate, batchId: string): RecruitmentAsses
     roundOutcomes: {},
     finalDecision: undefined,
     finalCenter: undefined,
+    adjustmentSuggestion: undefined,
     internalNote: undefined,
     updatedAt: undefined,
     publishedAt: undefined,
@@ -223,6 +244,146 @@ function initialBatchState(batchId: string, batchVersion: number): RecruitmentAs
       .map((candidate) => newRecord(candidate, batchId)),
     auditRecords: [],
   };
+}
+
+function emptyApiBatchState(batchId: string): RecruitmentAssessmentBatchState {
+  return {
+    batchId,
+    batchVersion: 0,
+    version: 0,
+    currentRound: 1,
+    status: "assessing",
+    records: [],
+    auditRecords: [],
+  };
+}
+
+function apiBatchStatus(
+  status: AssessmentBatchResponseDto["status"],
+): AssessmentBatchStatus {
+  switch (status) {
+    case "READY_TO_PUBLISH": return "ready-to-publish";
+    case "PUBLISHED": return "published";
+    default: return "assessing";
+  }
+}
+
+function apiRound(round: number): AssessmentRoundNumber {
+  if (round !== 1 && round !== 2 && round !== 3) {
+    throw new Error("ASSESSMENT_API_ROUND_UNSUPPORTED");
+  }
+  return round;
+}
+
+function apiCenterName(name: string): RecruitmentCenter {
+  if (!name.trim()) throw new Error("ASSESSMENT_API_CENTER_MISSING");
+  return name as RecruitmentCenter;
+}
+
+function apiCenterIdentity(center: { id: string; slug: string; name: string }) {
+  if (!center.id || !center.slug || !center.name.trim()) {
+    throw new Error("ASSESSMENT_API_CENTER_MISSING");
+  }
+  return { id: center.id, slug: center.slug, name: center.name };
+}
+
+function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string {
+  return [
+    ...candidate.roundResults.map((result) => result.createdAt),
+    candidate.adjustmentProposal?.createdAt,
+    candidate.adjustmentDecision?.createdAt,
+    candidate.finalResult?.publishedAt,
+  ].filter((value): value is string => Boolean(value)).sort().at(-1)
+    ?? "1970-01-01T00:00:00.000Z";
+}
+
+function mapApiCandidate(
+  batchId: string,
+  candidate: AssessmentCandidateDto,
+): { record: RecruitmentAssessmentRecord; profile: AdminCandidate } {
+  const preferences = candidate.preferences
+    .slice()
+    .sort((left, right) => ["FIRST", "SECOND", "THIRD"].indexOf(left.rank)
+      - ["FIRST", "SECOND", "THIRD"].indexOf(right.rank))
+    .map((preference) => apiCenterName(preference.center.name));
+  const firstChoice = preferences[0];
+  if (!firstChoice) throw new Error("ASSESSMENT_API_FIRST_PREFERENCE_MISSING");
+  const latestRound = candidate.roundResults.slice().sort((left, right) => left.round - right.round).at(-1);
+  const finalDecision = candidate.finalResult?.decision ?? candidate.adjustmentDecision?.decision;
+  const finalCenter = candidate.finalResult?.finalCenter ?? candidate.adjustmentDecision?.targetCenter;
+  const finalCenterIdentity = finalCenter ? apiCenterIdentity(finalCenter) : undefined;
+  const adjustmentSuggestionIdentity = candidate.adjustmentProposal
+    ? apiCenterIdentity(candidate.adjustmentProposal.targetCenter)
+    : undefined;
+  const updatedAt = latestCandidateTimestamp(candidate);
+  const publishedAt = candidate.finalResult?.publishedAt;
+  const record: RecruitmentAssessmentRecord = {
+    batchId,
+    candidateId: candidate.applicationId,
+    memberId: candidate.person.id,
+    center: firstChoice,
+    acceptsAdjustment: candidate.acceptsAdjustment,
+    roundOutcomes: Object.fromEntries(candidate.roundResults.map((result) => [
+      apiRound(result.round),
+      result.outcome === "PASSED" ? "passed" : "failed",
+    ])),
+    ...(finalDecision ? { finalDecision: finalDecision === "ADMITTED" ? "admitted" : "not-admitted" } : {}),
+    ...(finalCenterIdentity
+      ? { finalCenter: apiCenterName(finalCenterIdentity.name), finalCenterIdentity }
+      : {}),
+    ...(adjustmentSuggestionIdentity
+      ? {
+        adjustmentSuggestion: apiCenterName(adjustmentSuggestionIdentity.name) as AdjustmentDestination,
+        adjustmentSuggestionIdentity,
+      }
+      : {}),
+    ...(latestRound?.internalNote ? { internalNote: latestRound.internalNote } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+    ...(publishedAt ? { publishedAt } : {}),
+  };
+  const admitted = finalDecision === "ADMITTED";
+  const profile: AdminCandidate = {
+    id: candidate.applicationId,
+    batchId,
+    memberId: candidate.person.id,
+    name: candidate.person.name,
+    studentId: candidate.person.studentId,
+    grade: candidate.person.grade,
+    className: candidate.person.className,
+    contact: "",
+    identity: publishedAt ? admitted ? "正式成员" : "未录取" : "预备成员",
+    preferences: preferences.slice(0, 3) as AdminCandidate["preferences"],
+    ...(candidate.baizeDirection ? { baizeDirection: baizeDirectionLabel(candidate.baizeDirection) } : {}),
+    acceptsAdjustment: candidate.acceptsAdjustment,
+    stage: publishedAt ? "已结束" : ROUND_LABELS[apiRound(latestRound?.round ?? 1)] ?? "第一轮考核",
+    result: publishedAt ? admitted ? "已录取" : "未通过" : "待公布",
+    ...(finalCenterIdentity ? { finalCenter: apiCenterName(finalCenterIdentity.name) } : {}),
+    submittedAt: updatedAt,
+    updatedAt,
+    ...(latestRound?.internalNote ? { internalNote: latestRound.internalNote } : {}),
+  };
+  return { record, profile };
+}
+
+function mapApiBatch(batchId: string, response: AssessmentBatchResponseDto) {
+  const candidates = response.items.map((candidate) => mapApiCandidate(batchId, candidate));
+  return {
+    state: {
+      batchId,
+      batchVersion: response.version,
+      version: response.version,
+      currentRound: apiRound(response.currentRound),
+      status: apiBatchStatus(response.status),
+      records: candidates.map(({ record }) => record),
+      auditRecords: [],
+      ...(response.publishedAt ? { publishedAt: response.publishedAt } : {}),
+    } satisfies RecruitmentAssessmentBatchState,
+    profiles: Object.fromEntries(candidates.map(({ profile }) => [profile.id, profile])),
+  };
+}
+
+function mapApiAdjustmentTargets(response: AssessmentAdjustmentTargetCatalogResponseDto) {
+  return response.items.map((center) => ({ ...center }));
 }
 
 function isAssessableApplication(application: SubmittedRecruitmentApplication): boolean {
@@ -310,7 +471,7 @@ function applyDerivedDecision(record: RecruitmentAssessmentRecord) {
     ) ? "not-admitted" : "admitted";
     if (record.finalDecision === "admitted") record.finalCenter = record.center;
   }
-  if (status === "offline-adjustment-pending") {
+  if (status === "adjustment-suggestion-pending") {
     record.finalDecision = undefined;
     record.finalCenter = undefined;
   }
@@ -319,12 +480,166 @@ function applyDerivedDecision(record: RecruitmentAssessmentRecord) {
 export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment", {
   state: () => ({
     batches: restorePersistedBatches(),
+    apiMode: false,
+    apiCandidateProfiles: {} as Record<string, Record<string, AdminCandidate>>,
+    apiAdjustmentTargetsByBatch: {} as Record<string, AssessmentAdjustmentTargetCatalogResponseDto["items"]>,
+    apiLoadingByBatch: {} as Record<string, boolean>,
+    apiMutatingByBatch: {} as Record<string, boolean>,
+    apiErrorByBatch: {} as Record<string, string | undefined>,
+    myResults: [] as MyRecruitmentResultDto[],
+    myResultsLoading: false,
+    myResultsError: undefined as string | undefined,
   }),
   actions: {
+    enableApiMode() {
+      if (this.apiMode) return;
+      this.apiMode = true;
+      this.batches = {};
+      this.apiCandidateProfiles = {};
+      this.apiAdjustmentTargetsByBatch = {};
+    },
+    async refreshAssessmentBatch(batchId: string, gateway: RecruitmentGateway) {
+      this.enableApiMode();
+      this.apiLoadingByBatch[batchId] = true;
+      delete this.apiErrorByBatch[batchId];
+      try {
+        const [response, adjustmentTargets] = await Promise.all([
+          gateway.getAssessmentBatch(batchId),
+          gateway.getAdjustmentTargets(batchId),
+        ]);
+        const mapped = mapApiBatch(batchId, response);
+        this.batches[batchId] = mapped.state;
+        this.apiCandidateProfiles[batchId] = mapped.profiles;
+        this.apiAdjustmentTargetsByBatch[batchId] = mapApiAdjustmentTargets(adjustmentTargets);
+        return mapped.state;
+      } catch (error) {
+        this.apiErrorByBatch[batchId] = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
+        throw error;
+      } finally {
+        this.apiLoadingByBatch[batchId] = false;
+      }
+    },
+    async saveRoundOutcomeFromApi(
+      gateway: RecruitmentGateway,
+      input: {
+        batchId: string;
+        candidateId: string;
+        round: AssessmentRoundNumber;
+        outcome: Exclude<AssessmentOutcome, "pending">;
+        internalNote?: string;
+      },
+    ) {
+      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
+        gateway.recordRoundResult(input.batchId, input.candidateId, {
+          expectedVersion,
+          round: input.round,
+          outcome: input.outcome === "passed" ? "PASSED" : "FAILED",
+          ...(input.internalNote !== undefined ? { internalNote: input.internalNote } : {}),
+        })
+      ));
+    },
+    async recordAdjustmentSuggestionFromApi(
+      gateway: RecruitmentGateway,
+      input: { batchId: string; candidateId: string; targetCenterId: string },
+    ) {
+      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
+        gateway.proposeAdjustment(input.batchId, input.candidateId, {
+          expectedVersion,
+          targetCenterId: input.targetCenterId,
+        })
+      ));
+    },
+    async recordAdjustmentDecisionFromApi(
+      gateway: RecruitmentGateway,
+      input: {
+        batchId: string;
+        candidateId: string;
+        decision: "ADMITTED" | "NOT_ADMITTED";
+        targetCenterId?: string;
+      },
+    ) {
+      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
+        gateway.decideAdjustment(input.batchId, input.candidateId, {
+          expectedVersion,
+          decision: input.decision,
+          ...(input.targetCenterId ? { targetCenterId: input.targetCenterId } : {}),
+        })
+      ));
+    },
+    async advanceAssessmentRoundFromApi(
+      gateway: RecruitmentGateway,
+      batchId: string,
+      reason?: string,
+    ) {
+      return this.runApiMutation(gateway, batchId, (expectedVersion) => (
+        gateway.advanceAssessment(batchId, {
+          expectedVersion,
+          confirmed: true,
+          ...(reason ? { reason } : {}),
+        })
+      ));
+    },
+    async publishBatchResultsFromApi(
+      gateway: RecruitmentGateway,
+      batchId: string,
+      reason?: string,
+    ) {
+      return this.runApiMutation(gateway, batchId, (expectedVersion) => (
+        gateway.publishAssessment(batchId, {
+          expectedVersion,
+          confirmed: true,
+          ...(reason ? { reason } : {}),
+        })
+      ));
+    },
+    async runApiMutation(
+      gateway: RecruitmentGateway,
+      batchId: string,
+      mutation: (expectedVersion: number) => Promise<unknown>,
+    ) {
+      this.enableApiMode();
+      this.apiMutatingByBatch[batchId] = true;
+      delete this.apiErrorByBatch[batchId];
+      try {
+        await mutation(this.getBatchState(batchId).version);
+        return await this.refreshAssessmentBatch(batchId, gateway);
+      } catch (error) {
+        this.apiErrorByBatch[batchId] = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
+        throw error;
+      } finally {
+        this.apiMutatingByBatch[batchId] = false;
+      }
+    },
+    async refreshMyResults(gateway: RecruitmentGateway) {
+      this.enableApiMode();
+      this.myResultsLoading = true;
+      this.myResultsError = undefined;
+      try {
+        const response = await gateway.getMyResults();
+        this.myResults = response.items;
+        return response.items;
+      } catch (error) {
+        this.myResultsError = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
+        throw error;
+      } finally {
+        this.myResultsLoading = false;
+      }
+    },
     currentRound(batchId: string): AssessmentRoundNumber {
       return this.getBatchState(batchId).currentRound;
     },
+    getApiAdjustmentTargets(batchId: string) {
+      return this.apiAdjustmentTargetsByBatch[batchId]?.map((center) => ({ ...center })) ?? [];
+    },
+    getApiAdjustmentTarget(batchId: string, centerId: string) {
+      const center = this.apiAdjustmentTargetsByBatch[batchId]?.find(({ id }) => id === centerId);
+      return center ? { ...center } : undefined;
+    },
     getBatchState(batchId: string): RecruitmentAssessmentBatchState {
+      if (this.apiMode) {
+        if (!this.batches[batchId]) this.batches[batchId] = emptyApiBatchState(batchId);
+        return this.batches[batchId] as RecruitmentAssessmentBatchState;
+      }
       const batch = useRecruitmentBatchStore().getBatchOrThrow(batchId);
       const existing = this.batches[batchId];
       if (!existing) {
@@ -340,6 +655,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       return state;
     },
     reconcileApplications(state: RecruitmentAssessmentBatchState) {
+      if (this.apiMode) return;
       if (state.status === "published") return;
       const applications = useRecruitmentApplicationStore()
         .getApplicationsForBatch(state.batchId)
@@ -378,7 +694,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const state = this.getBatchState(batchId);
       return state.records
         .filter((record) => (
-          getAssessmentProcessingStatus(record) === "offline-adjustment-pending"
+          getAssessmentProcessingStatus(record) === "adjustment-suggestion-pending"
           || isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
         ))
         .map((record) => this.toCandidate(state, record));
@@ -386,7 +702,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     getCandidate(batchId: string, candidateId: string): RecruitmentAssessmentCandidate | undefined {
       const state = this.getBatchState(batchId);
       const record = state.records.find((item) => (
-        item.candidateId === candidateId || applicationFor(item)?.id === candidateId
+        item.candidateId === candidateId || (!this.apiMode && applicationFor(item)?.id === candidateId)
       ));
       return record ? this.toCandidate(state, record) : undefined;
     },
@@ -399,7 +715,9 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         ...cloneAssessmentRecord(record),
         ...(currentRound ? { currentPhase: ROUND_LABELS[currentRound] } : {}),
         processingStatus: getAssessmentProcessingStatus(record),
-        candidate: candidateFor(record),
+        candidate: this.apiMode
+          ? this.apiCandidateProfiles[state.batchId]?.[record.candidateId]
+          : candidateFor(record),
       };
     },
     assertCurrentBatch(batchId: string, _now: Date) {
@@ -441,6 +759,18 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (account.adminLevel === "owner") return account;
       if (account.adminCenterRole !== `${record.center}负责人`) {
         throw new Error("ASSESSMENT_EDIT_PERMISSION_REQUIRED");
+      }
+      return account;
+    },
+    assertCanSuggestAdjustment(record: RecruitmentAssessmentRecord) {
+      const session = useSessionStore();
+      const account = session.currentAccount;
+      if (!session.isAuthenticated || !session.canAccessAdmin || !account) {
+        throw new Error("ASSESSMENT_ADJUSTMENT_SUGGEST_PERMISSION_REQUIRED");
+      }
+      if (account.adminLevel === "owner") return account;
+      if (account.adminCenterRole !== `${record.center}负责人`) {
+        throw new Error("ASSESSMENT_ADJUSTMENT_SUGGEST_PERMISSION_REQUIRED");
       }
       return account;
     },
@@ -501,6 +831,32 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.touch(state);
       return this.toCandidate(state, record);
     },
+    recordAdjustmentSuggestion(input: {
+      batchId: string;
+      candidateId: string;
+      suggestedCenter: AdjustmentDestination;
+      now: Date;
+    }) {
+      this.assertAssessmentWritable(input.batchId, input.now);
+      const state = this.getBatchState(input.batchId);
+      if (state.status === "published") throw new Error("ASSESSMENT_NOT_EDITABLE");
+      const record = state.records.find((item) => item.candidateId === input.candidateId);
+      if (!record) throw new Error("ASSESSMENT_CANDIDATE_NOT_FOUND");
+      const actor = this.assertCanSuggestAdjustment(record);
+      if (getAssessmentProcessingStatus(record) !== "adjustment-suggestion-pending") {
+        throw new Error("ASSESSMENT_ADJUSTMENT_NOT_PENDING");
+      }
+      if (!record.acceptsAdjustment || !isRegularAdjustmentCenter(input.suggestedCenter)) {
+        throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
+      }
+      useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
+      useRecruitmentApplicationStore().lockApplicationForAssessment(input.batchId, record.memberId, input.now);
+      record.adjustmentSuggestion = input.suggestedCenter;
+      record.updatedAt = input.now.toISOString();
+      this.appendAudit(state, "record-adjustment-suggestion", actor.account, input.now);
+      this.touch(state);
+      return this.toCandidate(state, record);
+    },
     recordAdjustmentDecision(input: {
       batchId: string;
       candidateId: string;
@@ -514,15 +870,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       if (state.status === "published") throw new Error("ASSESSMENT_NOT_EDITABLE");
       const record = state.records.find((item) => item.candidateId === input.candidateId);
       if (!record) throw new Error("ASSESSMENT_CANDIDATE_NOT_FOUND");
-      const actor = this.assertCanEdit(record);
-      if (getAssessmentProcessingStatus(record) !== "offline-adjustment-pending") {
+      const actor = this.resolveOwner();
+      if (getAssessmentProcessingStatus(record) !== "adjustment-suggestion-pending") {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_PENDING");
       }
       if (input.decision === undefined && input.admitted === undefined) {
         throw new Error("ASSESSMENT_ADJUSTMENT_DECISION_REQUIRED");
       }
-      if (input.finalCenter !== undefined
-        && !(REGULAR_ADJUSTMENT_CENTERS as readonly string[]).includes(input.finalCenter as string)) {
+      if (input.finalCenter !== undefined && !isRegularAdjustmentCenter(input.finalCenter)) {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
       const decision = input.decision ?? (
@@ -531,7 +886,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const admitted = decision !== "not-admitted";
       if (!record.acceptsAdjustment
         || (admitted && (!decision
-          || !(REGULAR_ADJUSTMENT_CENTERS as readonly string[]).includes(decision as string)))) {
+          || !isRegularAdjustmentCenter(decision)))) {
         throw new Error("ASSESSMENT_ADJUSTMENT_NOT_ALLOWED");
       }
       useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
@@ -555,7 +910,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       const state = this.getBatchState(batchId);
       if (state.status !== "assessing") throw new Error("ASSESSMENT_NOT_EDITABLE");
       const incomplete = state.records.some((record) => (
-        getAssessmentProcessingStatus(record) === "offline-adjustment-pending"
+          getAssessmentProcessingStatus(record) === "adjustment-suggestion-pending"
         || isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
       ));
       if (incomplete) throw new Error("ASSESSMENT_ROUND_INCOMPLETE");
@@ -583,8 +938,8 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         : state.records;
       const processing = records.map((record) => getAssessmentProcessingStatus(record));
       const ready = processing.filter((status) => status === "ready-to-publish").length;
-      const adjustmentPending = processing.filter((status) => status === "offline-adjustment-pending").length;
-      const pending = processing.filter((status) => status === "assessing" || status === "offline-adjustment-pending").length;
+      const adjustmentPending = processing.filter((status) => status === "adjustment-suggestion-pending").length;
+      const pending = processing.filter((status) => status === "assessing" || status === "adjustment-suggestion-pending").length;
       const admitted = records.filter((record) => getFinalDecision(record) === "admitted").length;
       const notAdmitted = records.filter((record) => getFinalDecision(record) === "not-admitted").length;
       return {

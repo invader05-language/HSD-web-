@@ -2,6 +2,10 @@ import type { ContentMediaKind, ContentMediaRole, ContentMediaStatus } from "../
 
 export interface GalleryAsset {
   id: string;
+  /** Attachment already persisted by the API and retained by an admin aggregate response. */
+  serverOwned?: boolean;
+  /** Server optimistic-concurrency version for metadata updates. */
+  version?: number;
   assetId?: string;
   title: string;
   caption: string;

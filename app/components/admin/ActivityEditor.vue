@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ACTIVITY_TIME_OPTIONS, ACTIVITY_TYPE_OPTIONS } from "~/data/activities";
 import { useActivitiesStore } from "~/stores/activities";
+import { useContentGateway } from "~/composables/useContentGateway";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import type { ActivityDraftInput, ManagedActivity } from "~/types/activity";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 
 const props = defineProps<{
@@ -17,10 +19,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   saved: [id: string];
   published: [id: string];
+  offline: [id: string];
   cancelled: [];
 }>();
 
 const activitiesStore = useActivitiesStore();
+const gateway = useContentGateway();
+const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
 
 const CENTER_OPTIONS = [
@@ -37,6 +42,8 @@ type ActivityForm = Omit<ActivityDraftInput, "slug" | "agenda" | "cover" | "deta
 };
 
 function defaultOwnerCenterId() {
+  if (session.currentAccount?.adminCenterId) return session.currentAccount.adminCenterId;
+  if (gateway) return "";
   if (session.adminLevel === "owner") return "baize-development";
   const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
   return scope ? getRecruitmentCenterId(scope) : "";
@@ -60,11 +67,13 @@ function emptyForm(): ActivityForm {
 }
 
 const form = reactive<ActivityForm>(emptyForm());
+const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
 const formError = ref("");
 const fieldErrors = ref<Record<string, string>>({});
 const notice = ref("");
 const isSaving = ref(false);
 const isPublishing = ref(false);
+const isOfflining = ref(false);
 const coverItems = computed<ContentMediaAttachment[]>({
   get: () => form.cover ? [form.cover] : [],
   set: (value) => { form.cover = value[0] ?? null; },
@@ -73,6 +82,7 @@ const detailItems = computed<ContentMediaAttachment[]>({
   get: () => form.details,
   set: (value) => { form.details = value; },
 });
+const mediaOwner = computed(() => props.activity ? { centerId: props.activity.ownerCenterId, ownerType: "activity" as const, ownerId: props.activity.id } : undefined);
 
 const missingFields = computed(() => {
   const missing: string[] = [];
@@ -86,15 +96,26 @@ const missingFields = computed(() => {
   if (!form.summary.trim()) missing.push("摘要");
   if (!form.content.trim()) missing.push("活动内容");
   if (!form.agenda.split(/\r?\n/).some((item) => item.trim())) missing.push("活动流程");
-  if (!form.cover || !isContentMediaAttachmentComplete(form.cover) || form.cover.role !== "cover" || form.cover.kind !== "image") missing.push("活动封面");
-  if (form.details.some((item) => !isContentMediaAttachmentComplete(item) || item.role !== "detail")) missing.push("详情素材信息");
+  if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("活动封面");
+  if (form.details.some((item) => item.role !== "detail" || (!isRetainedServerContentMediaAttachment(item) && !isContentMediaAttachmentComplete(item)))) missing.push("详情素材信息");
   return missing;
 });
 
 const isComplete = computed(() => missingFields.value.length === 0);
 const ownerOptions = computed(() => session.adminLevel === "owner"
-  ? CENTER_OPTIONS
-  : CENTER_OPTIONS.filter((center) => center.id === form.ownerCenterId));
+  ? centerOptions.value
+  : centerOptions.value.filter((center) => center.id === (session.currentAccount?.adminCenterId ?? form.ownerCenterId)));
+
+onMounted(async () => {
+  if (!organizationGateway) return;
+  try {
+    const response = await organizationGateway.listCenters();
+    centerOptions.value = response.items.map((center) => ({ id: center.id, label: center.name }));
+    const assignedCenterId = session.currentAccount?.adminCenterId;
+    if (assignedCenterId) form.ownerCenterId = assignedCenterId;
+    else if (props.mode === "create" && !centerOptions.value.some((center) => center.id === form.ownerCenterId)) form.ownerCenterId = centerOptions.value[0]?.id ?? "";
+  } catch (caught) { formError.value = caught instanceof Error ? `中心加载失败：${caught.message}` : "中心加载失败。"; }
+});
 
 function loadActivity(activity?: ManagedActivity) {
   const source = activity ? {
@@ -146,19 +167,22 @@ function validateForm() {
   return missingFields.value.length === 0;
 }
 
-function persistDraft() {
+async function persistDraft() {
   const payload = toPayload();
+  if (gateway) return props.mode === "edit" && props.activity
+    ? activitiesStore.updateDraftFromApi(gateway, props.activity.id, payload)
+    : activitiesStore.createDraftFromApi(gateway, payload);
   return props.mode === "edit" && props.activity
     ? activitiesStore.updateDraft(props.activity.id, payload)
     : activitiesStore.createDraft(payload);
 }
 
-function saveDraft() {
+async function saveDraft() {
   if (isSaving.value || isPublishing.value) return;
   isSaving.value = true;
   formError.value = "";
   try {
-    const saved = persistDraft();
+    const saved = await persistDraft();
     notice.value = "草稿已保存。发布前的编辑不会影响用户端。";
     emit("saved", saved.id);
   } catch (caught) {
@@ -169,14 +193,15 @@ function saveDraft() {
   }
 }
 
-function publishActivity() {
+async function publishActivity() {
   if (isSaving.value || isPublishing.value) return;
   if (!validateForm()) return;
   isPublishing.value = true;
   notice.value = "";
   try {
-    const saved = persistDraft();
-    activitiesStore.publish(saved.id);
+    const saved = await persistDraft();
+    if (gateway) await activitiesStore.publishFromApi(gateway, saved.id);
+    else activitiesStore.publish(saved.id);
     notice.value = "活动已发布，用户端将显示最新公开快照。";
     emit("published", saved.id);
   } catch (caught) {
@@ -184,6 +209,18 @@ function publishActivity() {
   } finally {
     isPublishing.value = false;
   }
+}
+
+async function offlineActivity() {
+  if (!props.activity || isSaving.value || isPublishing.value || isOfflining.value) return;
+  isOfflining.value = true; formError.value = "";
+  try {
+    if (gateway) await activitiesStore.offlineFromApi(gateway, props.activity.id, "管理员下线");
+    else activitiesStore.unpublish(props.activity.id, "管理员下线");
+    notice.value = "活动已下线，报名已关闭。";
+    emit("offline", props.activity.id);
+  } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
+  finally { isOfflining.value = false; }
 }
 </script>
 
@@ -211,12 +248,14 @@ function publishActivity() {
       <ContentMediaUploader
         v-model="coverItems"
         mode="cover"
+        :owner="mediaOwner"
         title="活动封面"
         description="封面会出现在活动列表、活动详情页和公开导航中。"
       />
       <ContentMediaUploader
         v-model="detailItems"
         mode="collection"
+        :owner="mediaOwner"
         title="活动详情素材"
         description="可选。用于活动详情中的现场照片、视频或补充记录。"
       />
@@ -225,6 +264,7 @@ function publishActivity() {
       <span>{{ isComplete ? "必填信息已完整，可直接发布。" : "草稿可暂存，直接发布前需补齐全部信息。" }}</span>
       <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="emit('cancelled')">取消</button>
       <button type="button" class="button button--ghost" :disabled="isSaving || isPublishing" @click="saveDraft">保存草稿</button>
+      <button v-if="mode === 'edit' && activity?.publishedState === 'published'" type="button" class="button button--ghost" :disabled="isSaving || isPublishing || isOfflining" @click="offlineActivity">{{ isOfflining ? "下线中…" : "下线活动" }}</button>
       <button type="button" class="button" :disabled="!isComplete || isSaving || isPublishing" @click="publishActivity">{{ isPublishing ? "发布中…" : "直接发布" }}</button>
     </footer>
   </section>

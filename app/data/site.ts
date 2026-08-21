@@ -18,6 +18,7 @@ export const SITE_CONFIG = {
     { label: "媒体画廊", to: "/gallery" },
     { label: "资源中心", to: "/resources" },
     { label: "结果中心", to: "/member/results" },
-    { label: "加入我们", to: "/join" }
+    { label: "加入我们", to: "/join" },
+    { label: "帮助中心", to: "/help" }
   ] satisfies NavigationItem[]
 } as const;

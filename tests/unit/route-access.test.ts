@@ -7,25 +7,36 @@ import {
 const signedOut = {
   isAuthenticated: false,
   canAccessAdmin: false,
-  canManageAdminAccounts: false
+  canManageAdminAccounts: false,
+  hasCapability: () => false
 };
 
 const member = {
   isAuthenticated: true,
   canAccessAdmin: false,
-  canManageAdminAccounts: false
+  canManageAdminAccounts: false,
+  hasCapability: () => false
 };
 
 const admin = {
   isAuthenticated: true,
   canAccessAdmin: true,
-  canManageAdminAccounts: false
+  canManageAdminAccounts: false,
+  hasCapability: () => false
 };
 
 const owner = {
   isAuthenticated: true,
   canAccessAdmin: true,
-  canManageAdminAccounts: true
+  canManageAdminAccounts: true,
+  hasCapability: (capability: string) => capability === "portal.configure" || capability === "portal.publish"
+};
+
+const portalEditor = {
+  isAuthenticated: true,
+  canAccessAdmin: true,
+  canManageAdminAccounts: false,
+  hasCapability: (capability: string) => capability === "portal.configure"
 };
 
 describe("resolveProtectedRouteTarget", () => {
@@ -76,6 +87,21 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("allows administrators into regular admin modules", () => {
     expect(resolveProtectedRouteTarget("/admin/logs", "/admin/logs", admin)).toBeUndefined();
+  });
+
+  it("denies portal configuration routes when an administrator lacks portal.configure", () => {
+    expect(resolveProtectedRouteTarget("/admin/content/home", "/admin/content/home?view=visuals", admin))
+      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhome");
+  });
+
+  it("denies Help management when an administrator lacks portal.configure", () => {
+    expect(resolveProtectedRouteTarget("/admin/content/help", "/admin/content/help", admin))
+      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhelp");
+    expect(resolveProtectedRouteTarget("/admin/content/help", "/admin/content/help", owner)).toBeUndefined();
+  });
+
+  it("allows portal configuration routes from portal.configure rather than owner account management", () => {
+    expect(resolveProtectedRouteTarget("/admin/content/home", "/admin/content/home", portalEditor)).toBeUndefined();
   });
 
   it("treats only the canonical account configuration source as owner-only", () => {

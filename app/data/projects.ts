@@ -1,6 +1,7 @@
 import { PROJECTS } from "./home";
+import { PROJECT_CATEGORY_LABELS } from "~/types/project";
 
-export const PROJECT_FILTERS = ["全部", "HarmonyOS", "AI 应用", "校园服务", "软硬件"] as const;
+export const PROJECT_FILTERS = ["全部", ...Object.values(PROJECT_CATEGORY_LABELS)] as const;
 
 export const PROJECT_DETAILS = PROJECTS.map((project, index) => ({
   ...project,
@@ -12,9 +13,6 @@ export const PROJECT_DETAILS = PROJECTS.map((project, index) => ({
   solution: index === 0
     ? "通过视觉识别、HarmonyOS 终端与后端事件流，形成采集、告警、处置、复盘的完整闭环。"
     : "从用户访谈出发，完成需求排序、交互原型、技术验证和小范围测试。",
-  technologies: index === 0
-    ? ["HarmonyOS", "AI 视觉识别", "事件驱动架构"]
-    : ["Vue", "HarmonyOS", "校园场景研究"],
 }));
 
 export function findProject(slug: string) {

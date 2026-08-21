@@ -5,7 +5,7 @@ import { isContentMediaAttachmentComplete } from "../utils/content-media";
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
 import type { ContentMediaAttachment } from "../types/content-media";
-import type { ManagedProject, ProjectDraftInput, PublishedProject } from "../types/project";
+import { isProjectCategory, type ManagedProject, type ProjectDraftInput, type ProjectMember, type PublishedProject } from "../types/project";
 
 export type { ManagedProject, ProjectDraftInput, PublishedProject } from "../types/project";
 
@@ -71,8 +71,9 @@ function seedProject(project: (typeof PROJECT_DETAILS)[number], index: number): 
     projectStage: project.status,
     challenge: project.challenge,
     solution: project.solution,
-    technologies: [...project.technologies],
-    memberCount: record?.members ?? 1,
+    members: [],
+    memberCount: 0,
+    displayOrder: index + 1,
     ownerCenterId: inferOwnerCenter(project.title),
     cover: seedCover(project),
     details: [],
@@ -81,6 +82,7 @@ function seedProject(project: (typeof PROJECT_DETAILS)[number], index: number): 
   };
   return {
     ...snapshot,
+    memberPersonIds: [],
     publicationStatus: "published",
     version: index + 1,
     createdAt: publishedAt,
@@ -155,6 +157,7 @@ function requireAdminActor() {
 
 function canManage(session: ReturnType<typeof useSessionStore>, project: ManagedProject) {
   if (session.adminLevel === "owner") return true;
+  if (session.currentAccount?.adminCenterId) return project.ownerCenterId === session.currentAccount.adminCenterId;
   const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
   return Boolean(scope && project.ownerCenterId === getRecruitmentCenterId(scope));
 }
@@ -167,7 +170,8 @@ function assertCanManage(project: ManagedProject) {
 
 function assertCompleteProject(project: ManagedProject) {
   const required = [project.title, project.category, project.year, project.description, project.achievement, project.projectStage, project.challenge, project.solution, project.ownerCenterId];
-  if (required.some((value) => !value.trim()) || project.memberCount < 1 || !project.technologies.some((item) => item.trim())) throw new Error("PROJECT_INCOMPLETE");
+  if (!isProjectCategory(project.category)) throw new Error("PROJECT_CATEGORY_INVALID");
+  if (required.some((value) => !value.trim()) || project.memberPersonIds.length < 1) throw new Error("PROJECT_INCOMPLETE");
   const cover = project.cover;
   if (!cover || cover.role !== "cover" || cover.kind !== "image" || !isContentMediaAttachmentComplete(cover)) throw new Error("PROJECT_INCOMPLETE");
   if (project.details.some((detail) => detail.role !== "detail" || !isContentMediaAttachmentComplete(detail))) throw new Error("PROJECT_INCOMPLETE");
@@ -178,10 +182,77 @@ export const useProjectsStore = defineStore("projects", {
     const persisted = readPersistedState();
     return {
       projects: persisted?.projects ?? seedProjects(),
+      publicDetails: {} as Record<string, PublishedProject>,
+      apiModeActive: false,
+      apiLoading: false,
+      apiMutating: false,
+      apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
       persistenceError: undefined as string | undefined,
     };
   },
   actions: {
+    activateApiMode(clearData = true) {
+      const wasActive = this.apiModeActive;
+      this.apiModeActive = true;
+      if (clearData || !wasActive) this.projects = [];
+      this.apiError = null;
+    },
+    async refreshPublicFromApi(gateway: { projects: { listPublic(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
+      this.activateApiMode(); this.apiLoading = true;
+      try {
+        const response = await gateway.projects.listPublic();
+        this.projects = response.items.map((item) => projectFromPublicApi(item));
+        this.publicDetails = {};
+      } catch (error) { this.apiError = apiError(error); } finally { this.apiLoading = false; }
+    },
+    async refreshPublicDetailFromApi(gateway: { project(slug: string): Promise<Record<string, unknown>> }, slug: string) {
+      this.activateApiMode(false); this.apiLoading = true;
+      try { const project = projectFromPublicApi(await gateway.project(slug)); this.publicDetails[slug] = project.publishedSnapshot!; return project; }
+      catch (error) { this.apiError = apiError(error); return undefined; } finally { this.apiLoading = false; }
+    },
+    async refreshFromApi(gateway: { projects: { listAdmin(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
+      this.activateApiMode(); this.apiLoading = true;
+      try {
+        const response = await gateway.projects.listAdmin();
+        this.projects = response.items.map((item) => projectFromAdminApi(item));
+        this.publicDetails = {};
+      } catch (error) { this.apiError = apiError(error); } finally { this.apiLoading = false; }
+    },
+    async createDraftFromApi(gateway: any, input: ProjectDraftInput) {
+      this.activateApiMode(); this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = projectFromAdminApi(await gateway.projects.create(projectCreatePayload(input)));
+        this.projects = [saved, ...this.projects.filter((item) => item.id !== saved.id)];
+        return saved;
+      } catch (error) { this.apiError = apiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async updateDraftFromApi(gateway: any, projectId: string, input: ProjectDraftInput) {
+      const current = this.getById(projectId); if (!current) throw new Error("PROJECT_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = projectFromAdminApi(await gateway.projects.update(projectId, { ...projectCreatePayload(input), expectedVersion: current.version }));
+        this.projects = this.projects.map((item) => item.id === saved.id ? saved : item);
+        return saved;
+      } catch (error) { this.apiError = apiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async publishFromApi(gateway: any, projectId: string) {
+      const current = this.getById(projectId); if (!current) throw new Error("PROJECT_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = projectFromAdminApi(await gateway.projects.publish(projectId, { expectedVersion: current.version }));
+        this.projects = this.projects.map((item) => item.id === saved.id ? saved : item);
+        return saved;
+      } catch (error) { this.apiError = apiError(error); throw error; } finally { this.apiMutating = false; }
+    },
+    async offlineFromApi(gateway: any, projectId: string, reason: string) {
+      const current = this.getById(projectId); if (!current) throw new Error("PROJECT_NOT_FOUND");
+      this.apiMutating = true; this.apiError = null;
+      try {
+        const saved = projectFromAdminApi(await gateway.projects.offline(projectId, { expectedVersion: current.version, reason }));
+        this.projects = this.projects.map((item) => item.id === saved.id ? saved : item);
+        return saved;
+      } catch (error) { this.apiError = apiError(error); throw error; } finally { this.apiMutating = false; }
+    },
     hydrate() {
       const persisted = readPersistedState();
       if (persisted) this.projects = persisted.projects;
@@ -209,9 +280,13 @@ export const useProjectsStore = defineStore("projects", {
       return this.projects.filter((project) => canManage(session, project));
     },
     getPublicProjects(): PublishedProject[] {
-      return this.projects.filter((project) => project.publicationStatus === "published" && project.publishedSnapshot).map((project) => clone(project.publishedSnapshot!));
+      return this.projects
+        .filter((project) => project.publicationStatus === "published" && project.publishedSnapshot)
+        .map((project) => clone(project.publishedSnapshot!))
+        .sort((left, right) => left.displayOrder - right.displayOrder || left.title.localeCompare(right.title, "zh-CN"));
     },
     getPublicBySlug(slug: string) {
+      if (this.publicDetails[slug]) return clone(this.publicDetails[slug]);
       const project = this.projects.find((item) => item.slug === slug && item.publicationStatus === "published" && item.publishedSnapshot);
       return project?.publishedSnapshot ? clone(project.publishedSnapshot) : undefined;
     },
@@ -219,6 +294,7 @@ export const useProjectsStore = defineStore("projects", {
       const session = requireAdminActor();
       const slug = slugify(input.slug?.trim() || input.title);
       if (this.projects.some((project) => project.slug === slug || project.publishedSnapshot?.slug === slug)) throw new Error("PROJECT_DUPLICATE_SLUG");
+      if (!isProjectCategory(input.category)) throw new Error("PROJECT_CATEGORY_INVALID");
       const ownerCenterId = input.ownerCenterId.trim();
       if (session.adminLevel !== "owner") {
         const scope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
@@ -230,14 +306,17 @@ export const useProjectsStore = defineStore("projects", {
         id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         slug,
         title: input.title.trim(),
-        category: input.category.trim(),
+        category: input.category,
         year: input.year.trim(),
         description: input.description.trim(),
         achievement: input.achievement.trim(),
         projectStage: input.projectStage.trim(),
         challenge: input.challenge.trim(),
         solution: input.solution.trim(),
-        technologies: input.technologies.map((item) => item.trim()).filter(Boolean),
+        memberPersonIds: uniquePersonIds(input.memberPersonIds),
+        members: projectMembers(input.members, input.memberPersonIds),
+        memberCount: projectMembers(input.members, input.memberPersonIds).length,
+        displayOrder: normalizeDisplayOrder(input.displayOrder),
         ownerCenterId,
         cover: input.cover ? clone(input.cover) : null,
         details: input.details.map((item) => clone(item)),
@@ -272,10 +351,21 @@ export const useProjectsStore = defineStore("projects", {
         }
       }
       Object.assign(project, clone(patch));
-      for (const key of ["title", "category", "year", "description", "achievement", "projectStage", "challenge", "solution", "ownerCenterId"] as const) {
-        if (typeof project[key] === "string") project[key] = project[key].trim();
-      }
-      project.technologies = project.technologies.map((item) => item.trim()).filter(Boolean);
+      project.title = project.title.trim();
+      const category = project.category.trim();
+      if (!isProjectCategory(category)) throw new Error("PROJECT_CATEGORY_INVALID");
+      project.category = category;
+      project.year = project.year.trim();
+      project.description = project.description.trim();
+      project.achievement = project.achievement.trim();
+      project.projectStage = project.projectStage.trim();
+      project.challenge = project.challenge.trim();
+      project.solution = project.solution.trim();
+      project.ownerCenterId = project.ownerCenterId.trim();
+      project.memberPersonIds = uniquePersonIds(project.memberPersonIds);
+      project.members = projectMembers(project.members, project.memberPersonIds);
+      project.memberCount = project.members.length;
+      project.displayOrder = normalizeDisplayOrder(project.displayOrder);
       project.updatedAt = now.toISOString();
       project.version += 1;
       try {
@@ -303,8 +393,9 @@ export const useProjectsStore = defineStore("projects", {
         projectStage: project.projectStage,
         challenge: project.challenge,
         solution: project.solution,
-        technologies: clone(project.technologies),
-        memberCount: project.memberCount,
+        members: project.members.map((member) => ({ name: member.name })),
+        memberCount: project.members.length,
+        displayOrder: project.displayOrder,
         ownerCenterId: project.ownerCenterId,
         cover: project.cover ? clone(project.cover) : null,
         details: clone(project.details),
@@ -343,3 +434,77 @@ export const useProjectsStore = defineStore("projects", {
     },
   },
 });
+
+function apiError(error: unknown) { const api = error as { status?: unknown; code?: unknown; requestId?: unknown }; return error instanceof Error ? { status: typeof api.status === "number" ? api.status : undefined, code: typeof api.code === "string" ? api.code : "PROJECT_API_REQUEST_FAILED", message: error.message, requestId: typeof api.requestId === "string" ? api.requestId : undefined } : { code: "PROJECT_API_REQUEST_FAILED", message: "Project API request failed" }; }
+function projectCreatePayload(input: ProjectDraftInput) {
+  return {
+    expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title,
+    category: input.category, year: input.year, description: input.description, achievement: input.achievement,
+    projectStage: input.projectStage, challenge: input.challenge, solution: input.solution,
+    memberPersonIds: uniquePersonIds(input.memberPersonIds), displayOrder: normalizeDisplayOrder(input.displayOrder),
+    ...(input.cover ? { coverAttachmentId: input.cover.id } : {}),
+    ...(input.details.length ? { detailAttachmentIds: input.details.map((item) => item.id) } : {}),
+  };
+}
+
+function projectMembers(value: unknown, memberPersonIds: readonly string[] = []): ProjectMember[] {
+  const members = Array.isArray(value) ? value.flatMap((item) => {
+    if (!item || typeof item !== "object" || typeof (item as Record<string, unknown>).name !== "string") return [];
+    const member = item as Record<string, unknown>;
+    const name = (member.name as string).trim();
+    return name ? [{ name, ...(typeof member.personId === "string" ? { personId: member.personId } : {}) }] : [];
+  }) : [];
+  return members.length ? members : uniquePersonIds(memberPersonIds).map((personId) => ({ name: personId, personId }));
+}
+
+function publicProjectMembers(value: unknown): Array<Pick<ProjectMember, "name">> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const name = (item as Record<string, unknown>).name;
+    return typeof name === "string" && name.trim() ? [{ name: name.trim() }] : [];
+  });
+}
+
+function uniquePersonIds(value: unknown): string[] {
+  return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim()))] : [];
+}
+
+function normalizeDisplayOrder(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 9999;
+}
+
+function projectFromPublicApi(item: Record<string, unknown>): ManagedProject {
+  const slug = String(item.slug);
+  const cover = publicProjectAttachment(item.cover, `project-cover-${slug}`, "cover", 0);
+  const details = Array.isArray(item.details) ? item.details.flatMap((detail, index) => {
+    const mapped = publicProjectAttachment(detail, `project-detail-${slug}-${index}`, "detail", index);
+    return mapped ? [mapped] : [];
+  }) : [];
+  const members = publicProjectMembers(item.members);
+  const category = isProjectCategory(item.category) ? item.category : "AI_APPLICATION";
+  const base: PublishedProject = {
+    id: slug, slug, title: String(item.title), category, year: String(item.year), description: String(item.description),
+    achievement: String(item.achievement), projectStage: String(item.projectStage), challenge: String(item.challenge), solution: String(item.solution),
+    members, memberCount: members.length,
+    displayOrder: normalizeDisplayOrder(item.displayOrder), ownerCenterId: "", cover, details, publishedAt: "", revision: 1,
+  };
+  return { ...base, memberPersonIds: [], publicationStatus: "published", version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedSnapshot: base };
+}
+
+function projectFromAdminApi(item: Record<string, unknown>): ManagedProject {
+  const base = projectFromPublicApi({ ...item, cover: null, details: [] });
+  const cover = typeof item.coverAttachmentId === "string" ? adminProjectAttachment(item.coverAttachmentId, "cover", 0) : null;
+  const details = Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => adminProjectAttachment(id, "detail", index)) : [];
+  return {
+    ...base, cover, details, id: String(item.id), ownerCenterId: String(item.centerId),
+    memberPersonIds: uniquePersonIds(item.memberPersonIds), members: projectMembers(item.members),
+    memberCount: projectMembers(item.members).length, displayOrder: normalizeDisplayOrder(item.displayOrder),
+    publicationStatus: item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft",
+    version: Number(item.version), publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), publishedSnapshot: undefined,
+  };
+}
+
+function adminProjectAttachment(id: string, role: "cover" | "detail", sortOrder: number): ContentMediaAttachment { return { id, serverOwned: true, role, kind: "image", title: "", caption: "", alt: "", aspect: "landscape", sortOrder, status: "processing" }; }
+
+function publicProjectAttachment(value: unknown, id: string, fallbackRole: "cover" | "detail", fallbackOrder: number): ContentMediaAttachment | null { if (!value || typeof value !== "object" || Array.isArray(value)) return null; const media = value as Record<string, unknown>; return { id, role: media.role === "detail" ? "detail" : fallbackRole, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : fallbackOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: "ready" }; }

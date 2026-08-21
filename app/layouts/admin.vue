@@ -15,7 +15,8 @@ const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess({
   canManageAdminAccounts: session.canManageAdminAccounts,
-  canConfigurePortal: session.canManageAdminAccounts,
+  canManageOrganizationPersonnel: session.canManageAdminAccounts,
+  canConfigurePortal: session.hasCapability("portal.configure"),
 }, RELEASE_FEATURES));
 const currentIdentity = computed(() => session.currentAccount ?? null);
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();

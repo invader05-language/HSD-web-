@@ -16,6 +16,7 @@ export interface PublicHonor {
 interface PublicPersonBase {
   id: string;
   name: string;
+  grade?: string;
   memberDuty: MemberDuty;
   centerSlug: CenterSlug;
   centerName: string;
@@ -24,6 +25,7 @@ interface PublicPersonBase {
   isCore: boolean;
   order: number;
   honors: readonly PublicHonor[];
+  positions?: readonly string[];
 }
 
 type PublicAvatar =

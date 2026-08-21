@@ -1,8 +1,22 @@
 import tailwindcss from "@tailwindcss/vite";
+import { resolveApiRuntimeConfig } from "./app/utils/api-runtime-config";
+
+const browserApiRuntimeConfig = resolveApiRuntimeConfig({
+  nodeEnv: process.env.NODE_ENV,
+  apiBase: process.env.NUXT_PUBLIC_API_BASE,
+  useMockApi: process.env.NUXT_PUBLIC_USE_MOCK_API === "true",
+  e2eTestOnly: process.env.HSD_E2E_TEST_ONLY === "true",
+});
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-28",
   devtools: { enabled: false },
+  runtimeConfig: {
+    public: {
+      apiBase: browserApiRuntimeConfig.apiBase,
+      useMockApi: browserApiRuntimeConfig.useMockApi,
+    }
+  },
   css: ["~/assets/css/main.css"],
   app: {
     head: {

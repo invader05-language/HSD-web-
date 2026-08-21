@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { useProjectsStore } from "~/stores/projects";
+import { useContentGateway } from "~/composables/useContentGateway";
 import ProjectEditor from "~/components/admin/ProjectEditor.vue";
 
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const projectsStore = useProjectsStore();
+const gateway = useContentGateway();
+if (gateway) projectsStore.activateApiMode();
 const projectId = computed(() => decodeURIComponent(String(route.params.id)));
-if (import.meta.client) projectsStore.hydrate();
+if (import.meta.client && !gateway) projectsStore.hydrate();
+onMounted(() => { if (gateway) void projectsStore.refreshFromApi(gateway); });
 const sourceProject = computed(() => projectsStore.getById(projectId.value));
 const canEdit = computed(() => Boolean(sourceProject.value && projectsStore.canManageProject(projectId.value)));
 const project = computed(() => canEdit.value ? sourceProject.value : undefined);
@@ -32,6 +36,8 @@ function onCancelled() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
+    <p v-if="projectsStore.apiError" role="alert">{{ projectsStore.apiError.message }}（{{ projectsStore.apiError.code }}）</p>
+    <p v-if="projectsStore.apiLoading" role="status">正在加载项目…</p>
     <AdminPageHeading
       eyebrow="Projects"
       :title="project?.title || (sourceProject ? '编辑项目' : '项目不存在')"

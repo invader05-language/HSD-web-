@@ -153,7 +153,9 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
     },
     setFirstChoice(draft: RecruitmentApplicationDraft, firstChoice?: RecruitmentCenter) {
       draft.firstChoice = firstChoice;
-      if (firstChoice !== "白泽开发中心") draft.baizeDirection = undefined;
+      if (![draft.firstChoice, draft.secondChoice, draft.thirdChoice].includes("白泽开发中心")) {
+        draft.baizeDirection = undefined;
+      }
     },
     getApplicationsForBatch(batchId: string): SubmittedRecruitmentApplication[] {
       return Object.values(this.applicationsByBatchAndMember)
@@ -223,7 +225,7 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         firstChoice,
         secondChoice: applicationDraft.secondChoice,
         thirdChoice: applicationDraft.thirdChoice,
-        baizeDirection: firstChoice === "白泽开发中心"
+        baizeDirection: selectedCenters.some((preference) => preference.center === "白泽开发中心")
           ? applicationDraft.baizeDirection
           : undefined,
         preferences: selectedCenters,
