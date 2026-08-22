@@ -99,6 +99,9 @@ test("project-lead action selects a real project and submits the scoped command 
   await page.getByRole("button", { name: "授予项目负责人" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
+  const dialogActions = dialog.locator(".admin-position-dialog__actions");
+  await expect(dialogActions.evaluate((element) => getComputedStyle(element).columnGap)).resolves.toBe("12px");
+  await expect(dialogActions.evaluate((element) => getComputedStyle(element).rowGap)).resolves.toBe("10px");
   await dialog.getByLabel("选择项目").selectOption(projectId);
   const request = page.waitForRequest((candidate) => candidate.url().endsWith(`/api/v1/admin/organization/positions/projects/${projectId}/leads/${personId}`) && candidate.method() === "POST");
   await dialog.getByRole("button", { name: "确认任命" }).click();

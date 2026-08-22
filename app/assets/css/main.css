@@ -7732,6 +7732,11 @@ label small:not(:empty),
 }
 
 .admin-position-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 10px;
+  align-items: center;
   margin-top: 24px;
 }
 
