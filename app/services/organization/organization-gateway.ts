@@ -2,6 +2,7 @@ import type {
   AdminAccountListResponseDto,
   AdminAccountResponseDto,
   AdminCenterListResponseDto,
+  AdminProjectListResponseDto,
   AppointOrganizationPositionDto,
   CreateManagedMemberDto,
   CreateMembershipDto,
@@ -42,6 +43,7 @@ export interface OrganizationGateway {
   revokeCenterMinister(centerId: string, personId: string, payload: RevokeOrganizationPositionDto): Promise<unknown>;
   handoverCenterMinister(centerId: string, outgoingPersonId: string, incomingPersonId: string, payload: HandoverCenterMinisterDto): Promise<unknown>;
   setCoreMembership(personId: string, payload: SetCoreMembershipDto): Promise<unknown>;
-  grantProjectLead(personId: string, payload: AppointOrganizationPositionDto): Promise<unknown>;
-  revokeProjectLead(personId: string, payload: RevokeOrganizationPositionDto): Promise<unknown>;
+  grantProjectLead(projectId: string, personId: string, payload: AppointOrganizationPositionDto): Promise<unknown>;
+  revokeProjectLead(projectId: string, personId: string, payload: RevokeOrganizationPositionDto): Promise<unknown>;
+  listAdminProjects(): Promise<AdminProjectListResponseDto>;
 }

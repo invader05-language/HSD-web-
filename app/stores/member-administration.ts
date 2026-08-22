@@ -241,7 +241,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
 
   async function setCoreMembershipFromApi(personId: string, core: boolean, gateway: OrganizationGateway): Promise<boolean> {
     const member = apiManagedMembers.value.find((candidate) => candidate.id === personId);
-    if (!member?.membership || member.status !== "FORMAL_MEMBER") return false;
+    if (!member?.membership || !member.account || member.status !== "FORMAL_MEMBER") return false;
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
@@ -259,12 +259,11 @@ export const useMemberAdministrationStore = defineStore("member-administration",
 
   async function appointAllianceOwnerFromApi(personId: string, gateway: OrganizationGateway): Promise<boolean> {
     const member = apiManagedMembers.value.find((candidate) => candidate.id === personId);
-    if (!member?.membership || member.status !== "FORMAL_MEMBER") return false;
+    if (!member?.membership || !member.account || member.status !== "FORMAL_MEMBER") return false;
+    const account = member.account;
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
-      const account = (await gateway.listAccounts()).items.find((candidate) => candidate.person.id === personId);
-      if (!account) return false;
       await gateway.appointAllianceOwner(personId, {
         expectedAccountVersion: account.version,
         expectedMembershipVersion: member.membership.version,
@@ -298,16 +297,14 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
-  async function grantProjectLeadFromApi(personId: string, gateway: OrganizationGateway): Promise<boolean> {
+  async function grantProjectLeadFromApi(personId: string, projectId: string, gateway: OrganizationGateway): Promise<boolean> {
     const member = apiManagedMembers.value.find((candidate) => candidate.id === personId);
-    if (!member?.membership || member.status !== "FORMAL_MEMBER") return false;
+    if (!member?.membership || !member.account || member.status !== "FORMAL_MEMBER") return false;
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
-      const account = (await gateway.listAccounts()).items.find((candidate) => candidate.person.id === personId);
-      if (!account) return false;
-      await gateway.grantProjectLead(personId, {
-        expectedAccountVersion: account.version,
+      await gateway.grantProjectLead(projectId, personId, {
+        expectedAccountVersion: member.account.version,
         expectedMembershipVersion: member.membership.version,
       });
       await refreshFromApi(gateway);
@@ -321,13 +318,13 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     }
   }
 
-  async function revokeProjectLeadFromApi(personId: string, positionVersion: number, gateway: OrganizationGateway): Promise<boolean> {
-    const position = positionsForPerson(personId).find((item) => item.type === "PROJECT_LEAD" && item.version === positionVersion);
+  async function revokeProjectLeadFromApi(personId: string, projectId: string, positionVersion: number, gateway: OrganizationGateway): Promise<boolean> {
+    const position = positionsForPerson(personId).find((item) => item.type === "PROJECT_LEAD" && item.projectId === projectId && item.version === positionVersion);
     if (!position) return false;
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
-      await gateway.revokeProjectLead(personId, { expectedPositionVersion: positionVersion });
+      await gateway.revokeProjectLead(projectId, personId, { expectedPositionVersion: positionVersion });
       await refreshFromApi(gateway);
       return true;
     } catch (cause) {
@@ -342,11 +339,10 @@ export const useMemberAdministrationStore = defineStore("member-administration",
   async function appointCenterMinisterFromApi(personId: string, gateway: OrganizationGateway): Promise<boolean> {
     const member = apiManagedMembers.value.find((candidate) => candidate.id === personId);
     if (!member?.membership || !member.account) return false;
+    const account = member.account;
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
-      const account = (await gateway.listAccounts()).items.find((candidate) => candidate.person.id === personId);
-      if (!account) return false;
       await gateway.appointCenterMinister(member.membership.center.id, personId, {
         expectedAccountVersion: account.version,
         expectedMembershipVersion: member.membership.version,
@@ -394,11 +390,10 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     apiLoading.value = true;
     apiErrorState.value = null;
     try {
-      const incomingAccount = (await gateway.listAccounts()).items.find((account) => account.person.id === incomingPersonId);
-      if (!incomingAccount) return false;
+      if (!incoming.account) return false;
       await gateway.handoverCenterMinister(center.id, outgoingPersonId, incomingPersonId, {
         expectedOutgoingPositionVersion: outgoingPositionVersion,
-        expectedIncomingAccountVersion: incomingAccount.version,
+        expectedIncomingAccountVersion: incoming.account.version,
         expectedIncomingMembershipVersion: incoming.membership.version,
       });
       await refreshFromApi(gateway);

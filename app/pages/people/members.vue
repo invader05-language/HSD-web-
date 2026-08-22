@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
-import { getFeaturedHonors, resolvePublicAvatar } from "~/data/people";
+import { resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { usePublicMembersGateway } from '~/composables/usePublicMembersGateway'
 import { usePublicMembersStore } from '~/stores/public-members'
@@ -13,6 +13,8 @@ const isHydrated = ref(false);
 const memberRepository = useMemberRepository();
 const publicMembersGateway = usePublicMembersGateway()
 const publicMembersStore = usePublicMembersStore()
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } }
+const apiBase = runtimeConfig.public?.apiBase
 const publicMembersRequest = publicMembersGateway
   ? await useAsyncData('public-members', async () => {
       await publicMembersStore.refresh(publicMembersGateway)
@@ -21,7 +23,6 @@ const publicMembersRequest = publicMembersGateway
   : undefined
 const apiPublicPeople = computed(() => publicMembersRequest?.data.value ?? publicMembersStore.items)
 const publicMembers = computed(() => publicMembersGateway ? apiPublicPeople.value.filter((person) => !person.isCore) : memberRepository.publicMembers.value)
-const visibleHonors = (person: typeof publicMembers.value[number]) => publicMembersGateway ? person.honors : getFeaturedHonors(person)
 const pageSize = 12;
 const currentPage = ref(1);
 
@@ -104,20 +105,11 @@ watch(pageCount, (nextPageCount) => {
             class="directory-card people-member-card"
             :to="`/people/${person.id}`"
           >
-            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="md" />
+            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person, apiBase)" size="md" />
             <div class="people-member-card__content">
               <span>{{ person.centerName }}</span>
               <h2>{{ person.name }}</h2>
               <strong v-if="person.baizeDirection">{{ person.baizeDirection }}</strong>
-              <ul v-if="visibleHonors(person).length" class="featured-honors">
-                <li
-                  v-for="honor in visibleHonors(person)"
-                  :key="honor.id"
-                  data-testid="featured-honor"
-                >
-                  荣誉 · {{ honor.title }}
-                </li>
-              </ul>
               <p v-if="person.bio">{{ person.bio }}</p>
               <span class="directory-card__action">查看成员详情 →</span>
             </div>

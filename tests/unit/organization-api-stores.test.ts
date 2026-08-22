@@ -8,6 +8,7 @@ import { useMemberRepository } from "../../app/composables/useMemberRepository";
 const personId = "11111111-1111-4111-8111-111111111111";
 const accountId = "22222222-2222-4222-8222-222222222222";
 const centerId = "33333333-3333-4333-8333-333333333333";
+const projectId = "77777777-7777-4777-8777-777777777777";
 
 const center = { id: centerId, slug: "new-media", name: "新媒体中心", active: true };
 const publicCenter = { publicSlug: "new-media", name: "新媒体中心", publicMemberCount: 1, publicCoreMemberCount: 0 };
@@ -26,7 +27,7 @@ const managedMember = {
   publicProfileEnabled: false,
   version: 1,
   membership: { duty: "REGULAR" as const, version: 4, center: { id: centerId, slug: "new-media", name: "新媒体中心" } },
-  account: { id: accountId, username: "2026001001", status: "ENABLED" as const, adminLevel: "MEMBER" as const, adminCenterId: null, mustChangePassword: true },
+  account: { id: accountId, username: "2026001001", status: "ENABLED" as const, adminLevel: "MEMBER" as const, adminCenterId: null, mustChangePassword: true, version: 3 },
   coreMember: null,
 };
 const adminAccount = {
@@ -60,6 +61,7 @@ function gateway(overrides: Partial<OrganizationGateway> = {}): OrganizationGate
       personId,
       type: "ALLIANCE_OWNER" as const,
       centerId: null,
+      projectId: null,
       version: 4,
     })),
     revokeAllianceOwner: vi.fn(),
@@ -121,6 +123,7 @@ describe("organization production Pinia gateways", () => {
       personId,
       type: "ALLIANCE_OWNER" as const,
       centerId: null,
+      projectId,
       version: 7,
       appointedAt: "2026-08-14T00:00:00.000Z",
       revokedAt: null,
@@ -161,6 +164,7 @@ describe("organization production Pinia gateways", () => {
       personId,
       type: "PROJECT_LEAD" as const,
       centerId: null,
+      projectId,
       version: 8,
       appointedAt: "2026-08-14T00:00:00.000Z",
     };
@@ -185,10 +189,10 @@ describe("organization production Pinia gateways", () => {
     }]);
 
     await store.revokeAllianceOwnerFromApi(personId, ownerPosition.version, organization);
-    await store.revokeProjectLeadFromApi(personId, projectLeadPosition.version, organization);
+    await store.revokeProjectLeadFromApi(personId, projectId, projectLeadPosition.version, organization);
 
     expect(organization.revokeAllianceOwner).toHaveBeenCalledWith(personId, { expectedPositionVersion: 7 });
-    expect(organization.revokeProjectLead).toHaveBeenCalledWith(personId, { expectedPositionVersion: 8 });
+    expect(organization.revokeProjectLead).toHaveBeenCalledWith(projectId, personId, { expectedPositionVersion: 8 });
   });
 
   it("resolves a managed-member center-minister position through its centerId before revoking it", async () => {
@@ -247,6 +251,7 @@ describe("organization production Pinia gateways", () => {
       personId,
       type: "ALLIANCE_OWNER" as const,
       centerId: null,
+      projectId: null,
       version: 8,
       appointedAt: "2026-08-14T00:00:00.000Z",
     };
@@ -255,6 +260,7 @@ describe("organization production Pinia gateways", () => {
       personId,
       type: "PROJECT_LEAD" as const,
       centerId: null,
+      projectId,
       version: 9,
       appointedAt: "2026-08-14T00:00:00.000Z",
     };
@@ -272,8 +278,8 @@ describe("organization production Pinia gateways", () => {
 
     await store.appointAllianceOwnerFromApi(personId, organization);
     await store.revokeAllianceOwnerFromApi(personId, ownerPosition.version, organization);
-    await store.grantProjectLeadFromApi(personId, organization);
-    await store.revokeProjectLeadFromApi(personId, projectLeadPosition.version, organization);
+    await store.grantProjectLeadFromApi(personId, projectId, organization);
+    await store.revokeProjectLeadFromApi(personId, projectId, projectLeadPosition.version, organization);
     await store.setCoreMembershipFromApi(personId, false, organization);
 
     expect(organization.appointAllianceOwner).toHaveBeenCalledWith(personId, {
@@ -283,17 +289,18 @@ describe("organization production Pinia gateways", () => {
     expect(organization.revokeAllianceOwner).toHaveBeenCalledWith(personId, {
       expectedPositionVersion: ownerPosition.version,
     });
-    expect(organization.grantProjectLead).toHaveBeenCalledWith(personId, {
+    expect(organization.grantProjectLead).toHaveBeenCalledWith(projectId, personId, {
       expectedAccountVersion: adminAccount.version,
       expectedMembershipVersion: managedMember.membership.version,
     });
-    expect(organization.revokeProjectLead).toHaveBeenCalledWith(personId, {
+    expect(organization.revokeProjectLead).toHaveBeenCalledWith(projectId, personId, {
       expectedPositionVersion: projectLeadPosition.version,
     });
     expect(organization.setCoreMembership).toHaveBeenCalledWith(personId, {
       core: false,
       expectedMembershipVersion: managedMember.membership.version,
     });
+    expect(organization.listAccounts).not.toHaveBeenCalled();
   });
 
   it("provisions a formal member through the selected authoritative center instead of browser storage", async () => {

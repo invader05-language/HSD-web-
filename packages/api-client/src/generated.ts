@@ -28,8 +28,8 @@ export type AdminAccountResponseDto = {
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
   "mustChangePassword": boolean;
-  "lastLoginAt": (string) | null;
   "version": number;
+  "lastLoginAt": (string) | null;
   "createdAt": string;
   "updatedAt": string;
   "person": AdminPersonSummaryResponseDto;
@@ -141,6 +141,8 @@ export type AdminHonorResponseDto = {
   "type": string;
   "description": string;
   "awardedAt": string;
+  "awardedDatePrecision": "day" | "month" | "year" | "unknown";
+  "awardedDateLabel": string;
   "proofReference": string;
   "publicConsent": boolean;
   "status": "pending" | "approved" | "rejected";
@@ -160,6 +162,12 @@ export type AdminPortalConfigurationResponseDto = {
   "version": number;
   "entries": Array<PortalResolvedEntryResponseDto>;
   "visuals": Record<string, unknown>;
+};
+
+export type AdminProjectLeadSummaryDto = {
+  "personId": string;
+  "name": string;
+  "positionVersion": number;
 };
 
 export type AdminProjectListResponseDto = {
@@ -186,6 +194,7 @@ export type AdminProjectResponseDto = {
   "coverAttachmentId": (string) | null;
   "detailAttachmentIds": Array<string>;
   "revisionNumber": number;
+  "lead": (AdminProjectLeadSummaryDto) | null;
 };
 
 export type AdminRecruitmentApplicationDto = {
@@ -943,6 +952,7 @@ export type ManagedAccountSummaryResponseDto = {
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
   "mustChangePassword": boolean;
+  "version": number;
 };
 
 export type ManagedMemberCreatedResponseDto = {
@@ -1078,6 +1088,7 @@ export type OrganizationPositionResponseDto = {
   "personId": string;
   "type": "ALLIANCE_OWNER" | "CENTER_MINISTER" | "PROJECT_LEAD";
   "centerId": (string) | null;
+  "projectId": (string) | null;
   "version": number;
   "appointedAt": string;
 };
@@ -1309,6 +1320,8 @@ export type PublicHonorResponseDto = {
   "type": string;
   "description": string;
   "awardedAt": string;
+  "awardedDatePrecision": "day" | "month" | "year" | "unknown";
+  "awardedDateLabel": string;
   "featured": boolean;
 };
 
@@ -1827,8 +1840,8 @@ export const API_V1_PATHS = {
   organizationPositionRevokeCenterMinister: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke",
   organizationPositionHandoverCenterMinister: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}",
   organizationPositionSetCoreMembership: "/api/v1/admin/organization/positions/core-members/{personId}",
-  organizationPositionGrantProjectLead: "/api/v1/admin/organization/positions/project-leads/{personId}",
-  organizationPositionRevokeProjectLead: "/api/v1/admin/organization/positions/project-leads/{personId}/revoke",
+  organizationPositionGrantProjectLead: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}",
+  organizationPositionRevokeProjectLead: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke",
   preparatoryImportDryRun: "/api/v1/admin/imports/preparatory-members/dry-run",
   preparatoryImportCommit: "/api/v1/admin/imports/preparatory-members/commit",
   adminPortalDraft: "/api/v1/admin/portal/configuration/draft",
@@ -1936,8 +1949,8 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke": { method: "POST", path: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke" },
   "POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}": { method: "POST", path: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}" },
   "POST /api/v1/admin/organization/positions/core-members/{personId}": { method: "POST", path: "/api/v1/admin/organization/positions/core-members/{personId}" },
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}": { method: "POST", path: "/api/v1/admin/organization/positions/project-leads/{personId}" },
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}/revoke": { method: "POST", path: "/api/v1/admin/organization/positions/project-leads/{personId}/revoke" },
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}": { method: "POST", path: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}" },
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke": { method: "POST", path: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke" },
   "POST /api/v1/admin/imports/preparatory-members/dry-run": { method: "POST", path: "/api/v1/admin/imports/preparatory-members/dry-run" },
   "POST /api/v1/admin/imports/preparatory-members/commit": { method: "POST", path: "/api/v1/admin/imports/preparatory-members/commit" },
   "GET /api/v1/admin/portal/configuration/draft": { method: "GET", path: "/api/v1/admin/portal/configuration/draft" },
@@ -2051,8 +2064,8 @@ export interface ApiResponseByOperation {
   "incoming": OrganizationPositionResponseDto;
 };
   "POST /api/v1/admin/organization/positions/core-members/{personId}": MembershipResponseDto;
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}": OrganizationPositionResponseDto;
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}/revoke": OrganizationPositionResponseDto;
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}": OrganizationPositionResponseDto;
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke": OrganizationPositionResponseDto;
   "POST /api/v1/admin/imports/preparatory-members/dry-run": PreparatoryMemberImportReportResponseDto;
   "POST /api/v1/admin/imports/preparatory-members/commit": PreparatoryMemberImportReportResponseDto;
   "GET /api/v1/admin/portal/configuration/draft": AdminPortalConfigurationResponseDto;
@@ -2240,10 +2253,10 @@ const API_RESPONSE_SCHEMAS = {
   "POST /api/v1/admin/organization/positions/core-members/{personId}": {
     "$ref": "#/components/schemas/MembershipResponseDto"
   },
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}": {
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}": {
     "$ref": "#/components/schemas/OrganizationPositionResponseDto"
   },
-  "POST /api/v1/admin/organization/positions/project-leads/{personId}/revoke": {
+  "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke": {
     "$ref": "#/components/schemas/OrganizationPositionResponseDto"
   },
   "POST /api/v1/admin/imports/preparatory-members/dry-run": {
@@ -2854,6 +2867,11 @@ const API_COMPONENT_SCHEMAS = {
         "format": "uuid",
         "nullable": true
       },
+      "projectId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
       "version": {
         "type": "number",
         "minimum": 1
@@ -2868,6 +2886,7 @@ const API_COMPONENT_SCHEMAS = {
       "personId",
       "type",
       "centerId",
+      "projectId",
       "version",
       "appointedAt"
     ]
@@ -6295,6 +6314,27 @@ const API_COMPONENT_SCHEMAS = {
       "parts"
     ]
   },
+  "AdminProjectLeadSummaryDto": {
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "positionVersion": {
+        "type": "number",
+        "minimum": 1
+      }
+    },
+    "required": [
+      "personId",
+      "name",
+      "positionVersion"
+    ]
+  },
   "AdminProjectResponseDto": {
     "type": "object",
     "properties": {
@@ -6373,6 +6413,14 @@ const API_COMPONENT_SCHEMAS = {
       },
       "revisionNumber": {
         "type": "number"
+      },
+      "lead": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AdminProjectLeadSummaryDto"
+          }
+        ]
       }
     },
     "required": [
@@ -6394,7 +6442,8 @@ const API_COMPONENT_SCHEMAS = {
       "memberPersonIds",
       "coverAttachmentId",
       "detailAttachmentIds",
-      "revisionNumber"
+      "revisionNumber",
+      "lead"
     ]
   },
   "AdminProjectListResponseDto": {
@@ -7990,6 +8039,19 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date"
       },
+      "awardedDatePrecision": {
+        "type": "string",
+        "enum": [
+          "day",
+          "month",
+          "year",
+          "unknown"
+        ]
+      },
+      "awardedDateLabel": {
+        "type": "string",
+        "description": "Human-readable date label that respects source precision."
+      },
       "proofReference": {
         "type": "string"
       },
@@ -8023,6 +8085,8 @@ const API_COMPONENT_SCHEMAS = {
       "type",
       "description",
       "awardedAt",
+      "awardedDatePrecision",
+      "awardedDateLabel",
       "proofReference",
       "publicConsent",
       "status",
@@ -8895,6 +8959,18 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date"
       },
+      "awardedDatePrecision": {
+        "type": "string",
+        "enum": [
+          "day",
+          "month",
+          "year",
+          "unknown"
+        ]
+      },
+      "awardedDateLabel": {
+        "type": "string"
+      },
       "featured": {
         "type": "boolean",
         "default": false
@@ -8906,6 +8982,8 @@ const API_COMPONENT_SCHEMAS = {
       "type",
       "description",
       "awardedAt",
+      "awardedDatePrecision",
+      "awardedDateLabel",
       "featured"
     ]
   },
@@ -9490,6 +9568,10 @@ const API_COMPONENT_SCHEMAS = {
       },
       "mustChangePassword": {
         "type": "boolean"
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
       }
     },
     "required": [
@@ -9498,7 +9580,8 @@ const API_COMPONENT_SCHEMAS = {
       "status",
       "adminLevel",
       "adminCenterId",
-      "mustChangePassword"
+      "mustChangePassword",
+      "version"
     ]
   },
   "ManagedMemberResponseDto": {
@@ -9686,13 +9769,14 @@ const API_COMPONENT_SCHEMAS = {
       "mustChangePassword": {
         "type": "boolean"
       },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
       "lastLoginAt": {
         "type": "string",
         "format": "date-time",
         "nullable": true
-      },
-      "version": {
-        "type": "number"
       },
       "createdAt": {
         "type": "string",
@@ -9721,8 +9805,8 @@ const API_COMPONENT_SCHEMAS = {
       "adminLevel",
       "adminCenterId",
       "mustChangePassword",
-      "lastLoginAt",
       "version",
+      "lastLoginAt",
       "createdAt",
       "updatedAt",
       "person",

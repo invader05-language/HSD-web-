@@ -12,6 +12,8 @@ export interface MockHonorRecord {
   type: string
   description: string
   awardedAt: string
+  awardedDatePrecision: 'day' | 'month' | 'year' | 'unknown'
+  awardedDateLabel: string
   proofReference: string
   publicConsent: boolean
   status: HonorStatus
@@ -30,6 +32,8 @@ function cloneRecords(): MockHonorRecord[] {
     type: record.type,
     description: '',
     awardedAt: '2026-08-01',
+    awardedDatePrecision: 'day',
+    awardedDateLabel: '2026年8月1日',
     proofReference: record.proof,
     publicConsent: record.consent,
     status: record.status === '已通过' ? 'approved' : 'pending',
@@ -67,7 +71,7 @@ export function createMockHonorsGateway() {
       records.splice(index, 1)
       return { id: record.id, type: 'honor', title: record.title, version: record.version + 1 }
     },
-    async submit(input: Omit<MockHonorRecord, 'id' | 'publicId' | 'personId' | 'centerId' | 'memberName' | 'status' | 'version' | 'submittedAt'> & { expectedVersion: number }) {
+    async submit(input: Omit<MockHonorRecord, 'id' | 'publicId' | 'personId' | 'centerId' | 'memberName' | 'status' | 'version' | 'submittedAt' | 'awardedDatePrecision' | 'awardedDateLabel'> & { expectedVersion: number }) {
       if (input.expectedVersion !== 0) conflict()
       const next = records.length + 1
       const record: MockHonorRecord = {
@@ -80,6 +84,8 @@ export function createMockHonorsGateway() {
         type: input.type,
         description: input.description,
         awardedAt: input.awardedAt,
+        awardedDatePrecision: 'day',
+        awardedDateLabel: '2026年8月1日',
         proofReference: input.proofReference,
         publicConsent: input.publicConsent,
         status: 'pending',

@@ -8,7 +8,7 @@ import CorePage from '../../app/pages/people/core.vue'
 import AboutPage from '../../app/pages/about.vue'
 
 const publicId = '8a3b610d-6d5e-48ad-a591-4969f699ef02'
-const member = (honors: unknown[]) => ({ publicId, name: 'API Member', grade: '2026', className: 'Class 1', avatar: { kind: 'default', variant: 'white-hsd' }, center: { publicSlug: 'baize-development', name: 'API Center' }, duty: 'REGULAR', honors, positions: [], bio: 'Server profile' })
+const member = (honors: Array<Record<string, unknown>>) => ({ publicId, name: 'API Member', grade: '2026', className: 'Class 1', avatar: { kind: 'default', variant: 'white-hsd' }, center: { publicSlug: 'baize-development', name: 'API Center' }, duty: 'REGULAR', honors: honors.map((honor) => ({ awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', ...honor })), positions: [], bio: 'Server profile' })
 
 describe('public member API rendering', () => {
   beforeEach(() => {
@@ -30,12 +30,22 @@ describe('public member API rendering', () => {
   }
 
   it('renders only honors returned by the filtered public projection and removes them after consent withdrawal', async () => {
-    const honor = { id: 'hon_public', title: 'Published Award', type: 'service', description: 'Published description', awardedAt: '2026-08-01', featured: false }
+    const honor = { id: 'hon_public', title: 'Published Award', type: 'service', description: 'Published description', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', featured: false }
     const published = await render(member([honor]))
     expect(published).toContain('Published Award')
+    expect(published).toContain('2026年8月1日')
+    expect(published).not.toContain('Published description')
     expect(published).not.toContain('proofReference')
     const withdrawn = await render(member([]))
     expect(withdrawn).not.toContain('Published Award')
+  })
+
+  it('renders a historical unknown honor date label without exposing its internal anchor date', async () => {
+    const honor = { id: 'hon_unknown', title: 'Historical Award', type: 'service', description: '', awardedAt: '2026-08-22', awardedDatePrecision: 'unknown', awardedDateLabel: '日期待补充', featured: false }
+    const html = await render(member([honor]))
+
+    expect(html).toContain('日期待补充')
+    expect(html).not.toContain('>2026-08-22<')
   })
 
   it('renders the production member directory from the public members API', async () => {
@@ -46,7 +56,7 @@ describe('public member API rendering', () => {
     app.component('PaginationControls', defineComponent({ template: '<span />' }))
     const html = await renderToString(app)
     expect(html).toContain('API Member')
-    expect(html).toContain('Directory Award')
+    expect(html).not.toContain('Directory Award')
     expect(html).not.toContain('data-testid="empty"')
   })
 

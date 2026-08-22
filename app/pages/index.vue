@@ -18,6 +18,7 @@ import { useContentGateway } from "~/composables/useContentGateway";
 import { resolveHomepageUpdates } from "~/utils/homepage-updates";
 import { projectPublicPortal, resolvePublicPortalVisual } from "~/utils/public-homepage-portal";
 import type { PortalConfig } from "~/types/portal-config";
+import { resolveApiMediaUrl } from "~/utils/media-url";
 
 useHead({
   title: "白云 HSD 开发者部落｜让每一种创造力都有真实作品",
@@ -37,6 +38,8 @@ const activitiesStore = useActivitiesStore();
 const contentGateway = useContentGateway();
 const publicMembersGateway = usePublicMembersGateway();
 const publicMembersStore = usePublicMembersStore();
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } };
+const apiBase = runtimeConfig.public?.apiBase;
 const publicMembersRequest = publicMembersGateway
   ? await useAsyncData("homepage-public-members", async () => {
       await publicMembersStore.refresh(publicMembersGateway);
@@ -400,7 +403,7 @@ watch(
           <p v-if="publicMembersStore.apiLoading" class="home-members-status" role="status">正在加载公开成员…</p>
           <p v-else-if="publicMembersStore.apiError" class="home-members-status" role="alert">公开成员加载失败：{{ publicMembersStore.apiError.message }}</p>
           <article v-for="member in homepageMembers" :key="member.id" class="member-story">
-            <HsdAvatar :name="member.name" :src="member.avatarUrl" size="lg" />
+            <HsdAvatar :name="member.name" :src="resolveApiMediaUrl(member.avatarUrl, apiBase)" size="lg" />
             <p>{{ member.summary }}</p>
             <footer>
               <strong>{{ member.name }}</strong>

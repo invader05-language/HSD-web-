@@ -2088,25 +2088,50 @@ a {
 
 .member-honors li {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr);
+  grid-template-columns: minmax(7.5rem, clamp(7.5rem, 20%, 10rem)) minmax(0, 1fr);
   gap: 22px;
+  min-width: 0;
   padding: 22px 0;
   border-top: 1px solid var(--border);
 }
 
 .member-honors time {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--brand-red);
   font-size: 14px;
   font-weight: 800;
+  line-height: 1.4;
 }
 
 .member-honors h3 {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .member-honors li p {
   margin: 8px 0 0;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .member-detail__layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .member-honors li {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .member-honors time {
+    width: 100%;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--brand-red) 8%, transparent);
+  }
 }
 
 .member-detail__navigation {
@@ -7659,6 +7684,60 @@ label small:not(:empty),
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.admin-position-actions {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 10px;
+  align-items: center;
+}
+
+.admin-position-actions > label {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  color: #666d75;
+  font-size: 10px;
+}
+
+.admin-position-actions select,
+.admin-position-project-select select {
+  min-height: 34px;
+  border: 1px solid #d7dade;
+  border-radius: 4px;
+  padding: 0 9px;
+  background: #fff;
+  color: #353a40;
+  font-size: 11px;
+}
+
+.admin-position-project-select {
+  display: grid;
+  gap: 7px;
+  margin: 20px 0 4px;
+  color: #555c64;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-position-dialog__empty {
+  margin-top: 20px;
+  padding: 12px;
+  border: 1px solid #f1d4d6;
+  background: #fff7f7;
+  color: #81212b !important;
+}
+
+.admin-position-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 10px;
+  align-items: center;
+  margin-top: 24px;
 }
 
 .admin-table-scroll td:last-child a {

@@ -171,6 +171,28 @@ test.describe("real Nuxt + NestJS integration", () => {
     await expect(page.locator('[data-testid="gallery-media"]').first()).toBeVisible();
   });
 
+  test("deep-linked member details rehydrate live honors and avatars", async ({ page }) => {
+    const response = await page.request.get(`${apiBase}/api/v1/public/members`);
+    expect(response.ok()).toBe(true);
+    const members = await response.json() as {
+      items: Array<{
+        publicId: string;
+        name: string;
+        avatar: { kind: string };
+        honors: Array<{ id: string }>;
+      }>;
+    };
+    const member = members.items.find((item) => item.avatar.kind === "asset" && item.honors.length > 0);
+    expect(member).toBeDefined();
+
+    await page.goto(`/people/${member!.publicId}`, { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { level: 1, name: member!.name, exact: true })).toBeVisible();
+    await expect(page.getByTestId("honor-record")).toHaveCount(member!.honors.length);
+    const avatar = page.locator(".member-detail .hsd-avatar img");
+    await expect(avatar).toHaveCount(1);
+    await expect.poll(() => avatar.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  });
+
   test("activity and member directories retain live data through client hydration", async ({ page }) => {
     const [activitiesResponse, coreResponse, membersResponse] = await Promise.all([
       page.request.get(`${apiBase}/api/v1/public/activities`),

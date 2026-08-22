@@ -2,6 +2,9 @@
 import type { PublicPerson } from "~/data/people";
 import { resolvePublicAvatar } from "~/data/people";
 
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } };
+const apiBase = runtimeConfig.public?.apiBase;
+
 withDefaults(defineProps<{
   people: readonly PublicPerson[];
   heading: string;
@@ -54,7 +57,7 @@ withDefaults(defineProps<{
         :data-testid="cardTestId"
       >
         <div class="organization-leadership-card__identity center-minister-card__identity">
-          <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="md" />
+          <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person, apiBase)" size="md" />
           <div>
             <h3>{{ person.name }}</h3>
             <span>{{ roleLabel }}</span>

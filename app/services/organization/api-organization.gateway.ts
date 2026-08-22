@@ -107,6 +107,7 @@ export function createApiOrganizationGateway(options: ApiOrganizationGatewayOpti
     revokeCenterMinister: client.organization.revokeCenterMinister,
     handoverCenterMinister: client.organization.handoverCenterMinister,
     setCoreMembership: client.organization.setCoreMembership,
+    listAdminProjects: client.projects.listAdmin,
     grantProjectLead: client.organization.grantProjectLead,
     revokeProjectLead: client.organization.revokeProjectLead,
   };

@@ -123,8 +123,8 @@ export interface HsdApiClient {
     revokeCenterMinister(centerId: string, personId: string, payload: RevokeOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke">>;
     handoverCenterMinister(centerId: string, outgoingPersonId: string, incomingPersonId: string, payload: HandoverCenterMinisterDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}">>;
     setCoreMembership(personId: string, payload: SetCoreMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/core-members/{personId}">>;
-    grantProjectLead(personId: string, payload: AppointOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/project-leads/{personId}">>;
-    revokeProjectLead(personId: string, payload: RevokeOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/project-leads/{personId}/revoke">>;
+    grantProjectLead(projectId: string, personId: string, payload: AppointOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}">>;
+    revokeProjectLead(projectId: string, personId: string, payload: RevokeOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke">>;
   };
   homepage: {
     stats(): Promise<ApiResponseFor<"GET /api/v1/public/homepage/stats">>;
@@ -250,8 +250,8 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       revokeCenterMinister: (centerId, personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke", payload, `/api/v1/admin/organization/positions/centers/${encodeURIComponent(centerId)}/ministers/${encodeURIComponent(personId)}/revoke`),
       handoverCenterMinister: (centerId, outgoingPersonId, incomingPersonId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}", payload, `/api/v1/admin/organization/positions/centers/${encodeURIComponent(centerId)}/ministers/${encodeURIComponent(outgoingPersonId)}/handover/${encodeURIComponent(incomingPersonId)}`),
       setCoreMembership: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/core-members/{personId}", payload, `/api/v1/admin/organization/positions/core-members/${encodeURIComponent(personId)}`),
-      grantProjectLead: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/project-leads/{personId}", payload, `/api/v1/admin/organization/positions/project-leads/${encodeURIComponent(personId)}`),
-      revokeProjectLead: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/project-leads/{personId}/revoke", payload, `/api/v1/admin/organization/positions/project-leads/${encodeURIComponent(personId)}/revoke`),
+      grantProjectLead: (projectId, personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}", payload, `/api/v1/admin/organization/positions/projects/${encodeURIComponent(projectId)}/leads/${encodeURIComponent(personId)}`),
+      revokeProjectLead: (projectId, personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke", payload, `/api/v1/admin/organization/positions/projects/${encodeURIComponent(projectId)}/leads/${encodeURIComponent(personId)}/revoke`),
     },
     homepage: {
       stats: () => requestGenerated(transport, "GET /api/v1/public/homepage/stats"),

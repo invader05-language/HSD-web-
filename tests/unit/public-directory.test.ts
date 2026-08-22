@@ -221,4 +221,22 @@ describe("public people and center directory", () => {
     expect(person.positions).toEqual(["项目负责人", "部长"]);
     expect(person.isCore).toBe(false);
   });
+
+  it("resolves API-owned avatars against the configured API origin", () => {
+    const person = toPublicPerson({
+      publicId: "public-avatar-member",
+      name: "头像成员",
+      grade: "2026",
+      className: "软件工程 1 班",
+      avatar: { kind: "asset", publicToken: "avatar-token" },
+      center: { publicSlug: "new-media", name: "新媒体中心" },
+      duty: "REGULAR",
+      honors: [],
+      positions: [],
+    });
+
+    expect(resolvePublicAvatar(person, "http://127.0.0.1:3012")).toBe(
+      "http://127.0.0.1:3012/api/v1/public/media/avatar-token",
+    );
+  });
 });
