@@ -2169,10 +2169,18 @@
         ]
       }
     },
-    "/api/v1/admin/organization/positions/project-leads/{personId}": {
+    "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}": {
       "post": {
         "operationId": "OrganizationPositionController_grantProjectLead",
         "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "personId",
             "required": true,
@@ -2244,16 +2252,24 @@
             "sessionCookie": []
           }
         ],
-        "summary": "Grant the fixed project-lead position",
+        "summary": "Grant a project-scoped project-lead position",
         "tags": [
           "Organization positions"
         ]
       }
     },
-    "/api/v1/admin/organization/positions/project-leads/{personId}/revoke": {
+    "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke": {
       "post": {
         "operationId": "OrganizationPositionController_revokeProjectLead",
         "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "personId",
             "required": true,
@@ -11584,6 +11600,11 @@
             "format": "uuid",
             "nullable": true
           },
+          "projectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "version": {
             "type": "number",
             "minimum": 1
@@ -11598,6 +11619,7 @@
           "personId",
           "type",
           "centerId",
+          "projectId",
           "version",
           "appointedAt"
         ]
@@ -15025,6 +15047,27 @@
           "parts"
         ]
       },
+      "AdminProjectLeadSummaryDto": {
+        "type": "object",
+        "properties": {
+          "personId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "positionVersion": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "personId",
+          "name",
+          "positionVersion"
+        ]
+      },
       "AdminProjectResponseDto": {
         "type": "object",
         "properties": {
@@ -15103,6 +15146,14 @@
           },
           "revisionNumber": {
             "type": "number"
+          },
+          "lead": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AdminProjectLeadSummaryDto"
+              }
+            ]
           }
         },
         "required": [
@@ -15124,7 +15175,8 @@
           "memberPersonIds",
           "coverAttachmentId",
           "detailAttachmentIds",
-          "revisionNumber"
+          "revisionNumber",
+          "lead"
         ]
       },
       "AdminProjectListResponseDto": {
@@ -18249,6 +18301,10 @@
           },
           "mustChangePassword": {
             "type": "boolean"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
           }
         },
         "required": [
@@ -18257,7 +18313,8 @@
           "status",
           "adminLevel",
           "adminCenterId",
-          "mustChangePassword"
+          "mustChangePassword",
+          "version"
         ]
       },
       "ManagedMemberResponseDto": {
@@ -18445,13 +18502,14 @@
           "mustChangePassword": {
             "type": "boolean"
           },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
           "lastLoginAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
-          },
-          "version": {
-            "type": "number"
           },
           "createdAt": {
             "type": "string",
@@ -18480,8 +18538,8 @@
           "adminLevel",
           "adminCenterId",
           "mustChangePassword",
-          "lastLoginAt",
           "version",
+          "lastLoginAt",
           "createdAt",
           "updatedAt",
           "person",

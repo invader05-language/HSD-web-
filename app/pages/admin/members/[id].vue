@@ -9,6 +9,7 @@ import { BAIZE_DIRECTION_LABELS, type BaizeDirectionCode } from "~/utils/baize-d
 import { useSessionStore } from "~/stores/session";
 import { getOrganizationPositionLabel } from "~/utils/organization-positions";
 import { organizationMemberLabel } from "~/utils/organization-member-display";
+import type { ProjectActionOption, OrganizationPositionAction } from "~/components/admin/OrganizationPositionActionDialog.vue";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();
@@ -38,6 +39,10 @@ const promotionBaizeDirection = ref<BaizeDirectionCode | "">("");
 const selectedPromotionCenter = computed(() => memberAdministration.apiCenters.find((center) => center.id === promotionCenterId.value));
 const positions = computed(() => member.value ? memberAdministration.positionsForPerson(member.value.id) : []);
 const canManagePositions = computed(() => Boolean(organizationGateway && session.canManageAdminAccounts && member.value?.identity === "正式成员"));
+const projectOptions = ref<ProjectActionOption[]>([]);
+const projectOptionsLoading = ref(false);
+const projectOptionsError = ref("");
+const positionAction = ref<OrganizationPositionAction | null>(null);
 const handoverTargetId = ref("");
 const handoverCandidates = computed(() => member.value ? memberAdministration.apiManagedMembers.filter((candidate) => (
   candidate.id !== member.value!.id
@@ -45,9 +50,47 @@ const handoverCandidates = computed(() => member.value ? memberAdministration.ap
   && candidate.membership?.center.id === memberAdministration.apiManagedMembers.find((item) => item.id === member.value!.id)?.membership?.center.id
 )) : []);
 
-async function appointMinister() {
-  if (!member.value || !organizationGateway) return;
-  await memberAdministration.appointCenterMinisterFromApi(member.value.id, organizationGateway);
+function openPositionAction(action: OrganizationPositionAction) {
+  positionAction.value = action;
+}
+function closePositionAction() {
+  if (!memberAdministration.apiLoading) positionAction.value = null;
+}
+async function loadProjectOptions() {
+  if (!organizationGateway) return;
+  projectOptionsLoading.value = true;
+  projectOptionsError.value = "";
+  try {
+    const projects = await organizationGateway.listAdminProjects();
+    projectOptions.value = projects.items.map((project) => ({
+      id: project.id,
+      title: project.title,
+      status: project.status,
+      lead: project.lead,
+    }));
+  } catch (cause) {
+    projectOptions.value = [];
+    projectOptionsError.value = cause instanceof Error && cause.message
+      ? `项目目录加载失败：${cause.message}`
+      : "项目目录加载失败，请刷新重试";
+  } finally {
+    projectOptionsLoading.value = false;
+  }
+}
+async function confirmPositionAction(input: { projectId?: string }) {
+  if (!member.value || !organizationGateway || !positionAction.value) return;
+  const action = positionAction.value;
+  const succeeded = action === "ALLIANCE_OWNER"
+    ? await memberAdministration.appointAllianceOwnerFromApi(member.value.id, organizationGateway)
+    : action === "CENTER_MINISTER"
+      ? await memberAdministration.appointCenterMinisterFromApi(member.value.id, organizationGateway)
+      : input.projectId
+        ? await memberAdministration.grantProjectLeadFromApi(member.value.id, input.projectId, organizationGateway)
+        : false;
+  if (succeeded) {
+    await loadProjectOptions();
+    positionAction.value = null;
+  }
 }
 async function revokeMinister(version: number) {
   if (!member.value || !organizationGateway) return;
@@ -58,21 +101,13 @@ async function handoverMinister(version: number) {
   await memberAdministration.handoverCenterMinisterFromApi(member.value.id, handoverTargetId.value, version, organizationGateway);
   handoverTargetId.value = "";
 }
-async function appointAllianceOwner() {
-  if (!member.value || !organizationGateway) return;
-  await memberAdministration.appointAllianceOwnerFromApi(member.value.id, organizationGateway);
-}
 async function revokeAllianceOwner(version: number) {
   if (!member.value || !organizationGateway) return;
   await memberAdministration.revokeAllianceOwnerFromApi(member.value.id, version, organizationGateway);
 }
-async function grantProjectLead() {
-  if (!member.value || !organizationGateway) return;
-  await memberAdministration.grantProjectLeadFromApi(member.value.id, organizationGateway);
-}
-async function revokeProjectLead(version: number) {
-  if (!member.value || !organizationGateway) return;
-  await memberAdministration.revokeProjectLeadFromApi(member.value.id, version, organizationGateway);
+async function revokeProjectLead(projectId: string | null, version: number) {
+  if (!member.value || !organizationGateway || !projectId) return;
+  await memberAdministration.revokeProjectLeadFromApi(member.value.id, projectId, version, organizationGateway);
 }
 async function toggleCoreMembership() {
   if (!member.value || !organizationGateway) return;
@@ -136,6 +171,7 @@ onMounted(async () => {
   if (organizationGateway) {
     await memberAdministration.refreshFromApi(organizationGateway);
     promotionCenterId.value ||= memberAdministration.apiCenters[0]?.id ?? "";
+    await loadProjectOptions();
   }
 });
 useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HSD 管理台` : "成员管理｜HSD 管理台" }));
@@ -211,16 +247,21 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
           <header><span>Organization Positions</span><h2>组织职务</h2><p>正式成员所属中心只读；冲突后会刷新权威数据。</p></header>
           <p v-if="positions.length">{{ positions.map((position) => getOrganizationPositionLabel(position.type)).join("、") }}</p>
           <p v-else>暂无组织职务</p>
-          <div v-if="canManagePositions">
+          <p v-if="projectOptionsLoading" class="admin-inline-note" role="status">正在加载项目目录…</p>
+          <div v-else-if="projectOptionsError" class="admin-position-dialog__empty" role="alert">
+            <span>{{ projectOptionsError }}</span>
+            <button type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="loadProjectOptions">重新加载项目目录</button>
+          </div>
+          <div v-if="canManagePositions" class="admin-position-actions">
             <button type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="toggleCoreMembership">{{ (member.isCore ?? member.memberDuty === '核心人员') ? '降为普通成员' : '设为核心成员' }}</button>
-            <button v-if="!positions.some((item) => item.type === 'ALLIANCE_OWNER')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="appointAllianceOwner">任命联盟负责人</button>
+            <button v-if="!positions.some((item) => item.type === 'ALLIANCE_OWNER')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="openPositionAction('ALLIANCE_OWNER')">任命联盟负责人</button>
             <button v-for="position in positions.filter((item) => item.type === 'ALLIANCE_OWNER')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeAllianceOwner(position.version)">撤销联盟负责人</button>
-            <button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="appointMinister">任命为部长</button>
+            <button v-if="!positions.some((item) => item.type === 'CENTER_MINISTER')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="openPositionAction('CENTER_MINISTER')">任命为部长</button>
             <button v-for="position in positions.filter((item) => item.type === 'CENTER_MINISTER')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeMinister(position.version)">撤销部长</button>
             <label v-if="positions.some((item) => item.type === 'CENTER_MINISTER')">部长交接<select v-model="handoverTargetId"><option value="">选择同中心正式成员</option><option v-for="candidate in handoverCandidates" :key="candidate.id" :value="candidate.id">{{ candidate.name }}</option></select></label>
             <button v-if="handoverTargetId && positions.some((item) => item.type === 'CENTER_MINISTER')" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="handoverMinister(positions.find((item) => item.type === 'CENTER_MINISTER')!.version)">确认交接</button>
-            <button v-if="!positions.some((item) => item.type === 'PROJECT_LEAD')" type="button" class="button" :disabled="memberAdministration.apiLoading" @click="grantProjectLead">授予项目负责人</button>
-            <button v-for="position in positions.filter((item) => item.type === 'PROJECT_LEAD')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="revokeProjectLead(position.version)">撤销项目负责人</button>
+            <button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="openPositionAction('PROJECT_LEAD')">授予项目负责人</button>
+            <button v-for="position in positions.filter((item) => item.type === 'PROJECT_LEAD')" :key="position.id" type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading || !position.projectId" @click="revokeProjectLead(position.projectId, position.version)">撤销项目负责人{{ projectOptions.find((project) => project.id === position.projectId)?.title ? `（${projectOptions.find((project) => project.id === position.projectId)?.title}）` : '' }}</button>
           </div>
           <p v-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
         </section>
@@ -244,6 +285,19 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
         <div><button type="button" class="button button--ghost" @click="showPromotionConfirm = false">返回检查</button><button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="confirmPromotion">确认保存</button></div>
       </section>
     </div>
+
+    <AdminOrganizationPositionActionDialog
+      :open="Boolean(positionAction)"
+      :action="positionAction || 'PROJECT_LEAD'"
+      :member-name="member.name"
+      :projects="projectOptions"
+      :busy="memberAdministration.apiLoading"
+      :error="memberAdministration.apiError?.message || ''"
+      :projects-error="positionAction === 'PROJECT_LEAD' ? projectOptionsError : ''"
+      @close="closePositionAction"
+      @retry-projects="loadProjectOptions"
+      @confirm="confirmPositionAction"
+    />
   </div>
   <p v-else-if="memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步成员资料…</p>
   <p v-else-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>

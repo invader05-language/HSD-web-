@@ -7,6 +7,7 @@ import { createOrganizationGatewayForRuntime } from "../../app/composables/useOr
 
 const personId = "11111111-1111-4111-8111-111111111111";
 const centerId = "22222222-2222-4222-8222-222222222222";
+const projectId = "66666666-6666-4666-8666-666666666666";
 
 const membership = {
   id: "33333333-3333-4333-8333-333333333333",
@@ -84,10 +85,11 @@ describe("organization API gateway", () => {
       personId,
       type: "ALLIANCE_OWNER" as const,
       centerId: null,
+      projectId: null,
       version: 2,
       appointedAt: "2026-08-14T00:00:00.000Z",
     };
-    const responses = [membership, position, { ...position, type: "PROJECT_LEAD" as const }];
+    const responses = [membership, position, { ...position, type: "PROJECT_LEAD" as const, projectId }];
     const fetcher = vi.fn(async () => new Response(JSON.stringify(responses.shift()), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -101,7 +103,7 @@ describe("organization API gateway", () => {
 
     await gateway.updateMembership(personId, { expectedVersion: 1, duty: "CORE" });
     await gateway.appointAllianceOwner(personId, { expectedAccountVersion: 2, expectedMembershipVersion: 3 });
-    await gateway.grantProjectLead(personId, { expectedAccountVersion: 4, expectedMembershipVersion: 5 });
+    await gateway.grantProjectLead(projectId, personId, { expectedAccountVersion: 4, expectedMembershipVersion: 5 });
 
     expect(fetcher.mock.calls.map(([url, options]) => ({
       url,
@@ -111,7 +113,7 @@ describe("organization API gateway", () => {
     }))).toEqual([
       { url: `https://api.example.test/api/v1/admin/organization/memberships/${personId}`, method: "PATCH", csrf: "csrf token", requestId: "m4-request" },
       { url: `https://api.example.test/api/v1/admin/organization/positions/alliance-owners/${personId}`, method: "POST", csrf: "csrf token", requestId: "m4-request" },
-      { url: `https://api.example.test/api/v1/admin/organization/positions/project-leads/${personId}`, method: "POST", csrf: "csrf token", requestId: "m4-request" },
+      { url: `https://api.example.test/api/v1/admin/organization/positions/projects/${projectId}/leads/${personId}`, method: "POST", csrf: "csrf token", requestId: "m4-request" },
     ]);
   });
 
@@ -186,6 +188,7 @@ describe("organization API gateway", () => {
       personId,
       type: "CENTER_MINISTER",
       centerId,
+      projectId: null,
       version: 1,
       appointedAt: "2026-08-14T00:00:00.000Z",
     }), { status: 201, headers: { "content-type": "application/json" } }));

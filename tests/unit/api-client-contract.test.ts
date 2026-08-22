@@ -166,8 +166,8 @@ describe("generated browser API client", () => {
       organizationPositionRevokeCenterMinister: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{personId}/revoke",
       organizationPositionHandoverCenterMinister: "/api/v1/admin/organization/positions/centers/{centerId}/ministers/{outgoingPersonId}/handover/{incomingPersonId}",
       organizationPositionSetCoreMembership: "/api/v1/admin/organization/positions/core-members/{personId}",
-      organizationPositionGrantProjectLead: "/api/v1/admin/organization/positions/project-leads/{personId}",
-      organizationPositionRevokeProjectLead: "/api/v1/admin/organization/positions/project-leads/{personId}/revoke",
+      organizationPositionGrantProjectLead: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}",
+      organizationPositionRevokeProjectLead: "/api/v1/admin/organization/positions/projects/{projectId}/leads/{personId}/revoke",
     });
     for (const deprecated of [
       "organizationCoreMembers",
@@ -197,6 +197,7 @@ describe("generated browser API client", () => {
           personId,
           type: request.path.includes("alliance-owners") ? "ALLIANCE_OWNER" : "CENTER_MINISTER",
           centerId: request.path.includes("ministers") ? centerId : null,
+          projectId: null,
           version: 2,
           appointedAt: "2026-08-14T00:00:00.000Z",
         };
