@@ -141,6 +141,8 @@ export type AdminHonorResponseDto = {
   "type": string;
   "description": string;
   "awardedAt": string;
+  "awardedDatePrecision": "day" | "month" | "year" | "unknown";
+  "awardedDateLabel": string;
   "proofReference": string;
   "publicConsent": boolean;
   "status": "pending" | "approved" | "rejected";
@@ -1309,6 +1311,8 @@ export type PublicHonorResponseDto = {
   "type": string;
   "description": string;
   "awardedAt": string;
+  "awardedDatePrecision": "day" | "month" | "year" | "unknown";
+  "awardedDateLabel": string;
   "featured": boolean;
 };
 
@@ -7990,6 +7994,19 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date"
       },
+      "awardedDatePrecision": {
+        "type": "string",
+        "enum": [
+          "day",
+          "month",
+          "year",
+          "unknown"
+        ]
+      },
+      "awardedDateLabel": {
+        "type": "string",
+        "description": "Human-readable date label that respects source precision."
+      },
       "proofReference": {
         "type": "string"
       },
@@ -8023,6 +8040,8 @@ const API_COMPONENT_SCHEMAS = {
       "type",
       "description",
       "awardedAt",
+      "awardedDatePrecision",
+      "awardedDateLabel",
       "proofReference",
       "publicConsent",
       "status",
@@ -8895,6 +8914,18 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date"
       },
+      "awardedDatePrecision": {
+        "type": "string",
+        "enum": [
+          "day",
+          "month",
+          "year",
+          "unknown"
+        ]
+      },
+      "awardedDateLabel": {
+        "type": "string"
+      },
       "featured": {
         "type": "boolean",
         "default": false
@@ -8906,6 +8937,8 @@ const API_COMPONENT_SCHEMAS = {
       "type",
       "description",
       "awardedAt",
+      "awardedDatePrecision",
+      "awardedDateLabel",
       "featured"
     ]
   },

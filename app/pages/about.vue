@@ -10,6 +10,8 @@ useHead({ title: "部落介绍｜白云 HSD 开发者部落" });
 const memberRepository = useMemberRepository();
 const publicMembersGateway = usePublicMembersGateway();
 const publicMembersStore = usePublicMembersStore();
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } };
+const apiBase = runtimeConfig.public?.apiBase;
 const publicPeopleRequest = publicMembersGateway
   ? await useAsyncData("about-public-members", async () => {
       await publicMembersStore.refresh(publicMembersGateway);
@@ -64,7 +66,7 @@ const publicMembers = computed(() => publicMembersGateway
         <div class="core-team">
           <article v-for="(member, index) in corePeople.slice(0, 3)" :key="member.id">
             <div class="core-team__visual">
-              <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
+              <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member, apiBase)" size="lg" />
               <span>0{{ index + 1 }}</span>
             </div>
             <p>{{ member.memberDuty }}</p>
@@ -89,7 +91,7 @@ const publicMembers = computed(() => publicMembersGateway
         </div>
         <div class="member-directory">
           <article v-for="member in publicMembers.slice(0, 6)" :key="member.id">
-            <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member)" size="lg" />
+              <HsdAvatar :name="member.name" :src="resolvePublicAvatar(member, apiBase)" size="lg" />
             <div>
               <h3>{{ member.name }}</h3>
               <p>{{ member.centerName }}</p>

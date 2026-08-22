@@ -2088,25 +2088,50 @@ a {
 
 .member-honors li {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr);
+  grid-template-columns: minmax(7.5rem, clamp(7.5rem, 20%, 10rem)) minmax(0, 1fr);
   gap: 22px;
+  min-width: 0;
   padding: 22px 0;
   border-top: 1px solid var(--border);
 }
 
 .member-honors time {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--brand-red);
   font-size: 14px;
   font-weight: 800;
+  line-height: 1.4;
 }
 
 .member-honors h3 {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .member-honors li p {
   margin: 8px 0 0;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .member-detail__layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .member-honors li {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .member-honors time {
+    width: 100%;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--brand-red) 8%, transparent);
+  }
 }
 
 .member-detail__navigation {

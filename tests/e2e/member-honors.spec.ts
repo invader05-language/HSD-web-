@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("member directories show up to three featured honors and open details", async ({ page }) => {
+test("member directories keep honors on detail pages only", async ({ page }) => {
   await page.goto("/people/core");
   const card = page.getByRole("link", { name: /林同学.*查看成员详情/ });
-  await expect(card.getByTestId("featured-honor")).toHaveCount(3);
+  await expect(card.getByTestId("featured-honor")).toHaveCount(0);
   await card.click();
 
   await expect(page).toHaveURL(/\/people\/lin-development$/);

@@ -22,6 +22,8 @@ const memberRepository = useMemberRepository();
 const organizationGateway = useOrganizationGateway();
 const publicCenters = usePublicCentersStore();
 const router = useRouter();
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } };
+const apiBase = runtimeConfig.public?.apiBase;
 
 if (!center.value) {
   throw createError({ statusCode: 404, statusMessage: "中心不存在" });
@@ -239,7 +241,7 @@ if (organizationGateway && center.value) {
         <p v-else-if="!people.length" class="center-members-status">当前暂无公开成员</p>
         <div v-else class="center-people__list">
           <article v-for="person in visiblePeople" :key="person.id" data-testid="center-member-card">
-            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="md" />
+            <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person, apiBase)" size="md" />
             <div>
               <p>{{ person.memberDuty }}</p>
               <h3>{{ person.name }}</h3>

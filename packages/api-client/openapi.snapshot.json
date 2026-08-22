@@ -16720,6 +16720,19 @@
             "type": "string",
             "format": "date"
           },
+          "awardedDatePrecision": {
+            "type": "string",
+            "enum": [
+              "day",
+              "month",
+              "year",
+              "unknown"
+            ]
+          },
+          "awardedDateLabel": {
+            "type": "string",
+            "description": "Human-readable date label that respects source precision."
+          },
           "proofReference": {
             "type": "string"
           },
@@ -16753,6 +16766,8 @@
           "type",
           "description",
           "awardedAt",
+          "awardedDatePrecision",
+          "awardedDateLabel",
           "proofReference",
           "publicConsent",
           "status",
@@ -17625,6 +17640,18 @@
             "type": "string",
             "format": "date"
           },
+          "awardedDatePrecision": {
+            "type": "string",
+            "enum": [
+              "day",
+              "month",
+              "year",
+              "unknown"
+            ]
+          },
+          "awardedDateLabel": {
+            "type": "string"
+          },
           "featured": {
             "type": "boolean",
             "default": false
@@ -17636,6 +17663,8 @@
           "type",
           "description",
           "awardedAt",
+          "awardedDatePrecision",
+          "awardedDateLabel",
           "featured"
         ]
       },

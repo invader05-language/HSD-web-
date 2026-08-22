@@ -6,6 +6,8 @@ export interface PublicHonor {
   id: string;
   title: string;
   awardedAt: string;
+  awardedDatePrecision?: "DAY" | "MONTH" | "YEAR" | "UNKNOWN" | "day" | "month" | "year" | "unknown";
+  awardedDateLabel?: string;
   description: string;
   featured: boolean;
   visible: true;
@@ -427,6 +429,8 @@ export function getFeaturedHonors(person: PublicPerson): readonly PublicHonor[] 
     .slice(0, 3);
 }
 
-export function resolvePublicAvatar(person: PublicPerson): string | undefined {
-  return person.avatarVisible ? person.avatarUrl : undefined;
+export function resolvePublicAvatar(person: PublicPerson, apiBase?: string): string | undefined {
+  if (!person.avatarVisible) return undefined;
+  if (!apiBase || !person.avatarUrl.startsWith("/api/")) return person.avatarUrl;
+  return `${apiBase.replace(/\/+$/, "")}${person.avatarUrl}`;
 }

@@ -9,8 +9,18 @@ const memberRepository = useMemberRepository();
 const publicMembersGateway = usePublicMembersGateway()
 const publicMembersStore = usePublicMembersStore()
 const publicId = String(route.params.id)
-if (publicMembersGateway) await useAsyncData(`public-member-${publicId}`, () => publicMembersStore.refreshDetail(publicMembersGateway, publicId))
-const person = computed(() => publicMembersGateway ? publicMembersStore.detail : memberRepository.findPublicPerson(publicId));
+const publicMemberRequest = publicMembersGateway
+  ? await useAsyncData(`public-member-${publicId}`, () => publicMembersStore.refreshDetail(publicMembersGateway, publicId))
+  : undefined
+// Pinia is intentionally wired without @pinia/nuxt, so its state is not
+// serialized into the browser during SSR hydration. Keep the useAsyncData
+// snapshot as the client-side fallback for direct member links.
+const ssrPerson = computed(() => publicMemberRequest?.data.value)
+const person = computed(() => publicMembersGateway
+  ? publicMembersStore.detail ?? ssrPerson.value
+  : memberRepository.findPublicPerson(publicId));
+const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } }
+const apiBase = runtimeConfig.public?.apiBase
 
 if (!person.value) {
   const status = publicMembersStore.apiError && (publicMembersStore.apiError as any).status !== 404 ? 503 : 404
@@ -18,6 +28,7 @@ if (!person.value) {
 }
 
 const honors = computed(() => [...person.value!.honors].sort((a, b) => b.awardedAt.localeCompare(a.awardedAt)));
+const honorDateLabel = (honor: (typeof honors.value)[number]) => honor.awardedDateLabel ?? honor.awardedAt;
 
 useHead(() => ({
   title: `${person.value?.name}｜公开成员详情｜白云 HSD 开发者部落`,
@@ -43,7 +54,7 @@ useHead(() => ({
     <section class="section section--cool">
       <div class="shell member-detail__layout">
         <article class="member-detail__profile">
-          <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person)" size="lg" />
+          <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person, apiBase)" size="lg" />
           <div>
             <p class="eyebrow">Public Profile</p>
             <h2>公开成员信息</h2>
@@ -70,10 +81,9 @@ useHead(() => ({
           <h2 id="member-honors-heading">个人荣誉</h2>
           <ol>
             <li v-for="honor in honors" :key="honor.id" data-testid="honor-record">
-              <time :datetime="honor.awardedAt">{{ honor.awardedAt }}</time>
+              <time :datetime="honor.awardedAt">{{ honorDateLabel(honor) }}</time>
               <div>
                 <h3>{{ honor.title }}</h3>
-                <p>{{ honor.description }}</p>
               </div>
             </li>
           </ol>

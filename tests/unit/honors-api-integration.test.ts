@@ -15,7 +15,7 @@ describe('Honors production API integration', () => {
   beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
   it('uses the generated honors contract with CSRF and request correlation', async () => {
-    const approved = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_contract_approved', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Award', type: 'service', description: '', awardedAt: '2026-08-01', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
+    const approved = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_contract_approved', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Award', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify(approved), { status: 200, headers: { 'Content-Type': 'application/json' } }))
@@ -29,7 +29,7 @@ describe('Honors production API integration', () => {
   })
 
   it('soft deletes an Honor from the production review store using confirmation, CSRF, version, and external id', async () => {
-    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_external_soft_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Archive me', type: 'service', description: '', awardedAt: '2026-08-01', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
+    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_external_soft_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Archive me', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
     const recycled = { id: honor.id, type: 'honor', title: honor.title, centerName: 'Alpha', deletedAt: '2026-08-12T00:00:00.000Z', retentionEndsAt: '2026-09-11T00:00:00.000Z', version: 3, restoreEligible: true }
     const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(recycled), { status: 201, headers: { 'Content-Type': 'application/json' } }))
     const gateway = createApiHonorsGateway({ apiBase: 'https://api.example.test', fetcher, readCookie: () => 'csrf-soft-delete', createRequestId: () => 'honor-soft-delete-ui' })
@@ -51,7 +51,7 @@ describe('Honors production API integration', () => {
   })
 
   it('moves a selected production Honor into Recycle from the mounted admin page', async () => {
-    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5e', publicId: 'hon_external_page_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Mounted archive', type: 'service', description: '', awardedAt: '2026-08-01', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
+    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5e', publicId: 'hon_external_page_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Mounted archive', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
     const recycled = { id: honor.id, type: 'honor', title: honor.title, centerName: 'Alpha', deletedAt: '2026-08-12T00:00:00.000Z', retentionEndsAt: '2026-09-11T00:00:00.000Z', version: 3, restoreEligible: true }
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [honor] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
@@ -101,7 +101,7 @@ describe('Honors production API integration', () => {
   })
 
   it('submits honors and updates consent through the generated member contract', async () => {
-    const record = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_contract_member', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Award', type: 'service', description: '', awardedAt: '2026-08-01', proofReference: '', publicConsent: false, status: 'approved', version: 1, submittedAt: '2026-08-01T00:00:00.000Z' }
+    const record = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_contract_member', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Award', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: false, status: 'approved', version: 1, submittedAt: '2026-08-01T00:00:00.000Z' }
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify(record), { status: 201, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ...record, publicConsent: true, version: 2 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
