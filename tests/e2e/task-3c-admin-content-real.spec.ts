@@ -61,6 +61,40 @@ test("real admin content list visibly reports a 403 and does not retain API rows
   await expect(page.getByText("2026 秋季招新通道开放", { exact: true })).toHaveCount(0);
 });
 
+test("real admin content list ignores a seeded local automation failure and exposes no local retry path", async ({ page }) => {
+  const requests: string[] = [];
+  const localFailureState = {
+    version: 4,
+    records: [],
+    automationFailures: [{
+      automationKey: "qa-遗留自动化失败键",
+      event: {
+        eventId: "qa-local-event", eventType: "recruitment.batch.opened", occurredAt: "2026-08-23T00:00:00.000Z", actorId: "owner-api",
+        sourceDomain: "recruitment-batch", sourceId: "qa-local-batch", sourceVersion: 1,
+        payload: { batchName: "本地遗留批次", publicRoute: "/join", publicEndAt: "2026-08-31T00:00:00.000Z", isOpen: true },
+      },
+      errorCode: "PORTAL_AUTOMATION_FAILED", createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T00:00:00.000Z", audit: [],
+    }],
+  };
+  await page.addInitScript((state) => localStorage.setItem("baiyun-hsd.portal-content", JSON.stringify(state)), localFailureState);
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/content**", (route) => {
+    requests.push(route.request().url());
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(contentPage) });
+  });
+
+  await page.goto("/admin/content");
+
+  await expect(page.getByRole("table", { name: "官网内容列表" })).toContainText("qa-真实接口内容");
+  await expect(page.getByRole("table", { name: "快讯自动化失败列表" })).toHaveCount(0);
+  await expect(page.getByText("qa-遗留自动化失败键", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "按语义键重试" })).toHaveCount(0);
+  await expect(page.getByText("快讯草稿已重新生成。", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("该事件已有快讯草稿，无需重复生成。", { exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("baiyun-hsd.portal-content") || "null")?.automationFailures?.[0]?.automationKey)).toBe("qa-遗留自动化失败键");
+  expect(requests).toEqual([expect.stringContaining("/api/v1/admin/content?page=1&pageSize=20")]);
+});
+
 test("real admin content pagination replaces server rows and a filter resets page without stale content", async ({ page }) => {
   let releaseFilteredResponse!: () => void;
   const requests: string[] = [];
