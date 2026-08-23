@@ -45,6 +45,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 let draftObjectUrl: string | undefined;
 
 const avatarSource = computed(() => isMockApi ? draft.avatarUrl || undefined : productionProfile?.avatarSource.value);
+const currentProfileAvatarSource = computed(() => isMockApi ? currentProfile.value.avatarUrl : productionProfile?.avatarSource.value);
 const productionLoading = computed(() => productionProfile?.status.value === "loading");
 const productionError = computed(() => productionProfile?.error.value ?? "");
 
@@ -173,7 +174,7 @@ onMounted(() => {
   <div class="member-profile-page">
     <div class="member-profile-mobile-identity">
       <div>
-        <HsdAvatar :name="currentProfile.name" :src="currentProfile.avatarUrl" size="sm" />
+        <HsdAvatar :name="currentProfile.name" :src="currentProfileAvatarSource" size="sm" />
         <span><strong>{{ currentProfile.name }}</strong><small>{{ currentProfile.identity }}</small></span>
       </div>
       <span>成员空间 / 个人资料</span>
@@ -182,7 +183,7 @@ onMounted(() => {
     <div class="member-profile-layout">
       <aside class="member-profile-aside">
         <div class="member-space__identity">
-          <HsdAvatar :name="currentProfile.name" :src="currentProfile.avatarUrl" size="md" />
+          <HsdAvatar :name="currentProfile.name" :src="currentProfileAvatarSource" size="md" />
           <div><strong>{{ currentProfile.name }}</strong><span>{{ currentProfile.identity }}</span></div>
         </div>
         <nav aria-label="成员空间导航">

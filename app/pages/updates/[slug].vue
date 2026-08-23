@@ -22,6 +22,7 @@ interface DisplayUpdate {
 }
 
 const route = useRoute();
+const slug = computed(() => String(route.params.slug));
 const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
 const isMockApi = runtimeConfig.public.useMockApi;
 const gateway = usePublicContentGateway();
@@ -46,7 +47,7 @@ function normalizeMockBlock(block: Record<string, unknown>): DisplayBlock | unde
 }
 
 function loadMockUpdate() {
-  const record = usePortalContentStore().getPublicBySlug(String(route.params.slug));
+  const record = usePortalContentStore().getPublicBySlug(slug.value);
   if (!record || (record.kind !== "article" && record.kind !== "notice")) {
     throw createError({ statusCode: 404, statusMessage: "动态不存在" });
   }
@@ -69,7 +70,7 @@ async function loadProductionUpdate() {
   notFound.value = false;
   update.value = undefined;
   try {
-    const response = await gateway.getBySlug(String(route.params.slug));
+    const response = await gateway.getBySlug(slug.value);
     if (response.kind !== "article" && response.kind !== "notice") {
       notFound.value = true;
       return;
@@ -99,6 +100,9 @@ async function loadProductionUpdate() {
 
 if (isMockApi) loadMockUpdate();
 else onMounted(loadProductionUpdate);
+watch(slug, () => {
+  if (!isMockApi) void loadProductionUpdate();
+});
 
 useHead(() => ({ title: `${update.value?.title ?? "动态详情"}｜动态与活动` }));
 </script>

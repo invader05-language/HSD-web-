@@ -62,6 +62,7 @@ function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
   return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
 }
 const overviewRoute = computed(() => buildRecruitmentBatchRoute(batchId.value));
+const isNestedRoute = computed(() => route.path !== overviewRoute.value);
 const statusKey = computed(() => {
   if (!isMockApi) return productionBatch?.batch.value?.effectiveStatus ?? "closed";
   const effective = batchStore?.effectiveStatus(batchId.value, now.value);
@@ -331,7 +332,16 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 </script>
 
 <template>
-  <NuxtPage v-if="route.path !== overviewRoute" />
+  <NuxtPage v-if="isNestedRoute && isMockApi" />
+  <div v-else-if="isNestedRoute" class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading
+      eyebrow="Recruitment Batch Workspace"
+      title="该子工作区尚未接入真实数据"
+      description="当前真实模式仅提供批次列表与批次概要；报名名单、报名详情、考核和结果发布页面暂不可用，不会读取本地示例数据。"
+    >
+      <template #actions><NuxtLink class="button" :to="overviewRoute">返回批次概览</NuxtLink></template>
+    </AdminPageHeading>
+  </div>
   <div v-else-if="batch" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Recruitment Batch Context"
@@ -369,7 +379,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <div><span class="admin-batch-context-summary__label">计划时间</span><strong>{{ formatRecruitmentBatchPeriod(batch) }}</strong></div>
       <div><span class="admin-batch-context-summary__label">报名人数</span><strong>{{ applicantCount }} 人</strong></div>
       <div><span class="admin-batch-context-summary__label">开放中心</span><strong>{{ openCenterNames.length }} 个</strong><small>{{ openCenterNames.join("、") || "尚未配置" }}</small></div>
-      <div><span class="admin-batch-context-summary__label">负责人 / 版本</span><strong>{{ batch.owner || "联盟总负责人" }} · v{{ batch.version ?? 1 }}</strong></div>
+      <div><span class="admin-batch-context-summary__label">负责人 / 版本</span><strong>{{ batch.owner || "未分配" }} · v{{ batch.version ?? 1 }}</strong></div>
     </section>
 
     <section v-if="isMockApi && isDraft" class="admin-batch-readiness" aria-label="发布准备检查">

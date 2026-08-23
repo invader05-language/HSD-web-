@@ -17,7 +17,7 @@ const profileResponse = {
   biography: null,
   status: "PREPARATORY",
   baizeDirection: null,
-  avatar: { kind: "default" },
+  avatar: { kind: "asset", publicToken: "cross-origin-avatar" },
   publicProfileEnabled: false,
   version: 3,
   membership: null,
@@ -25,7 +25,7 @@ const profileResponse = {
 
 function mountPage(component: typeof MemberPage | typeof MemberProfilePage) {
   return mount(component, { global: { stubs: {
-    HsdAvatar: { props: ["name", "src"], template: "<span data-testid='avatar'>{{ name }}</span>" },
+    HsdAvatar: { props: ["name", "src"], template: "<img data-testid='avatar' :src='src' :alt='name'>" },
     NuxtLink: { props: ["to"], template: "<a><slot /></a>" },
   } } });
 }
@@ -78,5 +78,20 @@ describe("Task 3A member page production profile", () => {
     expect(wrapper.get("h1").text()).toContain("编辑个人资料");
     expect(wrapper.text()).toContain("API 陈同学");
     expect(wrapper.text()).not.toContain("前端演示预览");
+  });
+
+  it.each([
+    ["/member", MemberPage],
+    ["/member/profile", MemberProfilePage],
+  ])("resolves every %s avatar against a cross-origin API base", async (_path, component) => {
+    const wrapper = mountPage(component);
+    await flushPromises();
+    await nextTick();
+
+    const avatarSources = wrapper.findAll("[data-testid='avatar']").map((avatar) => avatar.attributes("src"));
+    expect(avatarSources.length).toBeGreaterThan(0);
+    expect(avatarSources).toEqual(avatarSources.map(() => (
+      "https://api.example.test/api/v1/public/media/cross-origin-avatar"
+    )));
   });
 });

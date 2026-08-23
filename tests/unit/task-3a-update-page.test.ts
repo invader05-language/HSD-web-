@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import UpdateDetailPage from "../../app/pages/updates/[slug].vue";
 import { usePortalContentStore } from "../../app/stores/portal-content";
+
+const updateRouteState = reactive({ params: { slug: "api-only-update" } });
 
 describe("Task 3A update detail runtime boundary", () => {
   beforeEach(() => {
@@ -12,7 +14,9 @@ describe("Task 3A update detail runtime boundary", () => {
     vi.stubGlobal("computed", computed);
     vi.stubGlobal("ref", ref);
     vi.stubGlobal("onMounted", onMounted);
-    vi.stubGlobal("useRoute", () => ({ params: { slug: "api-only-update" } }));
+    vi.stubGlobal("watch", watch);
+    updateRouteState.params.slug = "api-only-update";
+    vi.stubGlobal("useRoute", () => updateRouteState);
     vi.stubGlobal("useHead", vi.fn());
     vi.stubGlobal("createError", (input: unknown) => Object.assign(new Error("route error"), input));
   });
@@ -59,7 +63,7 @@ describe("Task 3A update detail runtime boundary", () => {
       message: "Content not found",
       requestId: "request-404",
     }), { status: 404, headers: { "Content-Type": "application/json" } })));
-    vi.stubGlobal("useRoute", () => ({ params: { slug: "project-team" } }));
+    updateRouteState.params.slug = "project-team";
     const localLookup = vi.spyOn(usePortalContentStore(), "getPublicBySlug");
 
     const wrapper = mount(UpdateDetailPage, { global: { stubs: {
@@ -79,7 +83,7 @@ describe("Task 3A update detail runtime boundary", () => {
 
   it("keeps the seeded mock update available when mock mode is explicit", async () => {
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "", useMockApi: true } }));
-    vi.stubGlobal("useRoute", () => ({ params: { slug: "project-team" } }));
+    updateRouteState.params.slug = "project-team";
 
     const wrapper = mount(UpdateDetailPage, { global: { stubs: {
       PageBanner: { props: ["title"], template: "<h1>{{ title }}</h1>" },
@@ -91,5 +95,56 @@ describe("Task 3A update detail runtime boundary", () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.get("h1").text()).toBeTruthy();
+  });
+
+  it("refetches a changed real slug and clears the stale update while the new request is pending", async () => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    let resolveSecond!: (response: Response) => void;
+    const secondResponse = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    const content = (slug: string, title: string) => ({
+      slug,
+      kind: "article",
+      title,
+      summary: null,
+      tag: null,
+      expiresAt: null,
+      blocks: [],
+      publishedAt: "2026-08-23T00:00:00.000Z",
+    });
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(content("api-only-update", "动态 A")), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockImplementationOnce(() => secondResponse);
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mount(UpdateDetailPage, { global: { stubs: {
+      PageBanner: { props: ["title"], template: "<h1>{{ title }}</h1>" },
+      ContentMediaView: true,
+      MediaPlaceholder: true,
+      EmptyState: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("动态 A");
+
+    updateRouteState.params.slug = "update-b";
+    await nextTick();
+
+    expect(fetcher).toHaveBeenNthCalledWith(2,
+      "https://api.example.test/api/v1/public/content/update-b",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(wrapper.find("h1").exists()).toBe(false);
+    expect(wrapper.get("[role='status']").text()).toContain("正在加载动态");
+
+    resolveSecond(new Response(JSON.stringify(content("update-b", "动态 B")), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("动态 B");
   });
 });

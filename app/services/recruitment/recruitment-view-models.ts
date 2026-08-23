@@ -77,11 +77,13 @@ export interface AdminRecruitmentBatchView {
   updatedAt: string;
   openCenterIds: string[];
   openCenters: AdminRecruitmentBatchDto["openCenters"];
-  owner: string;
+  owner: string | undefined;
   responsibleAccounts: AdminRecruitmentBatchDto["responsibleAccounts"];
 }
 
 export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRecruitmentBatchView {
+  const responsibleAccount = dto.responsibleAccounts[0];
+  const owner = responsibleAccount?.person.name.trim() || responsibleAccount?.username.trim() || undefined;
   return {
     id: dto.id,
     name: dto.name,
@@ -103,7 +105,7 @@ export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRe
     updatedAt: dto.updatedAt,
     openCenterIds: dto.openCenters.map((center) => center.id),
     openCenters: dto.openCenters,
-    owner: dto.responsibleAccounts[0]?.person.name ?? dto.responsibleAccounts[0]?.username ?? "联盟总负责人",
+    owner,
     responsibleAccounts: dto.responsibleAccounts,
   };
 }

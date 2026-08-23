@@ -215,6 +215,46 @@ describe("Task 3A production admin batch detail", () => {
     });
   });
 
+  it("leaves owner unassigned for zero or blank accounts and uses the first trimmed responsible identity", () => {
+    expect(mapAdminRecruitmentBatch({ ...apiBatch, responsibleAccounts: [] }).owner).toBeUndefined();
+
+    expect(mapAdminRecruitmentBatch({
+      ...apiBatch,
+      responsibleAccounts: [{
+        id: "account-blank-name",
+        username: "  fallback-owner  ",
+        status: "ENABLED",
+        adminLevel: "OWNER",
+        person: { id: "person-blank-name", name: "   " },
+      }],
+    }).owner).toBe("fallback-owner");
+
+    expect(mapAdminRecruitmentBatch({
+      ...apiBatch,
+      responsibleAccounts: [
+        { id: "account-first", username: "first", status: "ENABLED", adminLevel: "OWNER", person: { id: "person-first", name: "  第一负责人  " } },
+        { id: "account-second", username: "second", status: "ENABLED", adminLevel: "ADMIN", person: { id: "person-second", name: "第二负责人" } },
+      ],
+    })).toMatchObject({
+      owner: "第一负责人",
+      responsibleAccounts: [
+        expect.objectContaining({ id: "account-first" }),
+        expect.objectContaining({ id: "account-second" }),
+      ],
+    });
+
+    expect(mapAdminRecruitmentBatch({
+      ...apiBatch,
+      responsibleAccounts: [{
+        id: "account-all-blank",
+        username: "  ",
+        status: "DISABLED",
+        adminLevel: "ADMIN",
+        person: { id: "person-all-blank", name: "  " },
+      }],
+    }).owner).toBeUndefined();
+  });
+
   it("loads API-only detail and leaves data empty for 404 rather than using a fixture", async () => {
     const getAdminBatch = vi.fn().mockResolvedValue(apiBatch);
     const controller = createProductionRecruitmentBatchController({ getAdminBatch });

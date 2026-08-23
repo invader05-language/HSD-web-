@@ -198,7 +198,7 @@ onMounted(loadProductionBatches);
           <dl>
             <div><dt>开放中心</dt><dd>{{ batch.centerCount }} 个</dd></div>
             <div><dt>报名人数</dt><dd>{{ batch.applicantCount }} 人</dd></div>
-            <div><dt>负责人</dt><dd>{{ batch.owner || "联盟总负责人" }}</dd></div>
+            <div><dt>负责人</dt><dd>{{ batch.owner || "未分配" }}</dd></div>
           </dl>
           <NuxtLink class="admin-text-action" :to="buildRecruitmentBatchRoute(batch.id)">
             {{ batch.statusKey === "archived" ? "查看归档" : batch.statusKey === "closed" ? "处理收尾" : "进入批次" }} →

@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import BatchDetailPage from "../../app/pages/admin/recruitment/batches/[batchId].vue";
+import {
+  RECRUITMENT_BATCH_STORAGE_KEY,
+  useRecruitmentBatchStore,
+} from "../../app/stores/recruitment-batch";
+
+const routeState = reactive({
+  params: { batchId: "batch-api-only" },
+  path: "/admin/recruitment/batches/batch-api-only",
+});
 
 const apiBatch = {
   id: "batch-api-only",
@@ -44,7 +53,9 @@ describe("Task 3A production batch detail page", () => {
     vi.stubGlobal("definePageMeta", vi.fn());
     vi.stubGlobal("useHead", vi.fn());
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
-    vi.stubGlobal("useRoute", () => ({ params: { batchId: "batch-api-only" }, path: "/admin/recruitment/batches/batch-api-only" }));
+    routeState.params.batchId = "batch-api-only";
+    routeState.path = "/admin/recruitment/batches/batch-api-only";
+    vi.stubGlobal("useRoute", () => routeState);
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(apiBatch), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -73,5 +84,106 @@ describe("Task 3A production batch detail page", () => {
     expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
     expect(wrapper.text()).toContain("后端未提供生命周期审计接口");
     expect(wrapper.text()).not.toContain("归档批次");
+  });
+
+  it("blocks direct real-mode child routes before a mock store-backed page can mount", async () => {
+    localStorage.setItem(RECRUITMENT_BATCH_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      batches: [{
+        id: "batch-api-only",
+        name: "LOCAL FIXTURE MUST NOT RENDER",
+        startAt: "2026-09-01T00:00:00.000Z",
+        endAt: "2026-09-20T00:00:00.000Z",
+        timezone: "Asia/Shanghai",
+        openCenterIds: ["fixture-center"],
+        responsibleAccountIds: ["fixture-owner"],
+        lifecycleStatus: "published",
+        manualOverride: "none",
+        version: 1,
+        createdAt: "2026-08-20T00:00:00.000Z",
+        updatedAt: "2026-08-20T00:00:00.000Z",
+      }],
+    }));
+    routeState.path = "/admin/recruitment/batches/batch-api-only/applications";
+    const nestedPageMounted = vi.fn();
+    const MockStoreBackedNestedPage = defineComponent({
+      setup() {
+        nestedPageMounted();
+        const fixture = useRecruitmentBatchStore().getBatch("batch-api-only");
+        return { fixture };
+      },
+      template: "<div data-testid='mock-child'>{{ fixture?.name }}</div>",
+    });
+
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: MockStoreBackedNestedPage,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    expect(nestedPageMounted).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
+    expect(wrapper.text()).not.toContain("LOCAL FIXTURE MUST NOT RENDER");
+  });
+
+  it("renders an empty responsible-account list as unassigned", async () => {
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ...apiBatch,
+      responsibleAccounts: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title"], template: "<header><h1>{{ title }}</h1><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.text()).toContain("未分配 · v9");
+    expect(wrapper.text()).not.toContain("联盟总负责人 · v9");
+  });
+
+  it("refetches a changed batch id and clears the stale batch while the new request is pending", async () => {
+    let resolveSecond!: (response: Response) => void;
+    const secondResponse = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(apiBatch), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockImplementationOnce(() => secondResponse);
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("API 2026 秋季招新");
+
+    routeState.params.batchId = "batch-b";
+    routeState.path = "/admin/recruitment/batches/batch-b";
+    await nextTick();
+
+    expect(fetcher).toHaveBeenNthCalledWith(2,
+      "https://api.example.test/api/v1/admin/recruitment/batches/batch-b",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(wrapper.text()).not.toContain("API 2026 秋季招新");
+    expect(wrapper.get("h1").text()).toBe("正在读取批次…");
+
+    resolveSecond(new Response(JSON.stringify({ ...apiBatch, id: "batch-b", name: "API B 批次" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("API B 批次");
   });
 });
