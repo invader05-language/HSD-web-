@@ -75,6 +75,20 @@ export type AdminCenterResponseDto = {
   "positions": Array<OrganizationPositionResponseDto>;
 };
 
+export type AdminContentActorResponseDto = {
+  "type": "account" | "system";
+  "accountId": (string) | null;
+  "username": (string) | null;
+  "displayName": string;
+};
+
+export type AdminContentListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<AdminContentSummaryResponseDto>;
+};
+
 export type AdminContentResponseDto = {
   "id": string;
   "publicId": string;
@@ -83,12 +97,33 @@ export type AdminContentResponseDto = {
   "kind": "flash" | "article" | "notice";
   "status": "draft" | "review" | "pending_publication" | "published" | "offline";
   "version": number;
+  "createdBy": AdminContentActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
   "workingRevision": (ContentWorkingRevisionResponseDto) | null;
   "publishedRevisionNumber": (number) | null;
   "rejectionReason": (string) | null;
   "publishedAt": (string) | null;
   "offlineAt": (string) | null;
   "offlineReason": (string) | null;
+};
+
+export type AdminContentSummaryResponseDto = {
+  "id": string;
+  "publicId": string;
+  "centerId": (string) | null;
+  "slug": string;
+  "kind": "flash" | "article" | "notice";
+  "status": "draft" | "review" | "pending_publication" | "published" | "offline";
+  "version": number;
+  "workingRevisionNumber": number;
+  "title": string;
+  "summary": (string) | null;
+  "createdBy": AdminContentActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "publishedAt": (string) | null;
+  "offlineAt": (string) | null;
 };
 
 export type AdminGalleryListResponseDto = {
@@ -279,6 +314,19 @@ export type AdminRecruitmentResponsiblePersonDto = {
   "name": string;
 };
 
+export type AdminResourceActorResponseDto = {
+  "id": string;
+  "username": string;
+  "displayName": string;
+};
+
+export type AdminResourceListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<AdminResourceSummaryResponseDto>;
+};
+
 export type AdminResourceResponseDto = {
   "id": string;
   "centerId": string;
@@ -296,6 +344,33 @@ export type AdminResourceResponseDto = {
   "content": string;
   "attachmentId": (string) | null;
   "revisionNumber": number;
+  "createdBy": AdminResourceActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "offlineAt": (string) | null;
+  "offlineReason": (string) | null;
+};
+
+export type AdminResourceSummaryResponseDto = {
+  "id": string;
+  "centerId": string;
+  "slug": string;
+  "title": string;
+  "summary": string;
+  "kind": "article" | "pdf" | "docx" | "archive" | "external";
+  "format": "web" | "pdf" | "docx" | "zip" | "external";
+  "status": "draft" | "published" | "offline";
+  "version": number;
+  "versionLabel": string;
+  "access": "public" | "member";
+  "availability": "available" | "unavailable";
+  "attachmentId": (string) | null;
+  "revisionNumber": number;
+  "createdBy": AdminResourceActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "publishedAt": (string) | null;
+  "offlineAt": (string) | null;
 };
 
 export type AdminResourceVersionListResponseDto = {
@@ -1781,9 +1856,40 @@ export type UpdateRecruitmentBatchDto = {
   "reason"?: string;
 };
 
+export type UploadActorResponseDto = {
+  "id": string;
+  "username": string;
+  "displayName": string;
+};
+
 export type UploadDestinationDto = {
   "url": string;
   "headers": Record<string, string>;
+};
+
+export type UploadIntentResponseDto = {
+  "id": string;
+  "centerId": string;
+  "createdBy": UploadActorResponseDto;
+  "fileName": string;
+  "mimeType": string;
+  "byteSize": number;
+  "kind": "image" | "video";
+  "status": "uploading" | "processing" | "ready" | "failed" | "expired";
+  "version": number;
+  "expiresAt": string;
+  "failureCode": (string) | null;
+  "completedAt": (string) | null;
+  "createdAt": string;
+  "updatedAt": string;
+  "upload": UploadDestinationDto;
+};
+
+export type UploadListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<UploadResponseDto>;
 };
 
 export type UploadPartDto = {
@@ -1794,12 +1900,18 @@ export type UploadPartDto = {
 export type UploadResponseDto = {
   "id": string;
   "centerId": string;
+  "createdBy": UploadActorResponseDto;
+  "fileName": string;
+  "mimeType": string;
+  "byteSize": number;
   "kind": "image" | "video";
   "status": "uploading" | "processing" | "ready" | "failed" | "expired";
   "version": number;
   "expiresAt": string;
-  "upload"?: UploadDestinationDto;
-  "failureCode"?: (string) | null;
+  "failureCode": (string) | null;
+  "completedAt": (string) | null;
+  "createdAt": string;
+  "updatedAt": string;
 };
 
 export type WithdrawApplicationDto = {
@@ -1850,6 +1962,8 @@ export const API_V1_PATHS = {
   adminPortalPreview: "/api/v1/admin/portal/configuration/preview",
   adminPortalPublish: "/api/v1/admin/portal/configuration/publish",
   publicPortal: "/api/v1/public/portal",
+  adminContentList: "/api/v1/admin/content",
+  adminContentDetail: "/api/v1/admin/content/{contentId}",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
   adminUploadComplete: "/api/v1/admin/uploads/{uploadId}/complete",
   adminUploadStatus: "/api/v1/admin/uploads/{uploadId}",
@@ -1976,6 +2090,8 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/portal/configuration/preview": { method: "GET", path: "/api/v1/admin/portal/configuration/preview" },
   "POST /api/v1/admin/portal/configuration/publish": { method: "POST", path: "/api/v1/admin/portal/configuration/publish" },
   "GET /api/v1/public/portal": { method: "GET", path: "/api/v1/public/portal" },
+  "GET /api/v1/admin/content": { method: "GET", path: "/api/v1/admin/content" },
+  "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
   "POST /api/v1/admin/uploads/{uploadId}/complete": { method: "POST", path: "/api/v1/admin/uploads/{uploadId}/complete" },
   "GET /api/v1/admin/uploads/{uploadId}": { method: "GET", path: "/api/v1/admin/uploads/{uploadId}" },
@@ -2108,7 +2224,9 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/portal/configuration/preview": AdminPortalConfigurationResponseDto;
   "POST /api/v1/admin/portal/configuration/publish": PublishedPortalConfigurationResponseDto;
   "GET /api/v1/public/portal": PublicPortalResponseDto;
-  "POST /api/v1/admin/uploads/intents": UploadResponseDto;
+  "GET /api/v1/admin/content": AdminContentListResponseDto;
+  "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
   "POST /api/v1/admin/uploads/{uploadId}/complete": UploadResponseDto;
   "GET /api/v1/admin/uploads/{uploadId}": UploadResponseDto;
   "POST /api/v1/admin/media/attachments": MediaAttachmentResponseDto;
@@ -2334,8 +2452,14 @@ const API_RESPONSE_SCHEMAS = {
   "GET /api/v1/public/portal": {
     "$ref": "#/components/schemas/PublicPortalResponseDto"
   },
+  "GET /api/v1/admin/content": {
+    "$ref": "#/components/schemas/AdminContentListResponseDto"
+  },
+  "GET /api/v1/admin/content/{contentId}": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
   "POST /api/v1/admin/uploads/intents": {
-    "$ref": "#/components/schemas/UploadResponseDto"
+    "$ref": "#/components/schemas/UploadIntentResponseDto"
   },
   "POST /api/v1/admin/uploads/{uploadId}/complete": {
     "$ref": "#/components/schemas/UploadResponseDto"
@@ -3980,12 +4104,54 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion"
     ]
   },
-  "CreateContentDto": {
+  "AdminContentActorResponseDto": {
     "type": "object",
     "properties": {
-      "centerId": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "account",
+          "system"
+        ]
+      },
+      "accountId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "username": {
+        "type": "string",
+        "nullable": true
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "accountId",
+      "username",
+      "displayName"
+    ]
+  },
+  "AdminContentSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
         "type": "string",
         "format": "uuid"
+      },
+      "publicId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "slug": {
+        "type": "string"
       },
       "kind": {
         "type": "string",
@@ -3995,47 +4161,99 @@ const API_COMPONENT_SCHEMAS = {
           "notice"
         ]
       },
-      "slug": {
+      "status": {
         "type": "string",
-        "example": "community-update"
+        "enum": [
+          "draft",
+          "review",
+          "pending_publication",
+          "published",
+          "offline"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "workingRevisionNumber": {
+        "type": "number",
+        "minimum": 1
       },
       "title": {
-        "type": "string",
-        "maxLength": 120
+        "type": "string"
       },
       "summary": {
         "type": "string",
-        "maxLength": 500
+        "nullable": true
       },
-      "tag": {
-        "type": "string",
-        "maxLength": 40
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminContentActorResponseDto"
       },
-      "internalTarget": {
-        "type": "string",
-        "maxLength": 500
-      },
-      "expiresAt": {
+      "createdAt": {
         "type": "string",
         "format": "date-time"
       },
-      "blocks": {
-        "type": "array",
-        "items": {
-          "type": "object"
-        },
-        "default": []
-      },
-      "internalNote": {
+      "updatedAt": {
         "type": "string",
-        "maxLength": 2000
+        "format": "date-time"
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       }
     },
     "required": [
+      "id",
+      "publicId",
       "centerId",
-      "kind",
       "slug",
-      "title"
+      "kind",
+      "status",
+      "version",
+      "workingRevisionNumber",
+      "title",
+      "summary",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "offlineAt"
+    ]
+  },
+  "AdminContentListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminContentSummaryResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "ContentWorkingRevisionResponseDto": {
@@ -4138,6 +4356,17 @@ const API_COMPONENT_SCHEMAS = {
         "type": "number",
         "minimum": 1
       },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminContentActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
       "workingRevision": {
         "nullable": true,
         "allOf": [
@@ -4177,12 +4406,73 @@ const API_COMPONENT_SCHEMAS = {
       "kind",
       "status",
       "version",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
       "workingRevision",
       "publishedRevisionNumber",
       "rejectionReason",
       "publishedAt",
       "offlineAt",
       "offlineReason"
+    ]
+  },
+  "CreateContentDto": {
+    "type": "object",
+    "properties": {
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "flash",
+          "article",
+          "notice"
+        ]
+      },
+      "slug": {
+        "type": "string",
+        "example": "community-update"
+      },
+      "title": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "summary": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "tag": {
+        "type": "string",
+        "maxLength": 40
+      },
+      "internalTarget": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "blocks": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        },
+        "default": []
+      },
+      "internalNote": {
+        "type": "string",
+        "maxLength": 2000
+      }
+    },
+    "required": [
+      "centerId",
+      "kind",
+      "slug",
+      "title"
     ]
   },
   "UpdateContentDto": {
@@ -6257,6 +6547,140 @@ const API_COMPONENT_SCHEMAS = {
       "warnings"
     ]
   },
+  "UploadActorResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "username": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "username",
+      "displayName"
+    ]
+  },
+  "UploadResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "processing",
+          "ready",
+          "failed",
+          "expired"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "failureCode": {
+        "type": "string",
+        "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "kind",
+      "status",
+      "version",
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt"
+    ]
+  },
+  "UploadListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/UploadResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
   "CreateUploadIntentDto": {
     "type": "object",
     "properties": {
@@ -6328,7 +6752,7 @@ const API_COMPONENT_SCHEMAS = {
       "headers"
     ]
   },
-  "UploadResponseDto": {
+  "UploadIntentResponseDto": {
     "type": "object",
     "properties": {
       "id": {
@@ -6338,6 +6762,19 @@ const API_COMPONENT_SCHEMAS = {
       "centerId": {
         "type": "string",
         "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
       },
       "kind": {
         "type": "string",
@@ -6364,21 +6801,43 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date-time"
       },
-      "upload": {
-        "$ref": "#/components/schemas/UploadDestinationDto"
-      },
       "failureCode": {
         "type": "string",
         "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "upload": {
+        "$ref": "#/components/schemas/UploadDestinationDto"
       }
     },
     "required": [
       "id",
       "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
       "kind",
       "status",
       "version",
-      "expiresAt"
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt",
+      "upload"
     ]
   },
   "UploadPartDto": {
@@ -7670,13 +8129,32 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "CreateResourceDto": {
+  "AdminResourceActorResponseDto": {
     "type": "object",
     "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 0
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "username": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "username",
+      "displayName"
+    ]
+  },
+  "AdminResourceSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
       },
       "centerId": {
         "type": "string",
@@ -7694,56 +8172,133 @@ const API_COMPONENT_SCHEMAS = {
       "kind": {
         "type": "string",
         "enum": [
-          "ARTICLE",
-          "PDF",
-          "DOCX",
-          "ARCHIVE",
-          "EXTERNAL"
+          "article",
+          "pdf",
+          "docx",
+          "archive",
+          "external"
         ]
       },
       "format": {
         "type": "string",
         "enum": [
-          "WEB",
-          "PDF",
-          "DOCX",
-          "ZIP",
-          "EXTERNAL"
+          "web",
+          "pdf",
+          "docx",
+          "zip",
+          "external"
         ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "offline"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "versionLabel": {
+        "type": "string"
       },
       "access": {
         "type": "string",
         "enum": [
-          "PUBLIC",
-          "MEMBER"
+          "public",
+          "member"
         ]
       },
       "availability": {
         "type": "string",
         "enum": [
-          "AVAILABLE",
-          "UNAVAILABLE"
+          "available",
+          "unavailable"
         ]
       },
-      "versionLabel": {
-        "type": "string"
+      "attachmentId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
       },
-      "content": {
-        "type": "string"
+      "revisionNumber": {
+        "type": "number",
+        "minimum": 1
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       }
     },
     "required": [
-      "expectedVersion",
+      "id",
       "centerId",
       "slug",
       "title",
       "summary",
       "kind",
       "format",
+      "status",
+      "version",
+      "versionLabel",
       "access",
       "availability",
-      "versionLabel",
-      "content"
+      "attachmentId",
+      "revisionNumber",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "offlineAt"
+    ]
+  },
+  "AdminResourceListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminResourceSummaryResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "AdminResourceResponseDto": {
@@ -7829,6 +8384,26 @@ const API_COMPONENT_SCHEMAS = {
       },
       "revisionNumber": {
         "type": "number"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineReason": {
+        "type": "string",
+        "nullable": true
       }
     },
     "required": [
@@ -7847,7 +8422,88 @@ const API_COMPONENT_SCHEMAS = {
       "availability",
       "content",
       "attachmentId",
-      "revisionNumber"
+      "revisionNumber",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "offlineAt",
+      "offlineReason"
+    ]
+  },
+  "CreateResourceDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "ARTICLE",
+          "PDF",
+          "DOCX",
+          "ARCHIVE",
+          "EXTERNAL"
+        ]
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "WEB",
+          "PDF",
+          "DOCX",
+          "ZIP",
+          "EXTERNAL"
+        ]
+      },
+      "access": {
+        "type": "string",
+        "enum": [
+          "PUBLIC",
+          "MEMBER"
+        ]
+      },
+      "availability": {
+        "type": "string",
+        "enum": [
+          "AVAILABLE",
+          "UNAVAILABLE"
+        ]
+      },
+      "versionLabel": {
+        "type": "string"
+      },
+      "content": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "centerId",
+      "slug",
+      "title",
+      "summary",
+      "kind",
+      "format",
+      "access",
+      "availability",
+      "versionLabel",
+      "content"
     ]
   },
   "CreateResourceVersionDto": {

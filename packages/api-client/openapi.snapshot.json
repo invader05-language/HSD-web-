@@ -3929,6 +3929,126 @@
       }
     },
     "/api/v1/admin/content": {
+      "get": {
+        "operationId": "ContentAdminController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "review",
+                "pending_publication",
+                "published",
+                "offline"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flash",
+                "article",
+                "notice"
+              ]
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminContentListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "List content visible to the live administrator scope",
+        "tags": [
+          "Content administration"
+        ]
+      },
       "post": {
         "operationId": "ContentAdminController_create",
         "parameters": [
@@ -4002,6 +4122,67 @@
       }
     },
     "/api/v1/admin/content/{contentId}": {
+      "get": {
+        "operationId": "ContentAdminController_detail",
+        "parameters": [
+          {
+            "name": "contentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminContentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Read an editable content detail in the live administrator scope",
+        "tags": [
+          "Content administration"
+        ]
+      },
       "patch": {
         "operationId": "ContentAdminController_update",
         "parameters": [
@@ -6753,6 +6934,126 @@
         ]
       }
     },
+    "/api/v1/admin/uploads": {
+      "get": {
+        "operationId": "UploadsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "uploading",
+                "processing",
+                "ready",
+                "failed",
+                "expired"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video"
+              ]
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Direct uploads"
+        ]
+      }
+    },
     "/api/v1/admin/uploads/intents": {
       "post": {
         "operationId": "UploadsController_create",
@@ -6782,7 +7083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UploadResponseDto"
+                  "$ref": "#/components/schemas/UploadIntentResponseDto"
                 }
               }
             }
@@ -9131,6 +9432,164 @@
       }
     },
     "/api/v1/admin/resources": {
+      "get": {
+        "operationId": "ResourcesAdminController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "published",
+                "offline"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "article",
+                "pdf",
+                "docx",
+                "archive",
+                "external"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "pdf",
+                "docx",
+                "zip",
+                "external"
+              ]
+            }
+          },
+          {
+            "name": "access",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public",
+                "member"
+              ]
+            }
+          },
+          {
+            "name": "availability",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "available",
+                "unavailable"
+              ]
+            }
+          },
+          {
+            "name": "centerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResourceListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Resources"
+        ]
+      },
       "post": {
         "operationId": "ResourcesAdminController_create",
         "parameters": [
@@ -9155,6 +9614,68 @@
         },
         "responses": {
           "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResourceResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Resources"
+        ]
+      }
+    },
+    "/api/v1/admin/resources/{id}": {
+      "get": {
+        "operationId": "ResourcesAdminController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "",
             "content": {
               "application/json": {
@@ -12611,12 +13132,54 @@
           "expectedVersion"
         ]
       },
-      "CreateContentDto": {
+      "AdminContentActorResponseDto": {
         "type": "object",
         "properties": {
-          "centerId": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "account",
+              "system"
+            ]
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "accountId",
+          "username",
+          "displayName"
+        ]
+      },
+      "AdminContentSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "publicId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "centerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string"
           },
           "kind": {
             "type": "string",
@@ -12626,47 +13189,99 @@
               "notice"
             ]
           },
-          "slug": {
+          "status": {
             "type": "string",
-            "example": "community-update"
+            "enum": [
+              "draft",
+              "review",
+              "pending_publication",
+              "published",
+              "offline"
+            ]
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "workingRevisionNumber": {
+            "type": "number",
+            "minimum": 1
           },
           "title": {
-            "type": "string",
-            "maxLength": 120
+            "type": "string"
           },
           "summary": {
             "type": "string",
-            "maxLength": 500
+            "nullable": true
           },
-          "tag": {
-            "type": "string",
-            "maxLength": 40
+          "createdBy": {
+            "$ref": "#/components/schemas/AdminContentActorResponseDto"
           },
-          "internalTarget": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "expiresAt": {
+          "createdAt": {
             "type": "string",
             "format": "date-time"
           },
-          "blocks": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            },
-            "default": []
-          },
-          "internalNote": {
+          "updatedAt": {
             "type": "string",
-            "maxLength": 2000
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "offlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
+          "id",
+          "publicId",
           "centerId",
-          "kind",
           "slug",
-          "title"
+          "kind",
+          "status",
+          "version",
+          "workingRevisionNumber",
+          "title",
+          "summary",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "publishedAt",
+          "offlineAt"
+        ]
+      },
+      "AdminContentListResponseDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminContentSummaryResponseDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
         ]
       },
       "ContentWorkingRevisionResponseDto": {
@@ -12769,6 +13384,17 @@
             "type": "number",
             "minimum": 1
           },
+          "createdBy": {
+            "$ref": "#/components/schemas/AdminContentActorResponseDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "workingRevision": {
             "nullable": true,
             "allOf": [
@@ -12808,12 +13434,73 @@
           "kind",
           "status",
           "version",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
           "workingRevision",
           "publishedRevisionNumber",
           "rejectionReason",
           "publishedAt",
           "offlineAt",
           "offlineReason"
+        ]
+      },
+      "CreateContentDto": {
+        "type": "object",
+        "properties": {
+          "centerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "flash",
+              "article",
+              "notice"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "example": "community-update"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "tag": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "internalTarget": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "default": []
+          },
+          "internalNote": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "centerId",
+          "kind",
+          "slug",
+          "title"
         ]
       },
       "UpdateContentDto": {
@@ -14888,6 +15575,140 @@
           "warnings"
         ]
       },
+      "UploadActorResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName"
+        ]
+      },
+      "UploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "centerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UploadActorResponseDto"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "number",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploading",
+              "processing",
+              "ready",
+              "failed",
+              "expired"
+            ]
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "centerId",
+          "createdBy",
+          "fileName",
+          "mimeType",
+          "byteSize",
+          "kind",
+          "status",
+          "version",
+          "expiresAt",
+          "failureCode",
+          "completedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UploadListResponseDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadResponseDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
+        ]
+      },
       "CreateUploadIntentDto": {
         "type": "object",
         "properties": {
@@ -14959,7 +15780,7 @@
           "headers"
         ]
       },
-      "UploadResponseDto": {
+      "UploadIntentResponseDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -14969,6 +15790,19 @@
           "centerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/UploadActorResponseDto"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "byteSize": {
+            "type": "number",
+            "minimum": 1
           },
           "kind": {
             "type": "string",
@@ -14995,21 +15829,43 @@
             "type": "string",
             "format": "date-time"
           },
-          "upload": {
-            "$ref": "#/components/schemas/UploadDestinationDto"
-          },
           "failureCode": {
             "type": "string",
             "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/UploadDestinationDto"
           }
         },
         "required": [
           "id",
           "centerId",
+          "createdBy",
+          "fileName",
+          "mimeType",
+          "byteSize",
           "kind",
           "status",
           "version",
-          "expiresAt"
+          "expiresAt",
+          "failureCode",
+          "completedAt",
+          "createdAt",
+          "updatedAt",
+          "upload"
         ]
       },
       "UploadPartDto": {
@@ -16301,13 +17157,32 @@
           "items"
         ]
       },
-      "CreateResourceDto": {
+      "AdminResourceActorResponseDto": {
         "type": "object",
         "properties": {
-          "expectedVersion": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 0
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName"
+        ]
+      },
+      "AdminResourceSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
           },
           "centerId": {
             "type": "string",
@@ -16325,56 +17200,133 @@
           "kind": {
             "type": "string",
             "enum": [
-              "ARTICLE",
-              "PDF",
-              "DOCX",
-              "ARCHIVE",
-              "EXTERNAL"
+              "article",
+              "pdf",
+              "docx",
+              "archive",
+              "external"
             ]
           },
           "format": {
             "type": "string",
             "enum": [
-              "WEB",
-              "PDF",
-              "DOCX",
-              "ZIP",
-              "EXTERNAL"
+              "web",
+              "pdf",
+              "docx",
+              "zip",
+              "external"
             ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "offline"
+            ]
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "versionLabel": {
+            "type": "string"
           },
           "access": {
             "type": "string",
             "enum": [
-              "PUBLIC",
-              "MEMBER"
+              "public",
+              "member"
             ]
           },
           "availability": {
             "type": "string",
             "enum": [
-              "AVAILABLE",
-              "UNAVAILABLE"
+              "available",
+              "unavailable"
             ]
           },
-          "versionLabel": {
-            "type": "string"
+          "attachmentId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           },
-          "content": {
-            "type": "string"
+          "revisionNumber": {
+            "type": "number",
+            "minimum": 1
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "offlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
-          "expectedVersion",
+          "id",
           "centerId",
           "slug",
           "title",
           "summary",
           "kind",
           "format",
+          "status",
+          "version",
+          "versionLabel",
           "access",
           "availability",
-          "versionLabel",
-          "content"
+          "attachmentId",
+          "revisionNumber",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "publishedAt",
+          "offlineAt"
+        ]
+      },
+      "AdminResourceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminResourceSummaryResponseDto"
+            }
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total",
+          "items"
         ]
       },
       "AdminResourceResponseDto": {
@@ -16460,6 +17412,26 @@
           },
           "revisionNumber": {
             "type": "number"
+          },
+          "createdBy": {
+            "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "offlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "offlineReason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -16478,7 +17450,88 @@
           "availability",
           "content",
           "attachmentId",
-          "revisionNumber"
+          "revisionNumber",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "offlineAt",
+          "offlineReason"
+        ]
+      },
+      "CreateResourceDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0
+          },
+          "centerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ARTICLE",
+              "PDF",
+              "DOCX",
+              "ARCHIVE",
+              "EXTERNAL"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "WEB",
+              "PDF",
+              "DOCX",
+              "ZIP",
+              "EXTERNAL"
+            ]
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "MEMBER"
+            ]
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "UNAVAILABLE"
+            ]
+          },
+          "versionLabel": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "centerId",
+          "slug",
+          "title",
+          "summary",
+          "kind",
+          "format",
+          "access",
+          "availability",
+          "versionLabel",
+          "content"
         ]
       },
       "CreateResourceVersionDto": {

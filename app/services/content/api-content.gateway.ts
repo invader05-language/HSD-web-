@@ -17,7 +17,7 @@ export function createApiContentGateway(options: ApiContentGatewayOptions) {
   };
   const client = createHsdApiClient(transport);
   return {
-    projects: client.projects, activities: client.activities, registrations: client.registrations, galleries: client.galleries, resources: client.resources, help: client.help, portal: client.portal, media: client.media, homepage: client.homepage,
+    projects: client.projects, activities: client.activities, registrations: client.registrations, galleries: client.galleries, resources: client.resources, help: client.help, portal: client.portal, content: client.content, media: client.media, homepage: client.homepage,
     project: (slug: string) => client.projects.public(slug), activity: (slug: string) => client.activities.public(slug), gallery: (slug: string) => client.galleries.public(slug), resource: (slug: string) => client.resources.public(slug), resourceVersion: (slug: string, versionLabel: string) => client.resources.publicVersion(slug, versionLabel),
   };
 }

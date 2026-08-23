@@ -167,6 +167,10 @@ export interface HsdApiClient {
     publish(payload: PublishPortalConfigurationDto): Promise<ApiResponseFor<"POST /api/v1/admin/portal/configuration/publish">>;
     publicConfiguration(): Promise<ApiResponseFor<"GET /api/v1/public/portal">>;
   };
+  content: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/content">>;
+    detail(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}">>;
+  };
   uploads: {
     createIntent(payload: CreateUploadIntentDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/intents">>;
     complete(uploadId: string, payload: CompleteUploadDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/{uploadId}/complete">>;
@@ -308,6 +312,20 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       preview: () => requestGenerated(transport, "GET /api/v1/admin/portal/configuration/preview"),
       publish: (payload) => requestGenerated(transport, "POST /api/v1/admin/portal/configuration/publish", payload),
       publicConfiguration: () => requestGenerated(transport, "GET /api/v1/public/portal"),
+    },
+    content: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/content",
+        undefined,
+        `/api/v1/admin/content${query ? `?${query}` : ""}`,
+      ),
+      detail: (contentId) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/content/{contentId}",
+        undefined,
+        `/api/v1/admin/content/${encodeURIComponent(contentId)}`,
+      ),
     },
     uploads: {
       createIntent: (payload) => requestGenerated(transport, "POST /api/v1/admin/uploads/intents", payload),
