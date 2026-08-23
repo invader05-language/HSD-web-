@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { API_V1_PATHS, createHsdApiClient } from "../../packages/api-client/src";
-import { createAdminContentDetailController } from "../../app/services/content/admin-content-detail";
+import { createAdminContentDetailController, replaceFirstContentParagraph } from "../../app/services/content/admin-content-detail";
 import { createApiContentGateway } from "../../app/services/content/api-content.gateway";
 
 describe("admin content production mutations", () => {
@@ -48,5 +48,20 @@ describe("admin content production mutations", () => {
     await gateway.content.update("content-1", { expectedVersion: 1, title: "Updated" });
     expect(fetcher.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: "GET", credentials: "include", headers: { "X-Request-ID": "content-request-id" } }));
     expect(fetcher.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ method: "PATCH", credentials: "include", headers: { "X-Request-ID": "content-request-id", "Content-Type": "application/json", "X-CSRF-Token": "csrf-token" } }));
+  });
+
+  it("keeps the newest content request when older detail responses resolve late", async () => {
+    let resolveFirst: ((value: any) => void) | undefined;
+    const response = (id: string, title: string) => ({ id, publicId: `${id}-public`, centerId: null, slug: id, kind: "article", status: "draft", version: 1, createdBy: { type: "account", accountId: "owner", username: "owner", displayName: "Owner" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title, summary: "summary", tag: null, internalTarget: null, expiresAt: null, blocks: [], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null });
+    const detail = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; })).mockResolvedValueOnce(response("new", "New title"));
+    const controller = createAdminContentDetailController({ detail }); const first = controller.load("old"); await controller.load("new"); resolveFirst?.(response("old", "Old title")); await first;
+    expect(controller.record.value).toEqual(expect.objectContaining({ id: "new", title: "New title" }));
+    detail.mockResolvedValueOnce({ ...response("missing", "ignored"), workingRevision: null }); await controller.load("missing");
+    expect(controller.status.value).toBe("missingRevision"); expect(controller.record.value).toBeUndefined();
+  });
+
+  it("preserves mixed heading, image, and paragraph order when replacing editable body text", () => {
+    const blocks = [{ type: "heading" as const, level: 2 as const, text: "Heading" }, { type: "image" as const, attachmentId: "attachment-1", alt: "Image" }, { type: "paragraph" as const, text: "Old body" }];
+    expect(replaceFirstContentParagraph(blocks, "New body")).toEqual([{ type: "heading", level: 2, text: "Heading" }, { type: "image", attachmentId: "attachment-1", alt: "Image" }, { type: "paragraph", text: "New body" }]);
   });
 });

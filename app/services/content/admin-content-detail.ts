@@ -15,6 +15,16 @@ export function mapAdminContentDetail(item: AdminContentResponseDto): AdminConte
   return { id: item.id, kind: item.kind, status: STATUS_LABELS[item.status], canonicalStatus: item.status, version: item.version, workingRevisionNumber: revision.revisionNumber, title: revision.title, summary: revision.summary ?? "", internalTarget: revision.internalTarget, expiresAt: revision.expiresAt, blocks: revision.blocks, createdBy: item.createdBy.displayName, updatedAt: item.updatedAt, rejectionReason: item.rejectionReason };
 }
 
+export function replaceFirstContentParagraph(blocks: AdminContentDetailBlock[], text: string): AdminContentDetailBlock[] {
+  let replaced = false;
+  return blocks.flatMap((block) => {
+    if (block.type !== "paragraph") return [block];
+    if (replaced || !text.trim()) return [];
+    replaced = true;
+    return [{ type: "paragraph", text: text.trim() }];
+  });
+}
+
 export function createAdminContentDetailController(gateway: AdminContentDetailGateway) {
   const record = ref<AdminContentDetail>(); const loading = ref(false); const error = ref(""); const status = ref<AdminContentDetailStatus>("idle"); let requestGeneration = 0;
   async function load(contentId: string) {
