@@ -166,6 +166,7 @@ onMounted(loadProductionBatches);
       description="统一管理报名时间、开放中心和批次状态；关闭后的历史批次继续保留只读记录。"
     >
       <template #actions>
+        <button v-if="!isMockApi" type="button" class="button button--ghost" :disabled="productionLoading" aria-label="重新读取生产招新批次" @click="loadProductionBatches">重新读取</button>
         <button v-if="session.canManageAdminAccounts" type="button" class="button" @click="openCreateDrawer">新建招新批次</button>
       </template>
     </AdminPageHeading>

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+type RequestShape = { method: string; pathname: string; search: string };
+
+const fixtureBatchStorage = {
+  version: 1,
+  batches: [{ id: "fixture-batch", name: "本地 fixture 批次", startAt: "2026-01-01T00:00:00.000Z", endAt: "2026-01-02T00:00:00.000Z", timezone: "Asia/Shanghai", openCenterIds: [], responsibleAccountIds: [], lifecycleStatus: "draft", manualOverride: "none", version: 1, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
+};
+
 const ownerSession = {
   account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] },
   person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
@@ -61,19 +68,39 @@ async function installAuthenticatedRoutes(page: import("@playwright/test").Page)
   }));
 }
 
+async function seedFixtureBatchStorage(page: import("@playwright/test").Page) {
+  await page.addInitScript((storage) => localStorage.setItem("baiyun-hsd-recruitment-batches", JSON.stringify(storage)), fixtureBatchStorage);
+}
+
+function recordRequest(requests: RequestShape[], route: import("@playwright/test").Route) {
+  const url = new URL(route.request().url());
+  requests.push({ method: route.request().method(), pathname: url.pathname, search: url.search });
+}
+
+function expectCanonicalReads(requests: RequestShape[], count = 1) {
+  expect(requests).toHaveLength(count * 2);
+  for (const expected of [
+    { method: "GET", pathname: "/api/v1/admin/recruitment/batches", search: "" },
+    { method: "GET", pathname: "/api/v1/admin/organization/centers", search: "" },
+  ]) {
+    expect(requests.filter((request) => (
+      request.method === expected.method
+      && request.pathname === expected.pathname
+      && request.search === expected.search
+    ))).toHaveLength(count);
+  }
+}
+
 test("real OWNER batch list renders only canonical API rows, status, counts, owners and centers", async ({ page }) => {
-  const requests: string[] = [];
-  await page.addInitScript(() => localStorage.setItem("baiyun-hsd-recruitment-batches", JSON.stringify({
-    version: 1,
-    batches: [{ id: "fixture-batch", name: "本地 fixture 批次", startAt: "2026-01-01T00:00:00.000Z", endAt: "2026-01-02T00:00:00.000Z", timezone: "Asia/Shanghai", openCenterIds: [], responsibleAccountIds: [], lifecycleStatus: "draft", manualOverride: "none", version: 1, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
-  })));
+  const requests: RequestShape[] = [];
+  await seedFixtureBatchStorage(page);
   await installAuthenticatedRoutes(page);
   await page.route("**/api/v1/admin/recruitment/batches", (route) => {
-    requests.push(new URL(route.request().url()).pathname);
+    recordRequest(requests, route);
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 2, items: [apiBatch, { ...apiBatch, id: "batch-api-unassigned", name: "qa-无负责人批次", effectiveStatus: "draft", effectiveStatusReason: "draft", lifecycleStatus: "DRAFT", manualOverride: "NONE", applicationCount: 0, openCenters: [], responsibleAccounts: [] }] }) });
   });
   await page.route("**/api/v1/admin/organization/centers", (route) => {
-    requests.push(new URL(route.request().url()).pathname);
+    recordRequest(requests, route);
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(apiCenters) });
   });
 
@@ -90,14 +117,15 @@ test("real OWNER batch list renders only canonical API rows, status, counts, own
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("01");
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("23");
   await expect(page.getByRole("region", { name: "批次概览" })).not.toContainText("全站同一时间最多一个");
-  expect(requests).toEqual(["/api/v1/admin/recruitment/batches", "/api/v1/admin/organization/centers"]);
+  expectCanonicalReads(requests);
 });
 
 test("real batch list renders the server empty state and zero summary without fixture rows", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("baiyun-hsd-recruitment-batches", JSON.stringify({ version: 1, batches: [{ id: "fixture-batch", name: "本地 fixture 批次", startAt: "2026-01-01T00:00:00.000Z", endAt: "2026-01-02T00:00:00.000Z", timezone: "Asia/Shanghai", openCenterIds: [], responsibleAccountIds: [], lifecycleStatus: "draft", manualOverride: "none", version: 1, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }] })));
+  const requests: RequestShape[] = [];
+  await seedFixtureBatchStorage(page);
   await installAuthenticatedRoutes(page);
-  await page.route("**/api/v1/admin/recruitment/batches", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 0, items: [] }) }));
-  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...apiCenters, items: [] }) }));
+  await page.route("**/api/v1/admin/recruitment/batches", (route) => { recordRequest(requests, route); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 0, items: [] }) }); });
+  await page.route("**/api/v1/admin/organization/centers", (route) => { recordRequest(requests, route); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...apiCenters, items: [] }) }); });
 
   await page.goto("/admin/recruitment/batches");
 
@@ -105,34 +133,49 @@ test("real batch list renders the server empty state and zero summary without fi
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("00");
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("0");
   await expect(page.getByText("本地 fixture 批次", { exact: true })).toHaveCount(0);
+  expectCanonicalReads(requests);
 });
 
 test("real batch list clears prior API rows and exposes a 403 instead of a fixture fallback", async ({ page }) => {
   let forbidden = false;
+  const requests: RequestShape[] = [];
+  await seedFixtureBatchStorage(page);
   await installAuthenticatedRoutes(page);
-  await page.route("**/api/v1/admin/recruitment/batches", (route) => route.fulfill(forbidden
+  await page.route("**/api/v1/admin/recruitment/batches", (route) => { recordRequest(requests, route); return route.fulfill(forbidden
     ? { status: 403, contentType: "application/json", body: JSON.stringify({ code: "RECRUITMENT_BATCH_FORBIDDEN", message: "Owner scope denied", requestId: "batch-403" }) }
-    : { status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [apiBatch] }) }));
-  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(apiCenters) }));
+    : { status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [apiBatch] }) }); });
+  await page.route("**/api/v1/admin/organization/centers", (route) => { recordRequest(requests, route); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(apiCenters) }); });
 
   await page.goto("/admin/recruitment/batches");
   await expect(page.getByText("qa-接口开放批次", { exact: true })).toBeVisible();
   forbidden = true;
-  await page.reload();
+  await page.getByRole("button", { name: "重新读取生产招新批次" }).click();
 
   await expect(page.getByRole("alert")).toContainText("暂时无法读取生产招新批次");
   await expect(page.getByText("qa-接口开放批次", { exact: true })).toHaveCount(0);
   await expect(page.getByText("2026 秋季招新", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("本地 fixture 批次", { exact: true })).toHaveCount(0);
+  expectCanonicalReads(requests, 2);
 });
 
 test("a center-read failure clears batch rows and reports the real-mode error state", async ({ page }) => {
+  let centerFailure = false;
+  const requests: RequestShape[] = [];
+  await seedFixtureBatchStorage(page);
   await installAuthenticatedRoutes(page);
-  await page.route("**/api/v1/admin/recruitment/batches", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [apiBatch] }) }));
-  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "CENTERS_UNAVAILABLE", message: "Centers unavailable", requestId: "centers-503" }) }));
+  await page.route("**/api/v1/admin/recruitment/batches", (route) => { recordRequest(requests, route); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [apiBatch] }) }); });
+  await page.route("**/api/v1/admin/organization/centers", (route) => { recordRequest(requests, route); return route.fulfill(centerFailure
+    ? { status: 503, contentType: "application/json", body: JSON.stringify({ code: "CENTERS_UNAVAILABLE", message: "Centers unavailable", requestId: "centers-503" }) }
+    : { status: 200, contentType: "application/json", body: JSON.stringify(apiCenters) }); });
 
   await page.goto("/admin/recruitment/batches");
+  await expect(page.getByText("qa-接口开放批次", { exact: true })).toBeVisible();
+  centerFailure = true;
+  await page.getByRole("button", { name: "重新读取生产招新批次" }).click();
 
   await expect(page.getByRole("alert")).toContainText("暂时无法读取生产招新批次");
   await expect(page.getByText("qa-接口开放批次", { exact: true })).toHaveCount(0);
   await expect(page.getByText("2026 秋季招新", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("本地 fixture 批次", { exact: true })).toHaveCount(0);
+  expectCanonicalReads(requests, 2);
 });
