@@ -201,9 +201,19 @@ function requestAction(action: LifecycleAction) {
   actionError.value = "";
   actionMessage.value = "";
   if (!isMockApi) {
-    actionError.value = action === "archive"
-      ? "后端未提供归档命令。"
-      : "当前详情页尚未接入真实批次状态命令。";
+    if (action !== "archive") {
+      actionError.value = "当前详情页尚未接入真实批次状态命令。";
+      return;
+    }
+    if (!canManage.value) {
+      actionError.value = "只有联盟总负责人可以归档批次。";
+      return;
+    }
+    if (statusKey.value !== "closed") {
+      actionError.value = "只有服务端判定为已关闭的批次才能提交归档确认。";
+      return;
+    }
+    pendingAction.value = action;
     return;
   }
   if (!canManage.value) {
@@ -217,8 +227,18 @@ function requestAction(action: LifecycleAction) {
   pendingAction.value = action;
 }
 
-function invokeAction(action: LifecycleAction) {
-  if (!isMockApi || !batchStore) return;
+async function invokeAction(action: LifecycleAction) {
+  if (!isMockApi) {
+    if (action !== "archive" || !productionBatch) return;
+    const archived = await productionBatch.archive(reason.value);
+    actionError.value = productionBatch.archiveError.value;
+    if (!archived) return;
+    actionMessage.value = "归档批次已完成，状态和生命周期记录已刷新。";
+    pendingAction.value = null;
+    reason.value = "";
+    return;
+  }
+  if (!batchStore) return;
   const methodName = action === "publish" ? "publishBatch" : action;
   const method = (batchStore as unknown as Record<string, unknown>)[methodName];
   if (typeof method !== "function") {
@@ -245,7 +265,7 @@ function invokeAction(action: LifecycleAction) {
 }
 
 function confirmAction() {
-  if (pendingAction.value) invokeAction(pendingAction.value);
+  if (pendingAction.value) void invokeAction(pendingAction.value);
 }
 
 function dateInput(value?: string) {
@@ -304,6 +324,54 @@ function auditActionLabel(action: string) {
   return ({ create: "创建批次", publish: "发布批次", "open-now": "立即开放", pause: "暂停报名", resume: "恢复报名", close: "提前关闭", reopen: "重新开放", archive: "归档批次", update: "更新批次" } as Record<string, string>)[action] ?? action;
 }
 
+function lifecycleActionLabel(action: string) {
+  return ({
+    "recruitment.batch.created": "创建批次",
+    "recruitment.batch.updated": "更新批次",
+    "recruitment.batch.published": "发布批次",
+    "recruitment.batch.opened": "立即开放",
+    "recruitment.batch.paused": "暂停报名",
+    "recruitment.batch.resumed": "恢复报名",
+    "recruitment.batch.closed": "提前关闭",
+    "recruitment.batch.reopened": "重新开放",
+    "recruitment.batch.archived": "归档批次",
+  } as Record<string, string>)[action] ?? action;
+}
+
+const lifecycleSnapshotLabels = {
+  name: "名称",
+  startAt: "开始时间",
+  endAt: "结束时间",
+  timezone: "时区",
+  lifecycleStatus: "生命周期状态",
+  manualOverride: "人工覆盖",
+  version: "版本",
+  openCenterIds: "开放中心",
+  responsibleAccountIds: "负责人账号",
+} as const;
+
+function lifecycleSnapshotEntries(snapshot: Record<string, unknown> | null) {
+  if (!snapshot) return [];
+  return Object.entries(lifecycleSnapshotLabels)
+    .filter(([key]) => Object.hasOwn(snapshot, key))
+    .map(([key, label]) => ({ key, label, value: lifecycleSnapshotValue(snapshot[key]) }));
+}
+
+function lifecycleSnapshotValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => lifecycleSnapshotValue(item)).join("、") || "空列表";
+  if (value === null || value === undefined || value === "") return "空";
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return String(value);
+}
+
+function lifecycleStateMessage(status: string | undefined) {
+  if (status === "unauthorized") return "登录状态已失效，无法读取生命周期记录。";
+  if (status === "forbidden") return "当前账号无权读取该批次的生命周期记录。";
+  if (status === "notFound") return "生命周期记录所属批次不存在。";
+  if (status === "unavailable") return "真实生命周期记录接口暂不可用。";
+  return "生命周期记录读取失败，请稍后重试。";
+}
+
 function auditStatusLabel(status: string) {
   return getRecruitmentBatchStatusLabel(status as Parameters<typeof getRecruitmentBatchStatusLabel>[0]) ?? status;
 }
@@ -337,7 +405,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     <AdminPageHeading
       eyebrow="Recruitment Batch Workspace"
       title="该子工作区尚未接入真实数据"
-      description="当前真实模式仅提供批次列表与批次概要；报名名单、报名详情、考核和结果发布页面暂不可用，不会读取本地示例数据。"
+      description="当前真实模式提供批次概要、生命周期记录与 OWNER 归档；报名名单、报名详情、考核和结果发布页面暂不可用，不会读取本地示例数据。"
     >
       <template #actions><NuxtLink class="button" :to="overviewRoute">返回批次概览</NuxtLink></template>
     </AdminPageHeading>
@@ -346,7 +414,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     <AdminPageHeading
       eyebrow="Recruitment Batch Context"
       :title="batch.name"
-      :description="!isMockApi ? `当前仅展示 ${batch.name} 的真实批次概要；子工作区尚未接入真实数据。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
+      :description="!isMockApi ? `当前展示 ${batch.name} 的真实批次概要与生命周期记录；子工作区尚未接入真实数据。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
     >
       <template #actions>
         <div class="admin-batch-actions">
@@ -360,12 +428,14 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
           <button v-if="isMockApi && (statusKey === 'open' || statusKey === 'paused')" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('close')">提前关闭</button>
           <button v-if="canReopen" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('reopen')">重新开放</button>
           <button v-if="isMockApi && statusKey === 'closed'" type="button" class="button" :disabled="!canManage" @click="requestAction('archive')">归档批次</button>
+          <button v-if="!isMockApi && statusKey === 'closed' && canManage" type="button" class="button" :disabled="productionBatch?.archiving.value" @click="requestAction('archive')">归档批次</button>
         </div>
       </template>
     </AdminPageHeading>
 
     <p v-if="actionMessage" class="admin-save-message" role="status">{{ actionMessage }}</p>
     <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
+    <p v-if="!isMockApi" class="admin-empty-copy">真实模式仅接入 OWNER 归档；发布、开放、暂停、恢复、关闭和重开命令暂不可用。</p>
 
     <section class="admin-batch-context-summary" aria-label="批次概览">
       <div class="admin-batch-context-summary__primary">
@@ -417,20 +487,38 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </nav>
     </section>
 
-    <section class="admin-list-card admin-batch-audit">
+    <section class="admin-list-card admin-batch-audit" aria-label="生命周期记录">
       <header><div><span>Lifecycle Audit</span><h2>生命周期记录</h2></div><p>原计划时间、操作人和实际执行时间随命令保存</p></header>
-      <p v-if="!isMockApi" class="admin-empty-copy">后端未提供生命周期审计接口。</p>
+      <p v-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'loading'" class="admin-empty-copy">正在读取生命周期记录…</p>
+      <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'empty'" class="admin-empty-copy">当前批次暂无生命周期记录。</p>
+      <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value !== 'success'" class="admin-save-message admin-save-message--error" role="alert">{{ lifecycleStateMessage(productionBatch?.lifecycleStatus.value) }}</p>
+      <div v-else-if="!isMockApi" class="admin-table-scroll">
+        <table aria-label="真实批次生命周期记录">
+          <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>变更前</th><th>变更后</th><th>实际时间</th><th>原因</th></tr></thead>
+          <tbody>
+            <tr v-for="record in productionBatch?.lifecycleEvents.value ?? []" :key="record.id">
+              <td><strong>{{ lifecycleActionLabel(record.action) }}</strong><small>{{ record.action }}</small></td>
+              <td>{{ record.actorDisplayName }}</td>
+              <td>{{ record.target.type }} · {{ record.target.id }}</td>
+              <td><span v-if="!record.before">—</span><dl v-else><div v-for="entry in lifecycleSnapshotEntries(record.before)" :key="entry.key"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div></dl></td>
+              <td><span v-if="!record.after">—</span><dl v-else><div v-for="entry in lifecycleSnapshotEntries(record.after)" :key="entry.key"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div></dl></td>
+              <td>{{ auditTimestamp(record.createdAt) }}</td>
+              <td>{{ record.reason || "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p v-else-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
       <div v-else class="admin-table-scroll"><table aria-label="批次生命周期审计"><thead><tr><th>操作</th><th>操作人</th><th>状态变化</th><th>原计划开始</th><th>实际时间</th><th>原因</th></tr></thead><tbody><tr v-for="record in auditRecords" :key="auditText(record, 'id')"><td>{{ auditActionLabel(auditText(record, 'action')) }}</td><td>{{ auditText(record, 'actorName', 'actor') }}</td><td>{{ auditStatusLabel(auditText(record, 'beforeStatus', 'before')) }} → {{ auditStatusLabel(auditText(record, 'afterStatus', 'after')) }}</td><td>{{ auditTimestamp(auditText(record, 'originalStartAt')) }}</td><td>{{ auditTimestamp(auditText(record, 'actualAt', 'createdAt')) }}</td><td>{{ auditText(record, 'reason') === 'create recruitment batch' ? '创建招新批次' : auditText(record, 'reason') }}</td></tr></tbody></table></div>
     </section>
 
-    <div v-if="isMockApi && pendingAction" class="admin-modal-backdrop">
+    <div v-if="pendingAction" class="admin-modal-backdrop">
       <section role="alertdialog" aria-modal="true" aria-labelledby="batch-action-confirm-title">
         <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction) }}？</h2>
         <p>该操作会改变当前批次的用户报名入口。操作人、原计划时间、实际执行时间和前后状态会写入生命周期记录。</p>
         <label>操作原因（可选）<textarea v-model="reason" rows="3" placeholder="填写本次批次状态变更原因"></textarea></label>
         <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
-        <div><button type="button" class="button button--ghost" @click="pendingAction = null">返回检查</button><button type="button" class="button" @click="confirmAction">确认{{ actionLabel(pendingAction) }}</button></div>
+        <div><button type="button" class="button button--ghost" :disabled="productionBatch?.archiving.value" @click="pendingAction = null">返回检查</button><button type="button" class="button" :disabled="productionBatch?.archiving.value" @click="confirmAction">确认{{ actionLabel(pendingAction) }}</button></div>
       </section>
     </div>
 

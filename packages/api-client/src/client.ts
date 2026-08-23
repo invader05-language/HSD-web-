@@ -59,12 +59,17 @@ import {
   type SetCoreMembershipDto,
   type CreateRecruitmentBatchDto,
   type RecruitmentBatchCommandDto,
+  type RecruitmentBatchLifecycleEventListDto,
   type SubmitApplicationDto,
   type UpdateApplicationDto,
   type UpdateMyProfileDto,
   type UpdateRecruitmentBatchDto,
   type WithdrawApplicationDto,
 } from "./generated";
+
+export type ArchiveRecruitmentBatchPayload = Omit<RecruitmentBatchCommandDto, "confirmed"> & {
+  confirmed: true;
+};
 
 /** The dashboard endpoint is intentionally ungenerated until the M5 server contract exists in Swagger. */
 export const ADMIN_DASHBOARD_PATH = "/api/v1/admin/dashboard" as const;
@@ -163,7 +168,9 @@ export interface HsdApiClient {
     getAdminBatch(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}">>;
     createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches">>;
     updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/recruitment/batches/{batchId}">>;
+    listAdminBatchLifecycleEvents(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
     runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
+    archiveAdminBatch(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/archive">>;
     listAdminApplications(batchId: string, query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications">>;
     getAdminApplication(batchId: string, applicationId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}">>;
     results(): Promise<ApiResponseFor<"GET /api/v1/recruitment/results/me">>;
@@ -325,10 +332,22 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       getAdminBatch: (batchId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
       createAdminBatch: (payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches", payload),
       updateAdminBatch: (batchId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/recruitment/batches/{batchId}", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
+      listAdminBatchLifecycleEvents: (batchId, page = 1, pageSize = 50) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
+        undefined,
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/lifecycle-events?page=${page}&pageSize=${pageSize}`,
+      ),
       runAdminBatchCommand: (batchId, command, payload) => {
         const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
         return requestGenerated(transport, operation, payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`) as Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
       },
+      archiveAdminBatch: (batchId, payload) => requestGenerated(
+        transport,
+        "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
+        payload,
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
+      ),
       listAdminApplications: (batchId, query = "") => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`),
       getAdminApplication: (batchId, applicationId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
       results: () => requestGenerated(transport, "GET /api/v1/recruitment/results/me"),

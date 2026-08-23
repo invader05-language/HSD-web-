@@ -41,6 +41,8 @@ const apiBatch = {
   ],
 };
 
+const emptyLifecycle = { page: 1, pageSize: 50, total: 0, items: [] };
+
 function seedMockBatch(name = "Mock 批次概览") {
   localStorage.setItem(RECRUITMENT_BATCH_STORAGE_KEY, JSON.stringify({
     version: 1,
@@ -77,7 +79,9 @@ describe("Task 3A production batch detail page", () => {
     routeState.params.batchId = "batch-api-only";
     routeState.path = "/admin/recruitment/batches/batch-api-only";
     vi.stubGlobal("useRoute", () => routeState);
-    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(apiBatch), {
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => new Response(JSON.stringify(
+      String(input).includes("/lifecycle-events") ? emptyLifecycle : apiBatch,
+    ), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })));
@@ -107,7 +111,9 @@ describe("Task 3A production batch detail page", () => {
     expect(wrapper.text()).toContain("已停用中心（已停用）");
     expect(wrapper.text()).toContain("总负责人 · v9");
     expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
-    expect(wrapper.text()).toContain("后端未提供生命周期审计接口");
+    expect(wrapper.text()).toContain("当前批次暂无生命周期记录。");
+    expect(wrapper.text()).not.toContain("后端未提供生命周期审计接口");
+    expect(wrapper.text()).toContain("发布、开放、暂停、恢复、关闭和重开命令暂不可用");
     expect(wrapper.text()).not.toContain("归档批次");
   });
 
@@ -231,12 +237,12 @@ describe("Task 3A production batch detail page", () => {
   it("refetches a changed batch id and clears the stale batch while the new request is pending", async () => {
     let resolveSecond!: (response: Response) => void;
     const secondResponse = new Promise<Response>((resolve) => { resolveSecond = resolve; });
-    const fetcher = vi.fn<typeof globalThis.fetch>()
-      .mockResolvedValueOnce(new Response(JSON.stringify(apiBatch), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
-      .mockImplementationOnce(() => secondResponse);
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) return new Response(JSON.stringify(emptyLifecycle), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (url.includes("/batch-b")) return secondResponse;
+      return new Response(JSON.stringify(apiBatch), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
     vi.stubGlobal("fetch", fetcher);
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
@@ -252,10 +258,10 @@ describe("Task 3A production batch detail page", () => {
     routeState.path = "/admin/recruitment/batches/batch-b";
     await nextTick();
 
-    expect(fetcher).toHaveBeenNthCalledWith(2,
+    expect(fetcher.mock.calls).toContainEqual([
       "https://api.example.test/api/v1/admin/recruitment/batches/batch-b",
       expect.objectContaining({ method: "GET" }),
-    );
+    ]);
     expect(wrapper.text()).not.toContain("API 2026 秋季招新");
     expect(wrapper.get("h1").text()).toBe("正在读取批次…");
 
@@ -273,9 +279,11 @@ describe("Task 3A production batch detail page", () => {
     let resolveB!: (response: Response) => void;
     const responseA = new Promise<Response>((resolve) => { resolveA = resolve; });
     const responseB = new Promise<Response>((resolve) => { resolveB = resolve; });
-    const fetcher = vi.fn<typeof globalThis.fetch>()
-      .mockImplementationOnce(() => responseA)
-      .mockImplementationOnce(() => responseB);
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) return new Response(JSON.stringify(emptyLifecycle), { status: 200, headers: { "Content-Type": "application/json" } });
+      return url.includes("/batch-b") ? responseB : responseA;
+    });
     vi.stubGlobal("fetch", fetcher);
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
@@ -288,7 +296,7 @@ describe("Task 3A production batch detail page", () => {
     routeState.params.batchId = "batch-b";
     routeState.path = "/admin/recruitment/batches/batch-b";
     await nextTick();
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(4);
 
     resolveB(new Response(JSON.stringify({ ...apiBatch, id: "batch-b", name: "API B 批次" }), {
       status: 200,

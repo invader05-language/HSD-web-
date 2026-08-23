@@ -1,5 +1,6 @@
 import type {
   AdvanceAssessmentDto,
+  ArchiveRecruitmentBatchPayload,
   AssessmentBatchResponseDto,
   AssessmentAdjustmentTargetCatalogResponseDto,
   AssessmentBatchStateResponseDto,
@@ -22,6 +23,7 @@ import type {
   MyRecruitmentApplicationResponseDto,
   PublicRecruitmentBatchEnvelopeDto,
   RecruitmentBatchCommandDto,
+  RecruitmentBatchLifecycleEventListDto,
   SubmitApplicationDto,
   UpdateApplicationDto,
   UpdateMyProfileDto,
@@ -42,7 +44,9 @@ export interface RecruitmentGateway {
   getAdminBatch(batchId: string): Promise<AdminRecruitmentBatchDto>;
   createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
   updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
+  listAdminBatchLifecycleEvents(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
   runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
+  archiveAdminBatch(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
   listAdminApplications(batchId: string, query?: string): Promise<AdminRecruitmentApplicationListDto>;
   getAdminApplication(batchId: string, applicationId: string): Promise<AdminRecruitmentApplicationDto>;
   getAssessmentBatch(batchId: string): Promise<AssessmentBatchResponseDto>;

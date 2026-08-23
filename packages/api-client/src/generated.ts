@@ -2054,6 +2054,7 @@ export const API_V1_PATHS = {
   adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
   adminRecruitmentBatch: "/api/v1/admin/recruitment/batches/{batchId}",
   adminRecruitmentBatchUpdate: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentBatchLifecycleEvents: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
   adminRecruitmentApplications: "/api/v1/admin/recruitment/batches/{batchId}/applications",
   adminRecruitmentApplication: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}",
   adminRecruitmentBatchPublish: "/api/v1/admin/recruitment/batches/{batchId}/publish",
@@ -2062,6 +2063,7 @@ export const API_V1_PATHS = {
   adminRecruitmentBatchResume: "/api/v1/admin/recruitment/batches/{batchId}/resume",
   adminRecruitmentBatchClose: "/api/v1/admin/recruitment/batches/{batchId}/close",
   adminRecruitmentBatchReopen: "/api/v1/admin/recruitment/batches/{batchId}/reopen",
+  adminRecruitmentBatchArchive: "/api/v1/admin/recruitment/batches/{batchId}/archive",
   assessmentBatch: "/api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
@@ -2194,6 +2196,7 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
   "GET /api/v1/admin/recruitment/batches/{batchId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}" },
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": { method: "PATCH", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/publish": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/publish" },
@@ -2202,6 +2205,7 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/recruitment/batches/{batchId}/resume": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/resume" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/close": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/close" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/reopen" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/archive" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results" },
@@ -2340,6 +2344,7 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": RecruitmentBatchLifecycleEventListDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications": AdminRecruitmentApplicationListDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": AdminRecruitmentApplicationDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/publish": AdminRecruitmentBatchDto;
@@ -2348,6 +2353,7 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/recruitment/batches/{batchId}/resume": AdminRecruitmentBatchDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/close": AdminRecruitmentBatchDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": AssessmentBatchResponseDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": AssessmentAdjustmentTargetCatalogResponseDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": AssessmentRoundMutationResponseDto;
@@ -2634,6 +2640,9 @@ const API_RESPONSE_SCHEMAS = {
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
   },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": {
+    "$ref": "#/components/schemas/RecruitmentBatchLifecycleEventListDto"
+  },
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications": {
     "$ref": "#/components/schemas/AdminRecruitmentApplicationListDto"
   },
@@ -2656,6 +2665,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
   },
   "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
   },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": {

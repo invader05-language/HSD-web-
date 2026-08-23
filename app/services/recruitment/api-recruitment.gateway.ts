@@ -5,6 +5,7 @@ import {
   type AdminRecruitmentBatchDto,
   type AdminRecruitmentBatchListDto,
   type AdvanceAssessmentDto,
+  type ArchiveRecruitmentBatchPayload,
   type ApiOperation,
   type ApiResponseFor,
   type CreateAdjustmentProposalDto,
@@ -188,6 +189,10 @@ export function createApiRecruitmentGateway(
       payload,
       "PATCH",
     ),
+    listAdminBatchLifecycleEvents: (batchId, page = 1, pageSize = 50) => read(
+      "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/lifecycle-events?page=${page}&pageSize=${pageSize}`,
+    ),
     runAdminBatchCommand: async (batchId, command, payload: RecruitmentBatchCommandDto) => {
       const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
       return mutate(
@@ -195,6 +200,19 @@ export function createApiRecruitmentGateway(
         `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`,
         payload,
       ) as Promise<AdminRecruitmentBatchDto>;
+    },
+    archiveAdminBatch: async (batchId, payload: ArchiveRecruitmentBatchPayload) => {
+      if (!Number.isInteger(payload.expectedVersion) || payload.expectedVersion < 1) {
+        throw new Error("archive expectedVersion must be a positive integer");
+      }
+      if (payload.confirmed !== true) {
+        throw new Error("archive confirmed must be true");
+      }
+      return mutate(
+        "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
+        payload,
+      );
     },
     listAdminApplications: (batchId, query = "") => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}/applications",

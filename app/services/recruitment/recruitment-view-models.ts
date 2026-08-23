@@ -3,6 +3,8 @@ import type {
   MemberProfileResponseDto,
   MyRecruitmentApplicationResponseDto,
   PublicRecruitmentBatchDto,
+  RecruitmentBatchLifecycleEventDto,
+  RecruitmentBatchLifecycleSnapshotDto,
   SubmitApplicationDto,
   UpdateApplicationDto,
   UpdateMyProfileDto,
@@ -107,6 +109,68 @@ export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRe
     openCenters: dto.openCenters,
     owner,
     responsibleAccounts: dto.responsibleAccounts,
+  };
+}
+
+const LIFECYCLE_SNAPSHOT_KEYS = [
+  "name",
+  "startAt",
+  "endAt",
+  "timezone",
+  "lifecycleStatus",
+  "manualOverride",
+  "version",
+  "openCenterIds",
+  "responsibleAccountIds",
+] as const satisfies ReadonlyArray<keyof RecruitmentBatchLifecycleSnapshotDto>;
+
+type LifecycleSnapshotKey = (typeof LIFECYCLE_SNAPSHOT_KEYS)[number];
+
+export type RecruitmentBatchLifecycleSnapshotView = Partial<Pick<
+  RecruitmentBatchLifecycleSnapshotDto,
+  LifecycleSnapshotKey
+>>;
+
+export interface RecruitmentBatchLifecycleEventView {
+  id: string;
+  actorDisplayName: string;
+  action: RecruitmentBatchLifecycleEventDto["action"];
+  target: RecruitmentBatchLifecycleEventDto["target"];
+  before: RecruitmentBatchLifecycleSnapshotView | null;
+  after: RecruitmentBatchLifecycleSnapshotView | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+function isSnapshotScalar(value: unknown): value is string | number | boolean | null {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+export function mapRecruitmentBatchLifecycleSnapshot(
+  snapshot: RecruitmentBatchLifecycleSnapshotDto | null,
+): RecruitmentBatchLifecycleSnapshotView | null {
+  if (!snapshot) return null;
+  const safe: RecruitmentBatchLifecycleSnapshotView = {};
+  for (const key of LIFECYCLE_SNAPSHOT_KEYS) {
+    const value: unknown = snapshot[key];
+    if (isSnapshotScalar(value)) safe[key] = value;
+    else if (Array.isArray(value) && value.every(isSnapshotScalar)) safe[key] = [...value];
+  }
+  return safe;
+}
+
+export function mapRecruitmentBatchLifecycleEvent(
+  event: RecruitmentBatchLifecycleEventDto,
+): RecruitmentBatchLifecycleEventView {
+  return {
+    id: event.id,
+    actorDisplayName: event.actor.displayName,
+    action: event.action,
+    target: { type: event.target.type, id: event.target.id },
+    before: mapRecruitmentBatchLifecycleSnapshot(event.before),
+    after: mapRecruitmentBatchLifecycleSnapshot(event.after),
+    reason: event.reason,
+    createdAt: event.createdAt,
   };
 }
 
