@@ -1564,6 +1564,41 @@ export type RecruitmentBatchCommandDto = {
   "reason"?: string;
 };
 
+export type RecruitmentBatchLifecycleEventDto = {
+  "id": string;
+  "actor": SafeAuditActorDto;
+  "action": "recruitment.batch.created" | "recruitment.batch.updated" | "recruitment.batch.published" | "recruitment.batch.opened" | "recruitment.batch.paused" | "recruitment.batch.resumed" | "recruitment.batch.closed" | "recruitment.batch.reopened" | "recruitment.batch.archived";
+  "target": RecruitmentBatchLifecycleTargetDto;
+  "before": (RecruitmentBatchLifecycleSnapshotDto) | null;
+  "after": (RecruitmentBatchLifecycleSnapshotDto) | null;
+  "reason": (string) | null;
+  "createdAt": string;
+};
+
+export type RecruitmentBatchLifecycleEventListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<RecruitmentBatchLifecycleEventDto>;
+};
+
+export type RecruitmentBatchLifecycleSnapshotDto = {
+  "name"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "startAt"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "endAt"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "timezone"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "lifecycleStatus"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "manualOverride"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "version"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "openCenterIds"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "responsibleAccountIds"?: string | number | boolean | null | Array<string | number | boolean | null>;
+};
+
+export type RecruitmentBatchLifecycleTargetDto = {
+  "type": "RecruitmentBatch";
+  "id": string;
+};
+
 export type RecruitmentBatchStatusDto = {
   "effectiveStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
   "effectiveStatusReason": "draft" | "before-start" | "within-window" | "after-end" | "force-open" | "paused" | "force-closed" | "archived";
@@ -1683,6 +1718,36 @@ export type RetireMembershipDto = {
 export type RevokeOrganizationPositionDto = {
   "expectedPositionVersion": number;
   "reason"?: string;
+};
+
+export type SafeAuditActorDto = {
+  "type": "account" | "system";
+  "accountId": (string) | null;
+  "username": (string) | null;
+  "displayName": string;
+};
+
+export type SafeAuditEventDto = {
+  "id": string;
+  "actor": SafeAuditActorDto;
+  "action": string;
+  "target": SafeAuditTargetDto;
+  "before": (Record<string, string | number | boolean | null | Array<string | number | boolean | null>>) | null;
+  "after": (Record<string, string | number | boolean | null | Array<string | number | boolean | null>>) | null;
+  "reason": (string) | null;
+  "createdAt": string;
+};
+
+export type SafeAuditEventListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<SafeAuditEventDto>;
+};
+
+export type SafeAuditTargetDto = {
+  "type": string;
+  "id": string;
 };
 
 export type SavePortalConfigurationDto = {
@@ -1940,6 +2005,7 @@ export const API_V1_PATHS = {
   adminMembers: "/api/v1/admin/members",
   adminMemberPromote: "/api/v1/admin/members/{personId}/promote",
   adminAccounts: "/api/v1/admin/accounts",
+  adminAuditEvents: "/api/v1/admin/audit-events",
   publicCenters: "/api/v1/public/centers",
   publicCenterDetail: "/api/v1/public/centers/{publicSlug}",
   publicHomepageStats: "/api/v1/public/homepage/stats",
@@ -2079,6 +2145,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/members": { method: "GET", path: "/api/v1/admin/members" },
   "POST /api/v1/admin/members/{personId}/promote": { method: "POST", path: "/api/v1/admin/members/{personId}/promote" },
   "GET /api/v1/admin/accounts": { method: "GET", path: "/api/v1/admin/accounts" },
+  "GET /api/v1/admin/audit-events": { method: "GET", path: "/api/v1/admin/audit-events" },
   "GET /api/v1/public/centers": { method: "GET", path: "/api/v1/public/centers" },
   "GET /api/v1/public/centers/{publicSlug}": { method: "GET", path: "/api/v1/public/centers/{publicSlug}" },
   "GET /api/v1/public/homepage/stats": { method: "GET", path: "/api/v1/public/homepage/stats" },
@@ -2221,6 +2288,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/members": ManagedMemberListResponseDto;
   "POST /api/v1/admin/members/{personId}/promote": ManagedMemberResponseDto;
   "GET /api/v1/admin/accounts": AdminAccountListResponseDto;
+  "GET /api/v1/admin/audit-events": SafeAuditEventListDto;
   "GET /api/v1/public/centers": PublicCenterListResponseDto;
   "GET /api/v1/public/centers/{publicSlug}": PublicCenterDetailResponseDto;
   "GET /api/v1/public/homepage/stats": PublicHomepageStatsResponseDto;
@@ -2406,6 +2474,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/admin/accounts": {
     "$ref": "#/components/schemas/AdminAccountListResponseDto"
+  },
+  "GET /api/v1/admin/audit-events": {
+    "$ref": "#/components/schemas/SafeAuditEventListDto"
   },
   "GET /api/v1/public/centers": {
     "$ref": "#/components/schemas/PublicCenterListResponseDto"
@@ -2802,6 +2873,207 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "newPassword"
+    ]
+  },
+  "SafeAuditActorDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "account",
+          "system"
+        ]
+      },
+      "accountId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "username": {
+        "type": "string",
+        "nullable": true
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "accountId",
+      "username",
+      "displayName"
+    ]
+  },
+  "SafeAuditTargetDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "id"
+    ]
+  },
+  "SafeAuditEventDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "actor": {
+        "$ref": "#/components/schemas/SafeAuditActorDto"
+      },
+      "action": {
+        "type": "string"
+      },
+      "target": {
+        "$ref": "#/components/schemas/SafeAuditTargetDto"
+      },
+      "before": {
+        "type": "object",
+        "nullable": true,
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "nullable": true,
+              "enum": [
+                null
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "nullable": true,
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "after": {
+        "type": "object",
+        "nullable": true,
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "nullable": true,
+              "enum": [
+                null
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "nullable": true,
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "reason": {
+        "type": "string",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "actor",
+      "action",
+      "target",
+      "before",
+      "after",
+      "reason",
+      "createdAt"
+    ]
+  },
+  "SafeAuditEventListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SafeAuditEventDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "UpdateMyProfileDto": {
@@ -3931,6 +4203,492 @@ const API_COMPONENT_SCHEMAS = {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
+  "RecruitmentBatchLifecycleTargetDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "RecruitmentBatch"
+        ]
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "id"
+    ]
+  },
+  "RecruitmentBatchLifecycleSnapshotDto": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "startAt": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "endAt": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "timezone": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "lifecycleStatus": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "manualOverride": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "version": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "openCenterIds": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "responsibleAccountIds": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "RecruitmentBatchLifecycleEventDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "actor": {
+        "$ref": "#/components/schemas/SafeAuditActorDto"
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "recruitment.batch.created",
+          "recruitment.batch.updated",
+          "recruitment.batch.published",
+          "recruitment.batch.opened",
+          "recruitment.batch.paused",
+          "recruitment.batch.resumed",
+          "recruitment.batch.closed",
+          "recruitment.batch.reopened",
+          "recruitment.batch.archived"
+        ]
+      },
+      "target": {
+        "$ref": "#/components/schemas/RecruitmentBatchLifecycleTargetDto"
+      },
+      "before": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentBatchLifecycleSnapshotDto"
+          }
+        ]
+      },
+      "after": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentBatchLifecycleSnapshotDto"
+          }
+        ]
+      },
+      "reason": {
+        "type": "string",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "actor",
+      "action",
+      "target",
+      "before",
+      "after",
+      "reason",
+      "createdAt"
+    ]
+  },
+  "RecruitmentBatchLifecycleEventListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RecruitmentBatchLifecycleEventDto"
         }
       }
     },

@@ -26,6 +26,7 @@ const browserOperations = {
   adminMembers: "GET /api/v1/admin/members",
   adminMemberPromote: { operation: "POST /api/v1/admin/members/{personId}/promote", successStatus: "200" },
   adminAccounts: "GET /api/v1/admin/accounts",
+  adminAuditEvents: "GET /api/v1/admin/audit-events",
   publicCenters: "GET /api/v1/public/centers",
   publicCenterDetail: "GET /api/v1/public/centers/{publicSlug}",
   publicHomepageStats: "GET /api/v1/public/homepage/stats",

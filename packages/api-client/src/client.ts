@@ -145,6 +145,9 @@ export interface HsdApiClient {
   adminAccess: {
     accounts(): Promise<ApiResponseFor<"GET /api/v1/admin/accounts">>;
   };
+  auditEvents: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/audit-events">>;
+  };
   imports: {
     dryRun(payload: PreparatoryMemberImportDto): Promise<ApiResponseFor<"POST /api/v1/admin/imports/preparatory-members/dry-run">>;
     commit(payload: PreparatoryMemberImportDto): Promise<ApiResponseFor<"POST /api/v1/admin/imports/preparatory-members/commit">>;
@@ -298,6 +301,14 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     adminAccess: {
       accounts: () => requestGenerated(transport, "GET /api/v1/admin/accounts"),
+    },
+    auditEvents: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/audit-events",
+        undefined,
+        `/api/v1/admin/audit-events${query ? `?${query}` : ""}`,
+      ),
     },
     imports: {
       dryRun: (payload) => requestGenerated(transport, "POST /api/v1/admin/imports/preparatory-members/dry-run", payload),
