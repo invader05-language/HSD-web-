@@ -15,6 +15,14 @@ const contentPage = {
   }],
 };
 
+function apiContent(title: string, id: string) {
+  return {
+    id, publicId: `${id}-public`, centerId: null, slug: id, kind: "article", status: "review", version: 2, workingRevisionNumber: 1,
+    title, summary: "只来自服务端分页响应。", createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" },
+    createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T01:00:00.000Z", publishedAt: null, offlineAt: null,
+  };
+}
+
 test("real admin content list requests the server page and never falls back to a Mock title", async ({ page }) => {
   const requests: string[] = [];
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
@@ -51,4 +59,53 @@ test("real admin content list visibly reports a 403 and does not retain API rows
   await expect(page.getByText("owner scope denied", { exact: true })).toBeVisible();
   await expect(page.getByText("qa-真实接口内容", { exact: true })).toHaveCount(0);
   await expect(page.getByText("2026 秋季招新通道开放", { exact: true })).toHaveCount(0);
+});
+
+test("real admin content pagination replaces server rows and a filter resets page without stale content", async ({ page }) => {
+  let releaseFilteredResponse!: () => void;
+  const requests: string[] = [];
+  const filteredResponse = new Promise<void>((resolve) => { releaseFilteredResponse = resolve; });
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/content**", async (route) => {
+    const url = new URL(route.request().url());
+    requests.push(route.request().url());
+    const pageNumber = url.searchParams.get("page");
+    if (url.searchParams.get("status") === "review") {
+      await filteredResponse;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [apiContent("qa-筛选后的第一页", "qa-filtered")] }) });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(pageNumber === "2"
+        ? { page: 2, pageSize: 20, total: 40, items: [apiContent("qa-第二页接口内容", "qa-page-two")] }
+        : { page: 1, pageSize: 20, total: 40, items: [apiContent("qa-第一页接口内容", "qa-page-one")] }),
+    });
+  });
+
+  await page.goto("/admin/content");
+  await expect(page.getByText("qa-第一页接口内容", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "2", exact: true }).click();
+  await expect(page.getByText("qa-第二页接口内容", { exact: true })).toBeVisible();
+  await expect(page.getByText("qa-第一页接口内容", { exact: true })).toHaveCount(0);
+
+  await page.getByLabel("发布状态").selectOption("review");
+  await expect(page.getByRole("status")).toContainText("正在读取官网内容");
+  await expect(page.getByText("qa-第二页接口内容", { exact: true })).toHaveCount(0);
+  await expect.poll(() => requests.at(-1)).toContain("page=1&pageSize=20&status=review");
+  releaseFilteredResponse();
+  await expect(page.getByText("qa-筛选后的第一页", { exact: true })).toBeVisible();
+});
+
+test("real legacy content write and preview routes are unavailable and never report a local success", async ({ page }) => {
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+
+  for (const path of ["/admin/content/new", "/admin/content/legacy-local-id", "/admin/content/legacy-local-id/preview"]) {
+    await page.goto(path);
+    await expect(page.getByText("尚未接入真实 API", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "保存草稿" })).toHaveCount(0);
+    await expect(page.getByText("草稿已保存。", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("按语义键重试", { exact: true })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
+  }
 });
