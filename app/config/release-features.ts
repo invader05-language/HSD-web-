@@ -9,7 +9,7 @@ export interface ReleaseFeatures {
 export const RELEASE_FEATURES: ReleaseFeatures = {
   auditLog: false,
   recycleBin: true,
-  uploadTasks: false,
+  uploadTasks: true,
   recruitmentBatches: true,
   helpCenter: true
 };

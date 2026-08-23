@@ -145,13 +145,23 @@ test("dashboard presents a capability-aware operational workbench", async ({ pag
   await expect(page.getByRole("link", { name: "管理素材 →" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "上传任务", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "媒体与资源" }).click();
+  await expect(page.getByRole("link", { name: "上传任务", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "新建" }).click();
   const quickActions = page.getByRole("menu", { name: "快捷新建" });
   await expect(quickActions).toContainText("发布 HSD 快讯");
   await expect(quickActions).toContainText("添加成员");
   await expect(quickActions).not.toContainText("上传学习资料");
+});
+
+test("mock upload queue preserves its fixture progress demonstration", async ({ page }) => {
+  await signInToAdmin(page, "/admin/uploads");
+
+  await expect(page.getByRole("heading", { level: 1, name: "上传任务" })).toBeVisible();
+  await expect(page.getByText("中心介绍短片.mp4", { exact: true })).toBeVisible();
+  await expect(page.getByText("68%", { exact: true })).toBeVisible();
+  await expect(page.getByText("分片上传，可断点续传", { exact: false })).toBeVisible();
 });
 
 test("member administration defaults formal profiles to public without visibility controls", async ({ page }) => {

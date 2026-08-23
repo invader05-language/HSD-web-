@@ -1964,6 +1964,7 @@ export const API_V1_PATHS = {
   publicPortal: "/api/v1/public/portal",
   adminContentList: "/api/v1/admin/content",
   adminContentDetail: "/api/v1/admin/content/{contentId}",
+  adminUploads: "/api/v1/admin/uploads",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
   adminUploadComplete: "/api/v1/admin/uploads/{uploadId}/complete",
   adminUploadStatus: "/api/v1/admin/uploads/{uploadId}",
@@ -2094,6 +2095,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/public/portal": { method: "GET", path: "/api/v1/public/portal" },
   "GET /api/v1/admin/content": { method: "GET", path: "/api/v1/admin/content" },
   "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
+  "GET /api/v1/admin/uploads": { method: "GET", path: "/api/v1/admin/uploads" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
   "POST /api/v1/admin/uploads/{uploadId}/complete": { method: "POST", path: "/api/v1/admin/uploads/{uploadId}/complete" },
   "GET /api/v1/admin/uploads/{uploadId}": { method: "GET", path: "/api/v1/admin/uploads/{uploadId}" },
@@ -2230,6 +2232,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/public/portal": PublicPortalResponseDto;
   "GET /api/v1/admin/content": AdminContentListResponseDto;
   "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "GET /api/v1/admin/uploads": UploadListResponseDto;
   "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
   "POST /api/v1/admin/uploads/{uploadId}/complete": UploadResponseDto;
   "GET /api/v1/admin/uploads/{uploadId}": UploadResponseDto;
@@ -2463,6 +2466,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/admin/content/{contentId}": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "GET /api/v1/admin/uploads": {
+    "$ref": "#/components/schemas/UploadListResponseDto"
   },
   "POST /api/v1/admin/uploads/intents": {
     "$ref": "#/components/schemas/UploadIntentResponseDto"

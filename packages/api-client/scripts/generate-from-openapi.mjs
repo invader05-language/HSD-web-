@@ -50,6 +50,7 @@ const browserOperations = {
   publicPortal: "GET /api/v1/public/portal",
   adminContentList: "GET /api/v1/admin/content",
   adminContentDetail: "GET /api/v1/admin/content/{contentId}",
+  adminUploads: "GET /api/v1/admin/uploads",
   adminUploadIntent: "POST /api/v1/admin/uploads/intents",
   adminUploadComplete: { operation: "POST /api/v1/admin/uploads/{uploadId}/complete", successStatus: "200" },
   adminUploadStatus: "GET /api/v1/admin/uploads/{uploadId}",

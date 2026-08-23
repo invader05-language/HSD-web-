@@ -172,6 +172,7 @@ export interface HsdApiClient {
     detail(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}">>;
   };
   uploads: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/uploads">>;
     createIntent(payload: CreateUploadIntentDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/intents">>;
     complete(uploadId: string, payload: CompleteUploadDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/{uploadId}/complete">>;
     status(uploadId: string): Promise<ApiResponseFor<"GET /api/v1/admin/uploads/{uploadId}">>;
@@ -330,6 +331,12 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       ),
     },
     uploads: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/uploads",
+        undefined,
+        `/api/v1/admin/uploads${query ? `?${query}` : ""}`,
+      ),
       createIntent: (payload) => requestGenerated(transport, "POST /api/v1/admin/uploads/intents", payload),
       complete: (uploadId, payload) => requestGenerated(transport, "POST /api/v1/admin/uploads/{uploadId}/complete", payload, `/api/v1/admin/uploads/${encodeURIComponent(uploadId)}/complete`),
       status: (uploadId) => requestGenerated(transport, "GET /api/v1/admin/uploads/{uploadId}", undefined, `/api/v1/admin/uploads/${encodeURIComponent(uploadId)}`),
