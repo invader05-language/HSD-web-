@@ -175,7 +175,7 @@ onMounted(loadProductionBatches);
     <p v-if="createMessage" class="admin-save-message" role="status">{{ createMessage }}</p>
 
     <section class="admin-summary-strip" aria-label="批次概览">
-      <div><span>开放批次</span><strong>{{ String(openBatchCount).padStart(2, "0") }}</strong><small>全站同一时间最多一个</small></div>
+      <div><span>开放批次</span><strong>{{ String(openBatchCount).padStart(2, "0") }}</strong><small v-if="isMockApi">全站同一时间最多一个</small></div>
       <div><span>报名人数</span><strong>{{ applicantTotal }}</strong><small>按批次汇总</small></div>
       <div><span>开放中心</span><strong>{{ String(openCenterTotal).padStart(2, "0") }}</strong><small>当前开放批次</small></div>
       <div><span>待配置</span><strong>{{ String(draftCount).padStart(2, "0") }}</strong><small>草稿批次</small></div>
