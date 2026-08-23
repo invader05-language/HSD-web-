@@ -67,9 +67,35 @@ import {
   type WithdrawApplicationDto,
 } from "./generated";
 
-export type ArchiveRecruitmentBatchPayload = Omit<RecruitmentBatchCommandDto, "confirmed"> & {
+export interface ArchiveRecruitmentBatchPayload {
+  expectedVersion: number;
   confirmed: true;
-};
+  reason?: string;
+}
+
+export function normalizeArchiveRecruitmentBatchPayload(payload: unknown): ArchiveRecruitmentBatchPayload {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("archive payload must be an object");
+  }
+  const input = payload as Record<string, unknown>;
+  if (!Number.isInteger(input.expectedVersion) || (input.expectedVersion as number) < 1) {
+    throw new Error("archive expectedVersion must be a positive integer");
+  }
+  if (input.confirmed !== true) {
+    throw new Error("archive confirmed must be true");
+  }
+  if (input.reason === undefined) {
+    return { expectedVersion: input.expectedVersion as number, confirmed: true };
+  }
+  if (typeof input.reason !== "string") {
+    throw new Error("archive reason must be a string between 1 and 500 characters");
+  }
+  const reason = input.reason.trim();
+  if (reason.length < 1 || reason.length > 500) {
+    throw new Error("archive reason must be between 1 and 500 characters after trimming");
+  }
+  return { expectedVersion: input.expectedVersion as number, confirmed: true, reason };
+}
 
 /** The dashboard endpoint is intentionally ungenerated until the M5 server contract exists in Swagger. */
 export const ADMIN_DASHBOARD_PATH = "/api/v1/admin/dashboard" as const;
@@ -342,10 +368,10 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
         const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
         return requestGenerated(transport, operation, payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`) as Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
       },
-      archiveAdminBatch: (batchId, payload) => requestGenerated(
+      archiveAdminBatch: async (batchId, payload) => requestGenerated(
         transport,
         "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
-        payload,
+        normalizeArchiveRecruitmentBatchPayload(payload),
         `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
       ),
       listAdminApplications: (batchId, query = "") => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`),

@@ -12,6 +12,12 @@ const ADMIN_SESSION = {
   mustChangePassword: false,
 };
 
+const MEMBER_SESSION = {
+  account: { id: "member-api", adminLevel: "MEMBER", adminCenterId: null, capabilities: [] },
+  person: { id: "person-member", name: "普通成员", status: "FORMAL_MEMBER" },
+  mustChangePassword: false,
+};
+
 function batch(version = 9, archived = false) {
   return {
     id: "batch-real-closed",
@@ -246,6 +252,35 @@ test("real OWNER archive posts the current version with CSRF, maps the response,
   expect(archiveRequest?.headers["x-request-id"]).toBeTruthy();
 });
 
+test("real archive confirms success without claiming a failed lifecycle refresh", async ({ page }) => {
+  let lifecycleReads = 0;
+  await installSession(page);
+  await installDetail(page);
+  await page.context().addCookies([{ name: "hsd_csrf", value: "csrf-token", domain: "127.0.0.1", path: "/" }]);
+  await page.route("**/api/v1/admin/recruitment/batches/batch-real-closed/lifecycle-events?*", (route) => {
+    lifecycleReads += 1;
+    return lifecycleReads === 1
+      ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 50, total: 0, items: [] }) })
+      : route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "LIFECYCLE_UNAVAILABLE", message: "Lifecycle unavailable", requestId: "lifecycle-refresh-failed" }) });
+  });
+  await page.route("**/api/v1/admin/recruitment/batches/batch-real-closed/archive", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(batch(10, true)),
+  }));
+
+  await page.goto("/admin/recruitment/batches/batch-real-closed");
+  await page.getByRole("button", { name: "归档批次" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "确认归档批次" }).click();
+
+  const success = page.getByRole("status");
+  await expect(success).toContainText("归档批次已完成");
+  await expect(success).not.toContainText("状态和生命周期记录已刷新");
+  await expect(page.getByRole("region", { name: "批次概览" })).toContainText("已归档");
+  await expect(page.getByRole("region", { name: "生命周期记录" }).getByRole("alert")).toContainText("生命周期记录读取失败");
+  expect(lifecycleReads).toBe(2);
+});
+
 test("real ADMIN cannot start archive and a server 403 never produces success", async ({ page }) => {
   await installSession(page, ADMIN_SESSION);
   await installDetail(page);
@@ -260,6 +295,29 @@ test("real ADMIN cannot start archive and a server 403 never produces success", 
   await expect(page.getByRole("button", { name: "归档批次" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toContainText("当前账号无权读取该批次的生命周期记录。");
   await expect(page.getByRole("status")).toHaveCount(0);
+});
+
+test("real MEMBER receives the admin 403 view and can never submit archive", async ({ page }) => {
+  let adminRequests = 0;
+  let archivePosts = 0;
+  await installSession(page, MEMBER_SESSION);
+  await page.route("**/api/v1/admin/recruitment/**", (route) => {
+    adminRequests += 1;
+    if (route.request().method() === "POST") archivePosts += 1;
+    return route.fulfill({
+      status: 403,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "ADMIN_ACCESS_REQUIRED", message: "Admin only", requestId: "member-403" }),
+    });
+  });
+
+  await page.goto("/admin/recruitment/batches/batch-real-closed");
+
+  await expect(page.getByRole("heading", { level: 1, name: "当前账号没有此项管理权限" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /归档批次/ })).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveCount(0);
+  expect(adminRequests).toBe(0);
+  expect(archivePosts).toBe(0);
 });
 
 for (const status of [403, 422] as const) {
@@ -330,4 +388,45 @@ test("real archive keeps reason and confirmation context across 409 refresh, the
   await dialog.getByRole("button", { name: "确认归档批次" }).click();
   await expect(page.getByRole("status")).toContainText("归档批次已完成");
   expect(archiveBodies[1]).toEqual({ expectedVersion: 10, confirmed: true, reason: "保留这段原因" });
+});
+
+test("real archive disables a retained confirmation when the 409 refresh reports archived", async ({ page }) => {
+  let detailReads = 0;
+  const archiveBodies: unknown[] = [];
+  await installSession(page);
+  await page.context().addCookies([{ name: "hsd_csrf", value: "csrf-token", domain: "127.0.0.1", path: "/" }]);
+  await installDetail(page, (route) => {
+    detailReads += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(detailReads === 1 ? batch(9) : batch(10, true)),
+    });
+  });
+  await page.route("**/api/v1/admin/recruitment/batches/batch-real-closed/lifecycle-events?*", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ page: 1, pageSize: 50, total: 0, items: [] }),
+  }));
+  await page.route("**/api/v1/admin/recruitment/batches/batch-real-closed/archive", (route) => {
+    archiveBodies.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "RECRUITMENT_BATCH_VERSION_CONFLICT", message: "Version conflict", requestId: "archive-conflict-archived" }),
+    });
+  });
+
+  await page.goto("/admin/recruitment/batches/batch-real-closed");
+  await page.getByRole("button", { name: "归档批次" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await dialog.getByLabel("操作原因（可选）").fill("状态变化后仍保留展示");
+  await dialog.getByRole("button", { name: "确认归档批次" }).click();
+
+  await expect(page.getByRole("region", { name: "批次概览" })).toContainText("已归档");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("操作原因（可选）")).toHaveValue("状态变化后仍保留展示");
+  await expect(dialog.getByRole("button", { name: "确认归档批次" })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "确认归档批次？" })).toHaveCount(1);
+  expect(archiveBodies).toEqual([{ expectedVersion: 9, confirmed: true, reason: "状态变化后仍保留展示" }]);
 });

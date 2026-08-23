@@ -19,7 +19,18 @@ interface AdminBatchGateway {
 
 type DetailStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "error";
 type LifecycleStatus = DetailStatus | "empty" | "unavailable";
-type ArchiveStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "conflict" | "error" | "unavailable";
+type ArchiveStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "conflict" | "stale" | "error" | "unavailable";
+
+export interface ArchiveRecruitmentBatchConfirmation {
+  batchId: string;
+  expectedVersion: number;
+  reason?: string;
+}
+
+export interface ArchiveRecruitmentBatchResult {
+  archived: boolean;
+  lifecycleRefreshed: boolean;
+}
 
 function requestStatus(cause: unknown): Exclude<DetailStatus, "idle" | "loading" | "success"> {
   const status = (cause as { status?: number })?.status;
@@ -111,51 +122,64 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
-  async function refreshLifecycle(batchId: string, requestGeneration: number) {
+  async function refreshLifecycle(batchId: string, requestGeneration: number): Promise<boolean> {
     if (!gateway.listAdminBatchLifecycleEvents) {
       lifecycleStatus.value = "unavailable";
       lifecycleEvents.value = [];
-      return;
+      return false;
     }
     lifecycleStatus.value = "loading";
     lifecycleError.value = "";
     lifecycleEvents.value = [];
     try {
       const response = await gateway.listAdminBatchLifecycleEvents(batchId, 1, 50);
-      if (requestGeneration !== loadGeneration) return;
+      if (requestGeneration !== loadGeneration) return false;
       lifecycleEvents.value = response.items.map(mapRecruitmentBatchLifecycleEvent);
       lifecycleStatus.value = lifecycleEvents.value.length ? "success" : "empty";
+      return true;
     } catch (cause) {
-      if (requestGeneration !== loadGeneration) return;
+      if (requestGeneration !== loadGeneration) return false;
       lifecycleStatus.value = requestStatus(cause);
       lifecycleError.value = errorMessage(cause, "生命周期记录读取失败，请稍后重试。");
+      return false;
     }
   }
 
-  async function archive(reason?: string): Promise<boolean> {
+  async function archive(input: ArchiveRecruitmentBatchConfirmation): Promise<ArchiveRecruitmentBatchResult> {
+    const failed = { archived: false, lifecycleRefreshed: false };
     if (!batch.value || !currentBatchId || !gateway.archiveAdminBatch) {
       archiveStatus.value = "unavailable";
       archiveError.value = "真实归档接口暂不可用。";
-      return false;
+      return failed;
+    }
+    if (input.batchId !== currentBatchId || input.expectedVersion !== batch.value.version) {
+      archiveStatus.value = "stale";
+      archiveError.value = "归档确认已失效，请根据当前批次和版本重新确认。";
+      return failed;
+    }
+    if (batch.value.effectiveStatus !== "closed" || batch.value.archivedAt) {
+      archiveStatus.value = "stale";
+      archiveError.value = "只有当前有效状态为已关闭的批次才能归档。";
+      return failed;
     }
     const requestGeneration = loadGeneration;
     const payload: ArchiveRecruitmentBatchPayload = {
-      expectedVersion: batch.value.version,
+      expectedVersion: input.expectedVersion,
       confirmed: true,
-      ...(reason?.trim() ? { reason: reason.trim() } : {}),
+      ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
     };
     archiving.value = true;
     archiveStatus.value = "loading";
     archiveError.value = "";
     try {
       const response = await gateway.archiveAdminBatch(currentBatchId, payload);
-      if (requestGeneration !== loadGeneration) return false;
+      if (requestGeneration !== loadGeneration) return failed;
       batch.value = mapAdminRecruitmentBatch(response);
       archiveStatus.value = "success";
-      await refreshLifecycle(currentBatchId, requestGeneration);
-      return true;
+      const lifecycleRefreshed = await refreshLifecycle(currentBatchId, requestGeneration);
+      return { archived: true, lifecycleRefreshed };
     } catch (cause) {
-      if (requestGeneration !== loadGeneration) return false;
+      if (requestGeneration !== loadGeneration) return failed;
       const status = (cause as { status?: number })?.status;
       if (status === 409) {
         archiveStatus.value = "conflict";
@@ -165,11 +189,15 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
         } finally {
           if (requestGeneration === loadGeneration) loading.value = false;
         }
+        return {
+          archived: false,
+          lifecycleRefreshed: lifecycleStatus.value === "success" || lifecycleStatus.value === "empty",
+        };
       } else {
         archiveStatus.value = requestStatus(cause);
         archiveError.value = errorMessage(cause, "批次归档失败，请稍后重试。");
       }
-      return false;
+      return failed;
     } finally {
       if (requestGeneration === loadGeneration) archiving.value = false;
     }

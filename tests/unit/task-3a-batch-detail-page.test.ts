@@ -7,6 +7,7 @@ import {
   RECRUITMENT_BATCH_STORAGE_KEY,
   useRecruitmentBatchStore,
 } from "../../app/stores/recruitment-batch";
+import { useSessionStore } from "../../app/stores/session";
 
 const routeState = reactive({
   params: { batchId: "batch-api-only" },
@@ -42,6 +43,22 @@ const apiBatch = {
 };
 
 const emptyLifecycle = { page: 1, pageSize: 50, total: 0, items: [] };
+const closedApiBatch = {
+  ...apiBatch,
+  lifecycleStatus: "CLOSED",
+  manualOverride: "FORCE_CLOSED",
+  effectiveStatus: "closed",
+  effectiveStatusReason: "force-closed",
+  closedAt: "2026-09-21T00:00:00.000Z",
+};
+
+function installOwnerSession() {
+  useSessionStore().applyApiSession({
+    account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: ["recruitment.batch.manage"] },
+    person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
+    mustChangePassword: false,
+  });
+}
 
 function seedMockBatch(name = "Mock 批次概览") {
   localStorage.setItem(RECRUITMENT_BATCH_STORAGE_KEY, JSON.stringify({
@@ -314,5 +331,108 @@ describe("Task 3A production batch detail page", () => {
     await nextTick();
     expect(wrapper.get("h1").text()).toBe("API B 批次");
     expect(wrapper.text()).not.toContain("过期 API A 批次");
+  });
+
+  it("clears a bound archive dialog, reason, and error when the route batch changes", async () => {
+    installOwnerSession();
+    document.cookie = "hsd_csrf=csrf-token; path=/";
+    let archiveRequests = 0;
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) {
+        return new Response(JSON.stringify(emptyLifecycle), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/archive") && init?.method === "POST") {
+        archiveRequests += 1;
+        return new Response(JSON.stringify({ code: "OWNER_ONLY", message: "归档被拒绝", requestId: "archive-denied" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const isBatchB = url.includes("/batch-b");
+      return new Response(JSON.stringify({
+        ...closedApiBatch,
+        ...(isBatchB ? { id: "batch-b", name: "API B 已关闭批次", version: 4 } : {}),
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.get("button").trigger("click");
+    await wrapper.get("textarea").setValue("只能属于批次 A 的原因");
+    const confirm = wrapper.findAll("button").find((button) => button.text() === "确认归档批次");
+    expect(confirm).toBeDefined();
+    await confirm!.trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[role="alertdialog"]').text()).toContain("归档被拒绝");
+
+    routeState.params.batchId = "batch-b";
+    routeState.path = "/admin/recruitment/batches/batch-b";
+    await nextTick();
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.get("h1").text()).toBe("API B 已关闭批次");
+    expect(wrapper.find('[role="alertdialog"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("只能属于批次 A 的原因");
+    expect(wrapper.text()).not.toContain("归档被拒绝");
+    expect(archiveRequests).toBe(1);
+  });
+
+  it("clears archive success messaging when navigating to another batch", async () => {
+    installOwnerSession();
+    document.cookie = "hsd_csrf=csrf-token; path=/";
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) {
+        return new Response(JSON.stringify(emptyLifecycle), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.endsWith("/archive") && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          ...closedApiBatch,
+          lifecycleStatus: "ARCHIVED",
+          effectiveStatus: "archived",
+          effectiveStatusReason: "archived",
+          version: 10,
+          archivedAt: "2026-09-30T00:00:00.000Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      const isBatchB = url.includes("/batch-b");
+      return new Response(JSON.stringify({
+        ...closedApiBatch,
+        ...(isBatchB ? { id: "batch-b", name: "API B 已关闭批次", version: 4 } : {}),
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.get("button").trigger("click");
+    const confirm = wrapper.findAll("button").find((button) => button.text() === "确认归档批次");
+    await confirm!.trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[role="status"]').text()).toContain("归档批次已完成");
+
+    routeState.params.batchId = "batch-b";
+    routeState.path = "/admin/recruitment/batches/batch-b";
+    await nextTick();
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.get("h1").text()).toBe("API B 已关闭批次");
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
   });
 });

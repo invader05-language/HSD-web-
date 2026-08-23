@@ -1,5 +1,6 @@
 import {
   isApiResponse,
+  normalizeArchiveRecruitmentBatchPayload,
   type AdminRecruitmentApplicationDto,
   type AdminRecruitmentApplicationListDto,
   type AdminRecruitmentBatchDto,
@@ -202,16 +203,11 @@ export function createApiRecruitmentGateway(
       ) as Promise<AdminRecruitmentBatchDto>;
     },
     archiveAdminBatch: async (batchId, payload: ArchiveRecruitmentBatchPayload) => {
-      if (!Number.isInteger(payload.expectedVersion) || payload.expectedVersion < 1) {
-        throw new Error("archive expectedVersion must be a positive integer");
-      }
-      if (payload.confirmed !== true) {
-        throw new Error("archive confirmed must be true");
-      }
+      const normalizedPayload = normalizeArchiveRecruitmentBatchPayload(payload);
       return mutate(
         "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
         `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
-        payload,
+        normalizedPayload,
       );
     },
     listAdminApplications: (batchId, query = "") => read(

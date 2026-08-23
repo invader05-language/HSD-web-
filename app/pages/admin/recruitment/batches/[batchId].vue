@@ -39,6 +39,11 @@ interface AdminBatchDetail extends AdminRecruitmentBatchLike {
 }
 
 type LifecycleAction = "publish" | "openNow" | "pause" | "resume" | "close" | "reopen" | "archive";
+interface PendingLifecycleAction {
+  action: LifecycleAction;
+  batchId: string;
+  expectedVersion: number;
+}
 
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
@@ -94,10 +99,15 @@ const assessmentStarted = computed(() => Boolean(
   (batchStore as unknown as { assessmentStartedAt?: Record<string, string> } | undefined)?.assessmentStartedAt?.[batchId.value],
 ));
 const canReopen = computed(() => isMockApi && statusKey.value === "closed" && !assessmentPublished.value && !assessmentStarted.value);
-const pendingAction = ref<LifecycleAction | null>(null);
+const pendingAction = ref<PendingLifecycleAction | null>(null);
 const reason = ref("");
 const actionMessage = ref("");
 const actionError = ref("");
+const canConfirmPendingAction = computed(() => {
+  if (!pendingAction.value) return false;
+  if (isMockApi) return true;
+  return archiveConfirmationIssue(pendingAction.value) === undefined;
+});
 const editOpen = ref(false);
 const editError = ref("");
 const editForm = reactive({
@@ -197,6 +207,33 @@ function actionLabel(action: LifecycleAction) {
   }[action];
 }
 
+function archiveConfirmationIssue(context: PendingLifecycleAction): string | undefined {
+  if (context.action !== "archive" || !productionBatch) {
+    return "当前详情页尚未接入真实批次状态命令。";
+  }
+  if (context.batchId !== batchId.value) {
+    return "归档确认不属于当前批次，请重新确认。";
+  }
+  if (session.adminLevel !== "owner" || !canManage.value) {
+    return "只有联盟总负责人可以归档批次。";
+  }
+  const currentBatch = productionBatch.batch.value;
+  if (!currentBatch || statusKey.value !== "closed" || currentBatch.archivedAt) {
+    return "只有服务端判定为已关闭的批次才能提交归档确认。";
+  }
+  if (context.expectedVersion !== currentBatch.version) {
+    return "归档确认版本已失效，请根据当前版本重新确认。";
+  }
+  return undefined;
+}
+
+function clearActionState() {
+  pendingAction.value = null;
+  reason.value = "";
+  actionMessage.value = "";
+  actionError.value = "";
+}
+
 function requestAction(action: LifecycleAction) {
   actionError.value = "";
   actionMessage.value = "";
@@ -213,7 +250,12 @@ function requestAction(action: LifecycleAction) {
       actionError.value = "只有服务端判定为已关闭的批次才能提交归档确认。";
       return;
     }
-    pendingAction.value = action;
+    const expectedVersion = productionBatch?.batch.value?.version;
+    if (!Number.isInteger(expectedVersion) || (expectedVersion ?? 0) < 1) {
+      actionError.value = "当前批次版本无效，无法提交归档确认。";
+      return;
+    }
+    pendingAction.value = { action, batchId: batchId.value, expectedVersion: expectedVersion as number };
     return;
   }
   if (!canManage.value) {
@@ -224,16 +266,44 @@ function requestAction(action: LifecycleAction) {
     actionError.value = getRecruitmentBatchCommandMessage(publishReadiness.value);
     return;
   }
-  pendingAction.value = action;
+  pendingAction.value = {
+    action,
+    batchId: batchId.value,
+    expectedVersion: batch.value?.version ?? 1,
+  };
 }
 
-async function invokeAction(action: LifecycleAction) {
+async function invokeAction(context: PendingLifecycleAction) {
+  const action = context.action;
   if (!isMockApi) {
     if (action !== "archive" || !productionBatch) return;
-    const archived = await productionBatch.archive(reason.value);
+    const issue = archiveConfirmationIssue(context);
+    if (issue) {
+      actionError.value = issue;
+      return;
+    }
+    const result = await productionBatch.archive({
+      batchId: context.batchId,
+      expectedVersion: context.expectedVersion,
+      reason: reason.value,
+    });
+    if (context.batchId !== batchId.value || pendingAction.value !== context) return;
     actionError.value = productionBatch.archiveError.value;
-    if (!archived) return;
-    actionMessage.value = "归档批次已完成，状态和生命周期记录已刷新。";
+    if (!result.archived) {
+      if (productionBatch.archiveStatus.value === "conflict") {
+        const refreshedVersion = productionBatch.batch.value?.version;
+        if (Number.isInteger(refreshedVersion) && (refreshedVersion ?? 0) > 0) {
+          pendingAction.value = { ...context, expectedVersion: refreshedVersion as number };
+        }
+        if (statusKey.value !== "closed" || productionBatch.batch.value?.archivedAt) {
+          actionError.value = "批次版本已变化，最新状态不再允许归档，不能再次提交。";
+        }
+      }
+      return;
+    }
+    actionMessage.value = result.lifecycleRefreshed
+      ? "归档批次已完成，状态和生命周期记录已刷新。"
+      : "归档批次已完成。";
     pendingAction.value = null;
     reason.value = "";
     return;
@@ -249,8 +319,8 @@ async function invokeAction(action: LifecycleAction) {
     const rationale = reason.value.trim() || undefined;
     const currentTime = new Date();
     const result = action === "openNow" || action === "close" || action === "reopen"
-      ? (method as (id: string, confirmed: boolean, now: Date, reason?: string) => unknown).call(batchStore, batchId.value, true, currentTime, rationale)
-      : (method as (id: string, now?: Date, reason?: string) => unknown).call(batchStore, batchId.value, currentTime, rationale);
+      ? (method as (id: string, confirmed: boolean, now: Date, reason?: string) => unknown).call(batchStore, context.batchId, true, currentTime, rationale)
+      : (method as (id: string, now?: Date, reason?: string) => unknown).call(batchStore, context.batchId, currentTime, rationale);
     if (result === false || (result && typeof result === "object" && "ok" in result && !(result as { ok: boolean }).ok)) {
       throw new Error("BATCH_COMMAND_FAILED");
     }
@@ -265,7 +335,15 @@ async function invokeAction(action: LifecycleAction) {
 }
 
 function confirmAction() {
-  if (pendingAction.value) void invokeAction(pendingAction.value);
+  if (!pendingAction.value) return;
+  if (!isMockApi) {
+    const issue = archiveConfirmationIssue(pendingAction.value);
+    if (issue) {
+      actionError.value = issue;
+      return;
+    }
+  }
+  void invokeAction(pendingAction.value);
 }
 
 function dateInput(value?: string) {
@@ -394,7 +472,10 @@ async function loadProductionBatch() {
 }
 
 onMounted(loadProductionBatch);
-watch(batchId, () => { void loadProductionBatch(); });
+watch(batchId, () => {
+  clearActionState();
+  void loadProductionBatch();
+});
 
 useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台` }));
 </script>
@@ -514,11 +595,11 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <div v-if="pendingAction" class="admin-modal-backdrop">
       <section role="alertdialog" aria-modal="true" aria-labelledby="batch-action-confirm-title">
-        <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction) }}？</h2>
+        <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction.action) }}？</h2>
         <p>该操作会改变当前批次的用户报名入口。操作人、原计划时间、实际执行时间和前后状态会写入生命周期记录。</p>
-        <label>操作原因（可选）<textarea v-model="reason" rows="3" placeholder="填写本次批次状态变更原因"></textarea></label>
+        <label>操作原因（可选）<textarea v-model="reason" rows="3" maxlength="500" placeholder="填写本次批次状态变更原因"></textarea></label>
         <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
-        <div><button type="button" class="button button--ghost" :disabled="productionBatch?.archiving.value" @click="pendingAction = null">返回检查</button><button type="button" class="button" :disabled="productionBatch?.archiving.value" @click="confirmAction">确认{{ actionLabel(pendingAction) }}</button></div>
+        <div><button type="button" class="button button--ghost" :disabled="productionBatch?.archiving.value" @click="clearActionState">返回检查</button><button type="button" class="button" :disabled="productionBatch?.archiving.value || !canConfirmPendingAction" @click="confirmAction">确认{{ actionLabel(pendingAction.action) }}</button></div>
       </section>
     </div>
 

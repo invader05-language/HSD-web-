@@ -88,7 +88,7 @@ describe("Task 3C-G generated recruitment lifecycle client", () => {
     await expect(client.recruitment.archiveAdminBatch("batch/closed", {
       expectedVersion: 9,
       confirmed: true,
-      reason: "结果复核完成",
+      reason: "  结果复核完成  ",
     })).resolves.toEqual(archivedBatch);
 
     expect(transport).toHaveBeenNthCalledWith(1, {
@@ -100,6 +100,22 @@ describe("Task 3C-G generated recruitment lifecycle client", () => {
       path: "/api/v1/admin/recruitment/batches/batch%2Fclosed/archive",
       body: { expectedVersion: 9, confirmed: true, reason: "结果复核完成" },
     });
+  });
+
+  it.each([
+    [{ expectedVersion: 1.5, confirmed: true }, "expectedVersion"],
+    [{ expectedVersion: 0, confirmed: true }, "expectedVersion"],
+    [{ expectedVersion: 9, confirmed: false }, "confirmed"],
+    [{ expectedVersion: 9, confirmed: true, reason: "   " }, "reason"],
+    [{ expectedVersion: 9, confirmed: true, reason: "x".repeat(501) }, "reason"],
+  ])("rejects an invalid archive body at the client entry point: %o", async (payload, expectedMessage) => {
+    const transport = vi.fn();
+    const client = createHsdApiClient(transport) as ReturnType<typeof createHsdApiClient> & {
+      recruitment: { archiveAdminBatch(batchId: string, payload: unknown): Promise<AdminRecruitmentBatchDto> };
+    };
+
+    await expect(client.recruitment.archiveAdminBatch("batch", payload)).rejects.toThrow(expectedMessage);
+    expect(transport).not.toHaveBeenCalled();
   });
 });
 
@@ -122,7 +138,7 @@ describe("Task 3C-G recruitment lifecycle API gateway", () => {
     await expect(gateway.archiveAdminBatch("batch/closed", {
       expectedVersion: 9,
       confirmed: true,
-      reason: "结果复核完成",
+      reason: "  结果复核完成  ",
     })).resolves.toEqual(archivedBatch);
 
     expect(fetcher).toHaveBeenNthCalledWith(1,
@@ -150,7 +166,10 @@ describe("Task 3C-G recruitment lifecycle API gateway", () => {
 
   it.each([
     [{ expectedVersion: 1.5, confirmed: true }, "expectedVersion"],
+    [{ expectedVersion: 0, confirmed: true }, "expectedVersion"],
     [{ expectedVersion: 9, confirmed: false }, "confirmed"],
+    [{ expectedVersion: 9, confirmed: true, reason: "   " }, "reason"],
+    [{ expectedVersion: 9, confirmed: true, reason: "x".repeat(501) }, "reason"],
   ])("rejects an invalid archive body before transport: %o", async (payload, expectedMessage) => {
     const fetcher = vi.fn<typeof globalThis.fetch>();
     const gateway = createApiRecruitmentGateway({
@@ -191,7 +210,10 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
       detailStatus: { value: string };
       archiveStatus: { value: string };
       archiveError: { value: string };
-      archive(reason?: string): Promise<boolean>;
+      archive(input: { batchId: string; expectedVersion: number; reason?: string }): Promise<{
+        archived: boolean;
+        lifecycleRefreshed: boolean;
+      }>;
     };
   }
 
@@ -320,7 +342,11 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     });
     await controller.load("batch/closed");
 
-    await expect(controller.archive("  结果复核完成  ")).resolves.toBe(true);
+    await expect(controller.archive({
+      batchId: "batch/closed",
+      expectedVersion: 9,
+      reason: "  结果复核完成  ",
+    })).resolves.toEqual({ archived: true, lifecycleRefreshed: true });
 
     expect(archiveAdminBatch).toHaveBeenCalledWith("batch/closed", {
       expectedVersion: 9,
@@ -340,7 +366,11 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     });
     await controller.load("batch-closed");
 
-    await expect(controller.archive("not allowed")).resolves.toBe(false);
+    await expect(controller.archive({
+      batchId: "batch-closed",
+      expectedVersion: 9,
+      reason: "not allowed",
+    })).resolves.toEqual({ archived: false, lifecycleRefreshed: false });
 
     expect(controller.batch.value).toMatchObject({ lifecycleStatus: "closed", version: 9 });
     expect(controller.archiveStatus.value).toBe("forbidden");
@@ -361,18 +391,67 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     const controller = controllerWith({ getAdminBatch, listAdminBatchLifecycleEvents, archiveAdminBatch });
     await controller.load("batch-closed");
 
-    await expect(controller.archive("保留的原因")).resolves.toBe(false);
+    await expect(controller.archive({
+      batchId: "batch-closed",
+      expectedVersion: 9,
+      reason: "保留的原因",
+    })).resolves.toEqual({ archived: false, lifecycleRefreshed: true });
 
     expect(controller.archiveStatus.value).toBe("conflict");
     expect(controller.archiveError.value).toContain("版本");
     expect(controller.batch.value?.version).toBe(10);
     expect(controller.lifecycleEvents.value[0]?.after).toEqual({ version: 10 });
 
-    await expect(controller.archive("保留的原因")).resolves.toBe(true);
+    await expect(controller.archive({
+      batchId: "batch-closed",
+      expectedVersion: 10,
+      reason: "保留的原因",
+    })).resolves.toEqual({ archived: true, lifecycleRefreshed: true });
     expect(archiveAdminBatch).toHaveBeenNthCalledWith(2, "batch-closed", {
       expectedVersion: 10,
       confirmed: true,
       reason: "保留的原因",
     });
+  });
+
+  it("rejects a stale confirmation before transport when the bound version no longer matches", async () => {
+    const archiveAdminBatch = vi.fn().mockResolvedValue(archivedBatch);
+    const controller = controllerWith({
+      getAdminBatch: vi.fn().mockResolvedValue(closedBatch(10)),
+      listAdminBatchLifecycleEvents: vi.fn().mockResolvedValue(lifecycleResponse),
+      archiveAdminBatch,
+    });
+    await controller.load("batch-closed");
+
+    await expect(controller.archive({
+      batchId: "batch-closed",
+      expectedVersion: 9,
+      reason: "过期确认",
+    })).resolves.toEqual({ archived: false, lifecycleRefreshed: false });
+
+    expect(archiveAdminBatch).not.toHaveBeenCalled();
+    expect(controller.archiveError.value).toContain("失效");
+  });
+
+  it("reports archive success separately when the lifecycle refresh fails", async () => {
+    const listAdminBatchLifecycleEvents = vi.fn()
+      .mockResolvedValueOnce({ ...lifecycleResponse, total: 0, items: [] })
+      .mockRejectedValueOnce(Object.assign(new Error("lifecycle unavailable"), { status: 503 }));
+    const controller = controllerWith({
+      getAdminBatch: vi.fn().mockResolvedValue(closedBatch()),
+      listAdminBatchLifecycleEvents,
+      archiveAdminBatch: vi.fn().mockResolvedValue(archivedBatch),
+    });
+    await controller.load("batch-closed");
+
+    await expect(controller.archive({
+      batchId: "batch-closed",
+      expectedVersion: 9,
+    })).resolves.toEqual({ archived: true, lifecycleRefreshed: false });
+
+    expect(controller.archiveStatus.value).toBe("success");
+    expect(controller.batch.value).toMatchObject({ lifecycleStatus: "archived", version: 10 });
+    expect(controller.lifecycleStatus.value).toBe("error");
+    expect(controller.lifecycleError.value).toContain("lifecycle unavailable");
   });
 });
