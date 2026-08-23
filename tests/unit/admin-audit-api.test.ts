@@ -72,6 +72,32 @@ describe("admin audit production reads", () => {
     expect(JSON.stringify(projection)).not.toMatch(/contact|password|secret|token|session|cookie|requestId|127\.0\.0\.1|userAgent|objectStorage/i);
   });
 
+  it("does not expose camel, snake, or kebab case IP audit fields", () => {
+    const projection = projectSafeAuditValues({ status: "published", clientIp: "10.0.0.1", remoteIp: "10.0.0.2", sourceIp: "10.0.0.3", clientIPAddress: "10.0.0.4", client_ip: "10.0.0.5", "remote-ip": "10.0.0.6" });
+    expect(projection).toEqual({ status: "published" });
+    expect(JSON.stringify(projection)).not.toMatch(/10\.0\.0\.[1-6]|clientIp|remoteIp|sourceIp|clientIPAddress|client_ip|remote-ip/i);
+  });
+
+  it("clears selected API rows for 401 and network failures without a fallback result", async () => {
+    const list = vi.fn().mockResolvedValueOnce({ page: 1, pageSize: 20, total: 1, items: [event] });
+    const controller = createAdminAuditListController({ list });
+    await controller.load();
+    controller.select(controller.records.value[0]!);
+
+    list.mockRejectedValueOnce(Object.assign(new Error("Authentication required"), { status: 401 }));
+    await controller.load();
+    expect(controller.status.value).toBe("unauthorized");
+    expect(controller.records.value).toEqual([]);
+    expect(controller.selected.value).toBeUndefined();
+
+    list.mockRejectedValueOnce(new TypeError("Network unavailable"));
+    await controller.load();
+    expect(controller.status.value).toBe("error");
+    expect(controller.error.value).toBe("Network unavailable");
+    expect(controller.records.value).toEqual([]);
+    expect(controller.selected.value).toBeUndefined();
+  });
+
   it("uses cookie credentials and a request ID for the audit GET without a local fallback header", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1, pageSize: 20, total: 0, items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const gateway = createApiAuditGateway({ apiBase: "https://api.example.test/", fetcher, createRequestId: () => "audit-request-id" });

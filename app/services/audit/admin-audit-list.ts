@@ -12,12 +12,16 @@ export interface AdminAuditListGateway { list(query: string): Promise<SafeAuditE
 const SENSITIVE_KEY = /(?:contact|password|secret|token|session|cookie|request[_-]?id|(?:^|[_-])ip(?:$|[_-])|ipaddress|user[_-]?agent|device|storage|object[_-]?storage|(?:^|[_-])url(?:$|[_-])|endpoint)/i;
 const isScalar = (value: unknown): value is SafeAuditScalar => value === null || ["string", "number", "boolean"].includes(typeof value);
 const isScalarArray = (value: unknown): value is SafeAuditScalar[] => Array.isArray(value) && value.every(isScalar);
+function isSensitiveAuditKey(key: string) {
+  const normalized = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return SENSITIVE_KEY.test(key) || /(?:^|client|remote|source|origin|forwarded|request)ip(?:address)?$/.test(normalized);
+}
 
 export function projectSafeAuditValues(value: unknown): SafeAuditProjection | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const projection: SafeAuditProjection = {};
   for (const [key, candidate] of Object.entries(value as Record<string, unknown>)) {
-    if (SENSITIVE_KEY.test(key)) continue;
+    if (isSensitiveAuditKey(key)) continue;
     if (isScalar(candidate) || isScalarArray(candidate)) projection[key] = candidate;
   }
   return Object.keys(projection).length ? projection : null;
