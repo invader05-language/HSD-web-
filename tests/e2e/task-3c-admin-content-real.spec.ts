@@ -131,15 +131,43 @@ test("real admin content pagination replaces server rows and a filter resets pag
   await expect(page.getByText("qa-筛选后的第一页", { exact: true })).toBeVisible();
 });
 
-test("real legacy content write and preview routes are unavailable and never report a local success", async ({ page }) => {
+test("real content new, edit, and preview routes use API responses without a local fallback", async ({ page }) => {
+  const detail = { id: "content-edit", publicId: "content-edit-public", centerId: "center-1", slug: "content-edit", kind: "article", status: "draft", version: 2, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "qa-编辑接口内容", summary: "编辑摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "原始正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
+  let patchBody: Record<string, unknown> | undefined; let currentDetail = detail;
+  await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/content**", async (route) => {
+    const request = route.request(); const pathname = new URL(request.url()).pathname;
+    if (request.method() === "POST" && pathname === "/api/v1/admin/content") return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(detail) });
+    if (request.method() === "PATCH") { patchBody = request.postDataJSON() as Record<string, unknown>; currentDetail = { ...detail, version: 3, workingRevision: { ...detail.workingRevision, blocks: patchBody.blocks as typeof detail.workingRevision.blocks } }; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) }); }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
+  });
+  await page.goto("/admin/content/new");
+  await page.getByLabel("中心 ID").fill("center-1"); await page.getByLabel("Slug").fill("qa-new"); await page.getByLabel("标题").fill("qa-新建接口内容"); await page.getByLabel("摘要").fill("新建摘要"); await page.getByLabel("正文段落").fill("新建正文"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(page).toHaveURL(/\/admin\/content\/content-edit$/);
+  await page.getByLabel("正文段落").fill("修改后的 API 正文"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect.poll(() => patchBody).toMatchObject({ expectedVersion: 2, blocks: [{ type: "paragraph", text: "修改后的 API 正文" }] });
+  await page.goto("/admin/content/content-edit/preview");
+  await expect(page.getByText("修改后的 API 正文", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
+});
 
-  for (const path of ["/admin/content/new", "/admin/content/legacy-local-id", "/admin/content/legacy-local-id/preview"]) {
-    await page.goto(path);
-    await expect(page.getByText("尚未接入真实 API", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "保存草稿" })).toHaveCount(0);
-    await expect(page.getByText("草稿已保存。", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("按语义键重试", { exact: true })).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
-  }
+test("real content retains its edit draft on 409 and reports a 403 workflow denial without local success", async ({ page }) => {
+  const detail = { id: "conflict-content", publicId: "conflict-public", centerId: "center-1", slug: "conflict-content", kind: "article", status: "review", version: 4, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "冲突内容", summary: "冲突摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "旧正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
+  await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/content/**", async (route) => {
+    const request = route.request(); const path = new URL(request.url()).pathname;
+    if (request.method() === "PATCH") return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ code: "VERSION_CONFLICT", message: "Reload required", requestId: "conflict" }) });
+    if (path.endsWith("/approve-publication")) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "CONTENT_FORBIDDEN", message: "Owner denied", requestId: "forbidden" }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(detail) });
+  });
+  await page.goto("/admin/content/conflict-content");
+  await page.getByLabel("正文段落").fill("冲突后保留的草稿"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(page.getByRole("alert")).toContainText("版本冲突");
+  await expect(page.getByLabel("正文段落")).toHaveValue("冲突后保留的草稿");
+  await page.getByRole("button", { name: "重新读取" }).click();
+  await page.getByRole("button", { name: "审核通过" }).click();
+  await expect(page.getByRole("alert")).toContainText("Owner denied");
+  await expect(page.getByText("服务端已更新内容状态。", { exact: true })).toHaveCount(0);
 });

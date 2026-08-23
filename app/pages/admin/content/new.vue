@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PortalContentKind } from "~/types/portal-content";
 import PortalContentEditor from "~/components/admin/PortalContentEditor.vue";
+import ApiContentEditor from "~/components/admin/ApiContentEditor.vue";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "新建官网内容｜HSD 管理台" });
@@ -13,4 +14,4 @@ function onSaved(id: string) {
 }
 </script>
 
-<template><div class="admin-recruitment-page admin-section-page"><AdminContentRealModeUnavailable v-if="!useMockApi" page="新建官网内容" /><template v-else><AdminPageHeading eyebrow="Official Content" title="新建官网内容" description="内容先保存为草稿，再进入审核和发布流程。" /><PortalContentEditor :initial-kind="initialKind" @saved="onSaved" /></template></div></template>
+<template><div class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Official Content" title="新建官网内容" description="内容先保存为草稿，再进入审核和发布流程。" /><ApiContentEditor v-if="!useMockApi" @saved="onSaved" /><PortalContentEditor v-else :initial-kind="initialKind" @saved="onSaved" /></div></template>

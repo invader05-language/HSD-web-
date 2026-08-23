@@ -1964,6 +1964,14 @@ export const API_V1_PATHS = {
   publicPortal: "/api/v1/public/portal",
   adminContentList: "/api/v1/admin/content",
   adminContentDetail: "/api/v1/admin/content/{contentId}",
+  adminContentCreate: "/api/v1/admin/content",
+  adminContentUpdate: "/api/v1/admin/content/{contentId}",
+  adminContentPreview: "/api/v1/admin/content/{contentId}/preview",
+  adminContentSubmitReview: "/api/v1/admin/content/{contentId}/submit-review",
+  adminContentReturnDraft: "/api/v1/admin/content/{contentId}/return-draft",
+  adminContentApprovePublication: "/api/v1/admin/content/{contentId}/approve-publication",
+  adminContentPublish: "/api/v1/admin/content/{contentId}/publish",
+  adminContentOffline: "/api/v1/admin/content/{contentId}/offline",
   adminUploads: "/api/v1/admin/uploads",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
   adminUploadComplete: "/api/v1/admin/uploads/{uploadId}/complete",
@@ -2095,6 +2103,14 @@ export const API_OPERATIONS = {
   "GET /api/v1/public/portal": { method: "GET", path: "/api/v1/public/portal" },
   "GET /api/v1/admin/content": { method: "GET", path: "/api/v1/admin/content" },
   "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
+  "POST /api/v1/admin/content": { method: "POST", path: "/api/v1/admin/content" },
+  "PATCH /api/v1/admin/content/{contentId}": { method: "PATCH", path: "/api/v1/admin/content/{contentId}" },
+  "GET /api/v1/admin/content/{contentId}/preview": { method: "GET", path: "/api/v1/admin/content/{contentId}/preview" },
+  "POST /api/v1/admin/content/{contentId}/submit-review": { method: "POST", path: "/api/v1/admin/content/{contentId}/submit-review" },
+  "POST /api/v1/admin/content/{contentId}/return-draft": { method: "POST", path: "/api/v1/admin/content/{contentId}/return-draft" },
+  "POST /api/v1/admin/content/{contentId}/approve-publication": { method: "POST", path: "/api/v1/admin/content/{contentId}/approve-publication" },
+  "POST /api/v1/admin/content/{contentId}/publish": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish" },
+  "POST /api/v1/admin/content/{contentId}/offline": { method: "POST", path: "/api/v1/admin/content/{contentId}/offline" },
   "GET /api/v1/admin/uploads": { method: "GET", path: "/api/v1/admin/uploads" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
   "POST /api/v1/admin/uploads/{uploadId}/complete": { method: "POST", path: "/api/v1/admin/uploads/{uploadId}/complete" },
@@ -2232,6 +2248,14 @@ export interface ApiResponseByOperation {
   "GET /api/v1/public/portal": PublicPortalResponseDto;
   "GET /api/v1/admin/content": AdminContentListResponseDto;
   "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "POST /api/v1/admin/content": AdminContentResponseDto;
+  "PATCH /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "GET /api/v1/admin/content/{contentId}/preview": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/submit-review": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/return-draft": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/approve-publication": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/publish": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/offline": AdminContentResponseDto;
   "GET /api/v1/admin/uploads": UploadListResponseDto;
   "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
   "POST /api/v1/admin/uploads/{uploadId}/complete": UploadResponseDto;
@@ -2465,6 +2489,30 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AdminContentListResponseDto"
   },
   "GET /api/v1/admin/content/{contentId}": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "PATCH /api/v1/admin/content/{contentId}": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "GET /api/v1/admin/content/{contentId}/preview": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/submit-review": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/return-draft": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/approve-publication": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/publish": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/offline": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "GET /api/v1/admin/uploads": {

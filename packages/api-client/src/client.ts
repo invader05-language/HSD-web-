@@ -7,6 +7,11 @@ import {
   type ApiV1Path,
   type CreateManagedMemberDto,
   type CreateMembershipDto,
+  type CreateContentDto,
+  type UpdateContentDto,
+  type ContentCommandDto,
+  type ReasonedContentCommandDto,
+  type PublishContentDto,
   type CreateUploadIntentDto,
   type CompleteUploadDto,
   type CreateMediaAttachmentDto,
@@ -170,6 +175,14 @@ export interface HsdApiClient {
   content: {
     list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/content">>;
     detail(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}">>;
+    create(payload: CreateContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content">>;
+    update(contentId: string, payload: UpdateContentDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/content/{contentId}">>;
+    preview(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}/preview">>;
+    submitReview(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/submit-review">>;
+    returnDraft(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/return-draft">>;
+    approvePublication(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/approve-publication">>;
+    publish(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish">>;
+    offline(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/offline">>;
   };
   uploads: {
     list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/uploads">>;
@@ -329,6 +342,14 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
         undefined,
         `/api/v1/admin/content/${encodeURIComponent(contentId)}`,
       ),
+      create: (payload) => requestGenerated(transport, "POST /api/v1/admin/content", payload),
+      update: (contentId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/content/{contentId}", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}`),
+      preview: (contentId) => requestGenerated(transport, "GET /api/v1/admin/content/{contentId}/preview", undefined, `/api/v1/admin/content/${encodeURIComponent(contentId)}/preview`),
+      submitReview: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/submit-review", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/submit-review`),
+      returnDraft: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/return-draft", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/return-draft`),
+      approvePublication: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/approve-publication", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/approve-publication`),
+      publish: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish`),
+      offline: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/offline", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/offline`),
     },
     uploads: {
       list: (query = "") => requestGenerated(
