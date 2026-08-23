@@ -163,6 +163,39 @@ test("real OWNER detail renders canonical lifecycle data and recursively exclude
   expect(lifecycleRequest?.requestId).toBeTruthy();
 });
 
+test("real lifecycle pagination requests page two and replaces page-one events", async ({ page }) => {
+  const lifecycleRequests: string[] = [];
+  await installSession(page);
+  await installDetail(page);
+  await page.route("**/api/v1/admin/recruitment/batches/batch-real-closed/lifecycle-events?*", (route) => {
+    const url = new URL(route.request().url());
+    lifecycleRequests.push(url.search);
+    const pageNumber = Number(url.searchParams.get("page"));
+    const items = lifecycleItems().map((item) => pageNumber === 2 ? {
+      ...item,
+      id: "aef322d6-c7b5-4aa4-959e-891434398e68",
+      action: "recruitment.batch.closed",
+      reason: "第二页关闭记录",
+    } : item);
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ page: pageNumber, pageSize: 50, total: 51, items }),
+    });
+  });
+
+  await page.goto("/admin/recruitment/batches/batch-real-closed");
+  const audit = page.getByRole("region", { name: "生命周期记录" });
+  await expect(audit).toContainText("recruitment.batch.archived");
+
+  await audit.getByRole("button", { name: "2", exact: true }).click();
+
+  await expect(audit).toContainText("recruitment.batch.closed");
+  await expect(audit).toContainText("第二页关闭记录");
+  await expect(audit).not.toContainText("recruitment.batch.archived");
+  expect(lifecycleRequests).toEqual(["?page=1&pageSize=50", "?page=2&pageSize=50"]);
+});
+
 test("real lifecycle renders the canonical empty state without Mock fallback", async ({ page }) => {
   await seedUnsafeMockLifecycle(page);
   await installSession(page);

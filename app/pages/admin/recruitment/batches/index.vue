@@ -42,10 +42,15 @@ const now = useRecruitmentNow();
 if (isMockApi) watch(now, (value) => batchStore?.syncLifecycle(value), { immediate: true });
 const createMessage = ref("");
 const createError = ref("");
+const creating = ref(false);
 const productionLoading = ref(!isMockApi);
 const productionError = ref("");
 const productionBatches = ref<AdminRecruitmentBatchView[]>([]);
+const productionPage = ref(1);
+const productionPageSize = 20;
+const productionTotal = ref(0);
 const productionCenterOptions = ref<ReadonlyArray<readonly [string, string]>>([]);
+let productionLoadGeneration = 0;
 const draftForm = reactive({
   name: "",
   startAt: "",
@@ -85,6 +90,7 @@ const openBatchCount = computed(() => visibleBatches.value.filter((batch) => bat
 const applicantTotal = computed(() => visibleBatches.value.reduce((total, batch) => total + batch.applicantCount, 0));
 const openCenterTotal = computed(() => visibleBatches.value.find((batch) => batch.statusKey === "open")?.centerCount ?? 0);
 const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "draft").length);
+const productionPageCount = computed(() => Math.max(1, Math.ceil(productionTotal.value / productionPageSize)));
 
 function openCreateDrawer() {
   createError.value = "";
@@ -103,28 +109,41 @@ function toDateTime(value: string, endOfDay = false) {
 
 async function loadProductionBatches() {
   if (isMockApi || !recruitmentGateway) return;
+  const requestGeneration = ++productionLoadGeneration;
   productionLoading.value = true;
   productionError.value = "";
   try {
     if (!organizationGateway) throw new Error("ADMIN_ORGANIZATION_GATEWAY_UNAVAILABLE");
-    const [response, centers] = await Promise.all([
-      recruitmentGateway.listAdminBatches(),
-      organizationGateway.listCenters(),
+    const centersRequest = organizationGateway.listCenters().then((centers) => {
+      if (requestGeneration === productionLoadGeneration) {
+        productionCenterOptions.value = centers.items
+          .filter((center) => center.active)
+          .map((center) => [center.id, center.name] as const);
+      }
+      return centers;
+    });
+    const [response] = await Promise.all([
+      recruitmentGateway.listAdminBatches(productionPage.value, productionPageSize),
+      centersRequest,
     ]);
+    if (requestGeneration !== productionLoadGeneration) return;
     productionBatches.value = response.items.map(mapAdminRecruitmentBatch);
-    productionCenterOptions.value = centers.items
-      .filter((center) => center.active)
-      .map((center) => [center.id, center.name] as const);
+    productionPage.value = response.page;
+    productionTotal.value = response.total;
   } catch {
+    if (requestGeneration !== productionLoadGeneration) return;
     productionBatches.value = [];
+    productionTotal.value = 0;
     productionCenterOptions.value = [];
     productionError.value = "暂时无法读取生产招新批次，请稍后重试。";
   } finally {
-    productionLoading.value = false;
+    if (requestGeneration === productionLoadGeneration) productionLoading.value = false;
   }
 }
 
 async function saveDraft() {
+  if (creating.value) return;
+  creating.value = true;
   try {
     if (isMockApi) {
       batchStore?.createBatch({
@@ -143,7 +162,13 @@ async function saveDraft() {
         openCenterIds: draftForm.openCenterIds,
         responsibleAccountIds: [session.currentAccount.account],
       } satisfies CreateRecruitmentBatchDto);
-      productionBatches.value = [mapAdminRecruitmentBatch(response), ...productionBatches.value];
+      const createdBatch = mapAdminRecruitmentBatch(response);
+      const alreadyPresent = productionBatches.value.some((batch) => batch.id === createdBatch.id);
+      ++productionLoadGeneration;
+      productionLoading.value = false;
+      productionError.value = "";
+      productionBatches.value = [createdBatch, ...productionBatches.value.filter((batch) => batch.id !== createdBatch.id)];
+      if (!alreadyPresent) productionTotal.value += 1;
     } else {
       throw new Error("ADMIN_RECRUITMENT_GATEWAY_UNAVAILABLE");
     }
@@ -152,10 +177,13 @@ async function saveDraft() {
     createMessage.value = "招新批次已保存为草稿，可进入批次继续复核并发布。";
   } catch (error) {
     createError.value = getRecruitmentBatchCommandMessage(error);
+  } finally {
+    creating.value = false;
   }
 }
 
 onMounted(loadProductionBatches);
+watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
 </script>
 
 <template>
@@ -167,7 +195,7 @@ onMounted(loadProductionBatches);
     >
       <template #actions>
         <button v-if="!isMockApi" type="button" class="button button--ghost" :disabled="productionLoading" aria-label="重新读取生产招新批次" @click="loadProductionBatches">重新读取</button>
-        <button v-if="session.canManageAdminAccounts" type="button" class="button" @click="openCreateDrawer">新建招新批次</button>
+        <button v-if="session.canManageAdminAccounts" type="button" class="button" :disabled="creating" @click="openCreateDrawer">新建招新批次</button>
       </template>
     </AdminPageHeading>
 
@@ -185,7 +213,7 @@ onMounted(loadProductionBatches);
     <section class="admin-list-card">
       <header>
         <div><span>Recruitment Batch List</span><h2>全部招新批次</h2></div>
-        <p>共 {{ visibleBatches.length }} 个批次</p>
+        <p>共 {{ isMockApi ? visibleBatches.length : productionTotal }} 个批次</p>
       </header>
       <div v-if="!productionLoading" class="admin-batch-list">
         <p v-if="!visibleBatches.length" class="admin-empty-state">当前生产数据库暂无招新批次。</p>
@@ -206,6 +234,7 @@ onMounted(loadProductionBatches);
           </NuxtLink>
         </article>
       </div>
+      <PaginationControls v-if="!isMockApi && !productionLoading" v-model="productionPage" :page-count="productionPageCount" label="招新批次分页" />
     </section>
 
     <div v-if="showCreate && session.canManageAdminAccounts" class="admin-drawer-backdrop" @click.self="showCreate = false">
@@ -237,8 +266,8 @@ onMounted(loadProductionBatches);
         </div>
         <footer class="admin-drawer__footer">
           <span>联盟总负责人创建 · 保存为草稿</span>
-          <button type="button" class="button button--ghost" @click="showCreate = false">取消</button>
-          <button type="button" class="button" @click="saveDraft">保存草稿</button>
+          <button type="button" class="button button--ghost" :disabled="creating" @click="showCreate = false">取消</button>
+          <button type="button" class="button" :disabled="creating" @click="saveDraft">保存草稿</button>
         </footer>
       </aside>
     </div>

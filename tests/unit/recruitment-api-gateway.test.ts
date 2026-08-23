@@ -6,6 +6,30 @@ import {
 import { createRecruitmentGatewayForRuntime } from "../../app/composables/useRecruitmentGateway";
 
 describe("recruitment API gateway", () => {
+  it("requests the selected admin batch page from the server", async () => {
+    const response = { page: 2, pageSize: 20, total: 21, items: [] };
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test/",
+      fetcher,
+      createRequestId: () => "request-admin-batches-page-2",
+    });
+
+    await expect(gateway.listAdminBatches(2, 20)).resolves.toEqual(response);
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/admin/recruitment/batches?page=2&pageSize=20",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-admin-batches-page-2" },
+      },
+    );
+  });
+
   it("retains the synchronous fixture workflow only for explicit Mock runtime mode", () => {
     expect(createRecruitmentGatewayForRuntime({
       apiBase: "https://api.example.test",

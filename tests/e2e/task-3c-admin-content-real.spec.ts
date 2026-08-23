@@ -36,11 +36,28 @@ test("real admin content list requests the server page and never falls back to a
   await expect(page.getByRole("heading", { level: 1, name: "官网内容" })).toBeVisible();
   await expect(page.getByRole("table", { name: "官网内容列表" })).toContainText("qa-真实接口内容");
   await expect(page.getByText("2026 秋季招新通道开放", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "新建内容" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "新建内容" })).toHaveAttribute("href", "/admin/content/new");
   expect(requests).toEqual([expect.stringContaining("/api/v1/admin/content?page=1&pageSize=20")]);
 
   await page.getByLabel("发布状态").selectOption("review");
   await expect.poll(() => requests.at(-1)).toContain("status=review");
+});
+
+test("real admin content navigation keeps create capability-gated while exposing canonical row routes", async ({ page }) => {
+  const sessionWithoutCreate = {
+    ...session,
+    account: { ...session.account, capabilities: ["content.review", "content.publish"] },
+  };
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(sessionWithoutCreate) }));
+  await page.route("**/api/v1/admin/content**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(contentPage) }));
+
+  await page.goto("/admin/content");
+
+  const row = page.getByRole("row").filter({ hasText: "qa-真实接口内容" });
+  await expect(page.getByRole("link", { name: "新建内容" })).toHaveCount(0);
+  await expect(row.getByRole("link", { name: "编辑" })).toHaveAttribute("href", "/admin/content/qa-content-api-only");
+  await expect(row.getByRole("link", { name: "预览" })).toHaveAttribute("href", "/admin/content/qa-content-api-only/preview");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
 });
 
 test("real admin content list visibly reports a 403 and does not retain API rows", async ({ page }) => {
@@ -131,8 +148,9 @@ test("real admin content pagination replaces server rows and a filter resets pag
   await expect(page.getByText("qa-筛选后的第一页", { exact: true })).toBeVisible();
 });
 
-test("real content new, edit, and preview routes use API responses without a local fallback", async ({ page }) => {
+test("real content list navigates to API new, edit, and preview routes without a local fallback", async ({ page }) => {
   const detail = { id: "content-edit", publicId: "content-edit-public", centerId: "center-1", slug: "content-edit", kind: "article", status: "draft", version: 2, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "qa-编辑接口内容", summary: "编辑摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "原始正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
+  const listPage = { ...contentPage, items: [{ ...contentPage.items[0], id: detail.id, publicId: detail.publicId, slug: detail.slug, title: detail.workingRevision.title, summary: detail.workingRevision.summary, status: detail.status }] };
   let createBody: Record<string, unknown> | undefined; let patchBody: Record<string, unknown> | undefined; let currentDetail = detail;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
@@ -140,15 +158,24 @@ test("real content new, edit, and preview routes use API responses without a loc
     const request = route.request(); const pathname = new URL(request.url()).pathname;
     if (request.method() === "POST" && pathname === "/api/v1/admin/content") { createBody = request.postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(detail) }); }
     if (request.method() === "PATCH") { patchBody = request.postDataJSON() as Record<string, unknown>; currentDetail = { ...detail, version: 3, workingRevision: { ...detail.workingRevision, blocks: patchBody.blocks as typeof detail.workingRevision.blocks } }; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) }); }
+    if (pathname === "/api/v1/admin/content") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(listPage) });
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
   });
-  await page.goto("/admin/content/new");
+  await page.goto("/admin/content");
+  await page.getByRole("link", { name: "新建内容" }).click();
+  await expect(page).toHaveURL(/\/admin\/content\/new$/);
   await page.getByLabel("中心 ID").fill("center-1"); await page.getByLabel("Slug").fill("qa-new"); await page.getByLabel("标题").fill("qa-新建接口内容"); await page.getByLabel("摘要").fill("新建摘要"); await page.getByLabel("正文段落").fill("新建正文"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page).toHaveURL(/\/admin\/content\/content-edit$/);
   await expect.poll(() => createBody).toMatchObject({ blocks: [{ type: "paragraph", text: "新建正文" }] });
+  await page.goto("/admin/content");
+  const row = page.getByRole("row").filter({ hasText: "qa-编辑接口内容" });
+  await row.getByRole("link", { name: "编辑" }).click();
+  await expect(page).toHaveURL(/\/admin\/content\/content-edit$/);
   await page.getByLabel("正文段落").fill("修改后的 API 正文"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect.poll(() => patchBody).toMatchObject({ expectedVersion: 2, blocks: [{ type: "paragraph", text: "修改后的 API 正文" }] });
-  await page.goto("/admin/content/content-edit/preview");
+  await page.goto("/admin/content");
+  await page.getByRole("row").filter({ hasText: "qa-编辑接口内容" }).getByRole("link", { name: "预览" }).click();
+  await expect(page).toHaveURL(/\/admin\/content\/content-edit\/preview$/);
   await expect(page.getByText("修改后的 API 正文", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
 });

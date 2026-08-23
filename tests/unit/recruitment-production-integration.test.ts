@@ -13,6 +13,22 @@ import {
 } from "../../app/services/recruitment/recruitment-view-models";
 
 describe("production recruitment integration", () => {
+  it("passes admin batch pagination through the generated client", async () => {
+    const requests: ApiRequest[] = [];
+    const response = { page: 2, pageSize: 20, total: 21, items: [] };
+    const client = createHsdApiClient(async (request) => {
+      requests.push(request);
+      return response;
+    });
+
+    await expect(client.recruitment.listAdminBatches(2, 20)).resolves.toEqual(response);
+
+    expect(requests).toEqual([{
+      method: "GET",
+      path: "/api/v1/admin/recruitment/batches?page=2&pageSize=20",
+    }]);
+  });
+
   it("exposes profile and recruitment application operations through the generated client", async () => {
     const requests: ApiRequest[] = [];
     const client = createHsdApiClient(async (request) => {

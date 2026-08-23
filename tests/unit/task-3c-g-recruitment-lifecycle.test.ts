@@ -205,6 +205,9 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
   }) {
     return createProductionRecruitmentBatchController(gateway) as ReturnType<typeof createProductionRecruitmentBatchController> & {
       lifecycleEvents: { value: Array<Record<string, unknown>> };
+      lifecyclePage: { value: number };
+      lifecyclePageSize: number;
+      lifecycleTotal: { value: number };
       lifecycleStatus: { value: string };
       lifecycleError: { value: string };
       detailStatus: { value: string };
@@ -214,6 +217,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
         archived: boolean;
         lifecycleRefreshed: boolean;
       }>;
+      loadLifecyclePage(page: number): Promise<boolean>;
     };
   }
 
@@ -262,6 +266,41 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
       reason: "结果复核完成",
       createdAt: "2026-08-24T08:00:00.000Z",
     }]);
+  });
+
+  it("retains lifecycle pagination metadata and replaces page one with page two", async () => {
+    const pageTwo = {
+      ...lifecycleResponse,
+      page: 2,
+      total: 51,
+      items: [{
+        ...lifecycleResponse.items[0]!,
+        id: "aef322d6-c7b5-4aa4-959e-891434398e68",
+        action: "recruitment.batch.closed",
+      }],
+    };
+    const listAdminBatchLifecycleEvents = vi.fn()
+      .mockResolvedValueOnce({ ...lifecycleResponse, total: 51 })
+      .mockResolvedValueOnce(pageTwo);
+    const controller = controllerWith({
+      getAdminBatch: vi.fn().mockResolvedValue(closedBatch()),
+      listAdminBatchLifecycleEvents,
+      archiveAdminBatch: vi.fn().mockResolvedValue(archivedBatch),
+    });
+
+    await controller.load("batch-closed");
+    expect(listAdminBatchLifecycleEvents).toHaveBeenNthCalledWith(1, "batch-closed", 1, 50);
+    expect(controller.lifecyclePage.value).toBe(1);
+    expect(controller.lifecyclePageSize).toBe(50);
+    expect(controller.lifecycleTotal.value).toBe(51);
+
+    await expect(controller.loadLifecyclePage(2)).resolves.toBe(true);
+
+    expect(listAdminBatchLifecycleEvents).toHaveBeenNthCalledWith(2, "batch-closed", 2, 50);
+    expect(controller.lifecyclePage.value).toBe(2);
+    expect(controller.lifecycleTotal.value).toBe(51);
+    expect(controller.lifecycleEvents.value).toHaveLength(1);
+    expect(controller.lifecycleEvents.value[0]?.action).toBe("recruitment.batch.closed");
   });
 
   it.each([

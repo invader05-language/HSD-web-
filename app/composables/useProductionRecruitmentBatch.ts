@@ -47,6 +47,9 @@ function errorMessage(cause: unknown, fallback: string): string {
 export function createProductionRecruitmentBatchController(gateway: AdminBatchGateway) {
   const batch = ref<AdminRecruitmentBatchView>();
   const lifecycleEvents = ref<RecruitmentBatchLifecycleEventView[]>([]);
+  const lifecyclePage = ref(1);
+  const lifecyclePageSize = 50;
+  const lifecycleTotal = ref(0);
   const loading = ref(false);
   const error = ref("");
   const notFound = ref(false);
@@ -57,6 +60,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   const archiveStatus = ref<ArchiveStatus>("idle");
   const archiveError = ref("");
   let loadGeneration = 0;
+  let lifecycleLoadGeneration = 0;
   let currentBatchId = "";
 
   async function refresh(batchId: string, requestGeneration: number) {
@@ -68,13 +72,16 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     notFound.value = false;
     batch.value = undefined;
     lifecycleEvents.value = [];
+    lifecyclePage.value = 1;
+    lifecycleTotal.value = 0;
+    const lifecycleRequestGeneration = ++lifecycleLoadGeneration;
 
     const detailRequest = gateway.getAdminBatch(batchId);
     const lifecycleRequest = gateway.listAdminBatchLifecycleEvents
       ? gateway.listAdminBatchLifecycleEvents(batchId, 1, 50)
       : Promise.resolve(undefined);
     const [detailResult, lifecycleResult] = await Promise.allSettled([detailRequest, lifecycleRequest]);
-    if (requestGeneration !== loadGeneration) return undefined;
+    if (requestGeneration !== loadGeneration || lifecycleRequestGeneration !== lifecycleLoadGeneration) return undefined;
 
     if (detailResult.status === "rejected") {
       detailStatus.value = requestStatus(detailResult.reason);
@@ -105,6 +112,8 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
 
     const response = lifecycleResult.value as RecruitmentBatchLifecycleEventListDto;
     lifecycleEvents.value = response.items.map(mapRecruitmentBatchLifecycleEvent);
+    lifecyclePage.value = response.page;
+    lifecycleTotal.value = response.total;
     lifecycleStatus.value = lifecycleEvents.value.length ? "success" : "empty";
     return batch.value;
   }
@@ -122,7 +131,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
-  async function refreshLifecycle(batchId: string, requestGeneration: number): Promise<boolean> {
+  async function refreshLifecycle(batchId: string, requestGeneration: number, page = 1): Promise<boolean> {
     if (!gateway.listAdminBatchLifecycleEvents) {
       lifecycleStatus.value = "unavailable";
       lifecycleEvents.value = [];
@@ -131,18 +140,27 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     lifecycleStatus.value = "loading";
     lifecycleError.value = "";
     lifecycleEvents.value = [];
+    lifecyclePage.value = page;
+    const lifecycleRequestGeneration = ++lifecycleLoadGeneration;
     try {
-      const response = await gateway.listAdminBatchLifecycleEvents(batchId, 1, 50);
-      if (requestGeneration !== loadGeneration) return false;
+      const response = await gateway.listAdminBatchLifecycleEvents(batchId, page, lifecyclePageSize);
+      if (requestGeneration !== loadGeneration || lifecycleRequestGeneration !== lifecycleLoadGeneration) return false;
       lifecycleEvents.value = response.items.map(mapRecruitmentBatchLifecycleEvent);
+      lifecyclePage.value = response.page;
+      lifecycleTotal.value = response.total;
       lifecycleStatus.value = lifecycleEvents.value.length ? "success" : "empty";
       return true;
     } catch (cause) {
-      if (requestGeneration !== loadGeneration) return false;
+      if (requestGeneration !== loadGeneration || lifecycleRequestGeneration !== lifecycleLoadGeneration) return false;
       lifecycleStatus.value = requestStatus(cause);
       lifecycleError.value = errorMessage(cause, "生命周期记录读取失败，请稍后重试。");
       return false;
     }
+  }
+
+  async function loadLifecyclePage(page: number): Promise<boolean> {
+    if (!currentBatchId || !Number.isInteger(page) || page < 1) return false;
+    return refreshLifecycle(currentBatchId, loadGeneration, page);
   }
 
   async function archive(input: ArchiveRecruitmentBatchConfirmation): Promise<ArchiveRecruitmentBatchResult> {
@@ -206,6 +224,9 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   return {
     batch,
     lifecycleEvents,
+    lifecyclePage,
+    lifecyclePageSize,
+    lifecycleTotal,
     loading,
     error,
     notFound,
@@ -216,6 +237,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     archiveStatus,
     archiveError,
     load,
+    loadLifecyclePage,
     archive,
   };
 }

@@ -171,9 +171,9 @@ export function createApiRecruitmentGateway(
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/withdraw`,
       payload,
     ),
-    listAdminBatches: () => read(
+    listAdminBatches: (page = 1, pageSize = 20) => read(
       "GET /api/v1/admin/recruitment/batches",
-      "/api/v1/admin/recruitment/batches",
+      `/api/v1/admin/recruitment/batches?page=${page}&pageSize=${pageSize}`,
     ),
     getAdminBatch: (batchId) => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}",

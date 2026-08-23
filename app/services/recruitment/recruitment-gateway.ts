@@ -40,7 +40,7 @@ export interface RecruitmentGateway {
   submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
-  listAdminBatches(): Promise<AdminRecruitmentBatchListDto>;
+  listAdminBatches(page?: number, pageSize?: number): Promise<AdminRecruitmentBatchListDto>;
   getAdminBatch(batchId: string): Promise<AdminRecruitmentBatchDto>;
   createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
   updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;

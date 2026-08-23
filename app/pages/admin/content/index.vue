@@ -16,6 +16,7 @@ const gateway = useContentGateway();
 const mockContent = useMockApi ? usePortalContentStore() : undefined;
 const realContent = !useMockApi && gateway ? createAdminContentListController({ list: gateway.content.list }) : undefined;
 const session = useSessionStore();
+const canCreateContent = computed(() => useMockApi || session.hasCapability("content.create"));
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const isOwner = computed(() => useMockApi ? !centerScope.value : session.adminLevel === "owner");
 const canonicalStatuses: Array<{ value: AdminContentCanonicalStatus; label: string }> = [
@@ -74,8 +75,8 @@ function retryAutomationDraft(automationKey: string) {
     <AdminPageHeading eyebrow="Content & Portal" title="官网内容" description="维护 HSD 快讯、新闻和公开公告。草稿、审核、待发布与官网公开版本分开保存。">
       <template #actions>
         <NuxtLink v-if="useMockApi && !centerScope" class="button button--ghost" to="/admin/content/home">门户配置</NuxtLink>
-        <span v-else-if="!useMockApi" class="admin-page-heading__hint">门户配置与内容写入尚未接入真实 API</span>
-        <NuxtLink v-if="useMockApi" class="button" to="/admin/content/new">新建内容</NuxtLink>
+        <span v-else-if="!useMockApi" class="admin-page-heading__hint">门户配置尚未接入真实 API</span>
+        <NuxtLink v-if="canCreateContent" class="button" to="/admin/content/new">新建内容</NuxtLink>
       </template>
     </AdminPageHeading>
     <section class="admin-summary-strip" aria-label="官网内容概览">
@@ -100,7 +101,7 @@ function retryAutomationDraft(automationKey: string) {
       <div v-else-if="!useMockApi && realStatus === 'unauthorized'" class="admin-empty" role="alert"><strong>登录状态已失效</strong><p>{{ realError }}</p></div>
       <div v-else-if="!useMockApi && realStatus === 'forbidden'" class="admin-empty" role="alert"><strong>无权读取官网内容</strong><p>{{ realError }}</p></div>
       <div v-else-if="!useMockApi && realStatus === 'error'" class="admin-empty" role="alert"><strong>官网内容读取失败</strong><p>{{ realError }}</p></div>
-      <div v-else-if="rows.length" class="admin-table-scroll"><table aria-label="官网内容列表"><thead><tr><th>标题 / 摘要</th><th>分类</th><th>状态</th><th>创建人</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="record in rows" :key="record.id"><td><strong>{{ record.title }}</strong><small>{{ record.summary }}</small></td><td>{{ record.category }}</td><td><AdminStatusPill :status="record.status" /></td><td>{{ record.owner }}</td><td>{{ record.updatedAt }}</td><td><NuxtLink v-if="useMockApi" :to="`/admin/content/${record.id}`">编辑</NuxtLink><span v-else>编辑尚未接入</span></td></tr></tbody></table></div>
+      <div v-else-if="rows.length" class="admin-table-scroll"><table aria-label="官网内容列表"><thead><tr><th>标题 / 摘要</th><th>分类</th><th>状态</th><th>创建人</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="record in rows" :key="record.id"><td><strong>{{ record.title }}</strong><small>{{ record.summary }}</small></td><td>{{ record.category }}</td><td><AdminStatusPill :status="record.status" /></td><td>{{ record.owner }}</td><td>{{ record.updatedAt }}</td><td><NuxtLink :to="`/admin/content/${record.id}`">编辑</NuxtLink><template v-if="!useMockApi"> · <NuxtLink :to="`/admin/content/${record.id}/preview`">预览</NuxtLink></template></td></tr></tbody></table></div>
       <div v-else class="admin-empty"><strong>没有匹配的官网内容</strong><p>{{ useMockApi ? "调整关键词或筛选条件后再试。" : "服务端未返回符合当前筛选条件的内容。" }}</p></div>
       <PaginationControls v-if="!useMockApi && realStatus !== 'loading'" v-model="page" :page-count="pageCount" label="官网内容分页" />
     </section>

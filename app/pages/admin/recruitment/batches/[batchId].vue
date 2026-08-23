@@ -63,6 +63,12 @@ const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.a
 const batch = computed(() => isMockApi
   ? batchStore?.getBatch(batchId.value) as AdminBatchDetail | undefined
   : productionBatch?.batch.value);
+const lifecyclePageCount = computed(() => Math.max(1, Math.ceil(
+  (productionBatch?.lifecycleTotal.value ?? 0) / (productionBatch?.lifecyclePageSize ?? 50),
+)));
+function selectLifecyclePage(page: number) {
+  if (!isMockApi) void productionBatch?.loadLifecyclePage(page);
+}
 function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
   return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
 }
@@ -569,7 +575,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     </section>
 
     <section class="admin-list-card admin-batch-audit" aria-label="生命周期记录">
-      <header><div><span>Lifecycle Audit</span><h2>生命周期记录</h2></div><p>原计划时间、操作人和实际执行时间随命令保存</p></header>
+      <header><div><span>Lifecycle Audit</span><h2>生命周期记录</h2></div><p v-if="!isMockApi">共 {{ productionBatch?.lifecycleTotal.value ?? 0 }} 条 · 第 {{ productionBatch?.lifecyclePage.value ?? 1 }} / {{ lifecyclePageCount }} 页</p><p v-else>原计划时间、操作人和实际执行时间随命令保存</p></header>
       <p v-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'loading'" class="admin-empty-copy">正在读取生命周期记录…</p>
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'empty'" class="admin-empty-copy">当前批次暂无生命周期记录。</p>
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value !== 'success'" class="admin-save-message admin-save-message--error" role="alert">{{ lifecycleStateMessage(productionBatch?.lifecycleStatus.value) }}</p>
@@ -591,6 +597,13 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </div>
       <p v-else-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
       <div v-else class="admin-table-scroll"><table aria-label="批次生命周期审计"><thead><tr><th>操作</th><th>操作人</th><th>状态变化</th><th>原计划开始</th><th>实际时间</th><th>原因</th></tr></thead><tbody><tr v-for="record in auditRecords" :key="auditText(record, 'id')"><td>{{ auditActionLabel(auditText(record, 'action')) }}</td><td>{{ auditText(record, 'actorName', 'actor') }}</td><td>{{ auditStatusLabel(auditText(record, 'beforeStatus', 'before')) }} → {{ auditStatusLabel(auditText(record, 'afterStatus', 'after')) }}</td><td>{{ auditTimestamp(auditText(record, 'originalStartAt')) }}</td><td>{{ auditTimestamp(auditText(record, 'actualAt', 'createdAt')) }}</td><td>{{ auditText(record, 'reason') === 'create recruitment batch' ? '创建招新批次' : auditText(record, 'reason') }}</td></tr></tbody></table></div>
+      <PaginationControls
+        v-if="!isMockApi"
+        :model-value="productionBatch?.lifecyclePage.value ?? 1"
+        :page-count="lifecyclePageCount"
+        label="生命周期记录分页"
+        @update:model-value="selectLifecyclePage"
+      />
     </section>
 
     <div v-if="pendingAction" class="admin-modal-backdrop">

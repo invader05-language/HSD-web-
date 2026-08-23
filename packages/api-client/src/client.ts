@@ -190,7 +190,7 @@ export interface HsdApiClient {
     submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications">>;
     updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<ApiResponseFor<"PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}">>;
     withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw">>;
-    listAdminBatches(): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches">>;
+    listAdminBatches(page?: number, pageSize?: number): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches">>;
     getAdminBatch(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}">>;
     createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches">>;
     updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/recruitment/batches/{batchId}">>;
@@ -354,7 +354,12 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       submitApplication: (batchId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`),
       updateApplication: (batchId, applicationId, payload) => requestGenerated(transport, "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
       withdrawApplication: (batchId, applicationId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/withdraw`),
-      listAdminBatches: () => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches"),
+      listAdminBatches: (page = 1, pageSize = 20) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/recruitment/batches",
+        undefined,
+        `/api/v1/admin/recruitment/batches?page=${page}&pageSize=${pageSize}`,
+      ),
       getAdminBatch: (batchId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
       createAdminBatch: (payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches", payload),
       updateAdminBatch: (batchId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/recruitment/batches/{batchId}", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
