@@ -76,6 +76,12 @@ describe("admin resource production reads", () => {
     await controller.load();
     expect(controller.status.value).toBe("error");
     expect(controller.records.value).toEqual([]);
+
+    list.mockResolvedValueOnce({ page: 1, pageSize: 20, total: 0, items: [] });
+    await controller.load();
+    expect(controller.status.value).toBe("empty");
+    expect(controller.records.value).toEqual([]);
+    expect(controller.total.value).toBe(0);
   });
 
   it("loads canonical detail and version history together without mock-only file metadata", async () => {

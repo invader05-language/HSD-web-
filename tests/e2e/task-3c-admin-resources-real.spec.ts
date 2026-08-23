@@ -71,3 +71,24 @@ test("real admin resources visibly clears rows after a 403", async ({ page }) =>
   await expect(page.getByText("qa-真实接口资料", { exact: true })).toHaveCount(0);
   await expect(page.getByText("HarmonyOS 入门路线", { exact: true })).toHaveCount(0);
 });
+
+test("real admin resources shows the server empty state and removes prior rows", async ({ page }) => {
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/resources**", (route) => {
+    const url = new URL(route.request().url());
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(url.searchParams.get("format") === "web"
+        ? { page: 1, pageSize: 20, total: 0, items: [] }
+        : { page: 1, pageSize: 20, total: 1, items: [resource] }),
+    });
+  });
+
+  await page.goto("/admin/resources");
+  await expect(page.getByText("qa-真实接口资料", { exact: true })).toBeVisible();
+  await page.getByLabel("格式").selectOption("web");
+  await expect(page.getByText("没有匹配的学习资料", { exact: true })).toBeVisible();
+  await expect(page.getByText("服务端未返回符合当前筛选条件的资料。", { exact: true })).toBeVisible();
+  await expect(page.getByText("qa-真实接口资料", { exact: true })).toHaveCount(0);
+});
