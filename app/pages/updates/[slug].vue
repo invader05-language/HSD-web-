@@ -30,6 +30,7 @@ const update = ref<DisplayUpdate>();
 const loading = ref(!isMockApi);
 const error = ref("");
 const notFound = ref(false);
+let productionRequestGeneration = 0;
 
 function normalizeMockBlock(block: Record<string, unknown>): DisplayBlock | undefined {
   if (block.type === "heading" && typeof block.text === "string") return { type: "heading", text: block.text };
@@ -65,12 +66,15 @@ function loadMockUpdate() {
 
 async function loadProductionUpdate() {
   if (!gateway) return;
+  const requestGeneration = ++productionRequestGeneration;
+  const requestedSlug = slug.value;
   loading.value = true;
   error.value = "";
   notFound.value = false;
   update.value = undefined;
   try {
-    const response = await gateway.getBySlug(slug.value);
+    const response = await gateway.getBySlug(requestedSlug);
+    if (requestGeneration !== productionRequestGeneration) return;
     if (response.kind !== "article" && response.kind !== "notice") {
       notFound.value = true;
       return;
@@ -91,10 +95,11 @@ async function loadProductionUpdate() {
         : block),
     };
   } catch (cause) {
+    if (requestGeneration !== productionRequestGeneration) return;
     if (cause instanceof ContentApiError && cause.status === 404) notFound.value = true;
     else error.value = cause instanceof Error ? cause.message : "动态读取失败，请稍后重试。";
   } finally {
-    loading.value = false;
+    if (requestGeneration === productionRequestGeneration) loading.value = false;
   }
 }
 

@@ -270,4 +270,56 @@ describe("Task 3A production admin batch detail", () => {
     expect(controller.batch.value).toBeUndefined();
     expect(controller.notFound.value).toBe(true);
   });
+
+  it.each([
+    [404, "not-found"],
+    [503, "error"],
+  ])("ignores a stale A %s failure after batch B has loaded", async (status) => {
+    let rejectA!: (cause: Error) => void;
+    let resolveB!: (batch: AdminRecruitmentBatchDto) => void;
+    const responseA = new Promise<AdminRecruitmentBatchDto>((_resolve, reject) => { rejectA = reject; });
+    const responseB = new Promise<AdminRecruitmentBatchDto>((resolve) => { resolveB = resolve; });
+    const getAdminBatch = vi.fn()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB);
+    const controller = createProductionRecruitmentBatchController({ getAdminBatch });
+
+    const loadA = controller.load("batch-a");
+    const loadB = controller.load("batch-b");
+    resolveB({ ...apiBatch, id: "batch-b", name: "API B 批次" });
+    await loadB;
+    expect(controller.batch.value?.id).toBe("batch-b");
+
+    rejectA(Object.assign(new Error("stale A failure"), { status }));
+    await loadA;
+
+    expect(controller.batch.value?.id).toBe("batch-b");
+    expect(controller.error.value).toBe("");
+    expect(controller.notFound.value).toBe(false);
+    expect(controller.loading.value).toBe(false);
+  });
+
+  it("keeps loading for batch B when stale batch A resolves first", async () => {
+    let resolveA!: (batch: AdminRecruitmentBatchDto) => void;
+    let resolveB!: (batch: AdminRecruitmentBatchDto) => void;
+    const responseA = new Promise<AdminRecruitmentBatchDto>((resolve) => { resolveA = resolve; });
+    const responseB = new Promise<AdminRecruitmentBatchDto>((resolve) => { resolveB = resolve; });
+    const getAdminBatch = vi.fn()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB);
+    const controller = createProductionRecruitmentBatchController({ getAdminBatch });
+
+    const loadA = controller.load("batch-a");
+    const loadB = controller.load("batch-b");
+    resolveA({ ...apiBatch, id: "batch-a", name: "过期 API A 批次" });
+    await loadA;
+
+    expect(controller.batch.value).toBeUndefined();
+    expect(controller.loading.value).toBe(true);
+
+    resolveB({ ...apiBatch, id: "batch-b", name: "API B 批次" });
+    await loadB;
+    expect(controller.batch.value?.id).toBe("batch-b");
+    expect(controller.loading.value).toBe(false);
+  });
 });

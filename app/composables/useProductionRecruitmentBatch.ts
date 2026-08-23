@@ -14,22 +14,27 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   const loading = ref(false);
   const error = ref("");
   const notFound = ref(false);
+  let loadGeneration = 0;
 
   async function load(batchId: string) {
+    const requestGeneration = ++loadGeneration;
     loading.value = true;
     error.value = "";
     notFound.value = false;
     batch.value = undefined;
     try {
-      batch.value = mapAdminRecruitmentBatch(await gateway.getAdminBatch(batchId));
+      const response = await gateway.getAdminBatch(batchId);
+      if (requestGeneration !== loadGeneration) return undefined;
+      batch.value = mapAdminRecruitmentBatch(response);
       return batch.value;
     } catch (cause) {
+      if (requestGeneration !== loadGeneration) return undefined;
       const apiError = cause as { status?: number; message?: string };
       if (apiError?.status === 404) notFound.value = true;
       else error.value = apiError?.message || "招新批次读取失败，请稍后重试。";
       return undefined;
     } finally {
-      loading.value = false;
+      if (requestGeneration === loadGeneration) loading.value = false;
     }
   }
 

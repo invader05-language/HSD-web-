@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import BatchDetailPage from "../../app/pages/admin/recruitment/batches/[batchId].vue";
 import {
@@ -12,6 +12,7 @@ const routeState = reactive({
   params: { batchId: "batch-api-only" },
   path: "/admin/recruitment/batches/batch-api-only",
 });
+enableAutoUnmount(afterEach);
 
 const apiBatch = {
   id: "batch-api-only",
@@ -40,6 +41,26 @@ const apiBatch = {
   ],
 };
 
+function seedMockBatch(name = "Mock 批次概览") {
+  localStorage.setItem(RECRUITMENT_BATCH_STORAGE_KEY, JSON.stringify({
+    version: 1,
+    batches: [{
+      id: "batch-api-only",
+      name,
+      startAt: "2026-09-01T00:00:00.000Z",
+      endAt: "2026-09-20T00:00:00.000Z",
+      timezone: "Asia/Shanghai",
+      openCenterIds: ["fixture-center"],
+      responsibleAccountIds: ["fixture-owner"],
+      lifecycleStatus: "published",
+      manualOverride: "none",
+      version: 1,
+      createdAt: "2026-08-20T00:00:00.000Z",
+      updatedAt: "2026-08-20T00:00:00.000Z",
+    }],
+  }));
+}
+
 describe("Task 3A production batch detail page", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -62,7 +83,11 @@ describe("Task 3A production batch detail page", () => {
     })));
   });
 
-  it("renders API DTO counts, centers, owner and honest unavailable workspaces", async () => {
+  it.each([
+    ["canonical", "/admin/recruitment/batches/batch-api-only"],
+    ["trailing-slash", "/admin/recruitment/batches/batch-api-only/"],
+  ])("renders the real %s overview without treating it as a child route", async (_label, path) => {
+    routeState.path = path;
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: { props: ["status"], template: "<span>{{ status }}</span>" },
@@ -84,6 +109,62 @@ describe("Task 3A production batch detail page", () => {
     expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
     expect(wrapper.text()).toContain("后端未提供生命周期审计接口");
     expect(wrapper.text()).not.toContain("归档批次");
+  });
+
+  it.each([
+    ["canonical", "/admin/recruitment/batches/batch-api-only"],
+    ["trailing-slash", "/admin/recruitment/batches/batch-api-only/"],
+  ])("renders the mock %s overview without mounting NuxtPage", async (_label, path) => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "", useMockApi: true } }));
+    seedMockBatch();
+    routeState.path = path;
+    const nestedPageMounted = vi.fn();
+    const NestedPage = defineComponent({
+      setup() {
+        nestedPageMounted();
+        return {};
+      },
+      template: "<div data-testid='mock-child'>Mock child</div>",
+    });
+
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: NestedPage,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    expect(nestedPageMounted).not.toHaveBeenCalled();
+    expect(wrapper.get("h1").text()).toBe("Mock 批次概览");
+    expect(wrapper.text()).not.toContain("该子工作区尚未接入真实数据");
+  });
+
+  it("continues to mount NuxtPage for an actual mock child route", async () => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "", useMockApi: true } }));
+    seedMockBatch();
+    routeState.path = "/admin/recruitment/batches/batch-api-only/applications/";
+    const nestedPageMounted = vi.fn();
+    const NestedPage = defineComponent({
+      setup() {
+        nestedPageMounted();
+        return {};
+      },
+      template: "<div data-testid='mock-child'>Mock child</div>",
+    });
+
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: true,
+      AdminStatusPill: true,
+      NuxtPage: NestedPage,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await flushPromises();
+    await nextTick();
+
+    expect(nestedPageMounted).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-testid='mock-child']").text()).toBe("Mock child");
   });
 
   it("blocks direct real-mode child routes before a mock store-backed page can mount", async () => {
@@ -185,5 +266,45 @@ describe("Task 3A production batch detail page", () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.get("h1").text()).toBe("API B 批次");
+  });
+
+  it("keeps batch B when the slower batch A response resolves last", async () => {
+    let resolveA!: (response: Response) => void;
+    let resolveB!: (response: Response) => void;
+    const responseA = new Promise<Response>((resolve) => { resolveA = resolve; });
+    const responseB = new Promise<Response>((resolve) => { resolveB = resolve; });
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB);
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mount(BatchDetailPage, { global: { stubs: {
+      AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
+      AdminStatusPill: true,
+      NuxtPage: true,
+      NuxtLink: { template: "<a><slot /></a>" },
+    } } });
+    await nextTick();
+
+    routeState.params.batchId = "batch-b";
+    routeState.path = "/admin/recruitment/batches/batch-b";
+    await nextTick();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    resolveB(new Response(JSON.stringify({ ...apiBatch, id: "batch-b", name: "API B 批次" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("API B 批次");
+
+    resolveA(new Response(JSON.stringify({ ...apiBatch, id: "batch-api-only", name: "过期 API A 批次" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("API B 批次");
+    expect(wrapper.text()).not.toContain("过期 API A 批次");
   });
 });

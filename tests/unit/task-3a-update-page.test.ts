@@ -1,11 +1,35 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import UpdateDetailPage from "../../app/pages/updates/[slug].vue";
 import { usePortalContentStore } from "../../app/stores/portal-content";
 
 const updateRouteState = reactive({ params: { slug: "api-only-update" } });
+enableAutoUnmount(afterEach);
+
+function contentResponse(slug: string, title: string) {
+  return new Response(JSON.stringify({
+    slug,
+    kind: "article",
+    title,
+    summary: null,
+    tag: null,
+    expiresAt: null,
+    blocks: [],
+    publishedAt: "2026-08-23T00:00:00.000Z",
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+function mountUpdatePage() {
+  return mount(UpdateDetailPage, { global: { stubs: {
+    PageBanner: { props: ["title"], template: "<h1>{{ title }}</h1>" },
+    ContentMediaView: true,
+    MediaPlaceholder: true,
+    EmptyState: { props: ["title"], template: "<div data-testid='empty'>{{ title }}</div>" },
+    NuxtLink: { template: "<a><slot /></a>" },
+  } } });
+}
 
 describe("Task 3A update detail runtime boundary", () => {
   beforeEach(() => {
@@ -146,5 +170,96 @@ describe("Task 3A update detail runtime boundary", () => {
     await flushPromises();
     await nextTick();
     expect(wrapper.get("h1").text()).toBe("动态 B");
+  });
+
+  it("keeps route B content when the slower route A response resolves last", async () => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    let resolveA!: (response: Response) => void;
+    let resolveB!: (response: Response) => void;
+    const responseA = new Promise<Response>((resolve) => { resolveA = resolve; });
+    const responseB = new Promise<Response>((resolve) => { resolveB = resolve; });
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB);
+    vi.stubGlobal("fetch", fetcher);
+    const wrapper = mountUpdatePage();
+    await nextTick();
+
+    updateRouteState.params.slug = "update-b";
+    await nextTick();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    resolveB(contentResponse("update-b", "动态 B"));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("动态 B");
+
+    resolveA(contentResponse("api-only-update", "过期动态 A"));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("动态 B");
+    expect(wrapper.text()).not.toContain("过期动态 A");
+  });
+
+  it("keeps the newest request loading when stale route A resolves first", async () => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    let resolveA!: (response: Response) => void;
+    let resolveB!: (response: Response) => void;
+    const responseA = new Promise<Response>((resolve) => { resolveA = resolve; });
+    const responseB = new Promise<Response>((resolve) => { resolveB = resolve; });
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB));
+    const wrapper = mountUpdatePage();
+    await nextTick();
+
+    updateRouteState.params.slug = "update-b";
+    await nextTick();
+    resolveA(contentResponse("api-only-update", "过期动态 A"));
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.find("h1").exists()).toBe(false);
+    expect(wrapper.get("[role='status']").text()).toContain("正在加载动态");
+
+    resolveB(contentResponse("update-b", "动态 B"));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("h1").text()).toBe("动态 B");
+  });
+
+  it("keeps route B not-found state when stale route A later fails differently", async () => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    let resolveA!: (response: Response) => void;
+    let resolveB!: (response: Response) => void;
+    const responseA = new Promise<Response>((resolve) => { resolveA = resolve; });
+    const responseB = new Promise<Response>((resolve) => { resolveB = resolve; });
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(() => responseA)
+      .mockImplementationOnce(() => responseB));
+    const wrapper = mountUpdatePage();
+    await nextTick();
+
+    updateRouteState.params.slug = "missing-b";
+    await nextTick();
+    resolveB(new Response(JSON.stringify({
+      code: "CONTENT_NOT_FOUND",
+      message: "B not found",
+      requestId: "request-b-404",
+    }), { status: 404, headers: { "Content-Type": "application/json" } }));
+    await flushPromises();
+    await nextTick();
+    expect(wrapper.get("[data-testid='empty']").text()).toContain("动态不存在");
+
+    resolveA(new Response(JSON.stringify({
+      code: "CONTENT_UNAVAILABLE",
+      message: "stale A failure",
+      requestId: "request-a-503",
+    }), { status: 503, headers: { "Content-Type": "application/json" } }));
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.get("[data-testid='empty']").text()).toContain("动态不存在");
+    expect(wrapper.find("[role='alert']").exists()).toBe(false);
   });
 });

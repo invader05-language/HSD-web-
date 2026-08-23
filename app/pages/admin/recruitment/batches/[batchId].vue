@@ -62,7 +62,7 @@ function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
   return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
 }
 const overviewRoute = computed(() => buildRecruitmentBatchRoute(batchId.value));
-const isNestedRoute = computed(() => route.path !== overviewRoute.value);
+const isNestedRoute = computed(() => route.path.replace(/\/+$/, "") !== overviewRoute.value);
 const statusKey = computed(() => {
   if (!isMockApi) return productionBatch?.batch.value?.effectiveStatus ?? "closed";
   const effective = batchStore?.effectiveStatus(batchId.value, now.value);
