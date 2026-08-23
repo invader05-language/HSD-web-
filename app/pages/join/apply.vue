@@ -5,17 +5,30 @@ import {
   createRegistrationProfileDraft,
   type RecruitmentApplicationDraft,
   type RecruitmentCenter,
+  type SubmittedRecruitmentApplication,
 } from "~/data/recruitment-application";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
+import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import {
+  mapMemberProfileResponse,
+  mapMemberProfileUpdatePayload,
+  mapPublicRecruitmentBatch,
+  mapRecruitmentApplicationDraft,
+  mapRecruitmentApplicationResponse,
+  isRecruitmentApplicantEligible,
+  type ProductionMemberProfile,
+  type PublicRecruitmentBatchView,
+} from "~/services/recruitment/recruitment-view-models";
 import {
   validateApplicationDraft,
   validateConfirmation,
   validateRegistrationStep,
 } from "~/utils/recruitment-application-form";
 import { isSupportedAvatar } from "~/utils/member-profile-form";
+import type { MemberProfileResponseDto } from "../../../packages/api-client/src";
 
 type Step = 1 | 2 | 3;
 
@@ -28,23 +41,66 @@ const STEPS: ReadonlyArray<{ id: Step; label: string }> = [
 useHead({ title: "成员注册与招新报名｜白云 HSD 开发者部落" });
 definePageMeta({ middleware: "member" });
 
-const currentMember = useCurrentMember();
-const currentProfile = currentMember.profile;
-const batchStore = useRecruitmentBatchStore();
-const applicationStore = useRecruitmentApplicationStore();
+const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
+const isMockApi = runtimeConfig.public.useMockApi;
+const currentMember = isMockApi ? useCurrentMember() : undefined;
+const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
+const applicationStore = isMockApi ? useRecruitmentApplicationStore() : undefined;
+const recruitmentGateway = useRecruitmentGateway();
 const now = useRecruitmentNow();
-const capturedBatchId = ref(batchStore.currentOpenBatchAt(now.value)?.id ?? applicationStore.latestApplication?.batchId);
-const activeBatch = computed(() => capturedBatchId.value ? batchStore.getBatch(capturedBatchId.value) : undefined);
-const activeBatchStatus = computed(() => activeBatch.value
-  ? batchStore.effectiveStatus(activeBatch.value.id, now.value)
+const EMPTY_PROFILE: ProductionMemberProfile = {
+  id: "",
+  name: "",
+  studentId: "",
+  grade: "",
+  className: "",
+  center: "待确定",
+  memberDuty: "普通成员",
+  identity: "",
+  bio: "",
+  version: 0,
+  contact: "",
+  biography: "",
+  status: "PREPARATORY",
+  publicProfileEnabled: false,
+};
+const productionProfile = ref<ProductionMemberProfile | null>(null);
+const currentProfile = computed(() => isMockApi
+  ? currentMember!.profile.value
+  : productionProfile.value ?? EMPTY_PROFILE);
+const productionBatch = ref<PublicRecruitmentBatchView | null>(null);
+const productionUpcomingBatch = ref<PublicRecruitmentBatchView | null>(null);
+const productionApplication = ref<SubmittedRecruitmentApplication | undefined>();
+const productionApplicationVersion = ref<number | undefined>();
+const productionLoading = ref(!isMockApi);
+const productionError = ref("");
+const capturedBatchId = ref<string | undefined>(isMockApi
+  ? batchStore?.currentOpenBatchAt(now.value)?.id ?? applicationStore?.latestApplication?.batchId
   : undefined);
+const activeBatch = computed(() => isMockApi
+  ? capturedBatchId.value ? batchStore?.getBatch(capturedBatchId.value) : undefined
+  : productionBatch.value);
+const activeBatchStatus = computed(() => {
+  if (!activeBatch.value) return undefined;
+  if (isMockApi) return batchStore?.effectiveStatus(activeBatch.value.id, now.value);
+  return (activeBatch.value as PublicRecruitmentBatchView).effectiveStatus;
+});
 const hasOpenBatch = computed(() => activeBatchStatus.value === "open");
-const upcomingBatch = computed(() => batchStore.upcomingBatchAt(now.value));
-const pausedBatch = computed(() => batchStore.currentPausedBatchAt(now.value));
-watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
+const upcomingBatch = computed(() => isMockApi ? batchStore?.upcomingBatchAt(now.value) : productionUpcomingBatch.value);
+const pausedBatch = computed(() => isMockApi
+  ? batchStore?.currentPausedBatchAt(now.value)
+  : productionBatch.value?.effectiveStatus === "paused" ? productionBatch.value : null);
+if (isMockApi) watch(now, (value) => batchStore?.syncLifecycle(value), { immediate: true });
 const step = ref<Step>(1);
 const profileDraft = reactive(createRegistrationProfileDraft(currentProfile.value));
-const applicationDraft = reactive<RecruitmentApplicationDraft>(applicationStore.createDraft());
+const applicationDraft = reactive<RecruitmentApplicationDraft>(applicationStore?.createDraft() ?? {
+  contact: "",
+  firstChoice: undefined,
+  secondChoice: undefined,
+  thirdChoice: undefined,
+  baizeDirection: undefined,
+  acceptsAdjustment: undefined,
+});
 const errors = reactive<Record<string, string>>({});
 const confirmation = ref(false);
 const submitting = ref(false);
@@ -61,7 +117,9 @@ const hasBaizePreference = computed(() => [
 ].includes("白泽开发中心"));
 const avatarSource = computed(() => profileDraft.avatarUrl || undefined);
 const currentBatchApplication = computed(() => activeBatch.value
-  ? applicationStore.getApplication(activeBatch.value.id, currentProfile.value.id)
+  ? isMockApi
+    ? applicationStore?.getApplication(activeBatch.value.id, currentProfile.value.id)
+    : productionApplication.value
   : undefined);
 const submittedApplication = computed(() => {
   const application = currentBatchApplication.value;
@@ -71,6 +129,9 @@ const submittedApplication = computed(() => {
 });
 const canEditSubmittedApplication = computed(() => hasOpenBatch.value && submittedApplication.value?.status === "submitted");
 const isResubmitting = computed(() => currentBatchApplication.value?.status === "withdrawn");
+const isApplicantEligible = computed(() => isMockApi
+  ? currentProfile.value.identity === "预备成员"
+  : isRecruitmentApplicantEligible(currentProfile.value as ProductionMemberProfile));
 const submitButtonLabel = computed(() => {
   if (submitting.value) return "正在提交…";
   if (editingApplication.value) return "确认并保存修改";
@@ -132,7 +193,7 @@ async function goToStep(target: Step) {
 }
 
 function updateFirstChoice(event: Event) {
-  applicationStore.setFirstChoice(
+  applicationStore?.setFirstChoice(
     applicationDraft,
     ((event.target as HTMLSelectElement).value || undefined) as RecruitmentCenter | undefined,
   );
@@ -174,7 +235,14 @@ function loadApplicationDraft() {
   const application = currentBatchApplication.value;
   if (!application) return;
   Object.assign(profileDraft, createRegistrationProfileDraft(currentProfile.value));
-  Object.assign(applicationDraft, applicationStore.createDraft(), {
+  Object.assign(applicationDraft, isMockApi ? applicationStore?.createDraft() : {
+    contact: "",
+    firstChoice: undefined,
+    secondChoice: undefined,
+    thirdChoice: undefined,
+    baizeDirection: undefined,
+    acceptsAdjustment: undefined,
+  }, {
     contact: application.contact,
     firstChoice: application.firstChoice,
     secondChoice: application.secondChoice,
@@ -193,13 +261,25 @@ function startEditingApplication() {
   editingApplication.value = true;
 }
 
-function confirmWithdrawApplication() {
+async function confirmWithdrawApplication() {
   const batchId = activeBatch.value?.id;
   if (!batchId) return;
-  applicationStore.withdrawApplication(batchId);
-  showWithdrawConfirmation.value = false;
-  editingApplication.value = false;
-  loadApplicationDraft();
+  try {
+    if (isMockApi) {
+      applicationStore?.withdrawApplication(batchId);
+    } else if (productionApplication.value && productionApplicationVersion.value !== undefined && recruitmentGateway) {
+      const response = await recruitmentGateway.withdrawApplication(batchId, productionApplication.value.id, {
+        expectedVersion: productionApplicationVersion.value,
+      });
+      productionApplicationVersion.value = response.version;
+      productionApplication.value = mapRecruitmentApplicationResponse(response, productionProfile.value!, productionBatch.value!);
+    }
+    showWithdrawConfirmation.value = false;
+    editingApplication.value = false;
+    loadApplicationDraft();
+  } catch (error) {
+    submitError.value = recruitmentErrorMessage(error);
+  }
 }
 
 async function submitApplication() {
@@ -223,30 +303,87 @@ async function submitApplication() {
     if (!batchId || !hasOpenBatch.value) {
       throw new Error("当前批次已暂停或关闭，暂不能提交报名。请保留页面草稿并返回加入我们查看最新安排。");
     }
-    applicationStore.submitApplication(
-      {
-        ...profileDraft,
-        name: profileDraft.name.trim(),
-        studentId: profileDraft.studentId.trim(),
-        grade: profileDraft.grade.trim(),
-        className: profileDraft.className.trim(),
-        bio: profileDraft.bio.trim(),
-      },
-      {
-        ...applicationDraft,
-        contact: applicationDraft.contact.trim(),
-      },
-      confirmation.value,
-      { batchId, allowExistingUpdate: editingApplication.value },
-    );
+    if (!isApplicantEligible.value) throw new Error("正式成员账号不能提交招新报名。");
+    if (isMockApi) {
+      applicationStore?.submitApplication(
+        {
+          ...profileDraft,
+          name: profileDraft.name.trim(),
+          studentId: profileDraft.studentId.trim(),
+          grade: profileDraft.grade.trim(),
+          className: profileDraft.className.trim(),
+          bio: profileDraft.bio.trim(),
+        },
+        { ...applicationDraft, contact: applicationDraft.contact.trim() },
+        confirmation.value,
+        { batchId, allowExistingUpdate: editingApplication.value },
+      );
+    } else if (recruitmentGateway && productionProfile.value && productionBatch.value) {
+      const updatedProfile = await recruitmentGateway.updateCurrentProfile(mapMemberProfileUpdatePayload(
+        productionProfile.value,
+        { ...profileDraft, contact: applicationDraft.contact },
+      ));
+      productionProfile.value = mapMemberProfileResponse(updatedProfile as MemberProfileResponseDto);
+      Object.assign(profileDraft, createRegistrationProfileDraft(productionProfile.value));
+      const payload = mapRecruitmentApplicationDraft({ ...applicationDraft, contact: applicationDraft.contact.trim() });
+      const response = editingApplication.value && productionApplication.value && productionApplicationVersion.value !== undefined
+        ? await recruitmentGateway.updateApplication(batchId, productionApplication.value.id, {
+          ...payload,
+          expectedVersion: productionApplicationVersion.value,
+        })
+        : await recruitmentGateway.submitApplication(batchId, payload);
+      productionApplicationVersion.value = response.version;
+      productionApplication.value = mapRecruitmentApplicationResponse(response, productionProfile.value, productionBatch.value);
+    } else {
+      throw new Error("招新服务暂不可用，请稍后重试。");
+    }
     draftObjectUrl = undefined;
     editingApplication.value = false;
   } catch (error) {
-    submitError.value = error instanceof Error ? error.message : "报名提交失败，请稍后重试。";
+    submitError.value = recruitmentErrorMessage(error);
   } finally {
     submitting.value = false;
   }
 }
+
+function recruitmentErrorMessage(error: unknown): string {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  if (code === "APPLICANT_NOT_ELIGIBLE") return "正式成员账号不能提交招新报名。";
+  if (code === "RECRUITMENT_BATCH_NOT_OPEN") return "当前批次已暂停或关闭，请返回加入我们查看最新安排。";
+  if (code === "RECRUITMENT_CSRF_TOKEN_MISSING") return "当前会话已失效，请重新登录后再提交。";
+  return error instanceof Error ? error.message : "报名提交失败，请稍后重试。";
+}
+
+async function loadProductionRecruitment() {
+  if (isMockApi || !recruitmentGateway) return;
+  productionLoading.value = true;
+  productionError.value = "";
+  try {
+    const [current, upcoming, profile] = await Promise.all([
+      recruitmentGateway.getCurrentBatch(),
+      recruitmentGateway.getUpcomingBatch(),
+      recruitmentGateway.getCurrentProfile(),
+    ]);
+    productionProfile.value = mapMemberProfileResponse(profile);
+    Object.assign(profileDraft, createRegistrationProfileDraft(productionProfile.value));
+    productionBatch.value = current.batch ? mapPublicRecruitmentBatch(current.batch) : null;
+    productionUpcomingBatch.value = upcoming.batch ? mapPublicRecruitmentBatch(upcoming.batch) : null;
+    capturedBatchId.value = productionBatch.value?.id;
+    if (productionBatch.value && productionProfile.value.status === "PREPARATORY") {
+      const application = await recruitmentGateway.getMyApplication(productionBatch.value.id);
+      if (application.application) {
+        productionApplicationVersion.value = application.application.version;
+        productionApplication.value = mapRecruitmentApplicationResponse(application.application, productionProfile.value, productionBatch.value);
+      }
+    }
+  } catch (error) {
+    productionError.value = recruitmentErrorMessage(error);
+  } finally {
+    productionLoading.value = false;
+  }
+}
+
+onMounted(loadProductionRecruitment);
 
 onBeforeUnmount(() => {
   releaseDraftObjectUrl();
@@ -258,12 +395,30 @@ onBeforeUnmount(() => {
     <header class="task-page__header shell">
       <p class="eyebrow">Member Registration · Recruitment</p>
       <h1>成员注册与招新报名</h1>
-      <p>登录用于确认账号身份；在这里完善成员资料并提交本次招新志愿。当前为前端演示，刷新后会恢复示例数据。</p>
+      <p v-if="isMockApi">登录用于确认账号身份；在这里完善成员资料并提交本次招新志愿。当前为前端演示，刷新后会恢复示例数据。</p>
+      <p v-else>登录用于确认账号身份；页面将读取当前账号的真实成员资料和招新批次，不会使用本地示例数据替代。</p>
     </header>
 
     <section class="task-page__body">
       <div class="shell">
-        <section v-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
+        <section v-if="productionLoading" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
+          <p class="eyebrow">Recruitment</p>
+          <h2>正在读取报名资格</h2>
+          <p>正在确认当前账号、开放批次和既有报名记录，请稍候。</p>
+        </section>
+        <section v-else-if="productionError" class="recruitment-success recruitment-success--blocked" role="alert">
+          <p class="eyebrow">Recruitment Error</p>
+          <h2>招新数据暂时不可用</h2>
+          <p>{{ productionError }}</p>
+          <div class="recruitment-success__actions"><button class="button" type="button" @click="loadProductionRecruitment">重新读取</button><NuxtLink class="button button--ghost" to="/join">返回加入我们</NuxtLink></div>
+        </section>
+        <section v-else-if="!isApplicantEligible" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
+          <p class="eyebrow">Recruitment Eligibility</p>
+          <h2>当前账号无需填写招新报名表</h2>
+          <p>当前账号身份为“{{ currentProfile.identity || "正式成员" }}”。正式成员不能重复提交招新报名；如需查看已有个人记录，请进入成员空间。</p>
+          <div class="recruitment-success__actions"><NuxtLink class="button" to="/member">进入个人中心</NuxtLink><NuxtLink class="button button--ghost" to="/join">返回加入我们</NuxtLink></div>
+        </section>
+        <section v-else-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
           <p class="eyebrow">Submitted</p>
           <h2>成员注册与招新报名已提交</h2>
           <p>你的报名已关联到“{{ submittedApplication.batchNameSnapshot }}”，并以预备成员身份进入后续流程。</p>
@@ -319,7 +474,7 @@ onBeforeUnmount(() => {
                 <header class="recruitment-section-heading"><span>01</span><div><h2 id="registration-profile-heading">完善个人资料</h2><p>这些资料会在最终提交后建立当前账号的初始成员档案。</p></div></header>
                 <div class="registration-avatar" data-field="avatarUrl">
                   <HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="lg" />
-                  <div><strong>头像（可选）</strong><p>上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
+                  <div><strong>头像（可选）</strong><p v-if="isMockApi">上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><p v-else>当前报名接口不接收头像文件；如需修改头像，请在正式媒体上传能力上线后通过成员资料页操作。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button v-if="isMockApi" class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="isMockApi && profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
                 </div>
                 <div class="registration-fields">
                   <label data-field="name"><span>姓名</span><input v-model="profileDraft.name" autocomplete="name" maxlength="20" :aria-invalid="Boolean(errors.name)" :aria-describedby="errors.name ? 'name-error' : undefined"><small v-if="errors.name" id="name-error" class="form-error">{{ errors.name }}</small></label>
@@ -363,7 +518,7 @@ onBeforeUnmount(() => {
             </form>
           </div>
 
-          <aside class="recruitment-application-aside"><p class="eyebrow">Application Notes</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p>当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p></aside>
+          <aside class="recruitment-application-aside"><p class="eyebrow">Application Notes</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p v-if="isMockApi">当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p><p v-else>提交前请确认资料准确；报名会关联当前开放批次，并通过正式 API 写入当前账号的报名记录。</p></aside>
         </div>
       </div>
     </section>

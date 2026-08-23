@@ -52,6 +52,13 @@ import {
   type HandoverCenterMinisterDto,
   type RevokeOrganizationPositionDto,
   type SetCoreMembershipDto,
+  type CreateRecruitmentBatchDto,
+  type RecruitmentBatchCommandDto,
+  type SubmitApplicationDto,
+  type UpdateApplicationDto,
+  type UpdateMyProfileDto,
+  type UpdateRecruitmentBatchDto,
+  type WithdrawApplicationDto,
 } from "./generated";
 
 /** The dashboard endpoint is intentionally ungenerated until the M5 server contract exists in Swagger. */
@@ -90,6 +97,7 @@ export interface HsdApiClient {
   };
   members: {
     currentProfile(): Promise<ApiResponseFor<"GET /api/v1/members/me">>;
+    updateCurrentProfile(payload: UpdateMyProfileDto): Promise<ApiResponseFor<"PATCH /api/v1/members/me">>;
     managed(): Promise<ApiResponseFor<"GET /api/v1/admin/members">>;
     createManaged(payload: CreateManagedMemberDto): Promise<ApiResponseFor<"POST /api/v1/admin/members">>;
     promoteManaged(personId: string, payload: PromoteManagedMemberDto): Promise<ApiResponseFor<"POST /api/v1/admin/members/{personId}/promote">>;
@@ -139,6 +147,17 @@ export interface HsdApiClient {
   recruitment: {
     currentBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/current">>;
     upcomingBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/upcoming">>;
+    myApplication(batchId: string): Promise<ApiResponseFor<"GET /api/v1/recruitment/batches/{batchId}/my-application">>;
+    submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications">>;
+    updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<ApiResponseFor<"PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}">>;
+    withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw">>;
+    listAdminBatches(): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches">>;
+    getAdminBatch(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}">>;
+    createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches">>;
+    updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/recruitment/batches/{batchId}">>;
+    runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
+    listAdminApplications(batchId: string, query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications">>;
+    getAdminApplication(batchId: string, applicationId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}">>;
     results(): Promise<ApiResponseFor<"GET /api/v1/recruitment/results/me">>;
   };
   portal: {
@@ -217,6 +236,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     members: {
       currentProfile: () => requestGenerated(transport, "GET /api/v1/members/me"),
+      updateCurrentProfile: (payload) => requestGenerated(transport, "PATCH /api/v1/members/me", payload),
       managed: () => requestGenerated(transport, "GET /api/v1/admin/members"),
       createManaged: (payload) => requestGenerated(transport, "POST /api/v1/admin/members", payload),
       promoteManaged: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/members/{personId}/promote", payload, `/api/v1/admin/members/${encodeURIComponent(personId)}/promote`),
@@ -266,6 +286,20 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     recruitment: {
       currentBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/current"),
       upcomingBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/upcoming"),
+      myApplication: (batchId) => requestGenerated(transport, "GET /api/v1/recruitment/batches/{batchId}/my-application", undefined, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`),
+      submitApplication: (batchId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`),
+      updateApplication: (batchId, applicationId, payload) => requestGenerated(transport, "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
+      withdrawApplication: (batchId, applicationId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/withdraw`),
+      listAdminBatches: () => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches"),
+      getAdminBatch: (batchId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
+      createAdminBatch: (payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches", payload),
+      updateAdminBatch: (batchId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/recruitment/batches/{batchId}", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
+      runAdminBatchCommand: (batchId, command, payload) => {
+        const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
+        return requestGenerated(transport, operation, payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`) as Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
+      },
+      listAdminApplications: (batchId, query = "") => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`),
+      getAdminApplication: (batchId, applicationId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
       results: () => requestGenerated(transport, "GET /api/v1/recruitment/results/me"),
     },
     portal: {

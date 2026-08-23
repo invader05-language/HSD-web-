@@ -1811,6 +1811,7 @@ export const API_V1_PATHS = {
   authSession: "/api/v1/auth/session",
   authChangePassword: "/api/v1/auth/change-password",
   memberProfile: "/api/v1/members/me",
+  memberProfileUpdate: "/api/v1/members/me",
   memberHonorCreate: "/api/v1/members/me/honors",
   memberHonors: "/api/v1/members/me/honors",
   memberHonorConsent: "/api/v1/members/me/honors/{id}/consent",
@@ -1856,6 +1857,22 @@ export const API_V1_PATHS = {
   adminMediaAttachmentUpdate: "/api/v1/admin/media/attachments/{id}",
   recruitmentCurrent: "/api/v1/recruitment/current",
   recruitmentUpcoming: "/api/v1/recruitment/upcoming",
+  recruitmentMyApplication: "/api/v1/recruitment/batches/{batchId}/my-application",
+  recruitmentApplicationCreate: "/api/v1/recruitment/batches/{batchId}/applications",
+  recruitmentApplicationUpdate: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}",
+  recruitmentApplicationWithdraw: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw",
+  adminRecruitmentBatches: "/api/v1/admin/recruitment/batches",
+  adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
+  adminRecruitmentBatch: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentBatchUpdate: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentApplications: "/api/v1/admin/recruitment/batches/{batchId}/applications",
+  adminRecruitmentApplication: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}",
+  adminRecruitmentBatchPublish: "/api/v1/admin/recruitment/batches/{batchId}/publish",
+  adminRecruitmentBatchOpenNow: "/api/v1/admin/recruitment/batches/{batchId}/open-now",
+  adminRecruitmentBatchPause: "/api/v1/admin/recruitment/batches/{batchId}/pause",
+  adminRecruitmentBatchResume: "/api/v1/admin/recruitment/batches/{batchId}/resume",
+  adminRecruitmentBatchClose: "/api/v1/admin/recruitment/batches/{batchId}/close",
+  adminRecruitmentBatchReopen: "/api/v1/admin/recruitment/batches/{batchId}/reopen",
   assessmentBatch: "/api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
@@ -1920,6 +1937,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/auth/session": { method: "GET", path: "/api/v1/auth/session" },
   "POST /api/v1/auth/change-password": { method: "POST", path: "/api/v1/auth/change-password" },
   "GET /api/v1/members/me": { method: "GET", path: "/api/v1/members/me" },
+  "PATCH /api/v1/members/me": { method: "PATCH", path: "/api/v1/members/me" },
   "POST /api/v1/members/me/honors": { method: "POST", path: "/api/v1/members/me/honors" },
   "GET /api/v1/members/me/honors": { method: "GET", path: "/api/v1/members/me/honors" },
   "PATCH /api/v1/members/me/honors/{id}/consent": { method: "PATCH", path: "/api/v1/members/me/honors/{id}/consent" },
@@ -1965,6 +1983,22 @@ export const API_OPERATIONS = {
   "PATCH /api/v1/admin/media/attachments/{id}": { method: "PATCH", path: "/api/v1/admin/media/attachments/{id}" },
   "GET /api/v1/recruitment/current": { method: "GET", path: "/api/v1/recruitment/current" },
   "GET /api/v1/recruitment/upcoming": { method: "GET", path: "/api/v1/recruitment/upcoming" },
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-application" },
+  "POST /api/v1/recruitment/batches/{batchId}/applications": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications" },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw" },
+  "GET /api/v1/admin/recruitment/batches": { method: "GET", path: "/api/v1/admin/recruitment/batches" },
+  "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": { method: "PATCH", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/publish" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/open-now" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/pause" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/resume" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/close" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/reopen" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results" },
@@ -2032,6 +2066,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/auth/session": CurrentSessionResponseDto;
   "POST /api/v1/auth/change-password": AuthSessionResponseDto;
   "GET /api/v1/members/me": MemberProfileResponseDto;
+  "PATCH /api/v1/members/me": MemberProfileResponseDto;
   "POST /api/v1/members/me/honors": AdminHonorResponseDto;
   "GET /api/v1/members/me/honors": AdminHonorListResponseDto;
   "PATCH /api/v1/members/me/honors/{id}/consent": AdminHonorResponseDto;
@@ -2080,6 +2115,22 @@ export interface ApiResponseByOperation {
   "PATCH /api/v1/admin/media/attachments/{id}": MediaAttachmentResponseDto;
   "GET /api/v1/recruitment/current": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/upcoming": PublicRecruitmentBatchEnvelopeDto;
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": MyRecruitmentApplicationEnvelopeDto;
+  "POST /api/v1/recruitment/batches/{batchId}/applications": MyRecruitmentApplicationResponseDto;
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": MyRecruitmentApplicationResponseDto;
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": MyRecruitmentApplicationResponseDto;
+  "GET /api/v1/admin/recruitment/batches": AdminRecruitmentBatchListDto;
+  "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": AdminRecruitmentApplicationListDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": AdminRecruitmentApplicationDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": AssessmentBatchResponseDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": AssessmentAdjustmentTargetCatalogResponseDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": AssessmentRoundMutationResponseDto;
@@ -2152,6 +2203,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AuthSessionResponseDto"
   },
   "GET /api/v1/members/me": {
+    "$ref": "#/components/schemas/MemberProfileResponseDto"
+  },
+  "PATCH /api/v1/members/me": {
     "$ref": "#/components/schemas/MemberProfileResponseDto"
   },
   "POST /api/v1/members/me/honors": {
@@ -2300,6 +2354,54 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/recruitment/upcoming": {
     "$ref": "#/components/schemas/PublicRecruitmentBatchEnvelopeDto"
+  },
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationEnvelopeDto"
+  },
+  "POST /api/v1/recruitment/batches/{batchId}/applications": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "GET /api/v1/admin/recruitment/batches": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchListDto"
+  },
+  "POST /api/v1/admin/recruitment/batches": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": {
+    "$ref": "#/components/schemas/AdminRecruitmentApplicationListDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentApplicationDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
   },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": {
     "$ref": "#/components/schemas/AssessmentBatchResponseDto"
