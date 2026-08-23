@@ -16,13 +16,10 @@ export function mapAdminContentDetail(item: AdminContentResponseDto): AdminConte
 }
 
 export function replaceFirstContentParagraph(blocks: AdminContentDetailBlock[], text: string): AdminContentDetailBlock[] {
-  let replaced = false;
-  return blocks.flatMap((block) => {
-    if (block.type !== "paragraph") return [block];
-    if (replaced || !text.trim()) return [];
-    replaced = true;
-    return [{ type: "paragraph", text: text.trim() }];
-  });
+  const paragraphCount = blocks.filter((block) => block.type === "paragraph").length;
+  if (!paragraphCount) return text.trim() ? [...blocks, { type: "paragraph", text: text.trim() }] : blocks;
+  if (paragraphCount > 1) return blocks;
+  return blocks.map((block) => block.type === "paragraph" ? { type: "paragraph", text: text.trim() } : block);
 }
 
 export function createAdminContentDetailController(gateway: AdminContentDetailGateway) {

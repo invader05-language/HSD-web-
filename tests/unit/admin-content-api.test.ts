@@ -64,4 +64,10 @@ describe("admin content production mutations", () => {
     const blocks = [{ type: "heading" as const, level: 2 as const, text: "Heading" }, { type: "image" as const, attachmentId: "attachment-1", alt: "Image" }, { type: "paragraph" as const, text: "Old body" }];
     expect(replaceFirstContentParagraph(blocks, "New body")).toEqual([{ type: "heading", level: 2, text: "Heading" }, { type: "image", attachmentId: "attachment-1", alt: "Image" }, { type: "paragraph", text: "New body" }]);
   });
+
+  it("keeps multiple paragraphs intact and appends a new-content body paragraph", () => {
+    const mixed = [{ type: "paragraph" as const, text: "First" }, { type: "image" as const, attachmentId: "image", alt: "Image" }, { type: "paragraph" as const, text: "Last" }];
+    expect(replaceFirstContentParagraph(mixed, "Changed")).toEqual(mixed);
+    expect(replaceFirstContentParagraph([], "New body")).toEqual([{ type: "paragraph", text: "New body" }]);
+  });
 });
