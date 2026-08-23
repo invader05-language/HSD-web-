@@ -20,6 +20,8 @@ import { getRecruitmentBatchProgress } from "~/utils/recruitment-batch-rules";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import type { RecruitmentBatch } from "~/types/recruitment-batch";
+import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { createProductionRecruitmentBatchController } from "~/composables/useProductionRecruitmentBatch";
 
 definePageMeta({ layout: "admin" });
 
@@ -39,27 +41,44 @@ interface AdminBatchDetail extends AdminRecruitmentBatchLike {
 type LifecycleAction = "publish" | "openNow" | "pause" | "resume" | "close" | "reopen" | "archive";
 
 const route = useRoute();
+const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
+const isMockApi = runtimeConfig.public.useMockApi;
 const now = useRecruitmentNow();
 const session = useSessionStore();
-const batchStore = useRecruitmentBatchStore();
-const applicationStore = useRecruitmentApplicationStore();
-const assessmentStore = useRecruitmentAssessmentStore();
+const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
+const applicationStore = isMockApi ? useRecruitmentApplicationStore() : undefined;
+const assessmentStore = isMockApi ? useRecruitmentAssessmentStore() : undefined;
+const recruitmentGateway = useRecruitmentGateway();
+const productionBatch = recruitmentGateway
+  ? createProductionRecruitmentBatchController(recruitmentGateway)
+  : undefined;
 const batchId = computed(() => String(route.params.batchId));
-watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
+if (isMockApi) watch(now, (value) => batchStore?.syncLifecycle(value), { immediate: true });
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
-const batch = computed(() => batchStore.getBatch(batchId.value) as AdminBatchDetail | undefined);
+const batch = computed(() => isMockApi
+  ? batchStore?.getBatch(batchId.value) as AdminBatchDetail | undefined
+  : productionBatch?.batch.value);
 function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
   return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
 }
 const overviewRoute = computed(() => buildRecruitmentBatchRoute(batchId.value));
 const statusKey = computed(() => {
-  const effective = batchStore.effectiveStatus(batchId.value, now.value);
+  if (!isMockApi) return productionBatch?.batch.value?.effectiveStatus ?? "closed";
+  const effective = batchStore?.effectiveStatus(batchId.value, now.value);
   return effective ?? (batch.value ? getAdminBatchStatus(batch.value) : "closed");
 });
 const statusLabel = computed(() => getRecruitmentBatchStatusLabel(statusKey.value));
-const progress = computed(() => batch.value
-  ? getRecruitmentBatchProgress(batch.value as RecruitmentBatch, now.value)
-  : { status: "closed" as const, percentage: 100 });
+const progress = computed(() => {
+  if (!batch.value) return { status: "closed" as const, percentage: 100 };
+  if (isMockApi) return getRecruitmentBatchProgress(batch.value as RecruitmentBatch, now.value);
+  const start = new Date(batch.value.startAt ?? "").getTime();
+  const end = new Date(batch.value.endAt ?? "").getTime();
+  const current = now.value.getTime();
+  const percentage = Number.isFinite(start) && Number.isFinite(end) && end > start
+    ? Math.max(0, Math.min(100, Math.round(((current - start) / (end - start)) * 100)))
+    : 0;
+  return { status: statusKey.value, percentage };
+});
 const canManage = computed(() => canManageRecruitmentBatch(
   session.currentAccount
     ? { account: session.currentAccount.account, name: session.currentAccount.name, level: session.adminLevel as "admin" | "owner" }
@@ -68,12 +87,12 @@ const canManage = computed(() => canManageRecruitmentBatch(
 const isArchived = computed(() => statusKey.value === "archived");
 const isDraft = computed(() => statusKey.value === "draft");
 const assessmentPublished = computed(() => Boolean(
-  (batchStore as unknown as { assessmentPublishedAt?: Record<string, string> }).assessmentPublishedAt?.[batchId.value],
+  (batchStore as unknown as { assessmentPublishedAt?: Record<string, string> } | undefined)?.assessmentPublishedAt?.[batchId.value],
 ));
 const assessmentStarted = computed(() => Boolean(
-  (batchStore as unknown as { assessmentStartedAt?: Record<string, string> }).assessmentStartedAt?.[batchId.value],
+  (batchStore as unknown as { assessmentStartedAt?: Record<string, string> } | undefined)?.assessmentStartedAt?.[batchId.value],
 ));
-const canReopen = computed(() => statusKey.value === "closed" && !assessmentPublished.value && !assessmentStarted.value);
+const canReopen = computed(() => isMockApi && statusKey.value === "closed" && !assessmentPublished.value && !assessmentStarted.value);
 const pendingAction = ref<LifecycleAction | null>(null);
 const reason = ref("");
 const actionMessage = ref("");
@@ -93,34 +112,41 @@ const centerOptions = RECRUITMENT_CENTERS.map((label, index) => [
 ] as const);
 
 const applications = computed(() => batch.value
-  ? applicationStore.getApplicationsForBatch(batchId.value)
+  ? applicationStore?.getApplicationsForBatch(batchId.value)
     .filter((application) => !centerScope.value || application.firstChoice === centerScope.value)
+    ?? []
   : []);
 const candidates = computed(() => batch.value
-  ? assessmentStore.getCandidates(batchId.value)
+  ? assessmentStore?.getCandidates(batchId.value)
     .filter(canViewCandidate)
+    ?? []
   : []);
 const actionableCandidates = computed(() => batch.value
-  ? assessmentStore.getActionableCandidates(batchId.value)
+  ? assessmentStore?.getActionableCandidates(batchId.value)
     .filter(canViewCandidate)
+    ?? []
   : []);
 const publicationSummary = computed(() => batch.value
-  ? assessmentStore.getPublicationSummary(batchId.value, canViewCandidate)
+  ? assessmentStore?.getPublicationSummary(batchId.value, canViewCandidate)
+    ?? { total: 0, ready: 0, pending: 0, admitted: 0, notAdmitted: 0, canPublish: false }
   : { total: 0, ready: 0, pending: 0, admitted: 0, notAdmitted: 0, canPublish: false });
-const applicantCount = computed(() => Math.max(applications.value.length, candidates.value.length));
-const publishReadiness = computed(() => batch.value && isDraft.value
-  ? batchStore.getPublishReadiness(batchId.value, now.value)
+const applicantCount = computed(() => !isMockApi
+  ? productionBatch?.batch.value?.applicationCount ?? 0
+  : Math.max(applications.value.length, candidates.value.length));
+const publishReadiness = computed(() => batch.value && isDraft.value && isMockApi
+  ? batchStore?.getPublishReadiness(batchId.value, now.value) ?? { ok: false }
   : { ok: false });
-const openCenterNames = computed(() => (batch.value?.openCenterIds ?? [])
-  .map((id) => centerOptions.find(([centerId]) => centerId === id)?.[1] ?? id));
+const openCenterNames = computed(() => !isMockApi
+  ? productionBatch?.batch.value?.openCenters.map((center) => `${center.name}${center.active ? "" : "（已停用）"}`) ?? []
+  : (batch.value?.openCenterIds ?? []).map((id) => centerOptions.find(([centerId]) => centerId === id)?.[1] ?? id));
 
 const workflowItems = computed(() => [
   {
     step: "01",
     title: "报名名单",
     description: "查看报名资料、筛选与导出",
-    state: isArchived.value ? "已封存" : statusKey.value === "open" ? "报名收集中" : statusKey.value === "paused" ? "报名已暂停" : statusKey.value === "closed" ? "报名已结束" : "等待报名",
-    detail: `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
+    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已封存" : statusKey.value === "open" ? "报名收集中" : statusKey.value === "paused" ? "报名已暂停" : statusKey.value === "closed" ? "报名已结束" : "等待报名",
+    detail: !isMockApi ? `批次 API 已报告 ${applicantCount.value} 人；名单接口尚未接入本页` : `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
     count: `${applicantCount.value} 人`,
     section: "applications" as const,
     action: isArchived.value ? "查看名单" : "进入名单",
@@ -129,9 +155,9 @@ const workflowItems = computed(() => [
     step: "02",
     title: "预备成员考核",
     description: "分阶段审批、调剂与推进",
-    state: isArchived.value ? "已完成" : actionableCandidates.value.length > 0 ? "有待处理人员" : statusKey.value === "draft" ? "批次发布后开启" : "尚未开始",
-    detail: `${actionableCandidates.value.length} 人待处理 · ${candidates.value.length} 人进入本批次`,
-    count: `${candidates.value.length} 人`,
+    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已完成" : actionableCandidates.value.length > 0 ? "有待处理人员" : statusKey.value === "draft" ? "批次发布后开启" : "尚未开始",
+    detail: !isMockApi ? "不会读取 Mock 考核名单" : `${actionableCandidates.value.length} 人待处理 · ${candidates.value.length} 人进入本批次`,
+    count: !isMockApi ? "—" : `${candidates.value.length} 人`,
     section: "assessment" as const,
     action: isArchived.value ? "查看记录" : "进入考核台",
   },
@@ -139,15 +165,16 @@ const workflowItems = computed(() => [
     step: "03",
     title: "结果发布",
     description: "核对名单并发布用户端结果",
-    state: isArchived.value ? "已发布" : publicationSummary.value.canPublish ? "满足发布条件" : "等待考核完成",
-    detail: `${publicationSummary.value.ready} 人已形成结果 · ${publicationSummary.value.pending} 人待处理`,
-    count: publicationSummary.value.total ? `${publicationSummary.value.ready}/${publicationSummary.value.total}` : "—",
+    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已发布" : publicationSummary.value.canPublish ? "满足发布条件" : "等待考核完成",
+    detail: !isMockApi ? "不会读取 Mock 发布摘要" : `${publicationSummary.value.ready} 人已形成结果 · ${publicationSummary.value.pending} 人待处理`,
+    count: !isMockApi ? "—" : publicationSummary.value.total ? `${publicationSummary.value.ready}/${publicationSummary.value.total}` : "—",
     section: "publish" as const,
     action: isArchived.value ? "查看结果" : "进入结果发布",
   },
 ]);
 
 const auditRecords = computed(() => {
+  if (!isMockApi) return [];
   const records = (batchStore as unknown as { auditRecords?: unknown }).auditRecords;
   if (!Array.isArray(records)) return [];
   return records.filter((record) => (record as { batchId?: string }).batchId === batchId.value);
@@ -172,6 +199,12 @@ function actionLabel(action: LifecycleAction) {
 function requestAction(action: LifecycleAction) {
   actionError.value = "";
   actionMessage.value = "";
+  if (!isMockApi) {
+    actionError.value = action === "archive"
+      ? "后端未提供归档命令。"
+      : "当前详情页尚未接入真实批次状态命令。";
+    return;
+  }
   if (!canManage.value) {
     actionError.value = "只有联盟总负责人可以修改批次状态。";
     return;
@@ -184,6 +217,7 @@ function requestAction(action: LifecycleAction) {
 }
 
 function invokeAction(action: LifecycleAction) {
+  if (!isMockApi || !batchStore) return;
   const methodName = action === "publish" ? "publishBatch" : action;
   const method = (batchStore as unknown as Record<string, unknown>)[methodName];
   if (typeof method !== "function") {
@@ -232,7 +266,7 @@ function toDateTime(value: string, endOfDay = false) {
 }
 
 function openEditor() {
-  if (!batch.value || !canManage.value || !isDraft.value) return;
+  if (!isMockApi || !batch.value || !canManage.value || !isDraft.value) return;
   editError.value = "";
   editForm.name = batch.value.name;
   editForm.startAt = dateInput(batch.value.startAt);
@@ -242,7 +276,7 @@ function openEditor() {
 }
 
 function saveEditor() {
-  if (!batch.value) return;
+  if (!isMockApi || !batch.value || !batchStore) return;
   try {
     batchStore.updateBatch(batchId.value, {
       name: editForm.name,
@@ -286,6 +320,13 @@ function auditTimestamp(value: string) {
   }).format(date).replaceAll("/", "-");
 }
 
+async function loadProductionBatch() {
+  if (!isMockApi) await productionBatch?.load(batchId.value);
+}
+
+onMounted(loadProductionBatch);
+watch(batchId, () => { void loadProductionBatch(); });
+
 useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台` }));
 </script>
 
@@ -295,20 +336,20 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     <AdminPageHeading
       eyebrow="Recruitment Batch Context"
       :title="batch.name"
-      :description="isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
+      :description="!isMockApi ? `当前仅展示 ${batch.name} 的真实批次概要；子工作区尚未接入真实数据。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
     >
       <template #actions>
         <div class="admin-batch-actions">
           <NuxtLink class="button button--ghost" to="/admin/recruitment/batches">返回批次列表</NuxtLink>
           <NuxtLink class="button button--ghost" to="/join">查看用户端页面</NuxtLink>
-          <button v-if="isDraft && canManage" type="button" class="button button--ghost" @click="openEditor">编辑批次</button>
-          <button v-if="statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok" @click="requestAction('publish')">发布批次</button>
-          <button v-if="statusKey === 'upcoming'" type="button" class="button" :disabled="!canManage" @click="requestAction('openNow')">立即开放</button>
-          <button v-if="statusKey === 'open'" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('pause')">暂停报名</button>
-          <button v-if="statusKey === 'paused'" type="button" class="button" :disabled="!canManage" @click="requestAction('resume')">恢复报名</button>
-          <button v-if="statusKey === 'open' || statusKey === 'paused'" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('close')">提前关闭</button>
+          <button v-if="isMockApi && isDraft && canManage" type="button" class="button button--ghost" @click="openEditor">编辑批次</button>
+          <button v-if="isMockApi && statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok" @click="requestAction('publish')">发布批次</button>
+          <button v-if="isMockApi && statusKey === 'upcoming'" type="button" class="button" :disabled="!canManage" @click="requestAction('openNow')">立即开放</button>
+          <button v-if="isMockApi && statusKey === 'open'" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('pause')">暂停报名</button>
+          <button v-if="isMockApi && statusKey === 'paused'" type="button" class="button" :disabled="!canManage" @click="requestAction('resume')">恢复报名</button>
+          <button v-if="isMockApi && (statusKey === 'open' || statusKey === 'paused')" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('close')">提前关闭</button>
           <button v-if="canReopen" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('reopen')">重新开放</button>
-          <button v-if="statusKey === 'closed'" type="button" class="button" :disabled="!canManage" @click="requestAction('archive')">归档批次</button>
+          <button v-if="isMockApi && statusKey === 'closed'" type="button" class="button" :disabled="!canManage" @click="requestAction('archive')">归档批次</button>
         </div>
       </template>
     </AdminPageHeading>
@@ -331,7 +372,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <div><span class="admin-batch-context-summary__label">负责人 / 版本</span><strong>{{ batch.owner || "联盟总负责人" }} · v{{ batch.version ?? 1 }}</strong></div>
     </section>
 
-    <section v-if="isDraft" class="admin-batch-readiness" aria-label="发布准备检查">
+    <section v-if="isMockApi && isDraft" class="admin-batch-readiness" aria-label="发布准备检查">
       <header><div><span>Publish Readiness</span><h2>发布准备检查</h2></div><p>发布前先解决所有阻塞项，避免提交后才发现批次冲突。</p></header>
       <div class="admin-batch-readiness__body">
         <div :class="['admin-batch-readiness__status', publishReadiness.ok ? 'is-ready' : 'is-blocked']">
@@ -349,23 +390,31 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     <section class="admin-list-card admin-batch-workspace">
       <header><div><span>Batch Workflow</span><h2>批次工作区</h2></div><p>{{ isArchived ? "归档批次只允许查看和导出" : canManage ? "当前账号具备批次管理权限" : "当前账号仅可查看与处理授权数据" }}</p></header>
       <nav class="admin-batch-context-nav" aria-label="当前批次工作区">
-        <NuxtLink v-for="item in workflowItems" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
+        <NuxtLink v-for="item in isMockApi ? workflowItems : []" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
           <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
           <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
           <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small>{{ item.detail }}</small></span>
           <span class="admin-batch-workflow-row__count">{{ item.count }}</span>
           <span class="admin-batch-workflow-row__action">{{ item.action }} <span aria-hidden="true">→</span></span>
         </NuxtLink>
+        <div v-for="item in isMockApi ? [] : workflowItems" :key="item.section" class="admin-batch-workflow-row">
+          <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
+          <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
+          <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small>{{ item.detail }}</small></span>
+          <span class="admin-batch-workflow-row__count">{{ item.count }}</span>
+          <span class="admin-batch-workflow-row__action">暂不可用</span>
+        </div>
       </nav>
     </section>
 
     <section class="admin-list-card admin-batch-audit">
       <header><div><span>Lifecycle Audit</span><h2>生命周期记录</h2></div><p>原计划时间、操作人和实际执行时间随命令保存</p></header>
-      <p v-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
+      <p v-if="!isMockApi" class="admin-empty-copy">后端未提供生命周期审计接口。</p>
+      <p v-else-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
       <div v-else class="admin-table-scroll"><table aria-label="批次生命周期审计"><thead><tr><th>操作</th><th>操作人</th><th>状态变化</th><th>原计划开始</th><th>实际时间</th><th>原因</th></tr></thead><tbody><tr v-for="record in auditRecords" :key="auditText(record, 'id')"><td>{{ auditActionLabel(auditText(record, 'action')) }}</td><td>{{ auditText(record, 'actorName', 'actor') }}</td><td>{{ auditStatusLabel(auditText(record, 'beforeStatus', 'before')) }} → {{ auditStatusLabel(auditText(record, 'afterStatus', 'after')) }}</td><td>{{ auditTimestamp(auditText(record, 'originalStartAt')) }}</td><td>{{ auditTimestamp(auditText(record, 'actualAt', 'createdAt')) }}</td><td>{{ auditText(record, 'reason') === 'create recruitment batch' ? '创建招新批次' : auditText(record, 'reason') }}</td></tr></tbody></table></div>
     </section>
 
-    <div v-if="pendingAction" class="admin-modal-backdrop">
+    <div v-if="isMockApi && pendingAction" class="admin-modal-backdrop">
       <section role="alertdialog" aria-modal="true" aria-labelledby="batch-action-confirm-title">
         <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction) }}？</h2>
         <p>该操作会改变当前批次的用户报名入口。操作人、原计划时间、实际执行时间和前后状态会写入生命周期记录。</p>
@@ -375,7 +424,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </section>
     </div>
 
-    <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
+    <div v-if="isMockApi && editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="编辑招新批次">
         <header class="admin-drawer__header"><div><span>Edit Recruitment Cycle</span><h2>编辑招新批次</h2><p>仅草稿可以编辑，保存后需要重新完成发布准备检查。</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
         <div class="admin-drawer__body">
@@ -387,5 +436,13 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </aside>
     </div>
   </div>
-  <div v-else class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Recruitment Batch Context" title="批次不存在" description="请从招新批次列表重新进入。"><template #actions><NuxtLink class="button" to="/admin/recruitment/batches">返回批次列表</NuxtLink></template></AdminPageHeading></div>
+  <div v-else class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading
+      eyebrow="Recruitment Batch Context"
+      :title="!isMockApi && productionBatch?.loading.value ? '正在读取批次…' : !isMockApi && productionBatch?.error.value ? '批次读取失败' : '批次不存在'"
+      :description="!isMockApi && productionBatch?.error.value ? productionBatch.error.value : '请从招新批次列表重新进入。'"
+    >
+      <template #actions><button v-if="!isMockApi && productionBatch?.error.value" type="button" class="button button--ghost" @click="loadProductionBatch">重新读取</button><NuxtLink class="button" to="/admin/recruitment/batches">返回批次列表</NuxtLink></template>
+    </AdminPageHeading>
+  </div>
 </template>

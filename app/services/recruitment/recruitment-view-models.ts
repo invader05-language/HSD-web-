@@ -63,12 +63,22 @@ export interface AdminRecruitmentBatchView {
   endAt: string;
   timezone: "Asia/Shanghai";
   effectiveStatus: AdminRecruitmentBatchDto["effectiveStatus"];
+  effectiveStatusReason: AdminRecruitmentBatchDto["effectiveStatusReason"];
   lifecycleStatus: Lowercase<AdminRecruitmentBatchDto["lifecycleStatus"]>;
   manualOverride: Lowercase<AdminRecruitmentBatchDto["manualOverride"]>;
   version: number;
   applicants: number;
+  applicationCount: number;
+  publishedAt: string | null;
+  actualOpenedAt: string | null;
+  closedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
   openCenterIds: string[];
+  openCenters: AdminRecruitmentBatchDto["openCenters"];
   owner: string;
+  responsibleAccounts: AdminRecruitmentBatchDto["responsibleAccounts"];
 }
 
 export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRecruitmentBatchView {
@@ -79,12 +89,22 @@ export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRe
     endAt: dto.endAt,
     timezone: dto.timezone,
     effectiveStatus: dto.effectiveStatus,
+    effectiveStatusReason: dto.effectiveStatusReason,
     lifecycleStatus: dto.lifecycleStatus.toLowerCase() as AdminRecruitmentBatchView["lifecycleStatus"],
     manualOverride: dto.manualOverride.toLowerCase() as AdminRecruitmentBatchView["manualOverride"],
     version: dto.version,
     applicants: dto.applicationCount,
+    applicationCount: dto.applicationCount,
+    publishedAt: dto.publishedAt,
+    actualOpenedAt: dto.actualOpenedAt,
+    closedAt: dto.closedAt,
+    archivedAt: dto.archivedAt,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
     openCenterIds: dto.openCenters.map((center) => center.id),
+    openCenters: dto.openCenters,
     owner: dto.responsibleAccounts[0]?.person.name ?? dto.responsibleAccounts[0]?.username ?? "联盟总负责人",
+    responsibleAccounts: dto.responsibleAccounts,
   };
 }
 
