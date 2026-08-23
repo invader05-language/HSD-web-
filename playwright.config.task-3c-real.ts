@@ -5,7 +5,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: "**/task-3c-admin-content-real.spec.ts",
+  testMatch: "**/task-3c-admin-*-real.spec.ts",
   timeout: 30_000,
   workers: 1,
   use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure" },

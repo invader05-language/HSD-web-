@@ -132,6 +132,11 @@ describe("generated browser API client", () => {
       content: version.content,
       attachmentId: version.attachmentId,
       revisionNumber: version.revisionNumber,
+      createdBy: { id: "44444444-4444-4444-8444-444444444444", username: "owner", displayName: "Owner" },
+      createdAt: "2026-08-11T00:00:00.000Z",
+      updatedAt: "2026-08-11T00:00:00.000Z",
+      offlineAt: null,
+      offlineReason: null,
     };
     const client = createHsdApiClient(async (request) => {
       if (request.path.endsWith("/versions")) return request.method === "GET" ? { items: [version] } : version;

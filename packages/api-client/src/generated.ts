@@ -2026,6 +2026,8 @@ export const API_V1_PATHS = {
   adminGalleryOffline: "/api/v1/admin/galleries/{id}/offline",
   publicGalleries: "/api/v1/public/galleries",
   publicGallery: "/api/v1/public/galleries/{slug}",
+  adminResources: "/api/v1/admin/resources",
+  adminResource: "/api/v1/admin/resources/{id}",
   adminResourceCreate: "/api/v1/admin/resources",
   adminResourceVersionCreate: "/api/v1/admin/resources/{id}/versions",
   adminResourceVersions: "/api/v1/admin/resources/{id}/versions",
@@ -2154,6 +2156,8 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/galleries/{id}/offline": { method: "POST", path: "/api/v1/admin/galleries/{id}/offline" },
   "GET /api/v1/public/galleries": { method: "GET", path: "/api/v1/public/galleries" },
   "GET /api/v1/public/galleries/{slug}": { method: "GET", path: "/api/v1/public/galleries/{slug}" },
+  "GET /api/v1/admin/resources": { method: "GET", path: "/api/v1/admin/resources" },
+  "GET /api/v1/admin/resources/{id}": { method: "GET", path: "/api/v1/admin/resources/{id}" },
   "POST /api/v1/admin/resources": { method: "POST", path: "/api/v1/admin/resources" },
   "POST /api/v1/admin/resources/{id}/versions": { method: "POST", path: "/api/v1/admin/resources/{id}/versions" },
   "GET /api/v1/admin/resources/{id}/versions": { method: "GET", path: "/api/v1/admin/resources/{id}/versions" },
@@ -2288,6 +2292,8 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/galleries/{id}/offline": AdminGalleryResponseDto;
   "GET /api/v1/public/galleries": PublicGalleryListResponseDto;
   "GET /api/v1/public/galleries/{slug}": PublicGalleryResponseDto;
+  "GET /api/v1/admin/resources": AdminResourceListResponseDto;
+  "GET /api/v1/admin/resources/{id}": AdminResourceResponseDto;
   "POST /api/v1/admin/resources": AdminResourceResponseDto;
   "POST /api/v1/admin/resources/{id}/versions": AdminResourceVersionResponseDto;
   "GET /api/v1/admin/resources/{id}/versions": AdminResourceVersionListResponseDto;
@@ -2643,6 +2649,12 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/public/galleries/{slug}": {
     "$ref": "#/components/schemas/PublicGalleryResponseDto"
+  },
+  "GET /api/v1/admin/resources": {
+    "$ref": "#/components/schemas/AdminResourceListResponseDto"
+  },
+  "GET /api/v1/admin/resources/{id}": {
+    "$ref": "#/components/schemas/AdminResourceResponseDto"
   },
   "POST /api/v1/admin/resources": {
     "$ref": "#/components/schemas/AdminResourceResponseDto"

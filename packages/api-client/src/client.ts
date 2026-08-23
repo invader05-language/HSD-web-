@@ -206,6 +206,8 @@ export interface HsdApiClient {
   };
   resources: {
     listPublic(): Promise<ApiResponseFor<"GET /api/v1/public/resources">>;
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources">>;
+    detail(id: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources/{id}">>;
     create(payload: CreateResourceDto): Promise<ApiResponseFor<"POST /api/v1/admin/resources">>;
     appendVersion(id: string, payload: CreateResourceVersionDto): Promise<ApiResponseFor<"POST /api/v1/admin/resources/{id}/versions">>;
     versions(id: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources/{id}/versions">>;
@@ -362,6 +364,8 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     resources: {
       listPublic: () => requestGenerated(transport, "GET /api/v1/public/resources"),
+      list: (query = "") => requestGenerated(transport, "GET /api/v1/admin/resources", undefined, `/api/v1/admin/resources${query ? `?${query}` : ""}`),
+      detail: (id) => requestGenerated(transport, "GET /api/v1/admin/resources/{id}", undefined, `/api/v1/admin/resources/${encodeURIComponent(id)}`),
       create: (payload) => requestGenerated(transport, "POST /api/v1/admin/resources", payload),
       appendVersion: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/resources/{id}/versions", payload, `/api/v1/admin/resources/${encodeURIComponent(id)}/versions`),
       versions: (id) => requestGenerated(transport, "GET /api/v1/admin/resources/{id}/versions", undefined, `/api/v1/admin/resources/${encodeURIComponent(id)}/versions`),

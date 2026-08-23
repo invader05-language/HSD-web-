@@ -112,6 +112,8 @@ const browserOperations = {
   adminGalleryOffline: { operation: "POST /api/v1/admin/galleries/{id}/offline", successStatus: "200" },
   publicGalleries: "GET /api/v1/public/galleries",
   publicGallery: "GET /api/v1/public/galleries/{slug}",
+  adminResources: "GET /api/v1/admin/resources",
+  adminResource: "GET /api/v1/admin/resources/{id}",
   adminResourceCreate: "POST /api/v1/admin/resources",
   adminResourceVersionCreate: "POST /api/v1/admin/resources/{id}/versions",
   adminResourceVersions: "GET /api/v1/admin/resources/{id}/versions",
