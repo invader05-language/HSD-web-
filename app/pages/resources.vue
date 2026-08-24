@@ -12,11 +12,18 @@ const pageSize = 6;
 const currentPage = ref(1);
 const resourcesStore = useResourcesStore();
 const gateway = useContentGateway();
+const resourceData = ref<{ items: typeof resourcesStore.items } | undefined>();
 if (gateway) {
   resourcesStore.activateApiMode();
-  await useAsyncData(`public-resources`, () => resourcesStore.refreshPublicFromApi(gateway));
+  const { data } = await useAsyncData(`public-resources`, async () => {
+    await resourcesStore.refreshPublicFromApi(gateway);
+    return { items: resourcesStore.items };
+  });
+  resourceData.value = data.value;
 }
-const filtered = computed<any[]>(() => gateway ? resourcesStore.items : (active.value === "全部" ? [...PUBLIC_RESOURCES] : PUBLIC_RESOURCES.filter((item) => item.category === active.value)));
+const filtered = computed<any[]>(() => gateway
+  ? (resourcesStore.items.length ? resourcesStore.items : resourceData.value?.items ?? [])
+  : (active.value === "全部" ? [...PUBLIC_RESOURCES] : PUBLIC_RESOURCES.filter((item) => item.category === active.value)));
 const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)));
 const visible = computed(() => {
   const start = (currentPage.value - 1) * pageSize;
