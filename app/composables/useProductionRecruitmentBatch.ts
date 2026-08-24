@@ -2,6 +2,7 @@ import { ref } from "vue";
 import type {
   AdminRecruitmentBatchDto,
   ArchiveRecruitmentBatchPayload,
+  RecruitmentBatchCommandDto,
   RecruitmentBatchLifecycleEventListDto,
 } from "../../packages/api-client/src";
 import {
@@ -15,6 +16,7 @@ interface AdminBatchGateway {
   getAdminBatch(batchId: string): Promise<AdminRecruitmentBatchDto>;
   listAdminBatchLifecycleEvents?(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
   archiveAdminBatch?(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
+  runAdminBatchCommand?(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
 }
 
 type DetailStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "error";
@@ -59,6 +61,8 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   const archiving = ref(false);
   const archiveStatus = ref<ArchiveStatus>("idle");
   const archiveError = ref("");
+  const commanding = ref(false);
+  const commandError = ref("");
   let loadGeneration = 0;
   let lifecycleLoadGeneration = 0;
   let currentBatchId = "";
@@ -223,6 +227,32 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
+  async function runCommand(command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", reason?: string): Promise<boolean> {
+    if (!batch.value || !currentBatchId || !gateway.runAdminBatchCommand) {
+      commandError.value = "真实批次状态命令暂不可用。";
+      return false;
+    }
+    const requestGeneration = loadGeneration;
+    commanding.value = true;
+    commandError.value = "";
+    try {
+      const payload: RecruitmentBatchCommandDto = { expectedVersion: batch.value.version, confirmed: true, ...(reason?.trim() ? { reason: reason.trim() } : {}) };
+      const response = await gateway.runAdminBatchCommand(currentBatchId, command, payload);
+      if (requestGeneration !== loadGeneration) return false;
+      batch.value = mapAdminRecruitmentBatch(response);
+      await refreshLifecycle(currentBatchId, requestGeneration);
+      return true;
+    } catch (cause) {
+      if (requestGeneration === loadGeneration) {
+        commandError.value = errorMessage(cause, "批次状态命令失败，请刷新后重试。");
+        if ((cause as { status?: number })?.status === 409) await refresh(currentBatchId, requestGeneration);
+      }
+      return false;
+    } finally {
+      if (requestGeneration === loadGeneration) commanding.value = false;
+    }
+  }
+
   return {
     batch,
     lifecycleEvents,
@@ -238,8 +268,11 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     archiving,
     archiveStatus,
     archiveError,
+    commanding,
+    commandError,
     load,
     loadLifecyclePage,
     archive,
+    runCommand,
   };
 }

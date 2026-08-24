@@ -162,8 +162,8 @@ const workflowItems = computed(() => [
     step: "01",
     title: "报名名单",
     description: "查看报名资料、筛选与导出",
-    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已封存" : statusKey.value === "open" ? "报名收集中" : statusKey.value === "paused" ? "报名已暂停" : statusKey.value === "closed" ? "报名已结束" : "等待报名",
-    detail: !isMockApi ? `批次 API 已报告 ${applicantCount.value} 人；名单接口尚未接入本页` : `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
+    state: !isMockApi ? "服务端名单已接入" : isArchived.value ? "已封存" : statusKey.value === "open" ? "报名收集中" : statusKey.value === "paused" ? "报名已暂停" : statusKey.value === "closed" ? "报名已结束" : "等待报名",
+    detail: !isMockApi ? `批次 API 已报告 ${applicantCount.value} 人；名单支持服务端筛选、分页与详情` : `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
     count: `${applicantCount.value} 人`,
     section: "applications" as const,
     action: isArchived.value ? "查看名单" : "进入名单",
@@ -172,9 +172,9 @@ const workflowItems = computed(() => [
     step: "02",
     title: "预备成员考核",
     description: "分阶段审批、调剂与推进",
-    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已完成" : actionableCandidates.value.length > 0 ? "有待处理人员" : statusKey.value === "draft" ? "批次发布后开启" : "尚未开始",
-    detail: !isMockApi ? "不会读取 Mock 考核名单" : `${actionableCandidates.value.length} 人待处理 · ${candidates.value.length} 人进入本批次`,
-    count: !isMockApi ? "—" : `${candidates.value.length} 人`,
+    state: !isMockApi ? "服务端考核已接入" : isArchived.value ? "已完成" : actionableCandidates.value.length > 0 ? "有待处理人员" : statusKey.value === "draft" ? "批次发布后开启" : "尚未开始",
+    detail: !isMockApi ? "考核台读取服务端候选人、轮次和版本，并提交真实结果" : `${actionableCandidates.value.length} 人待处理 · ${candidates.value.length} 人进入本批次`,
+    count: !isMockApi ? "服务端" : `${candidates.value.length} 人`,
     section: "assessment" as const,
     action: isArchived.value ? "查看记录" : "进入考核台",
   },
@@ -182,9 +182,9 @@ const workflowItems = computed(() => [
     step: "03",
     title: "结果发布",
     description: "核对名单并发布用户端结果",
-    state: !isMockApi ? "该子工作区尚未接入真实数据" : isArchived.value ? "已发布" : publicationSummary.value.canPublish ? "满足发布条件" : "等待考核完成",
-    detail: !isMockApi ? "不会读取 Mock 发布摘要" : `${publicationSummary.value.ready} 人已形成结果 · ${publicationSummary.value.pending} 人待处理`,
-    count: !isMockApi ? "—" : publicationSummary.value.total ? `${publicationSummary.value.ready}/${publicationSummary.value.total}` : "—",
+    state: !isMockApi ? "服务端发布已接入" : isArchived.value ? "已发布" : publicationSummary.value.canPublish ? "满足发布条件" : "等待考核完成",
+    detail: !isMockApi ? "发布台读取服务端考核状态，并由服务器执行最终事务校验" : `${publicationSummary.value.ready} 人已形成结果 · ${publicationSummary.value.pending} 人待处理`,
+    count: !isMockApi ? "服务端" : publicationSummary.value.total ? `${publicationSummary.value.ready}/${publicationSummary.value.total}` : "—",
     section: "publish" as const,
     action: isArchived.value ? "查看结果" : "进入结果发布",
   },
@@ -244,15 +244,11 @@ function requestAction(action: LifecycleAction) {
   actionError.value = "";
   actionMessage.value = "";
   if (!isMockApi) {
-    if (action !== "archive") {
-      actionError.value = "当前详情页尚未接入真实批次状态命令。";
-      return;
-    }
     if (!canManage.value) {
-      actionError.value = "只有联盟总负责人可以归档批次。";
+      actionError.value = "只有联盟总负责人可以修改批次状态。";
       return;
     }
-    if (statusKey.value !== "closed") {
+    if (action === "archive" && statusKey.value !== "closed") {
       actionError.value = "只有服务端判定为已关闭的批次才能提交归档确认。";
       return;
     }
@@ -282,34 +278,29 @@ function requestAction(action: LifecycleAction) {
 async function invokeAction(context: PendingLifecycleAction) {
   const action = context.action;
   if (!isMockApi) {
-    if (action !== "archive" || !productionBatch) return;
-    const issue = archiveConfirmationIssue(context);
-    if (issue) {
-      actionError.value = issue;
-      return;
-    }
-    const result = await productionBatch.archive({
-      batchId: context.batchId,
-      expectedVersion: context.expectedVersion,
-      reason: reason.value,
-    });
-    if (context.batchId !== batchId.value || pendingAction.value !== context) return;
-    actionError.value = productionBatch.archiveError.value;
-    if (!result.archived) {
-      if (productionBatch.archiveStatus.value === "conflict") {
-        const refreshedVersion = productionBatch.batch.value?.version;
-        if (Number.isInteger(refreshedVersion) && (refreshedVersion ?? 0) > 0) {
-          pendingAction.value = { ...context, expectedVersion: refreshedVersion as number };
+    if (!productionBatch) return;
+    if (action === "archive") {
+      const issue = archiveConfirmationIssue(context);
+      if (issue) { actionError.value = issue; return; }
+      const result = await productionBatch.archive({ batchId: context.batchId, expectedVersion: context.expectedVersion, reason: reason.value });
+      if (context.batchId !== batchId.value || pendingAction.value !== context) return;
+      actionError.value = productionBatch.archiveError.value;
+      if (!result.archived) {
+        if (productionBatch.archiveStatus.value === "conflict") {
+          const refreshedVersion = productionBatch.batch.value?.version;
+          if (Number.isInteger(refreshedVersion) && (refreshedVersion ?? 0) > 0) pendingAction.value = { ...context, expectedVersion: refreshedVersion as number };
+          if (statusKey.value !== "closed" || productionBatch.batch.value?.archivedAt) actionError.value = "批次版本已变化，最新状态不再允许归档，不能再次提交。";
         }
-        if (statusKey.value !== "closed" || productionBatch.batch.value?.archivedAt) {
-          actionError.value = "批次版本已变化，最新状态不再允许归档，不能再次提交。";
-        }
+        return;
       }
-      return;
+      actionMessage.value = result.lifecycleRefreshed ? "归档批次已完成，状态和生命周期记录已刷新。" : "归档批次已完成。";
+    } else {
+      const command = action === "openNow" ? "open-now" : action;
+      const ok = await productionBatch.runCommand(command, reason.value);
+      if (context.batchId !== batchId.value || pendingAction.value !== context) return;
+      if (!ok) { actionError.value = productionBatch.commandError.value; return; }
+      actionMessage.value = `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`;
     }
-    actionMessage.value = result.lifecycleRefreshed
-      ? "归档批次已完成，状态和生命周期记录已刷新。"
-      : "归档批次已完成。";
     pendingAction.value = null;
     reason.value = "";
     return;
@@ -342,7 +333,7 @@ async function invokeAction(context: PendingLifecycleAction) {
 
 function confirmAction() {
   if (!pendingAction.value) return;
-  if (!isMockApi) {
+  if (!isMockApi && pendingAction.value.action === "archive") {
     const issue = archiveConfirmationIssue(pendingAction.value);
     if (issue) {
       actionError.value = issue;
@@ -487,21 +478,12 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 </script>
 
 <template>
-  <NuxtPage v-if="isNestedRoute && isMockApi" />
-  <div v-else-if="isNestedRoute" class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading
-      eyebrow="Recruitment Batch Workspace"
-      title="该子工作区尚未接入真实数据"
-      description="当前真实模式提供批次概要、生命周期记录与 OWNER 归档；报名名单、报名详情、考核和结果发布页面暂不可用，不会读取本地示例数据。"
-    >
-      <template #actions><NuxtLink class="button" :to="overviewRoute">返回批次概览</NuxtLink></template>
-    </AdminPageHeading>
-  </div>
+  <NuxtPage v-if="isNestedRoute" />
   <div v-else-if="batch" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Recruitment Batch Context"
       :title="batch.name"
-      :description="!isMockApi ? `当前展示 ${batch.name} 的真实批次概要与生命周期记录；子工作区尚未接入真实数据。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
+      :description="!isMockApi ? `当前展示 ${batch.name} 的真实批次概要、生命周期与工作区。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
     >
       <template #actions>
         <div class="admin-batch-actions">
@@ -515,6 +497,12 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
           <button v-if="isMockApi && (statusKey === 'open' || statusKey === 'paused')" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('close')">提前关闭</button>
           <button v-if="canReopen" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('reopen')">重新开放</button>
           <button v-if="isMockApi && statusKey === 'closed'" type="button" class="button" :disabled="!canManage" @click="requestAction('archive')">归档批次</button>
+          <button v-if="!isMockApi && statusKey === 'draft' && canManage" type="button" class="button" @click="requestAction('publish')">发布批次</button>
+          <button v-if="!isMockApi && statusKey === 'upcoming' && canManage" type="button" class="button" @click="requestAction('openNow')">立即开放</button>
+          <button v-if="!isMockApi && statusKey === 'open' && canManage" type="button" class="button button--ghost" @click="requestAction('pause')">暂停报名</button>
+          <button v-if="!isMockApi && statusKey === 'paused' && canManage" type="button" class="button" @click="requestAction('resume')">恢复报名</button>
+          <button v-if="!isMockApi && (statusKey === 'open' || statusKey === 'paused') && canManage" type="button" class="button button--ghost" @click="requestAction('close')">提前关闭</button>
+          <button v-if="!isMockApi && statusKey === 'closed' && canManage" type="button" class="button button--ghost" @click="requestAction('reopen')">重新开放</button>
           <button v-if="!isMockApi && statusKey === 'closed' && canManage" type="button" class="button" :disabled="productionBatch?.archiving.value" @click="requestAction('archive')">归档批次</button>
         </div>
       </template>
@@ -522,7 +510,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <p v-if="actionMessage" class="admin-save-message" role="status">{{ actionMessage }}</p>
     <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
-    <p v-if="!isMockApi" class="admin-empty-copy">真实模式仅接入 OWNER 归档；发布、开放、暂停、恢复、关闭和重开命令暂不可用。</p>
+    <p v-if="!isMockApi && productionBatch?.commandError.value" class="admin-save-message admin-save-message--error" role="alert">{{ productionBatch.commandError.value }}</p>
 
     <section class="admin-batch-context-summary" aria-label="批次概览">
       <div class="admin-batch-context-summary__primary">
@@ -557,20 +545,13 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     <section class="admin-list-card admin-batch-workspace">
       <header><div><span>Batch Workflow</span><h2>批次工作区</h2></div><p>{{ isArchived ? "归档批次只允许查看和导出" : canManage ? "当前账号具备批次管理权限" : "当前账号仅可查看与处理授权数据" }}</p></header>
       <nav class="admin-batch-context-nav" aria-label="当前批次工作区">
-        <NuxtLink v-for="item in isMockApi ? workflowItems : []" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
+        <NuxtLink v-for="item in workflowItems" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
           <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
           <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
           <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small>{{ item.detail }}</small></span>
           <span class="admin-batch-workflow-row__count">{{ item.count }}</span>
           <span class="admin-batch-workflow-row__action">{{ item.action }} <span aria-hidden="true">→</span></span>
         </NuxtLink>
-        <div v-for="item in isMockApi ? [] : workflowItems" :key="item.section" class="admin-batch-workflow-row">
-          <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
-          <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
-          <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small>{{ item.detail }}</small></span>
-          <span class="admin-batch-workflow-row__count">{{ item.count }}</span>
-          <span class="admin-batch-workflow-row__action">暂不可用</span>
-        </div>
       </nav>
     </section>
 
