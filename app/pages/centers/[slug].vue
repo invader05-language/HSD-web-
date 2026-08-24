@@ -30,9 +30,14 @@ if (!center.value) {
 }
 
 const apiMode = computed(() => Boolean(organizationGateway));
+const publicSlug = computed(() => (
+  center.value
+    ? publicCenters.resolvePublicSlug(center.value.slug, center.value.title)
+    : undefined
+));
 const detail = computed(() => {
   const current = publicCenters.detail;
-  return current && current.publicSlug === center.value?.slug ? current : undefined;
+  return current && current.publicSlug === publicSlug.value ? current : undefined;
 });
 const people = computed(() => (
   apiMode.value
@@ -122,7 +127,13 @@ watch(() => center.value?.slug, async (slug, previousSlug) => {
   if (!slug || slug === previousSlug) return;
   memberPage.value = 1;
   memberFilter.value = "all";
-  if (organizationGateway) await publicCenters.refreshDetail(organizationGateway, slug);
+  if (organizationGateway) {
+    const nextCenter = getCenterBySlug(slug);
+    const nextPublicSlug = nextCenter
+      ? publicCenters.resolvePublicSlug(nextCenter.slug, nextCenter.title)
+      : slug;
+    await publicCenters.refreshDetail(organizationGateway, nextPublicSlug);
+  }
 });
 
 useHead(() => ({
@@ -136,10 +147,16 @@ useHead(() => ({
 }));
 
 if (organizationGateway && center.value) {
-  await useAsyncData(`public-center-${center.value.slug}`, () => publicCenters.refreshDetail(organizationGateway, center.value!.slug));
+  await useAsyncData(`public-center-${center.value.slug}`, () => publicCenters.refreshDetail(
+    organizationGateway,
+    publicCenters.resolvePublicSlug(center.value!.slug, center.value!.title),
+  ));
   // The project uses a lightweight Pinia plugin without Nuxt state serialization.
   // Rehydrate the public snapshot on the client so SSR data is not replaced by an empty store.
-  if (import.meta.client) await publicCenters.refreshDetail(organizationGateway, center.value.slug);
+  if (import.meta.client) await publicCenters.refreshDetail(
+    organizationGateway,
+    publicCenters.resolvePublicSlug(center.value.slug, center.value.title),
+  );
 }
 </script>
 

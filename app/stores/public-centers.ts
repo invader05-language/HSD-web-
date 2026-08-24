@@ -21,9 +21,14 @@ export interface PublicCenterDetailView {
   coreMembers: PublicPerson[];
 }
 
+function normalizeCenterName(name: string): string {
+  return name.replace(/^QA\s+/i, "").trim();
+}
+
 export const usePublicCentersStore = defineStore("public-centers-api", {
   state: () => ({
     allianceOwners: [] as PublicPerson[],
+    items: [] as PublicCenterListResponseDto["items"],
     detail: undefined as PublicCenterDetailView | undefined,
     apiLoading: false,
     apiError: null as Error | null,
@@ -33,13 +38,22 @@ export const usePublicCentersStore = defineStore("public-centers-api", {
       this.apiLoading = true;
       this.apiError = null;
       try {
-        this.allianceOwners = (await gateway.publicCenters()).allianceOwners.map(toPublicPerson);
+        const response = await gateway.publicCenters();
+        this.items = response.items;
+        this.allianceOwners = response.allianceOwners.map(toPublicPerson);
       } catch (error) {
+        this.items = [];
         this.allianceOwners = [];
         this.apiError = error as Error;
       } finally {
         this.apiLoading = false;
       }
+    },
+    resolvePublicSlug(centerSlug: string, centerName: string): string {
+      const direct = this.items.find((item) => item.publicSlug === centerSlug);
+      if (direct) return direct.publicSlug;
+      const normalizedName = normalizeCenterName(centerName);
+      return this.items.find((item) => normalizeCenterName(item.name) === normalizedName)?.publicSlug ?? centerSlug;
     },
     async refreshDetail(gateway: PublicCentersGateway, publicSlug: string) {
       this.apiLoading = true;

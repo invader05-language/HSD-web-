@@ -37,4 +37,23 @@ describe("public centers store", () => {
     expect(store.detail?.coreMembers.map((item) => item.name)).toEqual(["李泽宇"]);
     expect(store.detail?.ministers.map((item) => item.name)).toEqual(["李泽宇"]);
   });
+
+  it("resolves a stable page slug to a QA-prefixed public center slug", async () => {
+    const gateway = {
+      publicCenters: vi.fn(async () => ({
+        allianceOwners: [],
+        items: [{
+          publicSlug: "qa-new-media",
+          name: "QA 新媒体中心",
+          publicMemberCount: 0,
+          publicCoreMemberCount: 0,
+        }],
+      })),
+    };
+
+    const store = usePublicCentersStore();
+    await store.refreshList(gateway);
+
+    expect(store.resolvePublicSlug("new-media", "新媒体中心")).toBe("qa-new-media");
+  });
 });
