@@ -16,5 +16,13 @@ export function createApiResourceGateway(options: ApiResourceGatewayOptions) {
     return payload;
   };
   const client = createHsdApiClient(transport);
-  return { list: client.resources.list, detail: client.resources.detail, versions: client.resources.versions };
+  return {
+    list: client.resources.list,
+    detail: client.resources.detail,
+    versions: client.resources.versions,
+    create: client.resources.create,
+    appendVersion: client.resources.appendVersion,
+    publish: client.resources.publish,
+    offline: client.resources.offline,
+  };
 }

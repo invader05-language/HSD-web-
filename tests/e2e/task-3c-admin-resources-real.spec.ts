@@ -23,7 +23,7 @@ test("real admin resources list/detail/version use only API canonical fields", a
   await expect(page.getByText("下载记录", { exact: true })).toHaveCount(0);
   await expect(page.getByText("分类", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "上传学习资料" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /保存资源|上传新版本|重试/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "新建资料" })).toBeVisible();
   await expect(page.getByText(/保存.*成功|重试成功/)).toHaveCount(0);
   expect(requests).toEqual([expect.stringContaining("/api/v1/admin/resources?page=1&pageSize=20")]);
 
@@ -36,8 +36,8 @@ test("real admin resources list/detail/version use only API canonical fields", a
   const drawer = page.getByRole("complementary", { name: "学习资料详情" });
   await expect(drawer).toContainText("接口正文");
   await expect(drawer).toContainText("v2.0");
-  await expect(drawer).not.toContainText("上传新版本");
-  await expect(page.getByText("尚未接入真实 API：新增、追加版本、发布与下架", { exact: true })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "保存新版本" })).toBeVisible();
+  await expect(page.getByText("服务端详情、版本与写入操作", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.admin-resources"))).toBe(JSON.stringify(legacyResources));
 });
 

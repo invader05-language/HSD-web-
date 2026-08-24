@@ -108,4 +108,20 @@ describe("admin resource production reads", () => {
     expect(fetcher).toHaveBeenCalledWith("https://api.example.test/api/v1/admin/resources?page=1&pageSize=20&status=published", expect.objectContaining({ method: "GET", credentials: "include", headers: { "X-Request-ID": "resource-request-id" } }));
     expect(fetcher.mock.calls[0]?.[1]?.headers).not.toHaveProperty("X-CSRF-Token");
   });
+
+  it("uses CSRF-protected API writes for create, version, publish and offline", async () => {
+    const fetcher = vi.fn().mockImplementation((url: string) => new Response(JSON.stringify(url.endsWith("/versions") ? { versionLabel: "v2.1", access: "member", availability: "available", content: "Body 2", attachmentId: null, revisionNumber: 3, createdAt: "2026-08-24T00:00:00.000Z" } : { ...resource, content: "updated", offlineReason: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiResourceGateway({ apiBase: "https://api.example.test", fetcher, readCookie: () => "csrf-token", createRequestId: () => "resource-write-id" });
+    await gateway.create({ expectedVersion: 0, centerId, slug: "qa-new", title: "New", summary: "Summary", kind: "ARTICLE", format: "WEB", access: "MEMBER", availability: "AVAILABLE", versionLabel: "v1.0", content: "Body" });
+    await gateway.appendVersion(resourceId, { expectedVersion: 4, versionLabel: "v2.1", content: "Body 2", access: "MEMBER", availability: "AVAILABLE" });
+    await gateway.publish(resourceId, { expectedVersion: 5 });
+    await gateway.offline(resourceId, { expectedVersion: 6, reason: "测试下架" });
+    expect(fetcher.mock.calls.map(([url, init]) => ({ url, method: init?.method, body: init?.body }))).toEqual([
+      { url: "https://api.example.test/api/v1/admin/resources", method: "POST", body: JSON.stringify({ expectedVersion: 0, centerId, slug: "qa-new", title: "New", summary: "Summary", kind: "ARTICLE", format: "WEB", access: "MEMBER", availability: "AVAILABLE", versionLabel: "v1.0", content: "Body" }) },
+      { url: `https://api.example.test/api/v1/admin/resources/${resourceId}/versions`, method: "POST", body: JSON.stringify({ expectedVersion: 4, versionLabel: "v2.1", content: "Body 2", access: "MEMBER", availability: "AVAILABLE" }) },
+      { url: `https://api.example.test/api/v1/admin/resources/${resourceId}/publish`, method: "POST", body: JSON.stringify({ expectedVersion: 5 }) },
+      { url: `https://api.example.test/api/v1/admin/resources/${resourceId}/offline`, method: "POST", body: JSON.stringify({ expectedVersion: 6, reason: "测试下架" }) },
+    ]);
+    expect(fetcher.mock.calls[1]?.[1]?.headers).toMatchObject({ "X-CSRF-Token": "csrf-token", "X-Request-ID": "resource-write-id" });
+  });
 });

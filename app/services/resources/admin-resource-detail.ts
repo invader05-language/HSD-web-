@@ -8,7 +8,7 @@ export interface AdminResourceDetailGateway {
 }
 
 export interface AdminResourceDetailRecord {
-  id: string; title: string; summary: string; kind: string; format: string; access: string; availability: string; status: string; versionLabel: string; version: number; content: string; attachmentId: string | null; revisionNumber: number; createdAt: string; updatedAt: string; publishedAt: string | null; offlineAt: string | null; offlineReason: string | null;
+  id: string; centerId: string; title: string; summary: string; kind: string; format: string; access: string; availability: string; status: string; versionLabel: string; version: number; content: string; attachmentId: string | null; revisionNumber: number; createdAt: string; updatedAt: string; publishedAt: string | null; offlineAt: string | null; offlineReason: string | null;
 }
 export interface AdminResourceVersionRecord { versionLabel: string; access: string; availability: string; content: string; attachmentId: string | null; revisionNumber: number; createdAt: string; }
 
@@ -19,7 +19,7 @@ const availabilityLabels = { available: "可用", unavailable: "暂不可用" } 
 const statusLabels = { draft: "草稿", published: "已发布", offline: "已下架" } as const;
 
 export function mapAdminResourceDetail(item: AdminResourceResponseDto): AdminResourceDetailRecord {
-  return { id: item.id, title: item.title, summary: item.summary, kind: kindLabels[item.kind], format: formatLabels[item.format], access: accessLabels[item.access], availability: availabilityLabels[item.availability], status: statusLabels[item.status], versionLabel: item.versionLabel, version: item.version, content: item.content, attachmentId: item.attachmentId, revisionNumber: item.revisionNumber, createdAt: item.createdAt, updatedAt: item.updatedAt, publishedAt: item.publishedAt, offlineAt: item.offlineAt, offlineReason: item.offlineReason };
+  return { id: item.id, centerId: item.centerId, title: item.title, summary: item.summary, kind: kindLabels[item.kind], format: formatLabels[item.format], access: accessLabels[item.access], availability: availabilityLabels[item.availability], status: statusLabels[item.status], versionLabel: item.versionLabel, version: item.version, content: item.content, attachmentId: item.attachmentId, revisionNumber: item.revisionNumber, createdAt: item.createdAt, updatedAt: item.updatedAt, publishedAt: item.publishedAt, offlineAt: item.offlineAt, offlineReason: item.offlineReason };
 }
 export function mapAdminResourceVersion(item: AdminResourceVersionResponseDto): AdminResourceVersionRecord { return { versionLabel: item.versionLabel, access: accessLabels[item.access], availability: availabilityLabels[item.availability], content: item.content, attachmentId: item.attachmentId, revisionNumber: item.revisionNumber, createdAt: item.createdAt }; }
 
