@@ -147,6 +147,7 @@ useHead(() => ({
 }));
 
 if (organizationGateway && center.value) {
+  await useAsyncData("public-center-list", () => publicCenters.refreshList(organizationGateway));
   await useAsyncData(`public-center-${center.value.slug}`, () => publicCenters.refreshDetail(
     organizationGateway,
     publicCenters.resolvePublicSlug(center.value!.slug, center.value!.title),

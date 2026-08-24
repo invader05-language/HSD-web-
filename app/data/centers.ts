@@ -92,5 +92,6 @@ export const CENTER_OPTIONS = CENTERS.map((center) => ({
 }));
 
 export function getCenterBySlug(slug: string): CenterProfile | undefined {
-  return CENTERS.find((center) => center.slug === slug);
+  return CENTERS.find((center) => center.slug === slug)
+    ?? CENTERS.find((center) => `qa-${center.slug}` === slug);
 }

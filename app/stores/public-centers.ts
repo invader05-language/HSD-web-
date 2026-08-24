@@ -39,7 +39,7 @@ export const usePublicCentersStore = defineStore("public-centers-api", {
       this.apiError = null;
       try {
         const response = await gateway.publicCenters();
-        this.items = response.items;
+        this.items = response.items ?? [];
         this.allianceOwners = response.allianceOwners.map(toPublicPerson);
       } catch (error) {
         this.items = [];

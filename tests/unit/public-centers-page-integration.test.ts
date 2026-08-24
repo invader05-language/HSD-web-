@@ -170,6 +170,48 @@ describe("public centers live organization integration", () => {
     expect(detail.text()).toContain("第 1 页");
   });
 
+  it("accepts a QA-prefixed public slug for direct center detail navigation", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/api/v1/public/centers")) {
+        return new Response(JSON.stringify({
+          allianceOwners: [],
+          items: [{
+            publicSlug: "qa-new-media",
+            name: "QA 新媒体中心",
+            publicMemberCount: 0,
+            publicCoreMemberCount: 0,
+          }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      if (url.endsWith("/qa-new-media")) {
+        return new Response(JSON.stringify({
+          publicSlug: "qa-new-media",
+          name: "QA 新媒体中心",
+          publicMemberCount: 0,
+          publicCoreMemberCount: 0,
+          ministers: [],
+          members: [],
+          coreMembers: [],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ code: "NOT_FOUND", message: "not found", requestId: "test" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    }));
+
+    routeParams = { slug: "qa-new-media" };
+    const global = { stubs: { NuxtPage: true, PageBanner: true, NuxtLink: { template: "<a><slot /></a>" }, HsdAvatar: true } };
+    const detail = mount(defineComponent({ components: { CenterDetailPage }, template: "<Suspense><CenterDetailPage /></Suspense>" }), { global });
+    await flushPromises();
+    await nextTick();
+
+    expect(detail.text()).toContain("新媒体中心");
+    expect(detail.text()).toContain("当前暂无公开成员");
+  });
+
   it("restores filter and page from the URL and writes filter changes back to the URL", async () => {
     const members = [
       ...Array.from({ length: 6 }, (_, index) => publicMember(`core-${index}`, `核心成员${index + 1}`, "ALLIANCE_OWNER")),
