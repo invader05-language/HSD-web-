@@ -32,7 +32,14 @@ const query = ref(typeof route.query.query === "string" ? route.query.query : ""
 const status = ref(useMockApi ? (typeof route.query.status === "string" ? route.query.status : "") : normalizeCanonicalStatus(route.query.status));
 const kind = ref(useMockApi ? (typeof route.query.kind === "string" ? route.query.kind : "") : normalizeKind(route.query.kind));
 const centerId = ref(typeof route.query.centerId === "string" ? route.query.centerId : "");
-const page = ref(1);
+const page = computed({
+  get: () => realContent?.query.value.page ?? 1,
+  set: (value: number) => {
+    if (!realContent) return;
+    realContent.setPage(value);
+    void realContent.load();
+  },
+});
 const automationNotice = ref("");
 const unresolvedAutomationFailures = computed(() => useMockApi && !centerScope.value ? mockContent?.automationFailures.filter((failure) => !failure.resolvedAt) ?? [] : []);
 const mockOverview = computed(() => getContentOverview(visibleContentRecords.value));
@@ -42,7 +49,7 @@ const mockRows = computed(() => visibleContentRecords.value.map(toAdminContentRe
 )));
 const rows = computed(() => useMockApi ? mockRows.value : realContent?.records.value ?? []);
 const total = computed(() => useMockApi ? mockOverview.value.total : realContent?.total.value ?? 0);
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20)));
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realContent?.query.value.pageSize ?? 20))));
 const realStatus = computed(() => realContent?.status.value ?? "error");
 const realError = computed(() => realContent?.error.value || "官网内容读取服务不可用。");
 
@@ -55,11 +62,9 @@ watchEffect(() => {
 
 watch([query, status, kind, centerId], () => {
   if (!realContent) return;
-  page.value = 1;
   realContent.setFilters({ q: query.value, ...(status.value ? { status: status.value as AdminContentCanonicalStatus } : {}), ...(kind.value ? { kind: kind.value as AdminContentKind } : {}), ...(centerId.value ? { centerId: centerId.value } : {}) });
   void realContent.load();
 }, { immediate: true });
-watch(page, () => { if (realContent) { realContent.setPage(page.value); void realContent.load(); } });
 
 function normalizeCanonicalStatus(value: unknown): string { return typeof value === "string" && canonicalStatuses.some((option) => option.value === value) ? value : ""; }
 function normalizeKind(value: unknown): string { return typeof value === "string" && canonicalKinds.some((option) => option.value === value) ? value : ""; }

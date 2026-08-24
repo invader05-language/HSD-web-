@@ -3,6 +3,7 @@ import { useActivitiesStore } from "~/stores/activities";
 import { useContentGateway } from "~/composables/useContentGateway";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
+import { formatActivityRegistrationNotice } from "~/utils/activity-registration-notice";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "活动管理｜HSD 管理台" });
@@ -16,7 +17,6 @@ if (import.meta.client && !gateway) activitiesStore.hydrate();
 onMounted(() => { if (gateway) void activitiesStore.refreshFromApi(gateway); });
 
 const activityActionNotice = ref("");
-const automationEventLabel = "activity.registration.opened";
 const scopedActivities = computed(() => {
   if (session.adminLevel === "owner") return activitiesStore.activities;
   const centerScope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
@@ -31,11 +31,10 @@ const openCount = computed(() => scopedActivities.value.filter((activity) => act
 function toggleRegistration(activity: typeof activitiesStore.activities[number]) {
   const run = async () => {
     try {
-    if (gateway) await activitiesStore.setRegistrationOpenFromApi(gateway, activity.id, !activity.registrationOpen);
-    else activitiesStore.setRegistrationOpen(activity.id, !activity.registrationOpen);
-    activityActionNotice.value = activity.registrationOpen
-      ? `报名已开放，并已处理 ${automationEventLabel} 快讯草稿事件。`
-      : "报名已关闭。";
+    const saved = gateway
+      ? await activitiesStore.setRegistrationOpenFromApi(gateway, activity.id, !activity.registrationOpen)
+      : activitiesStore.setRegistrationOpen(activity.id, !activity.registrationOpen);
+    activityActionNotice.value = formatActivityRegistrationNotice(saved.registrationOpen);
   } catch (caught) {
     activityActionNotice.value = caught instanceof Error ? `操作失败：${caught.message}` : "操作失败。";
   }

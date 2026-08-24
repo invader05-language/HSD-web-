@@ -109,4 +109,18 @@ describe("Task 3C-A real admin content list", () => {
     expect(controller.records.value).toEqual([]);
     expect(controller.total.value).toBe(0);
   });
+
+  it("adopts a server-corrected page and page size for the next request", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ ...apiResponse, page: 3, pageSize: 7, total: 41 })
+      .mockResolvedValueOnce({ ...apiResponse, page: 4, pageSize: 7, total: 41 });
+    const controller = createAdminContentListController({ list }, { page: 99, pageSize: 20 });
+
+    await controller.load();
+    expect(controller.query.value).toMatchObject({ page: 3, pageSize: 7 });
+
+    controller.setPage(4);
+    await controller.load();
+    expect(list).toHaveBeenLastCalledWith("page=4&pageSize=7");
+  });
 });

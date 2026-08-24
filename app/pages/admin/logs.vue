@@ -14,16 +14,15 @@ const mockSelected = ref<AdminAuditRecord | null>(null);
 const mockVisible = computed(() => mockAccess ? filterAuditRecords(mockAccess.auditRecords, mockFilters) : []);
 const gateway = useAuditGateway();
 const realList = !useMockApi && gateway ? createAdminAuditListController(gateway) : undefined;
-const action = ref(""); const actionPrefix = ref(""); const targetType = ref(""); const targetId = ref(""); const actorAccountId = ref(""); const from = ref(""); const to = ref(""); const page = ref(1);
-const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "审计日志读取服务不可用。"); const selected = computed(() => realList?.selected.value);
+const action = ref(""); const actionPrefix = ref(""); const targetType = ref(""); const targetId = ref(""); const actorAccountId = ref(""); const from = ref(""); const to = ref("");
+const page = computed({ get: () => realList?.query.value.page ?? 1, set: (value: number) => { if (realList) { realList.setPage(value); void realList.load(); } } });
+const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realList?.query.value.pageSize ?? 20)))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "审计日志读取服务不可用。"); const selected = computed(() => realList?.selected.value);
 function asIso(value: string) { return value ? new Date(value).toISOString() : ""; }
 watch([action, actionPrefix, targetType, targetId, actorAccountId, from, to], () => {
   if (!realList) return;
-  const pageChanged = page.value !== 1; page.value = 1;
   realList.setFilters({ action: action.value, actionPrefix: actionPrefix.value, targetType: targetType.value, targetId: targetId.value, actorAccountId: actorAccountId.value, from: asIso(from.value), to: asIso(to.value) });
-  if (!pageChanged) void realList.load();
+  void realList.load();
 }, { immediate: true });
-watch(page, () => { if (realList) { realList.setPage(page.value); void realList.load(); } });
 </script>
 
 <template>

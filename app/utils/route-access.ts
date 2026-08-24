@@ -10,6 +10,12 @@ export interface RouteAccessSession {
 }
 
 const ADMIN_FORBIDDEN = "/admin/forbidden";
+const OWNER_ADMIN_ROUTES = [
+  "/admin/accounts",
+  "/admin/members",
+  "/admin/core-members",
+  "/admin/centers",
+] as const;
 
 function normalizeRoutePath(path: string): string {
   const normalizedPath = path.toLowerCase();
@@ -23,13 +29,16 @@ function isProtectedRoute(path: string): boolean {
     || path === "/assessment-results";
 }
 
-function buildAdminForbiddenTarget(path: string): string {
+export function buildAdminForbiddenTarget(path: string): string {
   return `${ADMIN_FORBIDDEN}?from=${encodeURIComponent(normalizeRoutePath(path))}`;
 }
 
+function requiresOwnerAccess(path: string): boolean {
+  return OWNER_ADMIN_ROUTES.some((root) => path === root || path.startsWith(`${root}/`));
+}
+
 export function getRequiredAdminAccess(source: unknown): "admin" | "owner" {
-  return typeof source === "string" && ["/admin/accounts", "/admin/members", "/admin/core-members", "/admin/centers"]
-    .includes(normalizeRoutePath(source))
+  return typeof source === "string" && requiresOwnerAccess(normalizeRoutePath(source))
     ? "owner"
     : "admin";
 }
@@ -54,8 +63,7 @@ export function resolveProtectedRouteTarget(
       ? "/admin/accounts"
       : buildAdminForbiddenTarget("/admin/accounts");
   }
-  if (["/admin/accounts", "/admin/members", "/admin/core-members", "/admin/centers"].includes(normalizedPath)
-    && !session.canManageAdminAccounts) {
+  if (requiresOwnerAccess(normalizedPath) && !session.canManageAdminAccounts) {
     return buildAdminForbiddenTarget(normalizedPath);
   }
   if ((normalizedPath.startsWith("/admin/content/home") || normalizedPath.startsWith("/admin/content/help"))

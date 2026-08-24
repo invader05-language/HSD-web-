@@ -405,6 +405,182 @@ describe("organization production Pinia gateways", () => {
     expect(store.apiError).toBeNull();
   });
 
+  it("appoints an alliance owner with authoritative account and membership versions, then refreshes every projection", async () => {
+    const ownerAccount = { ...adminAccount, adminLevel: "OWNER" as const, version: 4 };
+    const ownerMember = {
+      ...managedMember,
+      account: { ...managedMember.account, adminLevel: "OWNER" as const, version: 4 },
+      positions: [{
+        id: "99999999-9999-4999-8999-999999999999",
+        personId,
+        type: "ALLIANCE_OWNER" as const,
+        centerId: null,
+        projectId: null,
+        version: 5,
+        appointedAt: "2026-08-24T00:00:00.000Z",
+      }],
+    };
+    const organization = gateway({
+      listAccounts: vi.fn()
+        .mockResolvedValueOnce({ page: 1, pageSize: 20, total: 1, items: [adminAccount] })
+        .mockResolvedValueOnce({ page: 1, pageSize: 20, total: 1, items: [ownerAccount] }),
+      listManagedMembers: vi.fn()
+        .mockResolvedValueOnce({ items: [managedMember] })
+        .mockResolvedValueOnce({ items: [ownerMember] }),
+    });
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+    await store.refreshFromApi(organization);
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+
+    const result = await store.appointAllianceOwnerFromApi("2026001001", organization);
+
+    expect(result).toEqual({ status: "success" });
+    expect(organization.appointAllianceOwner).toHaveBeenCalledWith(personId, {
+      expectedAccountVersion: 3,
+      expectedMembershipVersion: 4,
+    });
+    expect(organization.listAccounts).toHaveBeenCalledTimes(2);
+    expect(organization.listCenters).toHaveBeenCalledTimes(2);
+    expect(organization.listManagedMembers).toHaveBeenCalledTimes(2);
+    expect(store.accounts).toEqual([expect.objectContaining({ account: "2026001001", adminLevel: "owner" })]);
+    expect(store.apiError).toBeNull();
+    expect(storageWrite).not.toHaveBeenCalled();
+  });
+
+  it("revokes an alliance owner with the authoritative position version from the managed-member projection", async () => {
+    const ownerPosition = {
+      id: "99999999-9999-4999-8999-999999999999",
+      personId,
+      type: "ALLIANCE_OWNER" as const,
+      centerId: null,
+      projectId: null,
+      version: 8,
+      appointedAt: "2026-08-24T00:00:00.000Z",
+    };
+    const ownerAccount = { ...adminAccount, adminLevel: "OWNER" as const };
+    const ownerMember = {
+      ...managedMember,
+      account: { ...managedMember.account, adminLevel: "OWNER" as const },
+      positions: [ownerPosition],
+    };
+    const organization = gateway({
+      listAccounts: vi.fn(async () => ({ page: 1, pageSize: 20, total: 1, items: [ownerAccount] })),
+      listManagedMembers: vi.fn(async () => ({ items: [ownerMember] })),
+      revokeAllianceOwner: vi.fn(async () => ownerPosition),
+    });
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+    await store.refreshFromApi(organization);
+
+    const result = await store.revokeAllianceOwnerFromApi("2026001001", organization);
+
+    expect(result).toEqual({ status: "success" });
+    expect(organization.revokeAllianceOwner).toHaveBeenCalledWith(personId, { expectedPositionVersion: 8 });
+  });
+
+  it("revokes a center administrator with the authoritative center-minister position version", async () => {
+    const ministerPosition = {
+      id: "88888888-8888-4888-8888-888888888888",
+      personId,
+      type: "CENTER_MINISTER" as const,
+      centerId,
+      projectId: null,
+      version: 9,
+      appointedAt: "2026-08-24T00:00:00.000Z",
+    };
+    const administrator = {
+      ...adminAccount,
+      adminLevel: "ADMIN" as const,
+      adminCenterId: centerId,
+      adminCenter: center,
+    };
+    const administratorMember = {
+      ...managedMember,
+      account: { ...managedMember.account, adminLevel: "ADMIN" as const, adminCenterId: centerId },
+      positions: [ministerPosition],
+    };
+    const organization = gateway({
+      listAccounts: vi.fn(async () => ({ page: 1, pageSize: 20, total: 1, items: [administrator] })),
+      listManagedMembers: vi.fn(async () => ({ items: [administratorMember] })),
+      revokeCenterMinister: vi.fn(async () => ministerPosition),
+    });
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+    await store.refreshFromApi(organization);
+
+    const result = await store.revokeAdminCenterRoleFromApi("2026001001", organization);
+
+    expect(result).toEqual({ status: "success" });
+    expect(organization.revokeCenterMinister).toHaveBeenCalledWith(centerId, personId, { expectedPositionVersion: 9 });
+  });
+
+  it.each([
+    {
+      label: "403 owner appointment",
+      status: 403,
+      code: "OWNER_SCOPE_FORBIDDEN",
+      configure: () => ({ appointAllianceOwner: vi.fn(async () => { throw Object.assign(new Error("scope denied"), { status: 403, code: "OWNER_SCOPE_FORBIDDEN", requestId: "owner-denied" }); }) }),
+      run: (store: ReturnType<typeof useAdminAccessStore>, organization: OrganizationGateway) => store.appointAllianceOwnerFromApi("2026001001", organization),
+    },
+    {
+      label: "409 owner revocation",
+      status: 409,
+      code: "POSITION_VERSION_CONFLICT",
+      configure: () => ({
+        listAccounts: vi.fn(async () => ({ page: 1, pageSize: 20, total: 1, items: [{ ...adminAccount, adminLevel: "OWNER" as const }] })),
+        listManagedMembers: vi.fn(async () => ({ items: [{ ...managedMember, positions: [{ id: "owner-position", personId, type: "ALLIANCE_OWNER" as const, centerId: null, projectId: null, version: 8, appointedAt: "2026-08-24T00:00:00.000Z" }] }] })),
+        revokeAllianceOwner: vi.fn(async () => { throw Object.assign(new Error("version conflict"), { status: 409, code: "POSITION_VERSION_CONFLICT", requestId: "owner-conflict" }); }),
+      }),
+      run: (store: ReturnType<typeof useAdminAccessStore>, organization: OrganizationGateway) => store.revokeAllianceOwnerFromApi("2026001001", organization),
+    },
+    {
+      label: "network center-role revocation",
+      status: undefined,
+      code: "ORGANIZATION_API_REQUEST_FAILED",
+      configure: () => ({
+        listAccounts: vi.fn(async () => ({ page: 1, pageSize: 20, total: 1, items: [{ ...adminAccount, adminLevel: "ADMIN" as const, adminCenterId: centerId, adminCenter: center }] })),
+        listManagedMembers: vi.fn(async () => ({ items: [{ ...managedMember, positions: [{ id: "minister-position", personId, type: "CENTER_MINISTER" as const, centerId, projectId: null, version: 9, appointedAt: "2026-08-24T00:00:00.000Z" }] }] })),
+        revokeCenterMinister: vi.fn(async () => { throw new Error("network unavailable"); }),
+      }),
+      run: (store: ReturnType<typeof useAdminAccessStore>, organization: OrganizationGateway) => store.revokeAdminCenterRoleFromApi("2026001001", organization),
+    },
+  ])("keeps $label visible without mutating canonical rows or localStorage", async ({ status, code, configure, run }) => {
+    const organization = gateway(configure());
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+    await store.refreshFromApi(organization);
+    const before = JSON.parse(JSON.stringify(store.accounts));
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("localStorage must not be used"); });
+
+    const result = await run(store, organization);
+
+    expect(result).toEqual({ status: "api_error" });
+    expect(store.accounts).toEqual(before);
+    expect(store.apiError).toMatchObject({ ...(status === undefined ? {} : { status }), code });
+    expect(storageWrite).not.toHaveBeenCalled();
+  });
+
+  it("reports refresh failure after a successful owner command and retains the last canonical rows", async () => {
+    const refreshFailure = Object.assign(new Error("refresh unavailable"), { status: 503, code: "ORGANIZATION_REFRESH_FAILED", requestId: "refresh-failed" });
+    const organization = gateway({
+      listAccounts: vi.fn()
+        .mockResolvedValueOnce({ page: 1, pageSize: 20, total: 1, items: [adminAccount] })
+        .mockRejectedValueOnce(refreshFailure),
+    });
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+    await store.refreshFromApi(organization);
+    const before = JSON.parse(JSON.stringify(store.accounts));
+
+    const result = await store.appointAllianceOwnerFromApi("2026001001", organization);
+
+    expect(organization.appointAllianceOwner).toHaveBeenCalledOnce();
+    expect(result).toEqual({ status: "api_error" });
+    expect(store.accounts).toEqual(before);
+    expect(store.apiError).toMatchObject({ status: 503, code: "ORGANIZATION_REFRESH_FAILED", requestId: "refresh-failed" });
+  });
+
   it("keeps API failures visible and never falls back to localStorage mutation", async () => {
     const denied = Object.assign(new Error("scope denied"), { status: 403, code: "CENTER_SCOPE_FORBIDDEN", requestId: "scope-denied" });
     const organization = gateway({ appointCenterMinister: vi.fn(async () => { throw denied; }) });

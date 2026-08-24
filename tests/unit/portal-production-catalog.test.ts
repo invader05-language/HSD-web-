@@ -9,6 +9,19 @@ import { useResourcesStore } from "../../app/stores/resources";
 describe("production portal catalog", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
+  it("activates every production catalog store synchronously before returning candidates", () => {
+    expect(useProjectsStore().getPublicProjects().length).toBeGreaterThan(0);
+    expect(useActivitiesStore().getPublicActivities().length).toBeGreaterThan(0);
+
+    const catalog = usePortalCatalog({ useMockApi: false });
+
+    expect(catalog).toEqual([]);
+    expect(useProjectsStore().apiModeActive).toBe(true);
+    expect(useActivitiesStore().apiModeActive).toBe(true);
+    expect(useGalleryStore().apiModeActive).toBe(true);
+    expect(useResourcesStore().apiModeActive).toBe(true);
+  });
+
   it("uses API-backed typed candidates and excludes stale mock catalog data", async () => {
     await useProjectsStore().refreshPublicFromApi({ projects: { listPublic: async () => ({ items: [{
       slug: "api-project", title: "API project", category: "AI", year: "2026", description: "Project summary",

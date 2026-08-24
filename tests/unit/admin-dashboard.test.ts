@@ -71,6 +71,21 @@ describe("admin dashboard targets", () => {
     );
     expect(dashboardTargetToRoute({ module: "media", action: "health" })).toBe("/admin");
   });
+
+  it("fails resource-less production assessment and publication actions closed to the batch list", () => {
+    expect(dashboardTargetToRoute(
+      { module: "recruitment", action: "assess" },
+      { useMockApi: false },
+    )).toBe("/admin/recruitment/batches");
+    expect(dashboardTargetToRoute(
+      { module: "recruitment", action: "publish-results" },
+      { useMockApi: false },
+    )).toBe("/admin/recruitment/batches");
+    expect(dashboardTargetToRoute(
+      { module: "recruitment", action: "assess" },
+      { useMockApi: true },
+    )).toBe("/admin/recruitment");
+  });
 });
 
 describe("mock dashboard gateway", () => {

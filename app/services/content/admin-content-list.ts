@@ -113,6 +113,7 @@ export function createAdminContentListController(
     try {
       const response = await gateway.list(toQueryString(query.value));
       if (generation !== requestGeneration) return;
+      query.value = { ...query.value, page: response.page, pageSize: response.pageSize };
       records.value = response.items.map(mapAdminContentSummary);
       total.value = response.total;
       status.value = response.items.length ? "success" : "empty";

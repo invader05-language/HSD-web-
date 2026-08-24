@@ -10,16 +10,22 @@ import { useSessionStore } from "~/stores/session";
 import { getOrganizationPositionLabel } from "~/utils/organization-positions";
 import { organizationMemberLabel } from "~/utils/organization-member-display";
 import type { ProjectActionOption, OrganizationPositionAction } from "~/components/admin/OrganizationPositionActionDialog.vue";
+import { buildAdminForbiddenTarget } from "~/utils/route-access";
 
 definePageMeta({ layout: "admin" });
 const route = useRoute();
+const session = useSessionStore();
 const memberAdministration = useMemberAdministrationStore();
-const organizationGateway = useOrganizationGateway();
+const runtimeOrganizationGateway = useOrganizationGateway();
+const canManageMemberDetails = computed(() => session.canManageAdminAccounts);
+const organizationGateway = session.canManageAdminAccounts ? runtimeOrganizationGateway : undefined;
+if (!session.canManageAdminAccounts) {
+  void navigateTo(buildAdminForbiddenTarget(route.path), { replace: true });
+}
 if (organizationGateway) memberAdministration.activateApiMode();
 const memberRepository = useMemberRepository();
-const session = useSessionStore();
 const member = computed(() => memberRepository.findAdminMember(String(route.params.id)));
-if (!organizationGateway && !member.value) {
+if (session.canManageAdminAccounts && !organizationGateway && !member.value) {
   throw createError({ statusCode: 404, statusMessage: "成员不存在" });
 }
 const preview = computed(() => getPublicProfilePreview(member.value!));
@@ -124,7 +130,7 @@ watch(() => member.value?.identity, (identity) => {
 
 function requestSave() {
   saveStatus.value = "idle";
-  if (!member.value || !identityChanged.value) {
+  if (!session.canManageAdminAccounts || !member.value || !identityChanged.value) {
     return;
   }
 
@@ -138,7 +144,7 @@ function requestSave() {
 }
 
 async function confirmPromotion() {
-  if (!member.value) return;
+  if (!session.canManageAdminAccounts || !member.value) return;
   if (organizationGateway) {
     const result = await memberAdministration.promoteMemberToFormalFromApi(member.value.id, {
       centerId: promotionCenterId.value,
@@ -178,7 +184,7 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
 </script>
 
 <template>
-  <div v-if="member" class="admin-recruitment-page admin-section-page">
+  <div v-if="canManageMemberDetails && member" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
       eyebrow="Member Record"
       :title="member.name"
@@ -299,7 +305,7 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
       @confirm="confirmPositionAction"
     />
   </div>
-  <p v-else-if="memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步成员资料…</p>
-  <p v-else-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
-  <p v-else-if="organizationGateway" class="member-profile-error" role="alert">成员不存在或当前帐号无权查看。</p>
+  <p v-else-if="canManageMemberDetails && memberAdministration.apiLoading" class="admin-empty-row" role="status">正在同步成员资料…</p>
+  <p v-else-if="canManageMemberDetails && memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
+  <p v-else-if="canManageMemberDetails && organizationGateway" class="member-profile-error" role="alert">成员不存在或当前帐号无权查看。</p>
 </template>

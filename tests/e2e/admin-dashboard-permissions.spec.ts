@@ -153,29 +153,14 @@ async function enterDashboard(page: Page, level: "admin" | "owner") {
   await expect(page.getByRole("heading", { name: "管理工作台" })).toBeVisible();
 }
 
-async function navigateWithCenterScopedUiProjection(page: Page, path: string) {
+async function navigateInProductionRuntime(page: Page, path: string) {
   await page.evaluate(async (targetPath) => {
     const root = document.querySelector("#__nuxt") as Element & {
       __vue_app__?: { config?: { globalProperties?: {
-        $pinia?: { _s?: Map<string, unknown> };
         $router?: { push(path: string): Promise<unknown> };
       } } };
     };
     const globals = root?.__vue_app__?.config?.globalProperties;
-    const stores = globals?.$pinia?._s;
-    const session = stores?.get("session") as {
-      apiSession?: unknown;
-      isAuthenticated: boolean;
-      currentAccountId?: string;
-      currentMemberId: string;
-      isHydrated: boolean;
-    } | undefined;
-    if (!session) throw new Error("SESSION_STORE_NOT_EXPOSED");
-    session.apiSession = undefined;
-    session.isAuthenticated = true;
-    session.currentAccountId = "media-admin";
-    session.currentMemberId = "member-media-admin";
-    session.isHydrated = true;
     if (!globals?.$router) throw new Error("ROUTER_NOT_EXPOSED");
     await globals.$router.push(targetPath);
   }, path);
@@ -213,8 +198,9 @@ test("a center administrator receives no foreign content payload at the producti
   expect(JSON.stringify(result.body)).not.toContain("flash-recruitment-2026");
   expect(JSON.stringify(result.body)).not.toContain("workingRevision");
 
-  await navigateWithCenterScopedUiProjection(page, "/admin/content/flash-recruitment-2026");
-  await expect(page).toHaveURL(/\/admin\/forbidden\?from=/);
+  await navigateInProductionRuntime(page, `/admin/content/${foreignContentId}/preview`);
+  await expect(page).toHaveURL(new RegExp(`/admin/content/${foreignContentId}/preview$`));
+  await expect(page.getByRole("alert")).toContainText("Content permission is required");
   await expect(page.getByLabel("内部备注")).toHaveCount(0);
 });
 
@@ -234,10 +220,11 @@ test("a center administrator receives no foreign recruitment application details
   expect(JSON.stringify(result.body)).not.toContain("contact");
   expect(JSON.stringify(result.body)).not.toContain("preferences");
 
-  await navigateWithCenterScopedUiProjection(
+  await navigateInProductionRuntime(
     page,
-    "/admin/recruitment/batches/batch-current/applications/candidate-lin",
+    `/admin/recruitment/batches/${recruitmentBatchId}/applications/${foreignApplicationId}`,
   );
-  await expect(page.getByRole("heading", { name: "报名记录不存在", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "报名记录不可用", exact: true })).toBeVisible();
+  await expect(page.getByText("The recruitment application is outside the administrator center scope")).toBeVisible();
   await expect(page.getByLabel("联系方式")).toHaveCount(0);
 });

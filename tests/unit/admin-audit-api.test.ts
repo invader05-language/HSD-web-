@@ -66,6 +66,20 @@ describe("admin audit production reads", () => {
     expect(controller.selected.value).toBeUndefined();
   });
 
+  it("adopts a server-corrected page and page size for the next audit request", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ page: 3, pageSize: 7, total: 21, items: [event] })
+      .mockResolvedValueOnce({ page: 4, pageSize: 7, total: 21, items: [event] });
+    const controller = createAdminAuditListController({ list }, { page: 99, pageSize: 20 });
+
+    await controller.load();
+    expect(controller.query.value).toMatchObject({ page: 3, pageSize: 7 });
+
+    controller.setPage(4);
+    await controller.load();
+    expect(list).toHaveBeenLastCalledWith("page=4&pageSize=7");
+  });
+
   it("recursively excludes sensitive audit names while retaining typed scalar fields", () => {
     const projection = projectSafeAuditValues({ status: "published", count: 2, flags: [true, false], contact: "x", password: "x", secret: "x", token: "x", session: "x", cookie: "x", requestId: "x", ip: "127.0.0.1", userAgent: "x", objectStorageKey: "x", nested: { token: "x" } });
     expect(projection).toEqual({ status: "published", count: 2, flags: [true, false] });

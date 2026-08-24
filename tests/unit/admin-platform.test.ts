@@ -52,6 +52,21 @@ describe("administration platform navigation", () => {
     expect(centerAdminItems.map((item) => item.id)).not.toContain("homepage");
   });
 
+  it("routes every production recruitment entry through the authoritative batch list", () => {
+    const recruitmentItems = getAdminNavigationForAccess(
+      { canManageAdminAccounts: true },
+      undefined,
+      { useMockApi: false },
+    ).find((group) => group.id === "recruitment")!.items;
+
+    expect(recruitmentItems.map((item) => [item.id, item.to])).toEqual([
+      ["batches", "/admin/recruitment/batches"],
+      ["applications", "/admin/recruitment/batches"],
+      ["assessment", "/admin/recruitment/batches"],
+      ["publication", "/admin/recruitment/batches"],
+    ]);
+  });
+
   it("shows portal configuration for a capability holder without granting administrator-account management", () => {
     const items = getAdminNavigationForAccess({
       canManageAdminAccounts: false,

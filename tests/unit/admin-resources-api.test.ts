@@ -101,6 +101,20 @@ describe("admin resource production reads", () => {
     expect(controller.versions.value).toEqual([]);
   });
 
+  it("adopts a server-corrected page and page size for the next resource request", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ page: 3, pageSize: 7, total: 21, items: [resource] })
+      .mockResolvedValueOnce({ page: 4, pageSize: 7, total: 21, items: [resource] });
+    const controller = createAdminResourceListController({ list }, { page: 99, pageSize: 20 });
+
+    await controller.load();
+    expect(controller.query.value).toMatchObject({ page: 3, pageSize: 7 });
+
+    controller.setPage(4);
+    await controller.load();
+    expect(list).toHaveBeenLastCalledWith("page=4&pageSize=7");
+  });
+
   it("uses cookie credentials and request IDs for resource GETs without CSRF or local fallback", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1, pageSize: 20, total: 0, items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const gateway = createApiResourceGateway({ apiBase: "https://api.example.test/", fetcher, createRequestId: () => "resource-request-id" });

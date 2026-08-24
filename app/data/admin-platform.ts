@@ -19,6 +19,10 @@ export interface AdminNavigationAccess {
   canConfigurePortal?: boolean;
 }
 
+export interface AdminNavigationRuntime {
+  useMockApi: boolean;
+}
+
 export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
   {
     id: "dashboard",
@@ -89,11 +93,18 @@ export const ADMIN_ROUTES = ADMIN_NAVIGATION.flatMap((group) =>
 
 export function getAdminNavigationForAccess(
   access: AdminNavigationAccess,
-  features: ReleaseFeatures = RELEASE_FEATURES
+  features: ReleaseFeatures = RELEASE_FEATURES,
+  runtime: AdminNavigationRuntime = { useMockApi: true },
 ) {
   const canManageOrganizationPersonnel = access.canManageOrganizationPersonnel ?? access.canManageAdminAccounts;
   const canConfigurePortal = access.canConfigurePortal ?? access.canManageAdminAccounts;
-  return ADMIN_NAVIGATION.map((group) => ({
+  const navigation = runtime.useMockApi
+    ? ADMIN_NAVIGATION
+    : ADMIN_NAVIGATION.map((group) => group.id !== "recruitment" ? group : ({
+      ...group,
+      items: group.items.map((item) => ({ ...item, to: "/admin/recruitment/batches" })),
+    }));
+  return navigation.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) => (item.id !== "accounts" || access.canManageAdminAccounts)

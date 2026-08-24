@@ -39,7 +39,7 @@ export function createAdminUploadListController(gateway: AdminUploadListGateway,
   function setPage(page: number) { query.value = { ...query.value, page: Math.max(1, page) }; }
   async function load() {
     const generation = ++requestGeneration; loading.value = true; error.value = ""; records.value = []; total.value = 0; status.value = "loading";
-    try { const response = await gateway.list(toQueryString(query.value)); if (generation !== requestGeneration) return; records.value = response.items.map(mapAdminUpload); total.value = response.total; status.value = response.items.length ? "success" : "empty"; }
+    try { const response = await gateway.list(toQueryString(query.value)); if (generation !== requestGeneration) return; query.value = { ...query.value, page: response.page, pageSize: response.pageSize }; records.value = response.items.map(mapAdminUpload); total.value = response.total; status.value = response.items.length ? "success" : "empty"; }
     catch (cause) { if (generation !== requestGeneration) return; const apiError = cause as { status?: number; message?: string }; error.value = apiError.message || "上传任务读取失败，请稍后重试。"; status.value = apiError.status === 401 ? "unauthorized" : apiError.status === 403 ? "forbidden" : apiError.status === 404 ? "notFound" : "error"; }
     finally { if (generation === requestGeneration) loading.value = false; }
   }

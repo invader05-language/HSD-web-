@@ -31,7 +31,7 @@ const projectsStore = useProjectsStore();
 const activitiesStore = useActivitiesStore();
 const galleryStore = useGalleryStore();
 const resourcesStore = useResourcesStore();
-const catalog = computed(() => usePortalCatalog());
+const catalog = computed(() => usePortalCatalog(runtimeConfig.public));
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
 const showPublishConfirmation = ref(false);

@@ -48,7 +48,7 @@ function decide(id: string, status: "accepted" | "rejected") {
 <template>
   <div class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Registrations" title="活动报名名单" description="按活动查看报名信息并进行录取或不录取审核。活动不设候补。">
-      <template #actions><button class="button button--ghost" type="button">配置报名字段</button><button class="button" type="button">导出当前名单</button></template>
+      <template #actions><button class="button button--ghost" type="button" disabled>配置报名字段（暂不可用）</button><button class="button" type="button" disabled>导出当前名单（暂不可用）</button></template>
     </AdminPageHeading>
     <section class="admin-list-card">
       <header><div><span>Registration Records</span><h2>当前活动报名</h2></div><p>共 {{ registrations.length }} 人 · 仅显示当前管理员权限范围</p></header>

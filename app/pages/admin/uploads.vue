@@ -17,11 +17,11 @@ const ownerCenterId = computed<AdminAssetCenterId | undefined>(() => centerScope
 const visibleUploadTasks = computed(() => filterAdminUploadTasksByOwnerCenter(ADMIN_UPLOAD_TASKS, ownerCenterId.value));
 
 const realList = !useMockApi && gateway ? createAdminUploadListController(gateway) : undefined;
-const query = ref(""); const status = ref<AdminUploadStatus | "">(""); const kind = ref<AdminUploadKind | "">(""); const centerId = ref(""); const page = ref(1);
+const query = ref(""); const status = ref<AdminUploadStatus | "">(""); const kind = ref<AdminUploadKind | "">(""); const centerId = ref("");
+const page = computed({ get: () => realList?.query.value.page ?? 1, set: (value: number) => { if (realList) { realList.setPage(value); void realList.load(); } } });
 const isOwner = computed(() => session.adminLevel === "owner");
-const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "上传任务读取服务不可用。");
-watch([query, status, kind, centerId], () => { if (!realList) return; const pageChanged = page.value !== 1; page.value = 1; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(isOwner.value && centerId.value ? { centerId: centerId.value } : {}) }); if (!pageChanged) void realList.load(); }, { immediate: true });
-watch(page, () => { if (realList) { realList.setPage(page.value); void realList.load(); } });
+const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realList?.query.value.pageSize ?? 20)))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "上传任务读取服务不可用。");
+watch([query, status, kind, centerId], () => { if (!realList) return; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(isOwner.value && centerId.value ? { centerId: centerId.value } : {}) }); void realList.load(); }, { immediate: true });
 </script>
 
 <template>

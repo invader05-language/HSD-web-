@@ -83,14 +83,22 @@ const apiBusy = computed(() => Boolean(
 ));
 const apiError = computed(() => assessmentStore.apiErrorByBatch[props.batchId]);
 
-onMounted(async () => {
+let apiGeneration = 0;
+watch(() => props.batchId, async (batchId) => {
+  const generation = ++apiGeneration;
+  selectedCandidateId.value = undefined;
+  showSaveConfirmation.value = false;
+  showAdvanceConfirmation.value = false;
+  saveMessage.value = "";
+  saveError.value = "";
   if (!recruitmentGateway) return;
   try {
-    await assessmentStore.refreshAssessmentBatch(props.batchId, recruitmentGateway);
+    await assessmentStore.refreshAssessmentBatch(batchId, recruitmentGateway);
   } catch (error) {
+    if (generation !== apiGeneration) return;
     saveError.value = errorText(error, "无法加载服务器考核数据");
   }
-});
+}, { immediate: true });
 
 const selectedCandidate = computed(() => (
   selectedCandidateId.value

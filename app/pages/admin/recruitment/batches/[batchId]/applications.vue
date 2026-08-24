@@ -75,6 +75,7 @@ async function loadApiApplications() {
     if (query.value.trim()) params.set("keyword", query.value.trim());
     const response = await recruitmentGateway.listAdminApplications(batchId.value, params.toString());
     if (generation !== apiGeneration) return;
+    apiPage.value = response.page;
     apiPageSize.value = response.pageSize;
     apiTotal.value = response.total;
     apiRows.value = response.items.map(mapAdminApplication);
@@ -92,12 +93,23 @@ watch([query, sort], () => {
   apiPage.value = 1;
   void loadApiApplications();
 });
-watch(apiPage, () => {
+function requestApiPage(page: number) {
+  apiPage.value = Math.max(1, page);
   if (!useMockApi && recruitmentGateway && !route.params.id) void loadApiApplications();
-});
-onMounted(() => {
-  if (!useMockApi && recruitmentGateway && !route.params.id) void loadApiApplications();
-});
+}
+watch(batchId, () => {
+  apiBatch.value = undefined;
+  apiRows.value = [];
+  apiTotal.value = 0;
+  apiPage.value = 1;
+  apiError.value = "";
+  if (!useMockApi && recruitmentGateway && !route.params.id) {
+    void loadApiApplications();
+  } else {
+    apiGeneration += 1;
+    apiStatus.value = "idle";
+  }
+}, { immediate: true });
 
 useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}报名人员｜HSD 管理台` }));
 
@@ -188,7 +200,7 @@ function exportRecruitmentCsv() {
         </table>
       </div>
       <div v-else class="admin-empty"><strong>没有匹配的报名人员</strong><p>服务端未返回符合当前条件的报名记录。</p></div>
-      <PaginationControls v-if="apiStatus !== 'loading'" v-model="apiPage" :page-count="apiPageCount" label="报名人员分页" />
+      <PaginationControls v-if="apiStatus !== 'loading'" :model-value="apiPage" :page-count="apiPageCount" label="报名人员分页" @update:model-value="requestApiPage" />
     </section>
   </div>
 </template>

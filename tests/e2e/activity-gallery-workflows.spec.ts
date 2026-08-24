@@ -46,6 +46,8 @@ test("owner can publish an activity and review a member registration", async ({ 
   await expect(page.getByRole("status")).toContainText("报名已提交");
 
   await signIn(page, "admin-alliance", "/admin/activities/registrations");
+  await expect(page.getByRole("button", { name: "配置报名字段（暂不可用）" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "导出当前名单（暂不可用）" })).toBeDisabled();
   await expect(page.getByRole("row", { name: /端到端活动闭环验证/ })).toContainText("待审核");
   await page.getByRole("row", { name: /端到端活动闭环验证/ }).getByRole("button", { name: "录取", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("报名已录取");

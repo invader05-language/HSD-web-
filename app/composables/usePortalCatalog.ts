@@ -8,12 +8,19 @@ import { useResourcesStore } from "../stores/resources";
 
 const toIso = (date: string) => `${date}T00:00:00.000Z`;
 
-export function usePortalCatalog(): PortalCatalogItem[] {
+export function usePortalCatalog(runtime?: { useMockApi: boolean }): PortalCatalogItem[] {
   const activitiesStore = useActivitiesStore();
   const galleryStore = useGalleryStore();
   const projectsStore = useProjectsStore();
   const resourcesStore = useResourcesStore();
-  const productionCatalog = projectsStore.apiModeActive
+  if (runtime?.useMockApi === false) {
+    if (!projectsStore.apiModeActive) projectsStore.activateApiMode();
+    if (!activitiesStore.apiModeActive) activitiesStore.activateApiMode();
+    if (!galleryStore.apiModeActive) galleryStore.activateApiMode();
+    if (!resourcesStore.apiModeActive) resourcesStore.activateApiMode();
+  }
+  const productionCatalog = runtime?.useMockApi === false
+    || projectsStore.apiModeActive
     || activitiesStore.apiModeActive
     || galleryStore.apiModeActive
     || resourcesStore.apiModeActive;

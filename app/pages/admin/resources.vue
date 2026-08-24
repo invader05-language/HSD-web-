@@ -14,7 +14,8 @@ const session = useSessionStore();
 const mockSelected = ref<(typeof ADMIN_RESOURCES)[number] | null>(null);
 const realList = !useMockApi && gateway ? createAdminResourceListController(gateway) : undefined;
 const realDetail = !useMockApi && gateway ? createAdminResourceDetailController(gateway) : undefined;
-const query = ref(""); const status = ref<AdminResourceStatus | "">(""); const kind = ref<AdminResourceKind | "">(""); const format = ref<AdminResourceFormat | "">(""); const access = ref<AdminResourceAccess | "">(""); const availability = ref<AdminResourceAvailability | "">(""); const centerId = ref(""); const page = ref(1); const selectedResourceId = ref<string>();
+const query = ref(""); const status = ref<AdminResourceStatus | "">(""); const kind = ref<AdminResourceKind | "">(""); const format = ref<AdminResourceFormat | "">(""); const access = ref<AdminResourceAccess | "">(""); const availability = ref<AdminResourceAvailability | "">(""); const centerId = ref(""); const selectedResourceId = ref<string>();
+const page = computed({ get: () => realList?.query.value.page ?? 1, set: (value: number) => { if (realList) { realList.setPage(value); void realList.load(); } } });
 const isOwner = computed(() => session.adminLevel === "owner");
 const mutationBusy = ref(false);
 const mutationError = ref("");
@@ -23,9 +24,8 @@ const showCreate = ref(false);
 const createForm = reactive({ centerId: "", slug: "", title: "", summary: "", kind: "ARTICLE" as "ARTICLE" | "PDF" | "DOCX" | "ARCHIVE" | "EXTERNAL", format: "WEB" as "WEB" | "PDF" | "DOCX" | "ZIP" | "EXTERNAL", access: "MEMBER" as "PUBLIC" | "MEMBER", availability: "AVAILABLE" as "AVAILABLE" | "UNAVAILABLE", versionLabel: "v1.0", content: "" });
 const versionForm = reactive({ versionLabel: "", content: "", access: "MEMBER" as "PUBLIC" | "MEMBER", availability: "AVAILABLE" as "AVAILABLE" | "UNAVAILABLE" });
 const offlineReason = ref("");
-const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "学习资料读取服务不可用。"); const detailStatus = computed(() => realDetail?.status.value ?? "error"); const detailError = computed(() => realDetail?.error.value || "学习资料详情读取服务不可用。");
-watch([query, status, kind, format, access, availability, centerId], () => { if (!realList) return; const pageChanged = page.value !== 1; page.value = 1; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(format.value ? { format: format.value } : {}), ...(access.value ? { access: access.value } : {}), ...(availability.value ? { availability: availability.value } : {}), ...(centerId.value ? { centerId: centerId.value } : {}) }); if (!pageChanged) void realList.load(); }, { immediate: true });
-watch(page, () => { if (realList) { realList.setPage(page.value); void realList.load(); } });
+const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realList?.query.value.pageSize ?? 20)))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "学习资料读取服务不可用。"); const detailStatus = computed(() => realDetail?.status.value ?? "error"); const detailError = computed(() => realDetail?.error.value || "学习资料详情读取服务不可用。");
+watch([query, status, kind, format, access, availability, centerId], () => { if (!realList) return; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(format.value ? { format: format.value } : {}), ...(access.value ? { access: access.value } : {}), ...(availability.value ? { availability: availability.value } : {}), ...(centerId.value ? { centerId: centerId.value } : {}) }); void realList.load(); }, { immediate: true });
 function openRealDetail(id: string) { selectedResourceId.value = id; void realDetail?.load(id); }
 function resetMutationState() { mutationError.value = ""; mutationMessage.value = ""; }
 async function createRealResource() {

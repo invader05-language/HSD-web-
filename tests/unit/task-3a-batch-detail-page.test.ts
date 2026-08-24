@@ -112,6 +112,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: { props: ["status"], template: "<span>{{ status }}</span>" },
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { props: ["to"], template: "<a><slot /></a>" },
     } } });
@@ -127,10 +128,12 @@ describe("Task 3A production batch detail page", () => {
     expect(wrapper.text()).toContain("开放中心");
     expect(wrapper.text()).toContain("已停用中心（已停用）");
     expect(wrapper.text()).toContain("总负责人 · v9");
-    expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
+    expect(wrapper.text()).toContain("服务端名单已接入");
+    expect(wrapper.text()).toContain("服务端考核已接入");
+    expect(wrapper.text()).toContain("服务端发布已接入");
     expect(wrapper.text()).toContain("当前批次暂无生命周期记录。");
     expect(wrapper.text()).not.toContain("后端未提供生命周期审计接口");
-    expect(wrapper.text()).toContain("发布、开放、暂停、恢复、关闭和重开命令暂不可用");
+    expect(wrapper.text()).not.toContain("该子工作区尚未接入真实数据");
     expect(wrapper.text()).not.toContain("归档批次");
   });
 
@@ -153,6 +156,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: NestedPage,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
@@ -180,6 +184,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: true,
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: NestedPage,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
@@ -190,47 +195,29 @@ describe("Task 3A production batch detail page", () => {
     expect(wrapper.get("[data-testid='mock-child']").text()).toBe("Mock child");
   });
 
-  it("blocks direct real-mode child routes before a mock store-backed page can mount", async () => {
-    localStorage.setItem(RECRUITMENT_BATCH_STORAGE_KEY, JSON.stringify({
-      version: 1,
-      batches: [{
-        id: "batch-api-only",
-        name: "LOCAL FIXTURE MUST NOT RENDER",
-        startAt: "2026-09-01T00:00:00.000Z",
-        endAt: "2026-09-20T00:00:00.000Z",
-        timezone: "Asia/Shanghai",
-        openCenterIds: ["fixture-center"],
-        responsibleAccountIds: ["fixture-owner"],
-        lifecycleStatus: "published",
-        manualOverride: "none",
-        version: 1,
-        createdAt: "2026-08-20T00:00:00.000Z",
-        updatedAt: "2026-08-20T00:00:00.000Z",
-      }],
-    }));
+  it("mounts the real-mode child workspace for a nested route", async () => {
     routeState.path = "/admin/recruitment/batches/batch-api-only/applications";
     const nestedPageMounted = vi.fn();
-    const MockStoreBackedNestedPage = defineComponent({
+    const RealNestedPage = defineComponent({
       setup() {
         nestedPageMounted();
-        const fixture = useRecruitmentBatchStore().getBatch("batch-api-only");
-        return { fixture };
+        return {};
       },
-      template: "<div data-testid='mock-child'>{{ fixture?.name }}</div>",
+      template: "<div data-testid='real-child'>Real child workspace</div>",
     });
 
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
-      NuxtPage: MockStoreBackedNestedPage,
+      PaginationControls: true,
+      NuxtPage: RealNestedPage,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
     await flushPromises();
     await nextTick();
 
-    expect(nestedPageMounted).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain("该子工作区尚未接入真实数据");
-    expect(wrapper.text()).not.toContain("LOCAL FIXTURE MUST NOT RENDER");
+    expect(nestedPageMounted).toHaveBeenCalledTimes(1);
+    expect(wrapper.get("[data-testid='real-child']").text()).toBe("Real child workspace");
   });
 
   it("renders an empty responsible-account list as unassigned", async () => {
@@ -241,6 +228,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title"], template: "<header><h1>{{ title }}</h1><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
@@ -264,6 +252,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
@@ -305,6 +294,7 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
@@ -359,13 +349,14 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
     await flushPromises();
     await nextTick();
 
-    await wrapper.get("button").trigger("click");
+    await wrapper.findAll("button").find((button) => button.text() === "归档批次")!.trigger("click");
     await wrapper.get("textarea").setValue("只能属于批次 A 的原因");
     const confirm = wrapper.findAll("button").find((button) => button.text() === "确认归档批次");
     expect(confirm).toBeDefined();
@@ -414,13 +405,14 @@ describe("Task 3A production batch detail page", () => {
     const wrapper = mount(BatchDetailPage, { global: { stubs: {
       AdminPageHeading: { props: ["title", "description"], template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>" },
       AdminStatusPill: true,
+      PaginationControls: true,
       NuxtPage: true,
       NuxtLink: { template: "<a><slot /></a>" },
     } } });
     await flushPromises();
     await nextTick();
 
-    await wrapper.get("button").trigger("click");
+    await wrapper.findAll("button").find((button) => button.text() === "归档批次")!.trigger("click");
     const confirm = wrapper.findAll("button").find((button) => button.text() === "确认归档批次");
     await confirm!.trigger("click");
     await flushPromises();

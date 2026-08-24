@@ -28,18 +28,29 @@ const application = computed(() => assessmentStore
 const apiApplication = ref<AdminApplicationView>();
 const apiStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const apiError = ref("");
-onMounted(async () => {
+let apiGeneration = 0;
+
+async function loadApiApplication() {
   if (useMockApi || !recruitmentGateway) return;
+  const generation = ++apiGeneration;
   apiStatus.value = "loading";
+  apiApplication.value = undefined;
+  apiError.value = "";
   try {
     const response = await recruitmentGateway.getAdminApplication(batchId.value, applicationId.value);
+    if (generation !== apiGeneration) return;
     apiApplication.value = mapAdminApplication(response);
     apiStatus.value = "success";
   } catch (cause) {
+    if (generation !== apiGeneration) return;
     apiError.value = cause instanceof Error ? cause.message : "报名记录读取失败。";
     apiStatus.value = "error";
   }
-});
+}
+
+watch([batchId, applicationId], () => {
+  void loadApiApplication();
+}, { immediate: true });
 
 useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
 </script>

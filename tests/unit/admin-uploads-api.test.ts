@@ -65,6 +65,20 @@ describe("admin upload production reads", () => {
     expect(controller.records.value).toEqual([expect.objectContaining({ fileName: "latest.png" })]);
   });
 
+  it("adopts a server-corrected page and page size for the next upload request", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ page: 3, pageSize: 7, total: 21, items: [upload] })
+      .mockResolvedValueOnce({ page: 4, pageSize: 7, total: 21, items: [upload] });
+    const controller = createAdminUploadListController({ list }, { page: 99, pageSize: 20 });
+
+    await controller.load();
+    expect(controller.query.value).toMatchObject({ page: 3, pageSize: 7 });
+
+    controller.setPage(4);
+    await controller.load();
+    expect(list).toHaveBeenLastCalledWith("page=4&pageSize=7");
+  });
+
   it("uses credentialed GET requests with a request ID and exposes no upload mutations", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1, pageSize: 20, total: 0, items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const gateway = createApiUploadGateway({ apiBase: "https://api.example.test/", fetcher, createRequestId: () => "upload-request-id" });

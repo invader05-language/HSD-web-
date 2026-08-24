@@ -55,6 +55,7 @@ export function createAdminAuditListController(gateway: AdminAuditListGateway, i
     const generation = ++requestGeneration; loading.value = true; error.value = ""; records.value = []; selected.value = undefined; total.value = 0; status.value = "loading";
     try {
       const response = await gateway.list(toQueryString(query.value)); if (generation !== requestGeneration) return;
+      query.value = { ...query.value, page: response.page, pageSize: response.pageSize };
       records.value = response.items.map(mapSafeAuditEvent); total.value = response.total; status.value = response.items.length ? "success" : "empty";
     } catch (cause) {
       if (generation !== requestGeneration) return;

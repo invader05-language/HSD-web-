@@ -1,14 +1,25 @@
 <script setup lang="ts">
+import {
+  buildRecruitmentCompatibilityRoute,
+  resolveLegacyRecruitmentBatchId,
+} from "~/utils/recruitment-compatibility-routes";
+
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
-const batchId = computed(() => (
-  typeof route.query.batchId === "string" ? route.query.batchId : "batch-current"
+const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const batchId = computed(() => resolveLegacyRecruitmentBatchId(
+  route.query.batchId,
+  runtime.public.useMockApi,
 ));
+
+if (!runtime.public.useMockApi) {
+  await navigateTo(buildRecruitmentCompatibilityRoute("publish", batchId.value), { replace: true });
+}
 
 useHead({ title: "结果发布｜HSD 管理台" });
 </script>
 
 <template>
-  <AdminRecruitmentPublicationWorkbench :batch-id="batchId" />
+  <AdminRecruitmentPublicationWorkbench v-if="batchId" :batch-id="batchId" />
 </template>
