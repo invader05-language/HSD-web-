@@ -3,10 +3,13 @@ import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
   memberResultFromApi,
+  resultCenterMemberFromSession,
   describeAdmission,
-  describeAssessment
+  describeAssessment,
+  type MemberIdentity,
 } from "~/data/member-results";
 import { useCurrentMember } from "~/composables/useCurrentMember";
+import { useSessionStore } from "~/stores/session";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import { copyTextToClipboard } from "~/utils/clipboard";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
@@ -17,7 +20,19 @@ type ResultTab = "admission" | "assessment";
 
 useHead({ title: "结果中心｜白云 HSD 开发者部落" });
 
-const { profile: currentMember } = useCurrentMember();
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const isMockApi = apiRuntime.public.useMockApi;
+const session = useSessionStore();
+const mockCurrentMember = isMockApi ? useCurrentMember() : undefined;
+const currentMember = computed(() => isMockApi
+  ? mockCurrentMember?.profile.value
+  : resultCenterMemberFromSession(session.apiSession?.person));
+const currentMemberIdentity = computed<MemberIdentity | undefined>(() => {
+  const identity = currentMember.value?.identity;
+  return identity === "正式成员" || identity === "预备成员" || identity === "未录取"
+    ? identity
+    : undefined;
+});
 const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
@@ -38,7 +53,7 @@ const publishedAssessment = computed(() => {
   if (recruitmentGateway) return undefined;
   const published = batchStore.batches.flatMap((batch) => (
     assessmentStore.getCandidates(batch.id)
-      .filter((candidate) => candidate.memberId === currentMember.value.id && Boolean(candidate.publishedAt))
+      .filter((candidate) => candidate.memberId === currentMember.value?.id && Boolean(candidate.publishedAt))
       .map((candidate) => ({
         memberId: candidate.memberId,
         center: candidate.center,
@@ -53,9 +68,9 @@ const publishedAssessment = computed(() => {
   ))[0];
 });
 const result = computed(() => recruitmentGateway
-  ? memberResultFromApi(assessmentStore.myResults[0])
+  ? memberResultFromApi(assessmentStore.myResults[0], currentMemberIdentity.value ?? "预备成员")
   : applyPublishedAssessmentProjection(
-      getDemoMemberResult(currentMember.value.id, applicationStore.submittedApplication),
+      getDemoMemberResult(currentMember.value?.id ?? "", applicationStore.submittedApplication),
       publishedAssessment.value,
     ));
 const admission = computed(() => describeAdmission(result.value));
@@ -112,7 +127,7 @@ onBeforeUnmount(() => {
           <span>Current Recruitment</span>
           <h2>{{ result.batchLabel }}</h2>
           <dl>
-            <div><dt>当前账号</dt><dd>{{ currentMember.name }}</dd></div>
+            <div><dt>当前账号</dt><dd>{{ currentMember?.name ?? "当前登录成员" }}</dd></div>
             <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
           </dl>
         </aside>

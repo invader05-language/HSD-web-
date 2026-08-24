@@ -6,7 +6,8 @@ import {
   applyPublishedAssessmentProjection,
   memberResultFromApi,
   describeAdmission,
-  describeAssessment
+  describeAssessment,
+  resultCenterMemberFromSession,
 } from "../../app/data/member-results";
 import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "../../app/data/member-profile";
 import { useMemberRepository } from "../../app/composables/useMemberRepository";
@@ -72,6 +73,22 @@ describe("member result presentation", () => {
       batchLabel: "暂无已发布结果",
       status: "no-application",
       currentStage: "尚未开始",
+    });
+  });
+
+  it("projects the authenticated API person for an empty production result center", () => {
+    expect(resultCenterMemberFromSession({
+      id: "d5df7b31-eddb-4c6d-b234-8af26ddb0946",
+      name: "徐一鸣",
+      status: "FORMAL_MEMBER",
+    })).toEqual({
+      id: "d5df7b31-eddb-4c6d-b234-8af26ddb0946",
+      name: "徐一鸣",
+      identity: "正式成员",
+    });
+    expect(memberResultFromApi(undefined, "正式成员")).toMatchObject({
+      status: "no-application",
+      identity: "正式成员",
     });
   });
 

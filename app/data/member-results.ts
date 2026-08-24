@@ -53,12 +53,36 @@ export interface ResultPresentation {
   description: string;
 }
 
-export function memberResultFromApi(result?: MyRecruitmentResultDto): MemberResultRecord {
+export interface ResultCenterMember {
+  id: string;
+  name: string;
+  identity: MemberIdentity;
+}
+
+export function resultCenterMemberFromSession(
+  person?: Pick<SessionPersonResponseDto, "id" | "name" | "status">,
+): ResultCenterMember | undefined {
+  if (!person) return undefined;
+  return {
+    id: person.id,
+    name: person.name,
+    identity: person.status === "FORMAL_MEMBER"
+      ? "正式成员"
+      : person.status === "PREPARATORY"
+        ? "预备成员"
+        : "未录取",
+  };
+}
+
+export function memberResultFromApi(
+  result?: MyRecruitmentResultDto,
+  fallbackIdentity: MemberIdentity = "预备成员",
+): MemberResultRecord {
   if (!result) {
     return {
       batchLabel: "暂无已发布结果",
       status: "no-application",
-      identity: "预备成员",
+      identity: fallbackIdentity,
       preferences: [],
       currentStage: "尚未开始",
       currentConclusion: "待公布",
@@ -257,5 +281,5 @@ export function describeAssessment(record: MemberResultRecord): ResultPresentati
 }
 import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "./member-profile";
 import type { SubmittedRecruitmentApplication } from "./recruitment-application";
-import type { MyRecruitmentResultDto } from "../../packages/api-client/src";
+import type { MyRecruitmentResultDto, SessionPersonResponseDto } from "../../packages/api-client/src";
 import { baizeDirectionLabel } from "../utils/baize-direction-label";
