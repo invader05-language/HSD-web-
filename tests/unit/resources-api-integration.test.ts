@@ -80,8 +80,17 @@ describe("Resources production API integration", () => {
     const listPage = readFileSync("app/pages/resources.vue", "utf8");
     const detailPage = readFileSync("app/pages/resources/[slug].vue", "utf8");
     expect(listPage).toContain("await useAsyncData(`public-resources`");
+    expect(listPage).toContain("resourceData.value");
     expect(detailPage).toContain("createError({ statusCode: 404");
+    expect(detailPage).toContain("detailData.value");
     expect(detailPage).toContain("gateway ? [] : PUBLIC_RESOURCES");
     expect(detailPage).toContain("!gateway && resource.kind === 'external'");
+  });
+
+  it("normalizes the API resource contract for the existing public detail view", () => {
+    const detailPage = readFileSync("app/pages/resources/[slug].vue", "utf8");
+    expect(detailPage).toContain("resourceContents");
+    expect(detailPage).toContain("versionLabel");
+    expect(detailPage).toContain("updatedAt");
   });
 });

@@ -10,11 +10,13 @@ const session = useSessionStore();
 const gateway = useContentGateway();
 const resourcesStore = useResourcesStore();
 const slug = String(route.params.slug);
+const detailData = ref<any>();
 if (gateway) {
   if (resourcesStore.detail?.slug !== slug) resourcesStore.activateApiMode();
-  await useAsyncData(`public-resource-${slug}`, () => resourcesStore.refreshPublicDetailFromApi(gateway, slug));
+  const { data } = await useAsyncData(`public-resource-${slug}`, () => resourcesStore.refreshPublicDetailFromApi(gateway, slug));
+  detailData.value = data.value;
 }
-const resource = computed<any>(() => gateway ? resourcesStore.detail : findResource(slug));
+const resource = computed<any>(() => gateway ? resourcesStore.detail ?? detailData.value : findResource(slug));
 
 if (gateway && resourcesStore.apiError) {
   throw createError({ statusCode: resourcesStore.apiError.status ?? 502, statusMessage: resourcesStore.apiError.message });
@@ -28,6 +30,8 @@ const action = computed(() => gateway ? (resource.value?.kind === "article" ? "�
 const isUnavailable = computed(() => !gateway && ["not-connected", "offline"].includes(resource.value!.status));
 const loginTarget = computed(() => buildLoginTarget(route.fullPath));
 const relatedResources = computed(() => gateway ? [] : PUBLIC_RESOURCES.filter((item) => item.slug !== resource.value!.slug).slice(0, 3));
+const resourceCategory = computed(() => resource.value?.category ?? resource.value?.kind ?? "资源");
+const resourceContents = computed(() => resource.value?.contents ?? (resource.value?.content ? [resource.value.content] : []));
 
 useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
 </script>
@@ -36,8 +40,8 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
   <main v-if="resource" class="resource-detail">
     <header class="resource-detail-hero">
       <div class="shell">
-        <nav aria-label="面包屑" class="breadcrumb"><NuxtLink to="/resources">资源中心</NuxtLink><span>/</span><span>{{ resource.category }}</span></nav>
-        <p class="eyebrow">{{ resource.category }} · {{ resource.format }}</p>
+        <nav aria-label="面包屑" class="breadcrumb"><NuxtLink to="/resources">资源中心</NuxtLink><span>/</span><span>{{ resourceCategory }}</span></nav>
+        <p class="eyebrow">{{ resourceCategory }} · {{ resource.format }}</p>
         <h1>{{ resource.title }}</h1>
         <p>{{ resource.summary }}</p>
       </div>
@@ -50,13 +54,13 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
           <h2>{{ resource.kind === "article" ? "学习步骤" : "内容清单" }}</h2>
           <p v-if="resource.kind === 'article'">按以下步骤完成学习，并结合自己的项目记录实践中的问题与收获。</p>
           <ol class="resource-content-list">
-            <li v-for="(item, index) in (resource.contents ?? [])" :key="item"><span>0{{ Number(index) + 1 }}</span>{{ item }}</li>
+            <li v-for="(item, index) in resourceContents" :key="item"><span>0{{ Number(index) + 1 }}</span>{{ item }}</li>
           </ol>
 
           <section class="resource-version-list" aria-labelledby="version-heading">
             <p class="eyebrow">Version Record</p>
             <h2 id="version-heading">版本记录</h2>
-            <div><strong>{{ resource.version }}</strong><span>更新于 {{ resource.updatedAt }}</span><p>当前公开的资源说明与内容范围。</p></div>
+            <div><strong>{{ resource.versionLabel ?? resource.version ?? "当前版本" }}</strong><span v-if="resource.updatedAt">更新于 {{ resource.updatedAt }}</span><p>当前公开的资源说明与内容范围。</p></div>
           </section>
 
           <section class="resource-related" aria-labelledby="related-heading">
