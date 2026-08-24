@@ -30,6 +30,11 @@ export default defineConfig({
   testIgnore: [
     "**/real-stack-smoke.spec.ts",
     "**/baize-project-real-data.spec.ts",
+    // The task-3c suites boot a non-Mock runtime and are run explicitly with
+    // playwright.config.task-3c-real.ts. Keeping them out of the Mock suite
+    // prevents the real-mode API assertions from being evaluated against the
+    // fixture runtime.
+    "**/task-3c-*-real.spec.ts",
   ],
   ...(includeExtendedFixtures
     ? {}

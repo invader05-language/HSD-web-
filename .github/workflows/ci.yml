@@ -43,3 +43,6 @@ jobs:
 
       - name: Run end-to-end tests
         run: pnpm run test:e2e
+
+      - name: Run production-mode API end-to-end tests
+        run: pnpm exec playwright test tests/e2e/task-3c-admin-content-real.spec.ts tests/e2e/task-3c-admin-audit-real.spec.ts tests/e2e/task-3c-admin-uploads-real.spec.ts tests/e2e/task-3c-admin-resources-real.spec.ts tests/e2e/task-3c-recruitment-batches-real.spec.ts tests/e2e/task-3c-admin-recruitment-lifecycle-real.spec.ts tests/e2e/task-3c-admin-recruitment-workspaces-real.spec.ts --config playwright.config.task-3c-real.ts

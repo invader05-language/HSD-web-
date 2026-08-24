@@ -63,7 +63,7 @@ test("login modes reject members from administrator access and admit qualified a
   await expect(page).toHaveURL(/\/admin$/);
 });
 
-test("owner qualification changes are confirmed without an audit-log entry point", async ({ page }) => {
+test("owner qualification changes remain confirmed and expose the audit-log entry point", async ({ page }) => {
   await signInToAdmin(page, "/admin/accounts");
 
   const accounts = page.getByRole("table", { name: "管理员资格配置列表" });
@@ -91,7 +91,7 @@ test("owner qualification changes are confirmed without an audit-log entry point
   await confirm.getByRole("button", { name: "确认变更" }).click();
   await expect(memberRow).toHaveCount(0);
 
-  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "操作日志", exact: true })).toHaveCount(1);
 });
 
 test("a newly qualified account can start an admin session but cannot manage accounts", async ({ page }) => {
