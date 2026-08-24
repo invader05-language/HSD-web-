@@ -10,7 +10,10 @@ function batchRoute(batchId: string, section?: "applications" | "assessment" | "
   return section ? `${base}/${section}` : base;
 }
 
-export function dashboardTargetToRoute(target: DashboardTarget): string {
+export function dashboardTargetToRoute(
+  target: DashboardTarget,
+  runtime: { useMockApi: boolean } = { useMockApi: true },
+): string {
   if (target.module === "recruitment") {
     if (target.resourceType === "batch" && target.resourceId) {
       if (target.action === "applications") return batchRoute(target.resourceId, "applications");
@@ -18,8 +21,12 @@ export function dashboardTargetToRoute(target: DashboardTarget): string {
       if (target.action === "publish-results") return batchRoute(target.resourceId, "publish");
       return batchRoute(target.resourceId);
     }
-    if (target.action === "assess") return "/admin/recruitment";
-    if (target.action === "publish-results") return "/admin/recruitment/publish";
+    if (target.action === "assess") {
+      return runtime.useMockApi ? "/admin/recruitment" : "/admin/recruitment/batches";
+    }
+    if (target.action === "publish-results") {
+      return runtime.useMockApi ? "/admin/recruitment/publish" : "/admin/recruitment/batches";
+    }
     return "/admin/recruitment/batches";
   }
 

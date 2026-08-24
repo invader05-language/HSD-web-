@@ -1,39 +1,80 @@
 <script setup lang="ts">
 import { ADMIN_RESOURCES, getResourceAccessLabel } from "~/data/admin-assets";
+import { useResourceGateway } from "~/composables/useResourceGateway";
+import { createAdminResourceListController, type AdminResourceAccess, type AdminResourceAvailability, type AdminResourceFormat, type AdminResourceKind, type AdminResourceStatus } from "~/services/resources/admin-resource-list";
+import { createAdminResourceDetailController } from "~/services/resources/admin-resource-detail";
+import { useSessionStore } from "~/stores/session";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "学习资料｜HSD 管理台" });
-const selected = ref<(typeof ADMIN_RESOURCES)[number] | null>(null);
+const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const useMockApi = runtime.public.useMockApi;
+const gateway = useResourceGateway();
+const session = useSessionStore();
+const mockSelected = ref<(typeof ADMIN_RESOURCES)[number] | null>(null);
+const realList = !useMockApi && gateway ? createAdminResourceListController(gateway) : undefined;
+const realDetail = !useMockApi && gateway ? createAdminResourceDetailController(gateway) : undefined;
+const query = ref(""); const status = ref<AdminResourceStatus | "">(""); const kind = ref<AdminResourceKind | "">(""); const format = ref<AdminResourceFormat | "">(""); const access = ref<AdminResourceAccess | "">(""); const availability = ref<AdminResourceAvailability | "">(""); const centerId = ref(""); const selectedResourceId = ref<string>();
+const page = computed({ get: () => realList?.query.value.page ?? 1, set: (value: number) => { if (realList) { realList.setPage(value); void realList.load(); } } });
+const isOwner = computed(() => session.adminLevel === "owner");
+const mutationBusy = ref(false);
+const mutationError = ref("");
+const mutationMessage = ref("");
+const showCreate = ref(false);
+const createForm = reactive({ centerId: "", slug: "", title: "", summary: "", kind: "ARTICLE" as "ARTICLE" | "PDF" | "DOCX" | "ARCHIVE" | "EXTERNAL", format: "WEB" as "WEB" | "PDF" | "DOCX" | "ZIP" | "EXTERNAL", access: "MEMBER" as "PUBLIC" | "MEMBER", availability: "AVAILABLE" as "AVAILABLE" | "UNAVAILABLE", versionLabel: "v1.0", content: "" });
+const versionForm = reactive({ versionLabel: "", content: "", access: "MEMBER" as "PUBLIC" | "MEMBER", availability: "AVAILABLE" as "AVAILABLE" | "UNAVAILABLE" });
+const offlineReason = ref("");
+const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realList?.query.value.pageSize ?? 20)))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "学习资料读取服务不可用。"); const detailStatus = computed(() => realDetail?.status.value ?? "error"); const detailError = computed(() => realDetail?.error.value || "学习资料详情读取服务不可用。");
+watch([query, status, kind, format, access, availability, centerId], () => { if (!realList) return; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(format.value ? { format: format.value } : {}), ...(access.value ? { access: access.value } : {}), ...(availability.value ? { availability: availability.value } : {}), ...(centerId.value ? { centerId: centerId.value } : {}) }); void realList.load(); }, { immediate: true });
+function openRealDetail(id: string) { selectedResourceId.value = id; void realDetail?.load(id); }
+function resetMutationState() { mutationError.value = ""; mutationMessage.value = ""; }
+async function createRealResource() {
+  if (!gateway) return;
+  resetMutationState(); mutationBusy.value = true;
+  try {
+    await gateway.create({ expectedVersion: 0, ...createForm });
+    showCreate.value = false; mutationMessage.value = "资料草稿已创建。"; await realList?.load();
+  } catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料创建失败。"; }
+  finally { mutationBusy.value = false; }
+}
+async function appendRealVersion() {
+  const record = realDetail?.resource.value; if (!gateway || !record) return;
+  resetMutationState(); mutationBusy.value = true;
+  try { await gateway.appendVersion(record.id, { expectedVersion: record.version, ...versionForm }); versionForm.versionLabel = ""; versionForm.content = ""; mutationMessage.value = "新版本已保存。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+  catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "追加版本失败。"; }
+  finally { mutationBusy.value = false; }
+}
+async function publishRealResource() {
+  const record = realDetail?.resource.value; if (!gateway || !record) return;
+  resetMutationState(); mutationBusy.value = true;
+  try { await gateway.publish(record.id, { expectedVersion: record.version }); mutationMessage.value = "资料已发布。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+  catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料发布失败。"; }
+  finally { mutationBusy.value = false; }
+}
+async function offlineRealResource() {
+  const record = realDetail?.resource.value; if (!gateway || !record || !offlineReason.value.trim()) return;
+  resetMutationState(); mutationBusy.value = true;
+  try { await gateway.offline(record.id, { expectedVersion: record.version, reason: offlineReason.value.trim() }); offlineReason.value = ""; mutationMessage.value = "资料已下架。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+  catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料下架失败。"; }
+  finally { mutationBusy.value = false; }
+}
 </script>
 
 <template>
-  <div class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Learning Resources" title="学习资料" description="维护站内资料详情、文件版本、访问范围与发布设置；列表点击先进入站内详情，下载是明确的后续动作。">
-      <template #actions><button type="button" class="button">上传学习资料</button></template>
-    </AdminPageHeading>
-    <section class="admin-summary-strip" aria-label="资料概览">
-      <div><span>全部资料</span><strong>36</strong><small>PDF · DOCX · 外部链接</small></div>
-      <div><span>公开资料</span><strong>14</strong><small>无需登录即可查看详情</small></div>
-      <div><span>成员资料</span><strong>18</strong><small>登录后获取文件动作</small></div>
-      <div><span>待审核</span><strong>04</strong><small>文件与公开范围检查</small></div>
+  <div v-if="useMockApi" class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading eyebrow="Learning Resources" title="学习资料" description="本地 Mock 资料演示。"><template #actions><button type="button" class="button">上传学习资料</button></template></AdminPageHeading>
+    <section class="admin-list-card"><header><div><span>Resource Management</span><h2>学习资料管理列表</h2></div><p>Mock 演示数据</p></header><div class="admin-table-scroll"><table aria-label="学习资料管理列表"><thead><tr><th>资料</th><th>分类</th><th>格式</th><th>访问范围</th><th>状态</th><th>下载记录</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="resource in ADMIN_RESOURCES" :key="resource.id"><td><strong>{{ resource.title }}</strong><small>{{ resource.description }}</small></td><td>{{ resource.category }}</td><td>{{ resource.format }}</td><td>{{ getResourceAccessLabel(resource.access) }}</td><td><AdminStatusPill :status="resource.status" /></td><td>{{ resource.downloads }}</td><td><button type="button" :aria-label="`编辑资源 ${resource.title}`" @click="mockSelected = resource">查看 / 编辑</button></td></tr></tbody></table></div></section>
+    <Teleport to="body"><div v-if="mockSelected" class="admin-drawer-backdrop" @click.self="mockSelected = null"><aside class="admin-candidate-drawer" aria-label="学习资料编辑器"><header class="admin-drawer__header"><div><span>RESOURCE EDITOR</span><h2>{{ mockSelected.title }}</h2><p>{{ mockSelected.format }} · {{ getResourceAccessLabel(mockSelected.access) }}</p></div><button type="button" aria-label="关闭资源编辑器" @click="mockSelected = null">×</button></header><div class="admin-drawer__body"><p>{{ mockSelected.description }}</p><section><header><span>02</span><h3>版本历史</h3></header><div class="admin-version-list"><article v-for="version in mockSelected.versions" :key="version.version"><span>{{ version.version }}</span><div><strong>{{ version.fileName }}</strong><small>{{ version.size }} · {{ version.uploadedAt }} · {{ version.owner }}</small></div></article></div></section><p class="admin-inline-note">病毒扫描与 Office 转换将在后端接入；PDF 在线预览、临时签名下载地址和访问日志也属于文件服务范围。</p></div><footer class="admin-drawer__footer"><span>本页仅维护前端 Mock 数据</span><button type="button" class="button">保存资源</button></footer></aside></div></Teleport>
+  </div>
+
+  <div v-else class="admin-recruitment-page admin-section-page">
+    <AdminPageHeading eyebrow="Learning Resources" title="学习资料" description="服务端分页读取资料详情、版本、访问范围与可用状态。"><template #actions><button v-if="isOwner" type="button" class="button" @click="showCreate = true">新建资料</button></template></AdminPageHeading>
+    <p v-if="mutationMessage" class="admin-save-message" role="status">{{ mutationMessage }}</p><p v-if="mutationError" class="admin-save-message" role="alert">{{ mutationError }}</p>
+    <section class="admin-summary-strip" aria-label="资料概览"><div><span>匹配资料</span><strong>{{ total }}</strong><small>服务端查询结果</small></div><div><span>当前页</span><strong>{{ rows.length }}</strong><small>仅 API 返回项目</small></div><div><span>页码</span><strong>{{ page }}</strong><small>共 {{ pageCount }} 页</small></div><div><span>读取模式</span><strong>API</strong><small>不使用本地资料缓存</small></div></section>
+    <section class="admin-list-card"><header><div><span>Resource Management</span><h2>学习资料管理列表</h2></div><p>数据仅来自服务端分页查询</p></header><div class="admin-filters"><label>搜索资料<input v-model="query" type="search" placeholder="标题或摘要"></label><label>发布状态<select v-model="status"><option value="">全部状态</option><option value="draft">草稿</option><option value="published">已发布</option><option value="offline">已下架</option></select></label><label>资料类型<select v-model="kind"><option value="">全部类型</option><option value="article">文章</option><option value="pdf">PDF</option><option value="docx">DOCX</option><option value="archive">归档包</option><option value="external">外部链接</option></select></label><label>格式<select v-model="format"><option value="">全部格式</option><option value="web">网页</option><option value="pdf">PDF</option><option value="docx">DOCX</option><option value="zip">ZIP</option><option value="external">外部链接</option></select></label><label>访问范围<select v-model="access"><option value="">全部范围</option><option value="public">公开访问</option><option value="member">登录成员</option></select></label><label>可用状态<select v-model="availability"><option value="">全部可用状态</option><option value="available">可用</option><option value="unavailable">暂不可用</option></select></label><label v-if="isOwner">中心 ID<input v-model="centerId" type="search" placeholder="可选中心 ID"></label></div>
+      <div v-if="listStatus === 'loading'" class="admin-empty" role="status"><strong>正在读取学习资料</strong><p>正在请求服务端分页数据。</p></div><div v-else-if="listStatus === 'unauthorized'" class="admin-empty" role="alert"><strong>登录状态已失效</strong><p>{{ listError }}</p></div><div v-else-if="listStatus === 'forbidden'" class="admin-empty" role="alert"><strong>无权读取学习资料</strong><p>{{ listError }}</p></div><div v-else-if="listStatus === 'notFound'" class="admin-empty" role="alert"><strong>学习资料不存在</strong><p>{{ listError }}</p></div><div v-else-if="listStatus === 'error'" class="admin-empty" role="alert"><strong>学习资料读取失败</strong><p>{{ listError }}</p></div>
+      <div v-else-if="rows.length" class="admin-table-scroll"><table aria-label="学习资料管理列表"><thead><tr><th>资料</th><th>类型</th><th>格式</th><th>访问范围</th><th>可用状态</th><th>状态</th><th>版本</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="resource in rows" :key="resource.id"><td><strong>{{ resource.title }}</strong><small>{{ resource.summary }}</small></td><td>{{ resource.kind }}</td><td>{{ resource.format }}</td><td>{{ resource.access }}</td><td>{{ resource.availability }}</td><td><AdminStatusPill :status="resource.status" /></td><td>{{ resource.versionLabel }} · R{{ resource.version }}</td><td>{{ resource.updatedAt }}</td><td><button type="button" :aria-label="`查看资源 ${resource.title}`" @click="openRealDetail(resource.id)">查看详情</button></td></tr></tbody></table></div><div v-else class="admin-empty"><strong>没有匹配的学习资料</strong><p>服务端未返回符合当前筛选条件的资料。</p></div><PaginationControls v-if="listStatus !== 'loading'" v-model="page" :page-count="pageCount" label="学习资料分页" />
     </section>
-    <section class="admin-list-card">
-      <header><div><span>Resource Management</span><h2>学习资料管理列表</h2></div><p>真实文件服务尚未接入</p></header>
-      <div class="admin-filters"><label>搜索资料<input type="search" placeholder="标题、分类或负责人"></label><label>访问范围<select><option>全部范围</option><option>公开访问</option><option>登录成员</option><option>指定中心</option></select></label><label>发布状态<select><option>全部状态</option><option>草稿</option><option>待审核</option><option>已发布</option></select></label></div>
-      <div class="admin-table-scroll"><table aria-label="学习资料管理列表"><thead><tr><th>资料</th><th>分类</th><th>格式</th><th>访问范围</th><th>状态</th><th>下载记录</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="resource in ADMIN_RESOURCES" :key="resource.id"><td><strong>{{ resource.title }}</strong><small>{{ resource.description }}</small></td><td>{{ resource.category }}</td><td>{{ resource.format }}</td><td>{{ getResourceAccessLabel(resource.access) }}</td><td><AdminStatusPill :status="resource.status" /></td><td>{{ resource.downloads }}</td><td>{{ resource.updatedAt }}</td><td><button type="button" :aria-label="`编辑资源 ${resource.title}`" @click="selected = resource">查看 / 编辑</button></td></tr></tbody></table></div>
-    </section>
-    <Teleport to="body">
-      <div v-if="selected" class="admin-drawer-backdrop" @click.self="selected = null">
-        <aside class="admin-candidate-drawer" aria-label="学习资料编辑器">
-          <header class="admin-drawer__header"><div><span>RESOURCE EDITOR</span><h2>{{ selected.title }}</h2><p>{{ selected.format }} · {{ getResourceAccessLabel(selected.access) }}</p></div><button type="button" aria-label="关闭资源编辑器" @click="selected = null">×</button></header>
-          <div class="admin-drawer__body">
-            <section><header><span>01</span><h3>基本信息</h3></header><div class="admin-editor-grid"><label>标题<input v-model="selected.title" type="text"></label><label>分类<input v-model="selected.category" type="text"></label><label class="is-wide">资料说明<textarea v-model="selected.description" rows="4"></textarea></label></div></section>
-            <section><header><span>02</span><h3>文件与版本历史</h3></header><div class="admin-version-list"><article v-for="version in selected.versions" :key="version.version"><span>{{ version.version }}</span><div><strong>{{ version.fileName }}</strong><small>{{ version.size }} · {{ version.uploadedAt }} · {{ version.owner }}</small></div><AdminStatusPill :status="version.state" /></article></div><button type="button" class="admin-secondary-action">上传新版本</button></section>
-            <section><header><span>03</span><h3>访问与发布</h3></header><div class="admin-editor-grid"><label>访问范围<select v-model="selected.access"><option value="public">公开访问</option><option value="member">登录成员</option><option value="center">指定中心</option></select></label><label>发布状态<select v-model="selected.status"><option>草稿</option><option>待审核</option><option>已发布</option></select></label></div><p class="admin-inline-note">病毒扫描与 Office 转换将在后端接入；PDF 在线预览、临时签名下载地址和访问日志也属于文件服务范围。</p></section>
-          </div>
-          <footer class="admin-drawer__footer"><span>本页仅维护前端 Mock 数据</span><button type="button" class="button button--ghost">预览站内详情</button><button type="button" class="button">保存资源</button></footer>
-        </aside>
-      </div>
-    </Teleport>
+    <Teleport to="body"><div v-if="selectedResourceId" class="admin-drawer-backdrop" @click.self="selectedResourceId = undefined"><aside class="admin-candidate-drawer" aria-label="学习资料详情"><header class="admin-drawer__header"><div><span>RESOURCE DETAIL</span><h2>{{ realDetail?.resource.value?.title || '正在读取资料' }}</h2><p>服务端详情、版本与写入操作</p></div><button type="button" aria-label="关闭学习资料详情" @click="selectedResourceId = undefined">×</button></header><div class="admin-drawer__body"><p v-if="detailStatus === 'loading'" role="status">正在读取学习资料详情。</p><p v-else-if="detailStatus !== 'success'" role="alert">{{ detailError }}</p><template v-else-if="realDetail?.resource.value"><section><header><span>01</span><h3>资料详情</h3></header><p>{{ realDetail.resource.value.summary }}</p><dl><dt>类型</dt><dd>{{ realDetail.resource.value.kind }}</dd><dt>格式</dt><dd>{{ realDetail.resource.value.format }}</dd><dt>访问范围</dt><dd>{{ realDetail.resource.value.access }}</dd><dt>可用状态</dt><dd>{{ realDetail.resource.value.availability }}</dd><dt>当前版本</dt><dd>{{ realDetail.resource.value.versionLabel }} · R{{ realDetail.resource.value.version }}</dd></dl><p>{{ realDetail.resource.value.content }}</p></section><section><header><span>02</span><h3>追加版本</h3></header><div class="admin-form-grid"><label>版本号<input v-model="versionForm.versionLabel" placeholder="v1.1"></label><label>访问范围<select v-model="versionForm.access"><option value="PUBLIC">公开访问</option><option value="MEMBER">登录成员</option></select></label><label>可用状态<select v-model="versionForm.availability"><option value="AVAILABLE">可用</option><option value="UNAVAILABLE">暂不可用</option></select></label><label class="is-wide">版本正文<textarea v-model="versionForm.content" rows="3"></textarea></label></div><button type="button" class="button" :disabled="mutationBusy || !versionForm.versionLabel.trim() || !versionForm.content.trim()" @click="appendRealVersion">保存新版本</button></section><section><header><span>03</span><h3>版本历史</h3></header><div class="admin-version-list"><article v-for="version in realDetail.versions.value" :key="`${version.versionLabel}-${version.revisionNumber}`"><span>{{ version.versionLabel }}</span><div><strong>R{{ version.revisionNumber }}</strong><small>{{ version.access }} · {{ version.availability }} · {{ version.createdAt }}</small></div></article></div></section><section v-if="mutationError" class="admin-save-message" role="alert">{{ mutationError }}</section></template></div><footer class="admin-drawer__footer"><template v-if="realDetail?.resource.value"><span>所有写入均通过 CSRF、权限和版本校验。</span><button v-if="realDetail.resource.value.status !== 'published'" type="button" class="button" :disabled="mutationBusy" @click="publishRealResource">发布</button><template v-else><input v-model="offlineReason" aria-label="下架原因" placeholder="下架原因"><button type="button" class="button button--ghost" :disabled="mutationBusy || !offlineReason.trim()" @click="offlineRealResource">下架</button></template></template></footer></aside></div><div v-if="showCreate" class="admin-modal-backdrop"><section class="admin-modal" role="dialog" aria-modal="true" aria-label="新建学习资料"><h2>新建学习资料</h2><div class="admin-form-grid"><label>中心 ID<input v-model="createForm.centerId" placeholder="UUID"></label><label>Slug<input v-model="createForm.slug" placeholder="learning-resource"></label><label>标题<input v-model="createForm.title"></label><label>摘要<input v-model="createForm.summary"></label><label>类型<select v-model="createForm.kind"><option value="ARTICLE">文章</option><option value="PDF">PDF</option><option value="DOCX">DOCX</option><option value="ARCHIVE">归档包</option><option value="EXTERNAL">外部链接</option></select></label><label>格式<select v-model="createForm.format"><option value="WEB">网页</option><option value="PDF">PDF</option><option value="DOCX">DOCX</option><option value="ZIP">ZIP</option><option value="EXTERNAL">外部链接</option></select></label><label>访问范围<select v-model="createForm.access"><option value="PUBLIC">公开访问</option><option value="MEMBER">登录成员</option></select></label><label>可用状态<select v-model="createForm.availability"><option value="AVAILABLE">可用</option><option value="UNAVAILABLE">暂不可用</option></select></label><label>版本号<input v-model="createForm.versionLabel"></label><label class="is-wide">正文<textarea v-model="createForm.content" rows="5"></textarea></label></div><p v-if="mutationError" class="admin-save-message" role="alert">{{ mutationError }}</p><footer><button type="button" class="button button--ghost" :disabled="mutationBusy" @click="showCreate = false">取消</button><button type="button" class="button" :disabled="mutationBusy || !createForm.centerId.trim() || !createForm.slug.trim() || !createForm.title.trim() || !createForm.content.trim()" @click="createRealResource">{{ mutationBusy ? '创建中…' : '创建草稿' }}</button></footer></section></div></Teleport>
   </div>
 </template>

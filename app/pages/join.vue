@@ -6,22 +6,74 @@ import { resolveLoginAwareTarget } from "~/utils/login-continuation";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 import { resolvePageVisual } from "~/data/page-visuals";
+import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { mapPublicRecruitmentBatch, type PublicRecruitmentBatchView } from "~/services/recruitment/recruitment-view-models";
+import type { PublicRecruitmentBatchDto } from "../../packages/api-client/src";
 
 useHead({ title: "加入我们｜白云 HSD 开发者部落" });
 const session = useSessionStore();
-const batchStore = useRecruitmentBatchStore();
+const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
+const isMockApi = runtimeConfig.public.useMockApi;
+const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
+const recruitmentGateway = useRecruitmentGateway();
 const now = useRecruitmentNow();
 const route = useRoute();
 const isJoinLanding = computed(() => route.path === "/join");
-const currentBatch = computed(() => batchStore.currentOpenBatchAt(now.value));
-const pausedBatch = computed(() => batchStore.currentPausedBatchAt(now.value));
-const upcomingBatch = computed(() => batchStore.upcomingBatchAt(now.value));
-watch(now, (value) => batchStore.syncLifecycle(value), { immediate: true });
-const canApply = computed(() => Boolean(currentBatch.value));
+const productionCurrentBatch = ref<PublicRecruitmentBatchView | null>(null);
+const productionUpcomingBatch = ref<PublicRecruitmentBatchView | null>(null);
+const discoveryLoading = ref(!isMockApi);
+const discoveryError = ref("");
+const currentBatch = computed(() => {
+  if (!isMockApi) return productionCurrentBatch.value;
+  const batch = batchStore?.currentOpenBatchAt(now.value);
+  return batch ? {
+    id: batch.id,
+    name: batch.name,
+    startAt: batch.startAt,
+    endAt: batch.endAt,
+    timezone: batch.timezone,
+    effectiveStatus: "open" as const,
+    effectiveStatusReason: "within-window" as const,
+    openCenterIds: [...batch.openCenterIds],
+    openCenters: batch.openCenterIds.map((id) => ({ id, name: id })),
+  } satisfies PublicRecruitmentBatchView : null;
+});
+const pausedBatch = computed(() => {
+  if (!isMockApi) return productionCurrentBatch.value?.effectiveStatus === "paused" ? productionCurrentBatch.value : null;
+  return batchStore?.currentPausedBatchAt(now.value);
+});
+const upcomingBatch = computed(() => {
+  if (!isMockApi) return productionUpcomingBatch.value;
+  return batchStore?.upcomingBatchAt(now.value);
+});
+if (isMockApi) watch(now, (value) => batchStore?.syncLifecycle(value), { immediate: true });
+const canApply = computed(() => currentBatch.value?.effectiveStatus === "open");
 const applyTarget = computed(() => resolveLoginAwareTarget("/join/apply", session.isAuthenticated));
 const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名表" : "登录后填写报名表");
 const { config } = usePublishedPortal();
 const joinVisual = computed(() => resolvePageVisual(config.visuals.join, "join"));
+
+async function loadProductionDiscovery() {
+  if (isMockApi || !recruitmentGateway) return;
+  discoveryLoading.value = true;
+  discoveryError.value = "";
+  try {
+    const [current, upcoming] = await Promise.all([
+      recruitmentGateway.getCurrentBatch(),
+      recruitmentGateway.getUpcomingBatch(),
+    ]);
+    productionCurrentBatch.value = current.batch ? mapPublicRecruitmentBatch(current.batch as PublicRecruitmentBatchDto) : null;
+    productionUpcomingBatch.value = upcoming.batch ? mapPublicRecruitmentBatch(upcoming.batch as PublicRecruitmentBatchDto) : null;
+  } catch {
+    productionCurrentBatch.value = null;
+    productionUpcomingBatch.value = null;
+    discoveryError.value = "暂时无法读取招新安排，请稍后重试。";
+  } finally {
+    discoveryLoading.value = false;
+  }
+}
+
+onMounted(loadProductionDiscovery);
 </script>
 
 <template>
@@ -36,13 +88,21 @@ const joinVisual = computed(() => resolvePageVisual(config.visuals.join, "join")
       :visual="joinVisual"
     >
       <template #actions>
-        <NuxtLink v-if="canApply" class="button button--light" :to="applyTarget">{{ applyLabel }}</NuxtLink>
+        <button v-if="discoveryLoading" type="button" class="button button--light" disabled>正在读取招新安排…</button>
+        <NuxtLink v-else-if="canApply" class="button button--light" :to="applyTarget">{{ applyLabel }}</NuxtLink>
         <button v-else type="button" class="button button--light" disabled>当前暂无开放报名</button>
       </template>
     </PageBanner>
     <section class="section section--compact" aria-live="polite">
       <div class="shell">
-        <div v-if="currentBatch" class="join-batch-notice">
+        <div v-if="discoveryError" class="join-batch-notice join-batch-notice--closed" role="alert">
+          <div><p class="eyebrow">Recruitment Schedule</p><h2>招新安排暂时不可用</h2><p>{{ discoveryError }}</p></div>
+          <button type="button" class="button button--ghost" @click="loadProductionDiscovery">重新读取</button>
+        </div>
+        <div v-else-if="discoveryLoading" class="join-batch-notice join-batch-notice--closed" role="status">
+          <div><p class="eyebrow">Recruitment Schedule</p><h2>正在读取招新安排</h2><p>请稍候，页面不会使用本地示例批次替代真实数据。</p></div>
+        </div>
+        <div v-else-if="currentBatch" class="join-batch-notice">
           <div>
             <p class="eyebrow">Current Recruitment Batch</p>
             <h2>{{ currentBatch.name }}</h2>

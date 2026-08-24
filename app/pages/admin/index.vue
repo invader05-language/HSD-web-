@@ -11,6 +11,7 @@ useHead({ title: "管理工作台｜白云 HSD 开发者部落" });
 const quickCreateOpen = ref(false);
 const quickMenu = ref<HTMLElement>();
 const { snapshot, loading, error, refresh } = useAdminDashboard();
+const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 
 const quickActions: Array<{
   label: string;
@@ -28,7 +29,7 @@ const availableQuickActions = computed(() => quickActions.filter((action) => (
 )));
 
 function routeFor(target: DashboardTarget) {
-  return dashboardTargetToRoute(target);
+  return dashboardTargetToRoute(target, { useMockApi: runtime.public.useMockApi });
 }
 
 function formatTime(value: string) {

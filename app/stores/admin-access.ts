@@ -177,6 +177,22 @@ function apiAccountToStoreAccount(account: AdminAccountResponseDto): MockAccount
   };
 }
 
+function apiPositionsForPerson(
+  members: ManagedMemberResponseDto[],
+  centers: AdminCenterResponseDto[],
+  personId: string,
+) {
+  const memberPositions = members.find((member) => member.id === personId)?.positions ?? [];
+  const centerPositions = centers.flatMap((center) => (center.positions ?? [])
+    .filter((position) => position.personId === personId));
+  const seen = new Set<string>();
+  return [...memberPositions, ...centerPositions].filter((position) => {
+    if (seen.has(position.id)) return false;
+    seen.add(position.id);
+    return true;
+  });
+}
+
 function formatAuditTime(date = new Date()) {
   const parts = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate()
@@ -420,6 +436,96 @@ export const useAdminAccessStore = defineStore("admin-access", {
         await gateway.appointCenterMinister(center.id, account.person.id, {
           expectedAccountVersion: account.version,
           expectedMembershipVersion: member.membership.version,
+        });
+        await this.refreshFromApi(gateway);
+        if (this.apiError) return { status: "api_error" };
+        return { status: "success" };
+      } catch (cause) {
+        this.apiError = accessApiError(cause);
+        return { status: "api_error" };
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async appointAllianceOwnerFromApi(
+      username: string,
+      gateway: OrganizationGateway,
+    ): Promise<{ status: "success" | "api_error" }> {
+      const account = this.apiAccountRecords.find((candidate) => candidate.username === username);
+      const member = account
+        ? this.apiManagedMembers.find((candidate) => candidate.id === account.person.id)
+        : undefined;
+      if (!account || !member?.membership) {
+        this.apiError = { code: "OWNER_TARGET_NOT_FOUND", message: "Alliance-owner target or active membership is unavailable" };
+        return { status: "api_error" };
+      }
+      this.apiLoading = true;
+      this.apiError = null;
+      try {
+        await gateway.appointAllianceOwner(account.person.id, {
+          expectedAccountVersion: account.version,
+          expectedMembershipVersion: member.membership.version,
+        });
+        await this.refreshFromApi(gateway);
+        if (this.apiError) return { status: "api_error" };
+        return { status: "success" };
+      } catch (cause) {
+        this.apiError = accessApiError(cause);
+        return { status: "api_error" };
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async revokeAllianceOwnerFromApi(
+      username: string,
+      gateway: OrganizationGateway,
+    ): Promise<{ status: "success" | "api_error" }> {
+      const account = this.apiAccountRecords.find((candidate) => candidate.username === username);
+      const position = account
+        ? apiPositionsForPerson(this.apiManagedMembers, this.apiCenters, account.person.id)
+          .find((candidate) => candidate.type === "ALLIANCE_OWNER")
+        : undefined;
+      if (!account || !position) {
+        this.apiError = { code: "OWNER_POSITION_NOT_FOUND", message: "The authoritative alliance-owner position is unavailable" };
+        return { status: "api_error" };
+      }
+      this.apiLoading = true;
+      this.apiError = null;
+      try {
+        await gateway.revokeAllianceOwner(account.person.id, {
+          expectedPositionVersion: position.version,
+        });
+        await this.refreshFromApi(gateway);
+        if (this.apiError) return { status: "api_error" };
+        return { status: "success" };
+      } catch (cause) {
+        this.apiError = accessApiError(cause);
+        return { status: "api_error" };
+      } finally {
+        this.apiLoading = false;
+      }
+    },
+    async revokeAdminCenterRoleFromApi(
+      username: string,
+      gateway: OrganizationGateway,
+    ): Promise<{ status: "success" | "api_error" }> {
+      const account = this.apiAccountRecords.find((candidate) => candidate.username === username);
+      const position = account
+        ? apiPositionsForPerson(this.apiManagedMembers, this.apiCenters, account.person.id)
+          .find((candidate) => candidate.type === "CENTER_MINISTER")
+        : undefined;
+      const center = position?.centerId
+        ? this.apiCenters.find((candidate) => candidate.id === position.centerId)
+        : undefined;
+      if (!account || !position || !center) {
+        this.apiError = { code: "CENTER_MINISTER_POSITION_NOT_FOUND", message: "The authoritative center-minister position is unavailable" };
+        return { status: "api_error" };
+      }
+      this.apiLoading = true;
+      this.apiError = null;
+      try {
+        await gateway.revokeCenterMinister(center.id, account.person.id, {
+          expectedPositionVersion: position.version,
         });
         await this.refreshFromApi(gateway);
         if (this.apiError) return { status: "api_error" };

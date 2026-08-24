@@ -1,13 +1,30 @@
 import {
   isApiResponse,
+  normalizeArchiveRecruitmentBatchPayload,
+  type AdminRecruitmentApplicationDto,
+  type AdminRecruitmentApplicationListDto,
+  type AdminRecruitmentBatchDto,
+  type AdminRecruitmentBatchListDto,
   type AdvanceAssessmentDto,
+  type ArchiveRecruitmentBatchPayload,
   type ApiOperation,
   type ApiResponseFor,
   type CreateAdjustmentProposalDto,
+  type CreateRecruitmentBatchDto,
   type DecideAdjustmentDto,
   type ErrorResponse,
+  type MemberProfileResponseDto,
+  type MyRecruitmentApplicationEnvelopeDto,
+  type MyRecruitmentApplicationResponseDto,
   type PublishAssessmentDto,
+  type PublicRecruitmentBatchEnvelopeDto,
   type RecordRoundResultDto,
+  type RecruitmentBatchCommandDto,
+  type SubmitApplicationDto,
+  type UpdateApplicationDto,
+  type UpdateMyProfileDto,
+  type UpdateRecruitmentBatchDto,
+  type WithdrawApplicationDto,
 } from "../../../packages/api-client/src";
 import type { RecruitmentGateway } from "./recruitment-gateway";
 
@@ -98,11 +115,12 @@ export function createApiRecruitmentGateway(
     operation: TOperation,
     path: string,
     body: unknown,
+    method: "POST" | "PATCH" = "POST",
   ): Promise<ApiResponseFor<TOperation>> {
     const csrfToken = readCookie("hsd_csrf");
     if (!csrfToken) throw new Error("RECRUITMENT_CSRF_TOKEN_MISSING");
     const response = await fetcher(`${apiBase}${path}`, {
-      method: "POST",
+      method,
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
@@ -115,6 +133,91 @@ export function createApiRecruitmentGateway(
   }
 
   return {
+    getCurrentBatch: () => read(
+      "GET /api/v1/recruitment/current",
+      "/api/v1/recruitment/current",
+    ),
+    getUpcomingBatch: () => read(
+      "GET /api/v1/recruitment/upcoming",
+      "/api/v1/recruitment/upcoming",
+    ),
+    getCurrentProfile: () => read(
+      "GET /api/v1/members/me",
+      "/api/v1/members/me",
+    ),
+    updateCurrentProfile: (payload: UpdateMyProfileDto) => mutate(
+      "PATCH /api/v1/members/me",
+      "/api/v1/members/me",
+      payload,
+      "PATCH",
+    ),
+    getMyApplication: (batchId) => read(
+      "GET /api/v1/recruitment/batches/{batchId}/my-application",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`,
+    ),
+    submitApplication: (batchId, payload: SubmitApplicationDto) => mutate(
+      "POST /api/v1/recruitment/batches/{batchId}/applications",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`,
+      payload,
+    ),
+    updateApplication: (batchId, applicationId, payload: UpdateApplicationDto) => mutate(
+      "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`,
+      payload,
+      "PATCH",
+    ),
+    withdrawApplication: (batchId, applicationId, payload: WithdrawApplicationDto) => mutate(
+      "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/withdraw`,
+      payload,
+    ),
+    listAdminBatches: (page = 1, pageSize = 20) => read(
+      "GET /api/v1/admin/recruitment/batches",
+      `/api/v1/admin/recruitment/batches?page=${page}&pageSize=${pageSize}`,
+    ),
+    getAdminBatch: (batchId) => read(
+      "GET /api/v1/admin/recruitment/batches/{batchId}",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`,
+    ),
+    createAdminBatch: (payload: CreateRecruitmentBatchDto) => mutate(
+      "POST /api/v1/admin/recruitment/batches",
+      "/api/v1/admin/recruitment/batches",
+      payload,
+    ),
+    updateAdminBatch: (batchId, payload: UpdateRecruitmentBatchDto) => mutate(
+      "PATCH /api/v1/admin/recruitment/batches/{batchId}",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`,
+      payload,
+      "PATCH",
+    ),
+    listAdminBatchLifecycleEvents: (batchId, page = 1, pageSize = 50) => read(
+      "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/lifecycle-events?page=${page}&pageSize=${pageSize}`,
+    ),
+    runAdminBatchCommand: async (batchId, command, payload: RecruitmentBatchCommandDto) => {
+      const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
+      return mutate(
+        operation,
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`,
+        payload,
+      ) as Promise<AdminRecruitmentBatchDto>;
+    },
+    archiveAdminBatch: async (batchId, payload: ArchiveRecruitmentBatchPayload) => {
+      const normalizedPayload = normalizeArchiveRecruitmentBatchPayload(payload);
+      return mutate(
+        "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
+        normalizedPayload,
+      );
+    },
+    listAdminApplications: (batchId, query = "") => read(
+      "GET /api/v1/admin/recruitment/batches/{batchId}/applications",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`,
+    ),
+    getAdminApplication: (batchId, applicationId) => read(
+      "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`,
+    ),
     getAssessmentBatch: (batchId) => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}/assessments",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments`,

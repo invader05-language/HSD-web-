@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import {
+  buildRecruitmentCompatibilityRoute,
+  resolveLegacyRecruitmentBatchId,
+} from "~/utils/recruitment-compatibility-routes";
+
 definePageMeta({ layout: "admin" });
 
 const route = useRoute();
-const batchId = typeof route.query.batchId === "string" ? route.query.batchId : "batch-current";
+const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const batchId = resolveLegacyRecruitmentBatchId(route.query.batchId, runtime.public.useMockApi);
 const applicationId = typeof route.params.id === "string" ? route.params.id : undefined;
-const destination = applicationId
-  ? `/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`
-  : `/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`;
+const destination = buildRecruitmentCompatibilityRoute("applications", batchId, applicationId);
 
 await navigateTo(destination, { replace: true });
 </script>

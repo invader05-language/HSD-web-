@@ -20,7 +20,7 @@ const navigation = computed(() => getAdminNavigationForAccess({
   canManageAdminAccounts: session.canManageAdminAccounts,
   canManageOrganizationPersonnel: session.canManageAdminAccounts,
   canConfigurePortal: session.hasCapability("portal.configure"),
-}, RELEASE_FEATURES));
+}, RELEASE_FEATURES, { useMockApi: apiRuntime.public.useMockApi }));
 const currentIdentity = computed(() => session.currentAccount ?? null);
 const { notice: releaseNotice, receive: receiveReleaseNotice } = createReleaseNoticeState();
 const adminLevelLabel = computed(() => session.currentAccount

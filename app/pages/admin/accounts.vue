@@ -98,7 +98,10 @@ function closeAddDialog() {
 async function confirmAdd() {
   if (!actor.value || !selectedCandidateAccount.value) return;
   if (qualificationDialog.value === "owner") {
-    if (!organizationGateway) {
+    if (organizationGateway) {
+      const result = await access.appointAllianceOwnerFromApi(selectedCandidateAccount.value.account, organizationGateway);
+      if (result.status === "api_error") return;
+    } else {
       access.promoteToOwner(selectedCandidateAccount.value.account, actor.value);
     }
   } else if (qualificationDialog.value === "admin") {
@@ -115,6 +118,7 @@ async function confirmAdd() {
 function openConfirmation(account: MockAccount, requestedChange?: AdminQualificationChange | "demote-owner") {
   const change = requestedChange ?? availableAction(account);
   if (!change || account.adminLevel === "member") return;
+  if (organizationGateway && (change === "enable" || change === "disable")) return;
   if (account.adminLevel === "owner" && account.account === session.currentAccount?.account) return;
   pendingChange.value = { account: account.account, name: account.name, change };
   nextTick(() => confirmButton.value?.focus());
@@ -127,12 +131,24 @@ function closeConfirmation() {
 async function confirmChange() {
   if (!pendingChange.value || !actor.value) return;
   if (pendingChange.value.change === "demote-owner") {
-    if (!organizationGateway) {
+    if (organizationGateway) {
+      const result = await access.revokeAllianceOwnerFromApi(pendingChange.value.account, organizationGateway);
+      if (result.status === "api_error") return;
+    } else {
       access.demoteOwner(pendingChange.value.account, actor.value);
+    }
+  } else if (pendingChange.value.change === "revoke") {
+    if (organizationGateway) {
+      const result = await access.revokeAdminCenterRoleFromApi(pendingChange.value.account, organizationGateway);
+      if (result.status === "api_error") return;
+    } else {
+      access.changeAdminQualification(pendingChange.value.account, pendingChange.value.change, actor.value);
     }
   } else {
     if (!organizationGateway) {
       access.changeAdminQualification(pendingChange.value.account, pendingChange.value.change, actor.value);
+    } else {
+      return;
     }
   }
   closeConfirmation();
@@ -201,7 +217,8 @@ onMounted(async () => {
               <td><strong>{{ account.qualification?.configuredBy ?? "-" }}</strong><small>{{ account.qualification?.configuredAt ?? "-" }}</small></td>
               <td>{{ account.qualification?.lastLoginAt ?? "尚未登录" }}</td>
               <td class="admin-qualification-actions">
-                <button type="button" @click="openConfirmation(account)">{{ actionLabels[availableAction(account)!] }}</button>
+                <button v-if="organizationGateway" type="button" disabled>启用/停用暂不可用</button>
+                <button v-else type="button" @click="openConfirmation(account)">{{ actionLabels[availableAction(account)!] }}</button>
                 <button type="button" class="admin-text-danger" @click="openConfirmation(account, 'revoke')">撤销资格</button>
               </td>
             </tr>

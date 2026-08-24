@@ -73,14 +73,20 @@ const showConfirmation = ref(false);
 const feedback = ref("");
 const error = ref("");
 
-onMounted(async () => {
+let apiGeneration = 0;
+watch(() => props.batchId, async (batchId) => {
+  const generation = ++apiGeneration;
+  showConfirmation.value = false;
+  feedback.value = "";
+  error.value = "";
   if (!recruitmentGateway) return;
   try {
-    await assessmentStore.refreshAssessmentBatch(props.batchId, recruitmentGateway);
+    await assessmentStore.refreshAssessmentBatch(batchId, recruitmentGateway);
   } catch (reason) {
+    if (generation !== apiGeneration) return;
     error.value = reason instanceof Error ? `加载失败（${reason.message}）` : "加载失败";
   }
-});
+}, { immediate: true });
 
 function outcomeLabel(candidate: ReturnType<typeof assessmentStore.getCandidates>[number]) {
   if (candidate.finalDecision === "admitted") return "已录取";

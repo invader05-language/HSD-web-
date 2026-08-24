@@ -58,17 +58,26 @@ describe("content media contract", () => {
     const responses = [
       json({
         id: "11111111-1111-4111-8111-111111111111", centerId: "22222222-2222-4222-8222-222222222222",
+        createdBy: { id: "55555555-5555-4555-8555-555555555555", username: "owner", displayName: "Owner" },
+        fileName: "photo.png", mimeType: "image/png", byteSize: 3,
         kind: "image", status: "uploading", version: 1, expiresAt: "2030-01-01T00:00:00.000Z",
-        failureCode: null, upload: { url: "https://storage.test/direct", headers: { "x-upload": "proof" } },
+        failureCode: null, completedAt: null, createdAt: "2029-12-31T00:00:00.000Z", updatedAt: "2029-12-31T00:00:00.000Z",
+        upload: { url: "https://storage.test/direct", headers: { "x-upload": "proof" } },
       }, 201),
       new Response(null, { status: 200 }),
       json({
         id: "11111111-1111-4111-8111-111111111111", centerId: "22222222-2222-4222-8222-222222222222",
+        createdBy: { id: "55555555-5555-4555-8555-555555555555", username: "owner", displayName: "Owner" },
+        fileName: "photo.png", mimeType: "image/png", byteSize: 3,
         kind: "image", status: "ready", version: 2, expiresAt: "2030-01-01T00:00:00.000Z", failureCode: null,
+        completedAt: "2029-12-31T00:01:00.000Z", createdAt: "2029-12-31T00:00:00.000Z", updatedAt: "2029-12-31T00:01:00.000Z",
       }),
       json({
         id: "11111111-1111-4111-8111-111111111111", centerId: "22222222-2222-4222-8222-222222222222",
+        createdBy: { id: "55555555-5555-4555-8555-555555555555", username: "owner", displayName: "Owner" },
+        fileName: "photo.png", mimeType: "image/png", byteSize: 3,
         kind: "image", status: "ready", version: 2, expiresAt: "2030-01-01T00:00:00.000Z", failureCode: null,
+        completedAt: "2029-12-31T00:01:00.000Z", createdAt: "2029-12-31T00:00:00.000Z", updatedAt: "2029-12-31T00:01:00.000Z",
       }),
       json({
         id: "33333333-3333-4333-8333-333333333333", ownerType: "content",

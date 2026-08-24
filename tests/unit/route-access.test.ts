@@ -70,6 +70,20 @@ describe("resolveProtectedRouteTarget", () => {
       .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
   });
 
+  it("keeps nested member records owner-only", () => {
+    expect(resolveProtectedRouteTarget(
+      "/admin/members/member-lin",
+      "/admin/members/member-lin?tab=internal",
+      admin,
+    )).toBe("/admin/forbidden?from=%2Fadmin%2Fmembers%2Fmember-lin");
+    expect(resolveProtectedRouteTarget(
+      "/admin/members/member-lin",
+      "/admin/members/member-lin",
+      owner,
+    )).toBeUndefined();
+    expect(getRequiredAdminAccess("/admin/members/member-lin/")).toBe("owner");
+  });
+
   it("redirects the legacy roles address to accounts for owners", () => {
     expect(resolveProtectedRouteTarget("/admin/roles", "/admin/roles", owner))
       .toBe("/admin/accounts");

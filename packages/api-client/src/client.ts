@@ -7,6 +7,11 @@ import {
   type ApiV1Path,
   type CreateManagedMemberDto,
   type CreateMembershipDto,
+  type CreateContentDto,
+  type UpdateContentDto,
+  type ContentCommandDto,
+  type ReasonedContentCommandDto,
+  type PublishContentDto,
   type CreateUploadIntentDto,
   type CompleteUploadDto,
   type CreateMediaAttachmentDto,
@@ -52,7 +57,45 @@ import {
   type HandoverCenterMinisterDto,
   type RevokeOrganizationPositionDto,
   type SetCoreMembershipDto,
+  type CreateRecruitmentBatchDto,
+  type RecruitmentBatchCommandDto,
+  type RecruitmentBatchLifecycleEventListDto,
+  type SubmitApplicationDto,
+  type UpdateApplicationDto,
+  type UpdateMyProfileDto,
+  type UpdateRecruitmentBatchDto,
+  type WithdrawApplicationDto,
 } from "./generated";
+
+export interface ArchiveRecruitmentBatchPayload {
+  expectedVersion: number;
+  confirmed: true;
+  reason?: string;
+}
+
+export function normalizeArchiveRecruitmentBatchPayload(payload: unknown): ArchiveRecruitmentBatchPayload {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("archive payload must be an object");
+  }
+  const input = payload as Record<string, unknown>;
+  if (!Number.isInteger(input.expectedVersion) || (input.expectedVersion as number) < 1) {
+    throw new Error("archive expectedVersion must be a positive integer");
+  }
+  if (input.confirmed !== true) {
+    throw new Error("archive confirmed must be true");
+  }
+  if (input.reason === undefined) {
+    return { expectedVersion: input.expectedVersion as number, confirmed: true };
+  }
+  if (typeof input.reason !== "string") {
+    throw new Error("archive reason must be a string between 1 and 500 characters");
+  }
+  const reason = input.reason.trim();
+  if (reason.length < 1 || reason.length > 500) {
+    throw new Error("archive reason must be between 1 and 500 characters after trimming");
+  }
+  return { expectedVersion: input.expectedVersion as number, confirmed: true, reason };
+}
 
 /** The dashboard endpoint is intentionally ungenerated until the M5 server contract exists in Swagger. */
 export const ADMIN_DASHBOARD_PATH = "/api/v1/admin/dashboard" as const;
@@ -90,6 +133,7 @@ export interface HsdApiClient {
   };
   members: {
     currentProfile(): Promise<ApiResponseFor<"GET /api/v1/members/me">>;
+    updateCurrentProfile(payload: UpdateMyProfileDto): Promise<ApiResponseFor<"PATCH /api/v1/members/me">>;
     managed(): Promise<ApiResponseFor<"GET /api/v1/admin/members">>;
     createManaged(payload: CreateManagedMemberDto): Promise<ApiResponseFor<"POST /api/v1/admin/members">>;
     promoteManaged(personId: string, payload: PromoteManagedMemberDto): Promise<ApiResponseFor<"POST /api/v1/admin/members/{personId}/promote">>;
@@ -132,6 +176,9 @@ export interface HsdApiClient {
   adminAccess: {
     accounts(): Promise<ApiResponseFor<"GET /api/v1/admin/accounts">>;
   };
+  auditEvents: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/audit-events">>;
+  };
   imports: {
     dryRun(payload: PreparatoryMemberImportDto): Promise<ApiResponseFor<"POST /api/v1/admin/imports/preparatory-members/dry-run">>;
     commit(payload: PreparatoryMemberImportDto): Promise<ApiResponseFor<"POST /api/v1/admin/imports/preparatory-members/commit">>;
@@ -139,6 +186,19 @@ export interface HsdApiClient {
   recruitment: {
     currentBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/current">>;
     upcomingBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/upcoming">>;
+    myApplication(batchId: string): Promise<ApiResponseFor<"GET /api/v1/recruitment/batches/{batchId}/my-application">>;
+    submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications">>;
+    updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<ApiResponseFor<"PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}">>;
+    withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<ApiResponseFor<"POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw">>;
+    listAdminBatches(page?: number, pageSize?: number): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches">>;
+    getAdminBatch(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}">>;
+    createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches">>;
+    updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/recruitment/batches/{batchId}">>;
+    listAdminBatchLifecycleEvents(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
+    runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
+    archiveAdminBatch(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/archive">>;
+    listAdminApplications(batchId: string, query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications">>;
+    getAdminApplication(batchId: string, applicationId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}">>;
     results(): Promise<ApiResponseFor<"GET /api/v1/recruitment/results/me">>;
   };
   portal: {
@@ -148,7 +208,20 @@ export interface HsdApiClient {
     publish(payload: PublishPortalConfigurationDto): Promise<ApiResponseFor<"POST /api/v1/admin/portal/configuration/publish">>;
     publicConfiguration(): Promise<ApiResponseFor<"GET /api/v1/public/portal">>;
   };
+  content: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/content">>;
+    detail(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}">>;
+    create(payload: CreateContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content">>;
+    update(contentId: string, payload: UpdateContentDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/content/{contentId}">>;
+    preview(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}/preview">>;
+    submitReview(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/submit-review">>;
+    returnDraft(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/return-draft">>;
+    approvePublication(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/approve-publication">>;
+    publish(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish">>;
+    offline(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/offline">>;
+  };
   uploads: {
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/uploads">>;
     createIntent(payload: CreateUploadIntentDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/intents">>;
     complete(uploadId: string, payload: CompleteUploadDto): Promise<ApiResponseFor<"POST /api/v1/admin/uploads/{uploadId}/complete">>;
     status(uploadId: string): Promise<ApiResponseFor<"GET /api/v1/admin/uploads/{uploadId}">>;
@@ -183,6 +256,8 @@ export interface HsdApiClient {
   };
   resources: {
     listPublic(): Promise<ApiResponseFor<"GET /api/v1/public/resources">>;
+    list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources">>;
+    detail(id: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources/{id}">>;
     create(payload: CreateResourceDto): Promise<ApiResponseFor<"POST /api/v1/admin/resources">>;
     appendVersion(id: string, payload: CreateResourceVersionDto): Promise<ApiResponseFor<"POST /api/v1/admin/resources/{id}/versions">>;
     versions(id: string): Promise<ApiResponseFor<"GET /api/v1/admin/resources/{id}/versions">>;
@@ -217,6 +292,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     members: {
       currentProfile: () => requestGenerated(transport, "GET /api/v1/members/me"),
+      updateCurrentProfile: (payload) => requestGenerated(transport, "PATCH /api/v1/members/me", payload),
       managed: () => requestGenerated(transport, "GET /api/v1/admin/members"),
       createManaged: (payload) => requestGenerated(transport, "POST /api/v1/admin/members", payload),
       promoteManaged: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/members/{personId}/promote", payload, `/api/v1/admin/members/${encodeURIComponent(personId)}/promote`),
@@ -259,6 +335,14 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     adminAccess: {
       accounts: () => requestGenerated(transport, "GET /api/v1/admin/accounts"),
     },
+    auditEvents: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/audit-events",
+        undefined,
+        `/api/v1/admin/audit-events${query ? `?${query}` : ""}`,
+      ),
+    },
     imports: {
       dryRun: (payload) => requestGenerated(transport, "POST /api/v1/admin/imports/preparatory-members/dry-run", payload),
       commit: (payload) => requestGenerated(transport, "POST /api/v1/admin/imports/preparatory-members/commit", payload),
@@ -266,6 +350,37 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     recruitment: {
       currentBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/current"),
       upcomingBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/upcoming"),
+      myApplication: (batchId) => requestGenerated(transport, "GET /api/v1/recruitment/batches/{batchId}/my-application", undefined, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`),
+      submitApplication: (batchId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`),
+      updateApplication: (batchId, applicationId, payload) => requestGenerated(transport, "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
+      withdrawApplication: (batchId, applicationId, payload) => requestGenerated(transport, "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw", payload, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/withdraw`),
+      listAdminBatches: (page = 1, pageSize = 20) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/recruitment/batches",
+        undefined,
+        `/api/v1/admin/recruitment/batches?page=${page}&pageSize=${pageSize}`,
+      ),
+      getAdminBatch: (batchId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
+      createAdminBatch: (payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches", payload),
+      updateAdminBatch: (batchId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/recruitment/batches/{batchId}", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}`),
+      listAdminBatchLifecycleEvents: (batchId, page = 1, pageSize = 50) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
+        undefined,
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/lifecycle-events?page=${page}&pageSize=${pageSize}`,
+      ),
+      runAdminBatchCommand: (batchId, command, payload) => {
+        const operation = `POST /api/v1/admin/recruitment/batches/{batchId}/${command}` as ApiOperation;
+        return requestGenerated(transport, operation, payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/${command}`) as Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/publish">>;
+      },
+      archiveAdminBatch: async (batchId, payload) => requestGenerated(
+        transport,
+        "POST /api/v1/admin/recruitment/batches/{batchId}/archive",
+        normalizeArchiveRecruitmentBatchPayload(payload),
+        `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/archive`,
+      ),
+      listAdminApplications: (batchId, query = "") => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`),
+      getAdminApplication: (batchId, applicationId) => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`),
       results: () => requestGenerated(transport, "GET /api/v1/recruitment/results/me"),
     },
     portal: {
@@ -275,7 +390,35 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       publish: (payload) => requestGenerated(transport, "POST /api/v1/admin/portal/configuration/publish", payload),
       publicConfiguration: () => requestGenerated(transport, "GET /api/v1/public/portal"),
     },
+    content: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/content",
+        undefined,
+        `/api/v1/admin/content${query ? `?${query}` : ""}`,
+      ),
+      detail: (contentId) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/content/{contentId}",
+        undefined,
+        `/api/v1/admin/content/${encodeURIComponent(contentId)}`,
+      ),
+      create: (payload) => requestGenerated(transport, "POST /api/v1/admin/content", payload),
+      update: (contentId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/content/{contentId}", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}`),
+      preview: (contentId) => requestGenerated(transport, "GET /api/v1/admin/content/{contentId}/preview", undefined, `/api/v1/admin/content/${encodeURIComponent(contentId)}/preview`),
+      submitReview: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/submit-review", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/submit-review`),
+      returnDraft: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/return-draft", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/return-draft`),
+      approvePublication: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/approve-publication", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/approve-publication`),
+      publish: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish`),
+      offline: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/offline", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/offline`),
+    },
     uploads: {
+      list: (query = "") => requestGenerated(
+        transport,
+        "GET /api/v1/admin/uploads",
+        undefined,
+        `/api/v1/admin/uploads${query ? `?${query}` : ""}`,
+      ),
       createIntent: (payload) => requestGenerated(transport, "POST /api/v1/admin/uploads/intents", payload),
       complete: (uploadId, payload) => requestGenerated(transport, "POST /api/v1/admin/uploads/{uploadId}/complete", payload, `/api/v1/admin/uploads/${encodeURIComponent(uploadId)}/complete`),
       status: (uploadId) => requestGenerated(transport, "GET /api/v1/admin/uploads/{uploadId}", undefined, `/api/v1/admin/uploads/${encodeURIComponent(uploadId)}`),
@@ -310,6 +453,8 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     resources: {
       listPublic: () => requestGenerated(transport, "GET /api/v1/public/resources"),
+      list: (query = "") => requestGenerated(transport, "GET /api/v1/admin/resources", undefined, `/api/v1/admin/resources${query ? `?${query}` : ""}`),
+      detail: (id) => requestGenerated(transport, "GET /api/v1/admin/resources/{id}", undefined, `/api/v1/admin/resources/${encodeURIComponent(id)}`),
       create: (payload) => requestGenerated(transport, "POST /api/v1/admin/resources", payload),
       appendVersion: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/resources/{id}/versions", payload, `/api/v1/admin/resources/${encodeURIComponent(id)}/versions`),
       versions: (id) => requestGenerated(transport, "GET /api/v1/admin/resources/{id}/versions", undefined, `/api/v1/admin/resources/${encodeURIComponent(id)}/versions`),

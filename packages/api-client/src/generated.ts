@@ -75,6 +75,20 @@ export type AdminCenterResponseDto = {
   "positions": Array<OrganizationPositionResponseDto>;
 };
 
+export type AdminContentActorResponseDto = {
+  "type": "account" | "system";
+  "accountId": (string) | null;
+  "username": (string) | null;
+  "displayName": string;
+};
+
+export type AdminContentListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<AdminContentSummaryResponseDto>;
+};
+
 export type AdminContentResponseDto = {
   "id": string;
   "publicId": string;
@@ -83,12 +97,33 @@ export type AdminContentResponseDto = {
   "kind": "flash" | "article" | "notice";
   "status": "draft" | "review" | "pending_publication" | "published" | "offline";
   "version": number;
+  "createdBy": AdminContentActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
   "workingRevision": (ContentWorkingRevisionResponseDto) | null;
   "publishedRevisionNumber": (number) | null;
   "rejectionReason": (string) | null;
   "publishedAt": (string) | null;
   "offlineAt": (string) | null;
   "offlineReason": (string) | null;
+};
+
+export type AdminContentSummaryResponseDto = {
+  "id": string;
+  "publicId": string;
+  "centerId": (string) | null;
+  "slug": string;
+  "kind": "flash" | "article" | "notice";
+  "status": "draft" | "review" | "pending_publication" | "published" | "offline";
+  "version": number;
+  "workingRevisionNumber": number;
+  "title": string;
+  "summary": (string) | null;
+  "createdBy": AdminContentActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "publishedAt": (string) | null;
+  "offlineAt": (string) | null;
 };
 
 export type AdminGalleryListResponseDto = {
@@ -279,6 +314,19 @@ export type AdminRecruitmentResponsiblePersonDto = {
   "name": string;
 };
 
+export type AdminResourceActorResponseDto = {
+  "id": string;
+  "username": string;
+  "displayName": string;
+};
+
+export type AdminResourceListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<AdminResourceSummaryResponseDto>;
+};
+
 export type AdminResourceResponseDto = {
   "id": string;
   "centerId": string;
@@ -296,6 +344,33 @@ export type AdminResourceResponseDto = {
   "content": string;
   "attachmentId": (string) | null;
   "revisionNumber": number;
+  "createdBy": AdminResourceActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "offlineAt": (string) | null;
+  "offlineReason": (string) | null;
+};
+
+export type AdminResourceSummaryResponseDto = {
+  "id": string;
+  "centerId": string;
+  "slug": string;
+  "title": string;
+  "summary": string;
+  "kind": "article" | "pdf" | "docx" | "archive" | "external";
+  "format": "web" | "pdf" | "docx" | "zip" | "external";
+  "status": "draft" | "published" | "offline";
+  "version": number;
+  "versionLabel": string;
+  "access": "public" | "member";
+  "availability": "available" | "unavailable";
+  "attachmentId": (string) | null;
+  "revisionNumber": number;
+  "createdBy": AdminResourceActorResponseDto;
+  "createdAt": string;
+  "updatedAt": string;
+  "publishedAt": (string) | null;
+  "offlineAt": (string) | null;
 };
 
 export type AdminResourceVersionListResponseDto = {
@@ -1489,6 +1564,41 @@ export type RecruitmentBatchCommandDto = {
   "reason"?: string;
 };
 
+export type RecruitmentBatchLifecycleEventDto = {
+  "id": string;
+  "actor": SafeAuditActorDto;
+  "action": "recruitment.batch.created" | "recruitment.batch.updated" | "recruitment.batch.published" | "recruitment.batch.opened" | "recruitment.batch.paused" | "recruitment.batch.resumed" | "recruitment.batch.closed" | "recruitment.batch.reopened" | "recruitment.batch.archived";
+  "target": RecruitmentBatchLifecycleTargetDto;
+  "before": (RecruitmentBatchLifecycleSnapshotDto) | null;
+  "after": (RecruitmentBatchLifecycleSnapshotDto) | null;
+  "reason": (string) | null;
+  "createdAt": string;
+};
+
+export type RecruitmentBatchLifecycleEventListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<RecruitmentBatchLifecycleEventDto>;
+};
+
+export type RecruitmentBatchLifecycleSnapshotDto = {
+  "name"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "startAt"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "endAt"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "timezone"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "lifecycleStatus"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "manualOverride"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "version"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "openCenterIds"?: string | number | boolean | null | Array<string | number | boolean | null>;
+  "responsibleAccountIds"?: string | number | boolean | null | Array<string | number | boolean | null>;
+};
+
+export type RecruitmentBatchLifecycleTargetDto = {
+  "type": "RecruitmentBatch";
+  "id": string;
+};
+
 export type RecruitmentBatchStatusDto = {
   "effectiveStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
   "effectiveStatusReason": "draft" | "before-start" | "within-window" | "after-end" | "force-open" | "paused" | "force-closed" | "archived";
@@ -1608,6 +1718,36 @@ export type RetireMembershipDto = {
 export type RevokeOrganizationPositionDto = {
   "expectedPositionVersion": number;
   "reason"?: string;
+};
+
+export type SafeAuditActorDto = {
+  "type": "account" | "system";
+  "accountId": (string) | null;
+  "username": (string) | null;
+  "displayName": string;
+};
+
+export type SafeAuditEventDto = {
+  "id": string;
+  "actor": SafeAuditActorDto;
+  "action": string;
+  "target": SafeAuditTargetDto;
+  "before": (Record<string, string | number | boolean | null | Array<string | number | boolean | null>>) | null;
+  "after": (Record<string, string | number | boolean | null | Array<string | number | boolean | null>>) | null;
+  "reason": (string) | null;
+  "createdAt": string;
+};
+
+export type SafeAuditEventListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<SafeAuditEventDto>;
+};
+
+export type SafeAuditTargetDto = {
+  "type": string;
+  "id": string;
 };
 
 export type SavePortalConfigurationDto = {
@@ -1781,9 +1921,40 @@ export type UpdateRecruitmentBatchDto = {
   "reason"?: string;
 };
 
+export type UploadActorResponseDto = {
+  "id": string;
+  "username": string;
+  "displayName": string;
+};
+
 export type UploadDestinationDto = {
   "url": string;
   "headers": Record<string, string>;
+};
+
+export type UploadIntentResponseDto = {
+  "id": string;
+  "centerId": string;
+  "createdBy": UploadActorResponseDto;
+  "fileName": string;
+  "mimeType": string;
+  "byteSize": number;
+  "kind": "image" | "video";
+  "status": "uploading" | "processing" | "ready" | "failed" | "expired";
+  "version": number;
+  "expiresAt": string;
+  "failureCode": (string) | null;
+  "completedAt": (string) | null;
+  "createdAt": string;
+  "updatedAt": string;
+  "upload": UploadDestinationDto;
+};
+
+export type UploadListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<UploadResponseDto>;
 };
 
 export type UploadPartDto = {
@@ -1794,12 +1965,18 @@ export type UploadPartDto = {
 export type UploadResponseDto = {
   "id": string;
   "centerId": string;
+  "createdBy": UploadActorResponseDto;
+  "fileName": string;
+  "mimeType": string;
+  "byteSize": number;
   "kind": "image" | "video";
   "status": "uploading" | "processing" | "ready" | "failed" | "expired";
   "version": number;
   "expiresAt": string;
-  "upload"?: UploadDestinationDto;
-  "failureCode"?: (string) | null;
+  "failureCode": (string) | null;
+  "completedAt": (string) | null;
+  "createdAt": string;
+  "updatedAt": string;
 };
 
 export type WithdrawApplicationDto = {
@@ -1811,6 +1988,7 @@ export const API_V1_PATHS = {
   authSession: "/api/v1/auth/session",
   authChangePassword: "/api/v1/auth/change-password",
   memberProfile: "/api/v1/members/me",
+  memberProfileUpdate: "/api/v1/members/me",
   memberHonorCreate: "/api/v1/members/me/honors",
   memberHonors: "/api/v1/members/me/honors",
   memberHonorConsent: "/api/v1/members/me/honors/{id}/consent",
@@ -1827,6 +2005,7 @@ export const API_V1_PATHS = {
   adminMembers: "/api/v1/admin/members",
   adminMemberPromote: "/api/v1/admin/members/{personId}/promote",
   adminAccounts: "/api/v1/admin/accounts",
+  adminAuditEvents: "/api/v1/admin/audit-events",
   publicCenters: "/api/v1/public/centers",
   publicCenterDetail: "/api/v1/public/centers/{publicSlug}",
   publicHomepageStats: "/api/v1/public/homepage/stats",
@@ -1849,6 +2028,17 @@ export const API_V1_PATHS = {
   adminPortalPreview: "/api/v1/admin/portal/configuration/preview",
   adminPortalPublish: "/api/v1/admin/portal/configuration/publish",
   publicPortal: "/api/v1/public/portal",
+  adminContentList: "/api/v1/admin/content",
+  adminContentDetail: "/api/v1/admin/content/{contentId}",
+  adminContentCreate: "/api/v1/admin/content",
+  adminContentUpdate: "/api/v1/admin/content/{contentId}",
+  adminContentPreview: "/api/v1/admin/content/{contentId}/preview",
+  adminContentSubmitReview: "/api/v1/admin/content/{contentId}/submit-review",
+  adminContentReturnDraft: "/api/v1/admin/content/{contentId}/return-draft",
+  adminContentApprovePublication: "/api/v1/admin/content/{contentId}/approve-publication",
+  adminContentPublish: "/api/v1/admin/content/{contentId}/publish",
+  adminContentOffline: "/api/v1/admin/content/{contentId}/offline",
+  adminUploads: "/api/v1/admin/uploads",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
   adminUploadComplete: "/api/v1/admin/uploads/{uploadId}/complete",
   adminUploadStatus: "/api/v1/admin/uploads/{uploadId}",
@@ -1856,6 +2046,24 @@ export const API_V1_PATHS = {
   adminMediaAttachmentUpdate: "/api/v1/admin/media/attachments/{id}",
   recruitmentCurrent: "/api/v1/recruitment/current",
   recruitmentUpcoming: "/api/v1/recruitment/upcoming",
+  recruitmentMyApplication: "/api/v1/recruitment/batches/{batchId}/my-application",
+  recruitmentApplicationCreate: "/api/v1/recruitment/batches/{batchId}/applications",
+  recruitmentApplicationUpdate: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}",
+  recruitmentApplicationWithdraw: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw",
+  adminRecruitmentBatches: "/api/v1/admin/recruitment/batches",
+  adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
+  adminRecruitmentBatch: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentBatchUpdate: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentBatchLifecycleEvents: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
+  adminRecruitmentApplications: "/api/v1/admin/recruitment/batches/{batchId}/applications",
+  adminRecruitmentApplication: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}",
+  adminRecruitmentBatchPublish: "/api/v1/admin/recruitment/batches/{batchId}/publish",
+  adminRecruitmentBatchOpenNow: "/api/v1/admin/recruitment/batches/{batchId}/open-now",
+  adminRecruitmentBatchPause: "/api/v1/admin/recruitment/batches/{batchId}/pause",
+  adminRecruitmentBatchResume: "/api/v1/admin/recruitment/batches/{batchId}/resume",
+  adminRecruitmentBatchClose: "/api/v1/admin/recruitment/batches/{batchId}/close",
+  adminRecruitmentBatchReopen: "/api/v1/admin/recruitment/batches/{batchId}/reopen",
+  adminRecruitmentBatchArchive: "/api/v1/admin/recruitment/batches/{batchId}/archive",
   assessmentBatch: "/api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
@@ -1895,6 +2103,8 @@ export const API_V1_PATHS = {
   adminGalleryOffline: "/api/v1/admin/galleries/{id}/offline",
   publicGalleries: "/api/v1/public/galleries",
   publicGallery: "/api/v1/public/galleries/{slug}",
+  adminResources: "/api/v1/admin/resources",
+  adminResource: "/api/v1/admin/resources/{id}",
   adminResourceCreate: "/api/v1/admin/resources",
   adminResourceVersionCreate: "/api/v1/admin/resources/{id}/versions",
   adminResourceVersions: "/api/v1/admin/resources/{id}/versions",
@@ -1920,6 +2130,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/auth/session": { method: "GET", path: "/api/v1/auth/session" },
   "POST /api/v1/auth/change-password": { method: "POST", path: "/api/v1/auth/change-password" },
   "GET /api/v1/members/me": { method: "GET", path: "/api/v1/members/me" },
+  "PATCH /api/v1/members/me": { method: "PATCH", path: "/api/v1/members/me" },
   "POST /api/v1/members/me/honors": { method: "POST", path: "/api/v1/members/me/honors" },
   "GET /api/v1/members/me/honors": { method: "GET", path: "/api/v1/members/me/honors" },
   "PATCH /api/v1/members/me/honors/{id}/consent": { method: "PATCH", path: "/api/v1/members/me/honors/{id}/consent" },
@@ -1936,6 +2147,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/members": { method: "GET", path: "/api/v1/admin/members" },
   "POST /api/v1/admin/members/{personId}/promote": { method: "POST", path: "/api/v1/admin/members/{personId}/promote" },
   "GET /api/v1/admin/accounts": { method: "GET", path: "/api/v1/admin/accounts" },
+  "GET /api/v1/admin/audit-events": { method: "GET", path: "/api/v1/admin/audit-events" },
   "GET /api/v1/public/centers": { method: "GET", path: "/api/v1/public/centers" },
   "GET /api/v1/public/centers/{publicSlug}": { method: "GET", path: "/api/v1/public/centers/{publicSlug}" },
   "GET /api/v1/public/homepage/stats": { method: "GET", path: "/api/v1/public/homepage/stats" },
@@ -1958,6 +2170,17 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/portal/configuration/preview": { method: "GET", path: "/api/v1/admin/portal/configuration/preview" },
   "POST /api/v1/admin/portal/configuration/publish": { method: "POST", path: "/api/v1/admin/portal/configuration/publish" },
   "GET /api/v1/public/portal": { method: "GET", path: "/api/v1/public/portal" },
+  "GET /api/v1/admin/content": { method: "GET", path: "/api/v1/admin/content" },
+  "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
+  "POST /api/v1/admin/content": { method: "POST", path: "/api/v1/admin/content" },
+  "PATCH /api/v1/admin/content/{contentId}": { method: "PATCH", path: "/api/v1/admin/content/{contentId}" },
+  "GET /api/v1/admin/content/{contentId}/preview": { method: "GET", path: "/api/v1/admin/content/{contentId}/preview" },
+  "POST /api/v1/admin/content/{contentId}/submit-review": { method: "POST", path: "/api/v1/admin/content/{contentId}/submit-review" },
+  "POST /api/v1/admin/content/{contentId}/return-draft": { method: "POST", path: "/api/v1/admin/content/{contentId}/return-draft" },
+  "POST /api/v1/admin/content/{contentId}/approve-publication": { method: "POST", path: "/api/v1/admin/content/{contentId}/approve-publication" },
+  "POST /api/v1/admin/content/{contentId}/publish": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish" },
+  "POST /api/v1/admin/content/{contentId}/offline": { method: "POST", path: "/api/v1/admin/content/{contentId}/offline" },
+  "GET /api/v1/admin/uploads": { method: "GET", path: "/api/v1/admin/uploads" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
   "POST /api/v1/admin/uploads/{uploadId}/complete": { method: "POST", path: "/api/v1/admin/uploads/{uploadId}/complete" },
   "GET /api/v1/admin/uploads/{uploadId}": { method: "GET", path: "/api/v1/admin/uploads/{uploadId}" },
@@ -1965,6 +2188,24 @@ export const API_OPERATIONS = {
   "PATCH /api/v1/admin/media/attachments/{id}": { method: "PATCH", path: "/api/v1/admin/media/attachments/{id}" },
   "GET /api/v1/recruitment/current": { method: "GET", path: "/api/v1/recruitment/current" },
   "GET /api/v1/recruitment/upcoming": { method: "GET", path: "/api/v1/recruitment/upcoming" },
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-application" },
+  "POST /api/v1/recruitment/batches/{batchId}/applications": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications" },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw" },
+  "GET /api/v1/admin/recruitment/batches": { method: "GET", path: "/api/v1/admin/recruitment/batches" },
+  "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": { method: "PATCH", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/publish" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/open-now" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/pause" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/resume" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/close" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/reopen" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/archive" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results" },
@@ -2004,6 +2245,8 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/galleries/{id}/offline": { method: "POST", path: "/api/v1/admin/galleries/{id}/offline" },
   "GET /api/v1/public/galleries": { method: "GET", path: "/api/v1/public/galleries" },
   "GET /api/v1/public/galleries/{slug}": { method: "GET", path: "/api/v1/public/galleries/{slug}" },
+  "GET /api/v1/admin/resources": { method: "GET", path: "/api/v1/admin/resources" },
+  "GET /api/v1/admin/resources/{id}": { method: "GET", path: "/api/v1/admin/resources/{id}" },
   "POST /api/v1/admin/resources": { method: "POST", path: "/api/v1/admin/resources" },
   "POST /api/v1/admin/resources/{id}/versions": { method: "POST", path: "/api/v1/admin/resources/{id}/versions" },
   "GET /api/v1/admin/resources/{id}/versions": { method: "GET", path: "/api/v1/admin/resources/{id}/versions" },
@@ -2032,6 +2275,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/auth/session": CurrentSessionResponseDto;
   "POST /api/v1/auth/change-password": AuthSessionResponseDto;
   "GET /api/v1/members/me": MemberProfileResponseDto;
+  "PATCH /api/v1/members/me": MemberProfileResponseDto;
   "POST /api/v1/members/me/honors": AdminHonorResponseDto;
   "GET /api/v1/members/me/honors": AdminHonorListResponseDto;
   "PATCH /api/v1/members/me/honors/{id}/consent": AdminHonorResponseDto;
@@ -2048,6 +2292,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/members": ManagedMemberListResponseDto;
   "POST /api/v1/admin/members/{personId}/promote": ManagedMemberResponseDto;
   "GET /api/v1/admin/accounts": AdminAccountListResponseDto;
+  "GET /api/v1/admin/audit-events": SafeAuditEventListDto;
   "GET /api/v1/public/centers": PublicCenterListResponseDto;
   "GET /api/v1/public/centers/{publicSlug}": PublicCenterDetailResponseDto;
   "GET /api/v1/public/homepage/stats": PublicHomepageStatsResponseDto;
@@ -2073,13 +2318,42 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/portal/configuration/preview": AdminPortalConfigurationResponseDto;
   "POST /api/v1/admin/portal/configuration/publish": PublishedPortalConfigurationResponseDto;
   "GET /api/v1/public/portal": PublicPortalResponseDto;
-  "POST /api/v1/admin/uploads/intents": UploadResponseDto;
+  "GET /api/v1/admin/content": AdminContentListResponseDto;
+  "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "POST /api/v1/admin/content": AdminContentResponseDto;
+  "PATCH /api/v1/admin/content/{contentId}": AdminContentResponseDto;
+  "GET /api/v1/admin/content/{contentId}/preview": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/submit-review": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/return-draft": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/approve-publication": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/publish": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/offline": AdminContentResponseDto;
+  "GET /api/v1/admin/uploads": UploadListResponseDto;
+  "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
   "POST /api/v1/admin/uploads/{uploadId}/complete": UploadResponseDto;
   "GET /api/v1/admin/uploads/{uploadId}": UploadResponseDto;
   "POST /api/v1/admin/media/attachments": MediaAttachmentResponseDto;
   "PATCH /api/v1/admin/media/attachments/{id}": MediaAttachmentResponseDto;
   "GET /api/v1/recruitment/current": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/upcoming": PublicRecruitmentBatchEnvelopeDto;
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": MyRecruitmentApplicationEnvelopeDto;
+  "POST /api/v1/recruitment/batches/{batchId}/applications": MyRecruitmentApplicationResponseDto;
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": MyRecruitmentApplicationResponseDto;
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": MyRecruitmentApplicationResponseDto;
+  "GET /api/v1/admin/recruitment/batches": AdminRecruitmentBatchListDto;
+  "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": RecruitmentBatchLifecycleEventListDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": AdminRecruitmentApplicationListDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": AdminRecruitmentApplicationDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": AssessmentBatchResponseDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": AssessmentAdjustmentTargetCatalogResponseDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": AssessmentRoundMutationResponseDto;
@@ -2119,6 +2393,8 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/galleries/{id}/offline": AdminGalleryResponseDto;
   "GET /api/v1/public/galleries": PublicGalleryListResponseDto;
   "GET /api/v1/public/galleries/{slug}": PublicGalleryResponseDto;
+  "GET /api/v1/admin/resources": AdminResourceListResponseDto;
+  "GET /api/v1/admin/resources/{id}": AdminResourceResponseDto;
   "POST /api/v1/admin/resources": AdminResourceResponseDto;
   "POST /api/v1/admin/resources/{id}/versions": AdminResourceVersionResponseDto;
   "GET /api/v1/admin/resources/{id}/versions": AdminResourceVersionListResponseDto;
@@ -2152,6 +2428,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AuthSessionResponseDto"
   },
   "GET /api/v1/members/me": {
+    "$ref": "#/components/schemas/MemberProfileResponseDto"
+  },
+  "PATCH /api/v1/members/me": {
     "$ref": "#/components/schemas/MemberProfileResponseDto"
   },
   "POST /api/v1/members/me/honors": {
@@ -2201,6 +2480,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/admin/accounts": {
     "$ref": "#/components/schemas/AdminAccountListResponseDto"
+  },
+  "GET /api/v1/admin/audit-events": {
+    "$ref": "#/components/schemas/SafeAuditEventListDto"
   },
   "GET /api/v1/public/centers": {
     "$ref": "#/components/schemas/PublicCenterListResponseDto"
@@ -2280,8 +2562,41 @@ const API_RESPONSE_SCHEMAS = {
   "GET /api/v1/public/portal": {
     "$ref": "#/components/schemas/PublicPortalResponseDto"
   },
+  "GET /api/v1/admin/content": {
+    "$ref": "#/components/schemas/AdminContentListResponseDto"
+  },
+  "GET /api/v1/admin/content/{contentId}": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "PATCH /api/v1/admin/content/{contentId}": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "GET /api/v1/admin/content/{contentId}/preview": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/submit-review": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/return-draft": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/approve-publication": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/publish": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/offline": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "GET /api/v1/admin/uploads": {
+    "$ref": "#/components/schemas/UploadListResponseDto"
+  },
   "POST /api/v1/admin/uploads/intents": {
-    "$ref": "#/components/schemas/UploadResponseDto"
+    "$ref": "#/components/schemas/UploadIntentResponseDto"
   },
   "POST /api/v1/admin/uploads/{uploadId}/complete": {
     "$ref": "#/components/schemas/UploadResponseDto"
@@ -2300,6 +2615,60 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/recruitment/upcoming": {
     "$ref": "#/components/schemas/PublicRecruitmentBatchEnvelopeDto"
+  },
+  "GET /api/v1/recruitment/batches/{batchId}/my-application": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationEnvelopeDto"
+  },
+  "POST /api/v1/recruitment/batches/{batchId}/applications": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "GET /api/v1/admin/recruitment/batches": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchListDto"
+  },
+  "POST /api/v1/admin/recruitment/batches": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "PATCH /api/v1/admin/recruitment/batches/{batchId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": {
+    "$ref": "#/components/schemas/RecruitmentBatchLifecycleEventListDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications": {
+    "$ref": "#/components/schemas/AdminRecruitmentApplicationListDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/AdminRecruitmentApplicationDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/publish": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/open-now": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/pause": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/resume": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/close": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/archive": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
   },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": {
     "$ref": "#/components/schemas/AssessmentBatchResponseDto"
@@ -2418,6 +2787,12 @@ const API_RESPONSE_SCHEMAS = {
   "GET /api/v1/public/galleries/{slug}": {
     "$ref": "#/components/schemas/PublicGalleryResponseDto"
   },
+  "GET /api/v1/admin/resources": {
+    "$ref": "#/components/schemas/AdminResourceListResponseDto"
+  },
+  "GET /api/v1/admin/resources/{id}": {
+    "$ref": "#/components/schemas/AdminResourceResponseDto"
+  },
   "POST /api/v1/admin/resources": {
     "$ref": "#/components/schemas/AdminResourceResponseDto"
   },
@@ -2510,6 +2885,207 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "newPassword"
+    ]
+  },
+  "SafeAuditActorDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "account",
+          "system"
+        ]
+      },
+      "accountId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "username": {
+        "type": "string",
+        "nullable": true
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "accountId",
+      "username",
+      "displayName"
+    ]
+  },
+  "SafeAuditTargetDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "id"
+    ]
+  },
+  "SafeAuditEventDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "actor": {
+        "$ref": "#/components/schemas/SafeAuditActorDto"
+      },
+      "action": {
+        "type": "string"
+      },
+      "target": {
+        "$ref": "#/components/schemas/SafeAuditTargetDto"
+      },
+      "before": {
+        "type": "object",
+        "nullable": true,
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "nullable": true,
+              "enum": [
+                null
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "nullable": true,
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "after": {
+        "type": "object",
+        "nullable": true,
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "nullable": true,
+              "enum": [
+                null
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "nullable": true,
+                    "enum": [
+                      null
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "reason": {
+        "type": "string",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "actor",
+      "action",
+      "target",
+      "before",
+      "after",
+      "reason",
+      "createdAt"
+    ]
+  },
+  "SafeAuditEventListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SafeAuditEventDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "UpdateMyProfileDto": {
@@ -3649,6 +4225,492 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
+  "RecruitmentBatchLifecycleTargetDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "RecruitmentBatch"
+        ]
+      },
+      "id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "id"
+    ]
+  },
+  "RecruitmentBatchLifecycleSnapshotDto": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "startAt": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "endAt": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "timezone": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "lifecycleStatus": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "manualOverride": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "version": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "openCenterIds": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "responsibleAccountIds": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "nullable": true,
+            "enum": [
+              null
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true,
+                  "enum": [
+                    null
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "RecruitmentBatchLifecycleEventDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "actor": {
+        "$ref": "#/components/schemas/SafeAuditActorDto"
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "recruitment.batch.created",
+          "recruitment.batch.updated",
+          "recruitment.batch.published",
+          "recruitment.batch.opened",
+          "recruitment.batch.paused",
+          "recruitment.batch.resumed",
+          "recruitment.batch.closed",
+          "recruitment.batch.reopened",
+          "recruitment.batch.archived"
+        ]
+      },
+      "target": {
+        "$ref": "#/components/schemas/RecruitmentBatchLifecycleTargetDto"
+      },
+      "before": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentBatchLifecycleSnapshotDto"
+          }
+        ]
+      },
+      "after": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentBatchLifecycleSnapshotDto"
+          }
+        ]
+      },
+      "reason": {
+        "type": "string",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "actor",
+      "action",
+      "target",
+      "before",
+      "after",
+      "reason",
+      "createdAt"
+    ]
+  },
+  "RecruitmentBatchLifecycleEventListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RecruitmentBatchLifecycleEventDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
   "RecruitmentApplicantSnapshotDto": {
     "type": "object",
     "properties": {
@@ -3878,12 +4940,54 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion"
     ]
   },
-  "CreateContentDto": {
+  "AdminContentActorResponseDto": {
     "type": "object",
     "properties": {
-      "centerId": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "account",
+          "system"
+        ]
+      },
+      "accountId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "username": {
+        "type": "string",
+        "nullable": true
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "accountId",
+      "username",
+      "displayName"
+    ]
+  },
+  "AdminContentSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
         "type": "string",
         "format": "uuid"
+      },
+      "publicId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
+      "slug": {
+        "type": "string"
       },
       "kind": {
         "type": "string",
@@ -3893,47 +4997,99 @@ const API_COMPONENT_SCHEMAS = {
           "notice"
         ]
       },
-      "slug": {
+      "status": {
         "type": "string",
-        "example": "community-update"
+        "enum": [
+          "draft",
+          "review",
+          "pending_publication",
+          "published",
+          "offline"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "workingRevisionNumber": {
+        "type": "number",
+        "minimum": 1
       },
       "title": {
-        "type": "string",
-        "maxLength": 120
+        "type": "string"
       },
       "summary": {
         "type": "string",
-        "maxLength": 500
+        "nullable": true
       },
-      "tag": {
-        "type": "string",
-        "maxLength": 40
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminContentActorResponseDto"
       },
-      "internalTarget": {
-        "type": "string",
-        "maxLength": 500
-      },
-      "expiresAt": {
+      "createdAt": {
         "type": "string",
         "format": "date-time"
       },
-      "blocks": {
-        "type": "array",
-        "items": {
-          "type": "object"
-        },
-        "default": []
-      },
-      "internalNote": {
+      "updatedAt": {
         "type": "string",
-        "maxLength": 2000
+        "format": "date-time"
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       }
     },
     "required": [
+      "id",
+      "publicId",
       "centerId",
-      "kind",
       "slug",
-      "title"
+      "kind",
+      "status",
+      "version",
+      "workingRevisionNumber",
+      "title",
+      "summary",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "offlineAt"
+    ]
+  },
+  "AdminContentListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminContentSummaryResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "ContentWorkingRevisionResponseDto": {
@@ -4036,6 +5192,17 @@ const API_COMPONENT_SCHEMAS = {
         "type": "number",
         "minimum": 1
       },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminContentActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
       "workingRevision": {
         "nullable": true,
         "allOf": [
@@ -4075,12 +5242,73 @@ const API_COMPONENT_SCHEMAS = {
       "kind",
       "status",
       "version",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
       "workingRevision",
       "publishedRevisionNumber",
       "rejectionReason",
       "publishedAt",
       "offlineAt",
       "offlineReason"
+    ]
+  },
+  "CreateContentDto": {
+    "type": "object",
+    "properties": {
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "flash",
+          "article",
+          "notice"
+        ]
+      },
+      "slug": {
+        "type": "string",
+        "example": "community-update"
+      },
+      "title": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "summary": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "tag": {
+        "type": "string",
+        "maxLength": 40
+      },
+      "internalTarget": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "blocks": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        },
+        "default": []
+      },
+      "internalNote": {
+        "type": "string",
+        "maxLength": 2000
+      }
+    },
+    "required": [
+      "centerId",
+      "kind",
+      "slug",
+      "title"
     ]
   },
   "UpdateContentDto": {
@@ -6155,6 +7383,140 @@ const API_COMPONENT_SCHEMAS = {
       "warnings"
     ]
   },
+  "UploadActorResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "username": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "username",
+      "displayName"
+    ]
+  },
+  "UploadResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "processing",
+          "ready",
+          "failed",
+          "expired"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "failureCode": {
+        "type": "string",
+        "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "kind",
+      "status",
+      "version",
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt"
+    ]
+  },
+  "UploadListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/UploadResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
   "CreateUploadIntentDto": {
     "type": "object",
     "properties": {
@@ -6226,7 +7588,7 @@ const API_COMPONENT_SCHEMAS = {
       "headers"
     ]
   },
-  "UploadResponseDto": {
+  "UploadIntentResponseDto": {
     "type": "object",
     "properties": {
       "id": {
@@ -6236,6 +7598,19 @@ const API_COMPONENT_SCHEMAS = {
       "centerId": {
         "type": "string",
         "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
       },
       "kind": {
         "type": "string",
@@ -6262,21 +7637,43 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string",
         "format": "date-time"
       },
-      "upload": {
-        "$ref": "#/components/schemas/UploadDestinationDto"
-      },
       "failureCode": {
         "type": "string",
         "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "upload": {
+        "$ref": "#/components/schemas/UploadDestinationDto"
       }
     },
     "required": [
       "id",
       "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
       "kind",
       "status",
       "version",
-      "expiresAt"
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt",
+      "upload"
     ]
   },
   "UploadPartDto": {
@@ -7568,13 +8965,32 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "CreateResourceDto": {
+  "AdminResourceActorResponseDto": {
     "type": "object",
     "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 0
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "username": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "username",
+      "displayName"
+    ]
+  },
+  "AdminResourceSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
       },
       "centerId": {
         "type": "string",
@@ -7592,56 +9008,133 @@ const API_COMPONENT_SCHEMAS = {
       "kind": {
         "type": "string",
         "enum": [
-          "ARTICLE",
-          "PDF",
-          "DOCX",
-          "ARCHIVE",
-          "EXTERNAL"
+          "article",
+          "pdf",
+          "docx",
+          "archive",
+          "external"
         ]
       },
       "format": {
         "type": "string",
         "enum": [
-          "WEB",
-          "PDF",
-          "DOCX",
-          "ZIP",
-          "EXTERNAL"
+          "web",
+          "pdf",
+          "docx",
+          "zip",
+          "external"
         ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "offline"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "versionLabel": {
+        "type": "string"
       },
       "access": {
         "type": "string",
         "enum": [
-          "PUBLIC",
-          "MEMBER"
+          "public",
+          "member"
         ]
       },
       "availability": {
         "type": "string",
         "enum": [
-          "AVAILABLE",
-          "UNAVAILABLE"
+          "available",
+          "unavailable"
         ]
       },
-      "versionLabel": {
-        "type": "string"
+      "attachmentId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
       },
-      "content": {
-        "type": "string"
+      "revisionNumber": {
+        "type": "number",
+        "minimum": 1
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       }
     },
     "required": [
-      "expectedVersion",
+      "id",
       "centerId",
       "slug",
       "title",
       "summary",
       "kind",
       "format",
+      "status",
+      "version",
+      "versionLabel",
       "access",
       "availability",
-      "versionLabel",
-      "content"
+      "attachmentId",
+      "revisionNumber",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "publishedAt",
+      "offlineAt"
+    ]
+  },
+  "AdminResourceListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminResourceSummaryResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "AdminResourceResponseDto": {
@@ -7727,6 +9220,26 @@ const API_COMPONENT_SCHEMAS = {
       },
       "revisionNumber": {
         "type": "number"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/AdminResourceActorResponseDto"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "offlineAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "offlineReason": {
+        "type": "string",
+        "nullable": true
       }
     },
     "required": [
@@ -7745,7 +9258,88 @@ const API_COMPONENT_SCHEMAS = {
       "availability",
       "content",
       "attachmentId",
-      "revisionNumber"
+      "revisionNumber",
+      "createdBy",
+      "createdAt",
+      "updatedAt",
+      "offlineAt",
+      "offlineReason"
+    ]
+  },
+  "CreateResourceDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "ARTICLE",
+          "PDF",
+          "DOCX",
+          "ARCHIVE",
+          "EXTERNAL"
+        ]
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "WEB",
+          "PDF",
+          "DOCX",
+          "ZIP",
+          "EXTERNAL"
+        ]
+      },
+      "access": {
+        "type": "string",
+        "enum": [
+          "PUBLIC",
+          "MEMBER"
+        ]
+      },
+      "availability": {
+        "type": "string",
+        "enum": [
+          "AVAILABLE",
+          "UNAVAILABLE"
+        ]
+      },
+      "versionLabel": {
+        "type": "string"
+      },
+      "content": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "centerId",
+      "slug",
+      "title",
+      "summary",
+      "kind",
+      "format",
+      "access",
+      "availability",
+      "versionLabel",
+      "content"
     ]
   },
   "CreateResourceVersionDto": {

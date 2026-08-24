@@ -8,10 +8,10 @@ import {
 } from "../../app/utils/admin-release-access";
 
 describe("admin release feature availability", () => {
-  it("redirects disabled admin modules and leaves completed Recycle available", () => {
-    expect(resolveDisabledRoute("/admin/logs", RELEASE_FEATURES)).toEqual({ to: "/admin", notice: "当前版本暂未开放" });
+  it("redirects disabled modules while leaving completed Recycle and upload tasks available", () => {
+    expect(resolveDisabledRoute("/admin/logs", RELEASE_FEATURES)).toBeUndefined();
     expect(resolveDisabledRoute("/admin/media", RELEASE_FEATURES)).toEqual({ to: "/admin", notice: RETIRED_MEDIA_LIBRARY_NOTICE });
-    expect(resolveDisabledRoute("/admin/uploads", RELEASE_FEATURES)).toEqual({ to: "/admin", notice: "当前版本暂未开放" });
+    expect(resolveDisabledRoute("/admin/uploads", RELEASE_FEATURES)).toBeUndefined();
     expect(resolveDisabledRoute("/admin/recycle-bin", RELEASE_FEATURES)).toBeUndefined();
   });
 
@@ -51,13 +51,14 @@ describe("admin release feature availability", () => {
     expect(adminIds).not.toContain("help");
   });
 
-  it("enables Recycle without enabling unrelated unfinished modules", () => {
+  it("enables Recycle and the completed read-only upload queue without unrelated unfinished modules", () => {
     const ids = getAdminNavigationForAccess({ canManageAdminAccounts: true }, RELEASE_FEATURES).flatMap((group) => group.items.map((item) => item.id));
-    expect(ids).not.toEqual(expect.arrayContaining(["logs", "uploads"]));
+    expect(ids).toContain("logs");
+    expect(ids).toContain("uploads");
     expect(ids).toContain("recycle-bin");
     expect(ids).toContain("batches");
     expect(ids).toContain("accounts");
-    expect(RELEASE_FEATURES.auditLog).toBe(false);
-    expect(RELEASE_FEATURES.uploadTasks).toBe(false);
+    expect(RELEASE_FEATURES.auditLog).toBe(true);
+    expect(RELEASE_FEATURES.uploadTasks).toBe(true);
   });
 });

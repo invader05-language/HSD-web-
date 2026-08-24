@@ -100,12 +100,12 @@ describe("administration content workflow", () => {
     expect(contentList).toContain("automationKey");
     expect(activities).toContain("useActivitiesStore");
     expect(activities).toContain("openRegistration");
-    expect(activities).toContain("activity.registration.opened");
+    expect(activities).toContain("formatActivityRegistrationNotice");
   });
 
   it("renders the official content editor on both create and edit routes", () => {
     const createPage = readFileSync("app/pages/admin/content/new.vue", "utf8");
-    const editPage = readFileSync("app/pages/admin/content/[id].vue", "utf8");
+    const editPage = readFileSync("app/pages/admin/content/[id]/index.vue", "utf8");
 
     expect(createPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');
     expect(editPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');

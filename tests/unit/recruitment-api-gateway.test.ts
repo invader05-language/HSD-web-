@@ -6,6 +6,30 @@ import {
 import { createRecruitmentGatewayForRuntime } from "../../app/composables/useRecruitmentGateway";
 
 describe("recruitment API gateway", () => {
+  it("requests the selected admin batch page from the server", async () => {
+    const response = { page: 2, pageSize: 20, total: 21, items: [] };
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test/",
+      fetcher,
+      createRequestId: () => "request-admin-batches-page-2",
+    });
+
+    await expect(gateway.listAdminBatches(2, 20)).resolves.toEqual(response);
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/admin/recruitment/batches?page=2&pageSize=20",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-admin-batches-page-2" },
+      },
+    );
+  });
+
   it("retains the synchronous fixture workflow only for explicit Mock runtime mode", () => {
     expect(createRecruitmentGatewayForRuntime({
       apiBase: "https://api.example.test",
@@ -15,6 +39,158 @@ describe("recruitment API gateway", () => {
       apiBase: "https://api.example.test",
       useMockApi: false,
     })).toBeDefined();
+  });
+
+  it("reads production recruitment discovery and the authenticated application without fixture fallback", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ batch: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ batch: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ application: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "request-recruitment-read-1",
+    });
+
+    await gateway.getCurrentBatch();
+    await gateway.getUpcomingBatch();
+    await gateway.getMyApplication("batch-1");
+
+    expect(fetcher).toHaveBeenNthCalledWith(1,
+      "https://api.example.test/api/v1/recruitment/current",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-recruitment-read-1" },
+      },
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(2,
+      "https://api.example.test/api/v1/recruitment/upcoming",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-recruitment-read-1" },
+      },
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(3,
+      "https://api.example.test/api/v1/recruitment/batches/batch-1/my-application",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-recruitment-read-1" },
+      },
+    );
+  });
+
+  it("submits a production application through the CSRF-protected API", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      id: "application-1",
+      batchId: "batch-1",
+      contact: "applicant@example.com",
+      baizeDirection: null,
+      acceptsAdjustment: true,
+      status: "SUBMITTED",
+      version: 1,
+      submittedAt: "2026-08-23T04:00:00.000Z",
+      withdrawnAt: null,
+      locked: false,
+      preferences: [],
+    }), { status: 201, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: () => "csrf-token",
+      createRequestId: () => "request-recruitment-submit-1",
+    });
+
+    await gateway.submitApplication("batch-1", {
+      contact: "applicant@example.com",
+      preferences: [{ rank: 1, centerId: "new-media" }],
+      acceptsAdjustment: true,
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/recruitment/batches/batch-1/applications",
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": "csrf-token",
+          "X-Request-ID": "request-recruitment-submit-1",
+        },
+        body: JSON.stringify({
+          contact: "applicant@example.com",
+          preferences: [{ rank: 1, centerId: "new-media" }],
+          acceptsAdjustment: true,
+        }),
+      },
+    );
+  });
+
+  it("uses PATCH for profile and application updates while retaining CSRF protection", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: "person-1",
+        name: "陈同学",
+        studentId: "20260001",
+        grade: "2026 级",
+        className: "软件工程 1 班",
+        contact: "13800000000",
+        bio: null,
+        biography: null,
+        status: "PREPARATORY",
+        baizeDirection: null,
+        avatar: { kind: "default" },
+        publicProfileEnabled: false,
+        version: 2,
+        membership: null,
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: "application-1",
+        batchId: "batch-1",
+        contact: "13800000000",
+        baizeDirection: null,
+        acceptsAdjustment: true,
+        status: "SUBMITTED",
+        version: 2,
+        submittedAt: "2026-08-23T04:00:00.000Z",
+        withdrawnAt: null,
+        locked: false,
+        preferences: [],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: () => "csrf-token",
+      createRequestId: () => "request-patch-1",
+    });
+
+    await gateway.updateCurrentProfile({ expectedVersion: 1, name: "陈同学" });
+    await gateway.updateApplication("batch-1", "application-1", {
+      expectedVersion: 1,
+      contact: "13800000000",
+      preferences: [],
+      acceptsAdjustment: true,
+    });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1,
+      "https://api.example.test/api/v1/members/me",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(2,
+      "https://api.example.test/api/v1/recruitment/batches/batch-1/applications/application-1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
   });
 
   it("sends authenticated assessment mutations with CSRF, request ID, and the generated payload contract", async () => {

@@ -91,12 +91,12 @@ describe('Recycle production API integration', () => {
     expect(store.items).toEqual([])
   })
 
-  it('enables only the completed recycle route and navigation feature', () => {
+  it('keeps the completed recycle, audit, and upload routes enabled', () => {
     expect(RELEASE_FEATURES.recycleBin).toBe(true)
     expect(resolveDisabledRoute('/admin/recycle-bin', RELEASE_FEATURES)).toBeUndefined()
     const ids = getAdminNavigationForAccess({ canManageAdminAccounts: false }, RELEASE_FEATURES).flatMap((group) => group.items.map((item) => item.id))
     expect(ids).toContain('recycle-bin')
-    expect(RELEASE_FEATURES.auditLog).toBe(false); expect(RELEASE_FEATURES.uploadTasks).toBe(false)
+    expect(RELEASE_FEATURES.auditLog).toBe(true); expect(RELEASE_FEATURES.uploadTasks).toBe(true)
   })
 
   it('renders production loading, API empty, and failure states without fixtures', async () => {
