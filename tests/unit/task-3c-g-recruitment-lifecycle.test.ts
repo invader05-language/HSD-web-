@@ -206,7 +206,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     return createProductionRecruitmentBatchController(gateway) as ReturnType<typeof createProductionRecruitmentBatchController> & {
       lifecycleEvents: { value: Array<Record<string, unknown>> };
       lifecyclePage: { value: number };
-      lifecyclePageSize: number;
+      lifecyclePageSize: { value: number };
       lifecycleTotal: { value: number };
       lifecycleStatus: { value: string };
       lifecycleError: { value: string };
@@ -272,6 +272,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     const pageTwo = {
       ...lifecycleResponse,
       page: 2,
+      pageSize: 7,
       total: 51,
       items: [{
         ...lifecycleResponse.items[0]!,
@@ -280,7 +281,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
       }],
     };
     const listAdminBatchLifecycleEvents = vi.fn()
-      .mockResolvedValueOnce({ ...lifecycleResponse, total: 51 })
+      .mockResolvedValueOnce({ ...lifecycleResponse, pageSize: 7, total: 51 })
       .mockResolvedValueOnce(pageTwo);
     const controller = controllerWith({
       getAdminBatch: vi.fn().mockResolvedValue(closedBatch()),
@@ -291,12 +292,12 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
     await controller.load("batch-closed");
     expect(listAdminBatchLifecycleEvents).toHaveBeenNthCalledWith(1, "batch-closed", 1, 50);
     expect(controller.lifecyclePage.value).toBe(1);
-    expect(controller.lifecyclePageSize).toBe(50);
+    expect(controller.lifecyclePageSize.value).toBe(7);
     expect(controller.lifecycleTotal.value).toBe(51);
 
     await expect(controller.loadLifecyclePage(2)).resolves.toBe(true);
 
-    expect(listAdminBatchLifecycleEvents).toHaveBeenNthCalledWith(2, "batch-closed", 2, 50);
+    expect(listAdminBatchLifecycleEvents).toHaveBeenNthCalledWith(2, "batch-closed", 2, 7);
     expect(controller.lifecyclePage.value).toBe(2);
     expect(controller.lifecycleTotal.value).toBe(51);
     expect(controller.lifecycleEvents.value).toHaveLength(1);

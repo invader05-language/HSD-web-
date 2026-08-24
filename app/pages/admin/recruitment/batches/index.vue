@@ -47,7 +47,7 @@ const productionLoading = ref(!isMockApi);
 const productionError = ref("");
 const productionBatches = ref<AdminRecruitmentBatchView[]>([]);
 const productionPage = ref(1);
-const productionPageSize = 20;
+const productionPageSize = ref(20);
 const productionTotal = ref(0);
 const productionCenterOptions = ref<ReadonlyArray<readonly [string, string]>>([]);
 let productionLoadGeneration = 0;
@@ -90,7 +90,7 @@ const openBatchCount = computed(() => visibleBatches.value.filter((batch) => bat
 const applicantTotal = computed(() => visibleBatches.value.reduce((total, batch) => total + batch.applicantCount, 0));
 const openCenterTotal = computed(() => visibleBatches.value.find((batch) => batch.statusKey === "open")?.centerCount ?? 0);
 const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "draft").length);
-const productionPageCount = computed(() => Math.max(1, Math.ceil(productionTotal.value / productionPageSize)));
+const productionPageCount = computed(() => Math.max(1, Math.ceil(productionTotal.value / productionPageSize.value)));
 
 function openCreateDrawer() {
   createError.value = "";
@@ -123,12 +123,13 @@ async function loadProductionBatches() {
       return centers;
     });
     const [response] = await Promise.all([
-      recruitmentGateway.listAdminBatches(productionPage.value, productionPageSize),
+      recruitmentGateway.listAdminBatches(productionPage.value, productionPageSize.value),
       centersRequest,
     ]);
     if (requestGeneration !== productionLoadGeneration) return;
     productionBatches.value = response.items.map(mapAdminRecruitmentBatch);
     productionPage.value = response.page;
+    productionPageSize.value = response.pageSize;
     productionTotal.value = response.total;
   } catch {
     if (requestGeneration !== productionLoadGeneration) return;
@@ -154,7 +155,7 @@ async function saveDraft() {
       });
     } else if (recruitmentGateway && session.currentAccount?.account) {
       if (!draftForm.openCenterIds.length) throw new Error("请至少选择一个开放中心。");
-      const response = await recruitmentGateway.createAdminBatch({
+      await recruitmentGateway.createAdminBatch({
         name: draftForm.name.trim(),
         startAt: toDateTime(draftForm.startAt),
         endAt: toDateTime(draftForm.endAt, true),
@@ -162,13 +163,8 @@ async function saveDraft() {
         openCenterIds: draftForm.openCenterIds,
         responsibleAccountIds: [session.currentAccount.account],
       } satisfies CreateRecruitmentBatchDto);
-      const createdBatch = mapAdminRecruitmentBatch(response);
-      const alreadyPresent = productionBatches.value.some((batch) => batch.id === createdBatch.id);
       ++productionLoadGeneration;
-      productionLoading.value = false;
-      productionError.value = "";
-      productionBatches.value = [createdBatch, ...productionBatches.value.filter((batch) => batch.id !== createdBatch.id)];
-      if (!alreadyPresent) productionTotal.value += 1;
+      await loadProductionBatches();
     } else {
       throw new Error("ADMIN_RECRUITMENT_GATEWAY_UNAVAILABLE");
     }

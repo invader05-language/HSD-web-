@@ -64,7 +64,7 @@ const batch = computed(() => isMockApi
   ? batchStore?.getBatch(batchId.value) as AdminBatchDetail | undefined
   : productionBatch?.batch.value);
 const lifecyclePageCount = computed(() => Math.max(1, Math.ceil(
-  (productionBatch?.lifecycleTotal.value ?? 0) / (productionBatch?.lifecyclePageSize ?? 50),
+  (productionBatch?.lifecycleTotal.value ?? 0) / (productionBatch?.lifecyclePageSize.value ?? 50),
 )));
 function selectLifecyclePage(page: number) {
   if (!isMockApi) void productionBatch?.loadLifecyclePage(page);

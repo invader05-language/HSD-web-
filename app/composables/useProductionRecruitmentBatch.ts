@@ -48,7 +48,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   const batch = ref<AdminRecruitmentBatchView>();
   const lifecycleEvents = ref<RecruitmentBatchLifecycleEventView[]>([]);
   const lifecyclePage = ref(1);
-  const lifecyclePageSize = 50;
+  const lifecyclePageSize = ref(50);
   const lifecycleTotal = ref(0);
   const loading = ref(false);
   const error = ref("");
@@ -78,7 +78,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
 
     const detailRequest = gateway.getAdminBatch(batchId);
     const lifecycleRequest = gateway.listAdminBatchLifecycleEvents
-      ? gateway.listAdminBatchLifecycleEvents(batchId, 1, 50)
+      ? gateway.listAdminBatchLifecycleEvents(batchId, 1, lifecyclePageSize.value)
       : Promise.resolve(undefined);
     const [detailResult, lifecycleResult] = await Promise.allSettled([detailRequest, lifecycleRequest]);
     if (requestGeneration !== loadGeneration || lifecycleRequestGeneration !== lifecycleLoadGeneration) return undefined;
@@ -113,6 +113,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     const response = lifecycleResult.value as RecruitmentBatchLifecycleEventListDto;
     lifecycleEvents.value = response.items.map(mapRecruitmentBatchLifecycleEvent);
     lifecyclePage.value = response.page;
+    lifecyclePageSize.value = response.pageSize;
     lifecycleTotal.value = response.total;
     lifecycleStatus.value = lifecycleEvents.value.length ? "success" : "empty";
     return batch.value;
@@ -143,10 +144,11 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     lifecyclePage.value = page;
     const lifecycleRequestGeneration = ++lifecycleLoadGeneration;
     try {
-      const response = await gateway.listAdminBatchLifecycleEvents(batchId, page, lifecyclePageSize);
+      const response = await gateway.listAdminBatchLifecycleEvents(batchId, page, lifecyclePageSize.value);
       if (requestGeneration !== loadGeneration || lifecycleRequestGeneration !== lifecycleLoadGeneration) return false;
       lifecycleEvents.value = response.items.map(mapRecruitmentBatchLifecycleEvent);
       lifecyclePage.value = response.page;
+      lifecyclePageSize.value = response.pageSize;
       lifecycleTotal.value = response.total;
       lifecycleStatus.value = lifecycleEvents.value.length ? "success" : "empty";
       return true;
