@@ -112,6 +112,7 @@ const browserOperations = {
   adminActivityOffline: { operation: "POST /api/v1/admin/activities/{id}/offline", successStatus: "200" },
   publicActivities: "GET /api/v1/public/activities",
   publicActivity: "GET /api/v1/public/activities/{slug}",
+  publicTimeline: "GET /api/v1/public/timeline",
   activityRegistrationCreate: "POST /api/v1/activities/{slug}/registrations",
   activityRegistrationMine: "GET /api/v1/activities/{slug}/registration",
   activityRegistrationCancel: { operation: "POST /api/v1/registrations/{id}/cancel", successStatus: "200" },

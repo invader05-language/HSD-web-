@@ -242,6 +242,9 @@ export interface HsdApiClient {
     publish(id: string, payload: ActivityCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/activities/{id}/publish">>; openRegistration(id: string, payload: ActivityCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/activities/{id}/registration/open">>; closeRegistration(id: string, payload: ActivityCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/activities/{id}/registration/close">>; offline(id: string, payload: ActivityOfflineDto): Promise<ApiResponseFor<"POST /api/v1/admin/activities/{id}/offline">>;
     listPublic(): Promise<ApiResponseFor<"GET /api/v1/public/activities">>; public(slug: string): Promise<ApiResponseFor<"GET /api/v1/public/activities/{slug}">>;
   };
+  timeline: {
+    listPublic(query?: { page?: number; pageSize?: number; kind?: "activity" | "article" | "notice" }): Promise<ApiResponseFor<"GET /api/v1/public/timeline">>;
+  };
   registrations: {
     create(slug: string, payload: CreateRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/activities/{slug}/registrations">>; mine(slug: string): Promise<ApiResponseFor<"GET /api/v1/activities/{slug}/registration">>; cancel(id: string, payload: RegistrationCommandDto): Promise<ApiResponseFor<"POST /api/v1/registrations/{id}/cancel">>; listAdmin(activityId: string): Promise<ApiResponseFor<"GET /api/v1/admin/activities/{activityId}/registrations">>; decide(id: string, payload: DecideRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/admin/registrations/{id}/decision">>;
   };
@@ -438,6 +441,13 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       create: (payload) => requestGenerated(transport, "POST /api/v1/admin/activities", payload), update: (id, payload) => requestGenerated(transport, "PATCH /api/v1/admin/activities/{id}", payload, `/api/v1/admin/activities/${encodeURIComponent(id)}`),
       publish: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/activities/{id}/publish", payload, `/api/v1/admin/activities/${encodeURIComponent(id)}/publish`), openRegistration: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/activities/{id}/registration/open", payload, `/api/v1/admin/activities/${encodeURIComponent(id)}/registration/open`), closeRegistration: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/activities/{id}/registration/close", payload, `/api/v1/admin/activities/${encodeURIComponent(id)}/registration/close`), offline: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/activities/{id}/offline", payload, `/api/v1/admin/activities/${encodeURIComponent(id)}/offline`),
       listPublic: () => requestGenerated(transport, "GET /api/v1/public/activities"), public: (slug) => requestGenerated(transport, "GET /api/v1/public/activities/{slug}", undefined, `/api/v1/public/activities/${encodeURIComponent(slug)}`),
+    },
+    timeline: {
+      listPublic: (query = {}) => {
+        const params = new URLSearchParams({ page: String(query.page ?? 1), pageSize: String(query.pageSize ?? 12) });
+        if (query.kind) params.set("kind", query.kind);
+        return requestGenerated(transport, "GET /api/v1/public/timeline", undefined, `/api/v1/public/timeline?${params.toString()}`);
+      },
     },
     registrations: {
       create: (slug, payload) => requestGenerated(transport, "POST /api/v1/activities/{slug}/registrations", payload, `/api/v1/activities/${encodeURIComponent(slug)}/registrations`), mine: (slug) => requestGenerated(transport, "GET /api/v1/activities/{slug}/registration", undefined, `/api/v1/activities/${encodeURIComponent(slug)}/registration`), cancel: (id, payload) => requestGenerated(transport, "POST /api/v1/registrations/{id}/cancel", payload, `/api/v1/registrations/${encodeURIComponent(id)}/cancel`), listAdmin: (activityId) => requestGenerated(transport, "GET /api/v1/admin/activities/{activityId}/registrations", undefined, `/api/v1/admin/activities/${encodeURIComponent(activityId)}/registrations`), decide: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/registrations/{id}/decision", payload, `/api/v1/admin/registrations/${encodeURIComponent(id)}/decision`),

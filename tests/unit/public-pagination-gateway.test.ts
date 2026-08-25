@@ -11,4 +11,16 @@ describe("public catalog pagination gateway", () => {
       expect.objectContaining({ method: "GET", credentials: "include" }),
     );
   });
+
+  it("requests the server-paginated public timeline for a selected tab", async () => {
+    const fetcher = vi.fn(async (url: string) => new Response(JSON.stringify({ page: 2, pageSize: 5, total: 7, items: [] }), { status: 200, headers: { "content-type": "application/json" } }));
+    const gateway = createApiContentGateway({ apiBase: "https://hsd.example", fetcher });
+
+    await gateway.timeline.listPublic({ page: 2, pageSize: 5, kind: "article" });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://hsd.example/api/v1/public/timeline?page=2&pageSize=5&kind=article",
+      expect.objectContaining({ method: "GET", credentials: "include" }),
+    );
+  });
 });

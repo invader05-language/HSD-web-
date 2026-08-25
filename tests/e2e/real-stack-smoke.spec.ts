@@ -193,16 +193,21 @@ test.describe("real Nuxt + NestJS integration", () => {
     await expect.poll(() => avatar.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   });
 
-  test("activity and member directories retain live data through client hydration", async ({ page }) => {
-    const [activitiesResponse, coreResponse, membersResponse] = await Promise.all([
+  test("public timeline and member directories retain live data through client hydration", async ({ page }) => {
+    const [activitiesResponse, timelineResponse, coreResponse, membersResponse] = await Promise.all([
       page.request.get(`${apiBase}/api/v1/public/activities`),
+      page.request.get(`${apiBase}/api/v1/public/timeline?page=1&pageSize=12`),
       page.request.get(`${apiBase}/api/v1/public/core-members`),
       page.request.get(`${apiBase}/api/v1/public/members`),
     ]);
     expect(activitiesResponse.ok()).toBe(true);
+    expect(timelineResponse.ok()).toBe(true);
     expect(coreResponse.ok()).toBe(true);
     expect(membersResponse.ok()).toBe(true);
     const activities = await activitiesResponse.json() as { items: Array<{ title: string }> };
+    const timeline = await timelineResponse.json() as { total: number; items: Array<{ entityType: string; slug: string }> };
+    expect(timeline.total).toBeGreaterThanOrEqual(activities.items.length);
+    expect(timeline.items.every((item) => ["activity", "article", "notice"].includes(item.entityType))).toBe(true);
     const coreMembers = await coreResponse.json() as { items: Array<{ name: string }> };
     const members = await membersResponse.json() as { items: Array<{ name: string }> };
     const browserErrors: string[] = [];
@@ -211,7 +216,7 @@ test.describe("real Nuxt + NestJS integration", () => {
     });
 
     await page.goto("/activities");
-    await expect(page.getByTestId("public-timeline-item")).toHaveCount(activities.items.length);
+    await expect(page.getByTestId("public-timeline-item")).toHaveCount(Math.min(timeline.total, 12));
     await page.goto("/");
     await expect(page.locator("main h1")).toBeVisible();
     await expect(page.locator('[data-testid="homepage-activity-media"]')).not.toHaveCount(0);

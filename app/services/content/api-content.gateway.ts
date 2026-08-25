@@ -35,8 +35,11 @@ export function createApiContentGateway(options: ApiContentGatewayOptions) {
       ? readPublicCollection(`/api/v1/public/galleries?page=${query.page ?? 1}&pageSize=${query.pageSize ?? 12}${query.category ? `&category=${encodeURIComponent(query.category)}` : ""}`)
       : client.galleries.listPublic(),
   };
+  const timeline = {
+    listPublic: (query?: { page?: number; pageSize?: number; kind?: "activity" | "article" | "notice" }) => client.timeline.listPublic(query),
+  };
   return {
-    projects: client.projects, activities, registrations: client.registrations, galleries, resources: client.resources, help: client.help, portal: client.portal, content: client.content, media: client.media, homepage: client.homepage,
+    projects: client.projects, activities, timeline, registrations: client.registrations, galleries, resources: client.resources, help: client.help, portal: client.portal, content: client.content, media: client.media, homepage: client.homepage,
     project: (slug: string) => client.projects.public(slug), activity: (slug: string) => client.activities.public(slug), gallery: (slug: string) => client.galleries.public(slug), resource: (slug: string) => client.resources.public(slug), resourceVersion: (slug: string, versionLabel: string) => client.resources.publicVersion(slug, versionLabel),
   };
 }
