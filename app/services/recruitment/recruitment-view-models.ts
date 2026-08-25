@@ -58,6 +58,12 @@ export interface PublicRecruitmentBatchView {
   openCenters: Array<{ id: string; name: string }>;
 }
 
+export function getRecruitmentCenterOptions(
+  batch: Pick<PublicRecruitmentBatchView, "openCenters">,
+): Array<readonly [string, string]> {
+  return batch.openCenters.map((center) => [center.id, center.name] as const);
+}
+
 export interface AdminRecruitmentBatchView {
   id: string;
   name: string;

@@ -56,7 +56,7 @@ useHead(() => ({
         <article class="member-detail__profile">
           <HsdAvatar :name="person.name" :src="resolvePublicAvatar(person, apiBase)" size="lg" />
           <div>
-            <p class="eyebrow">Public Profile</p>
+            <p class="eyebrow">公开资料</p>
             <h2>公开成员信息</h2>
             <dl>
               <div>
@@ -77,7 +77,7 @@ useHead(() => ({
           class="member-honors"
           aria-labelledby="member-honors-heading"
         >
-          <p class="eyebrow">Published Honors</p>
+            <p class="eyebrow">已发布荣誉</p>
           <h2 id="member-honors-heading">个人荣誉</h2>
           <ol>
             <li v-for="honor in honors" :key="honor.id" data-testid="honor-record">

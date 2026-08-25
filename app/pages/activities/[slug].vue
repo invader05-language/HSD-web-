@@ -73,7 +73,7 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
     <section class="section section--cool">
       <div class="shell detail-layout">
         <article class="detail-main">
-          <p class="eyebrow">Activity Brief</p>
+          <p class="eyebrow">活动简介</p>
           <h2>活动介绍</h2>
           <h3>活动内容</h3>
           <p>{{ activity.content }}</p>
@@ -96,7 +96,7 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
           </dl>
           <NuxtLink class="button" :to="signupTarget" :aria-disabled="!activity.registrationOpen && !registration ? 'true' : undefined" @click="handleSignupClick">{{ signupSubmitLabel }}</NuxtLink>
           <p v-if="actionNotice" role="status">{{ actionNotice }}</p>
-          <p>浏览活动详情无需登录，提交报名后由管理端进行录取或不录取审核。</p>
+          <p>活动详情、报名状态与审核结果会在这里集中展示。</p>
         </aside>
       </div>
     </section>

@@ -199,7 +199,7 @@ onMounted(() => {
 
       <main id="profile-form" class="member-profile-main">
         <p class="member-profile-breadcrumb">成员空间　/　<strong>个人资料</strong></p>
-        <p class="eyebrow">Member Profile</p>
+        <p class="eyebrow">成员资料</p>
         <h1>编辑个人资料</h1>
         <p class="member-profile-lead">完善你的个人与成员资料。姓名、年级和班级可由本人修改；学号和组织归属由部落统一维护。</p>
 

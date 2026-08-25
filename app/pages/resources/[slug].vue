@@ -50,7 +50,7 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
     <section class="section section--cool">
       <div class="shell resource-detail-body">
         <article id="resource-content">
-          <p class="eyebrow">Resource Overview</p>
+        <p class="eyebrow">资源概览</p>
           <h2>{{ resource.kind === "article" ? "学习步骤" : "内容清单" }}</h2>
           <p v-if="resource.kind === 'article'">按以下步骤完成学习，并结合自己的项目记录实践中的问题与收获。</p>
           <ol class="resource-content-list">
@@ -58,13 +58,13 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
           </ol>
 
           <section class="resource-version-list" aria-labelledby="version-heading">
-            <p class="eyebrow">Version Record</p>
+        <p class="eyebrow">版本记录</p>
             <h2 id="version-heading">版本记录</h2>
             <div><strong>{{ resource.versionLabel ?? resource.version ?? "当前版本" }}</strong><span v-if="resource.updatedAt">更新于 {{ resource.updatedAt }}</span><p>当前公开的资源说明与内容范围。</p></div>
           </section>
 
           <section class="resource-related" aria-labelledby="related-heading">
-            <p class="eyebrow">Related Resources</p>
+        <p class="eyebrow">相关资源</p>
             <h2 id="related-heading">相关资源</h2>
             <div>
               <NuxtLink v-for="item in relatedResources" :key="item.slug" :to="item.to">{{ item.title }} <span>→</span></NuxtLink>
@@ -73,7 +73,7 @@ useHead(() => ({ title: `${resource.value?.title}｜资源中心` }));
         </article>
 
         <aside class="resource-file-panel">
-          <p class="eyebrow">File Information</p>
+        <p class="eyebrow">文件信息</p>
           <h2>资源信息</h2>
           <dl>
             <div><dt>格式</dt><dd>{{ resource.format }}</dd></div>

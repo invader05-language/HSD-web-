@@ -171,7 +171,7 @@ watch(
     <section class="home-hero">
       <div class="home-hero__inner">
         <div class="home-hero__copy">
-          <p class="eyebrow">Baiyun HSD Developer Community</p>
+          <p class="eyebrow">白云 HSD 开发者部落</p>
           <h1>鸿蒙启航<br>共赴星河万里</h1>
           <p ref="heroText" class="home-hero__description">{{ heroDescription }}</p>
           <div class="home-hero__actions">
@@ -234,7 +234,7 @@ watch(
       <div class="shell">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">News & Updates</p>
+            <p class="eyebrow">新闻与动态</p>
             <h2>正在发生的事</h2>
           </div>
           <NuxtLink class="text-link" to="/activities">查看全部动态 →</NuxtLink>
@@ -266,7 +266,7 @@ watch(
       <div class="shell">
         <div class="section-heading section-heading--wide">
           <div>
-            <p class="eyebrow">Four Centers</p>
+            <p class="eyebrow">四大中心</p>
             <h2>四大中心，共同完成一件事</h2>
           </div>
           <p>从研发、传播到策划与成长，每个中心都不是附属角色，而是完整协作链路的一部分。</p>
@@ -296,7 +296,7 @@ watch(
       <div class="shell">
         <div class="section-heading section-heading--light">
           <div>
-            <p class="eyebrow">Real Projects</p>
+            <p class="eyebrow">真实项目</p>
             <h2>把想法做成真实项目</h2>
           </div>
           <NuxtLink class="text-link" to="/projects">查看全部项目 →</NuxtLink>
@@ -306,7 +306,7 @@ watch(
             <ContentMediaView v-if="publishedProjects[0].media" :item="publishedProjects[0].media" preview="thumbnail" fit="cover" :controls="false" class="featured-project__media" />
             <MediaPlaceholder v-else :label="`${publishedProjects[0].title}演示素材位`" detail="项目实机、流程或现场验证" dark />
             <div class="featured-project__copy">
-              <span>精选项目 · Portal Selection</span>
+              <span>精选项目</span>
               <h3>{{ publishedProjects[0].title }}</h3>
               <p>{{ publishedProjects[0].summary }}</p>
               <strong>已发布项目</strong>
@@ -338,7 +338,7 @@ watch(
       <div class="shell">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Upcoming</p>
+            <p class="eyebrow">近期安排</p>
             <h2>近期活动</h2>
           </div>
           <NuxtLink class="text-link" to="/activities">活动日历 →</NuxtLink>
@@ -376,7 +376,7 @@ watch(
       <div class="shell">
         <div class="section-heading section-heading--wide">
           <div>
-            <p class="eyebrow">Media Gallery</p>
+          <p class="eyebrow">媒体画廊</p>
             <h2>由成员记录，也由成员创作</h2>
           </div>
           <p>摄影、海报、短视频与人物专访，共同形成部落的内容档案。</p>
@@ -394,7 +394,7 @@ watch(
       <div class="shell">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Member Growth</p>
+          <p class="eyebrow">成员成长</p>
             <h2>在一次次协作里看见成长</h2>
           </div>
           <NuxtLink class="text-link" to="/about#members">认识部落成员 →</NuxtLink>
@@ -417,7 +417,7 @@ watch(
     <section class="section section--surface">
       <div class="shell resources-layout">
         <div>
-          <p class="eyebrow">Resources</p>
+          <p class="eyebrow">资源中心</p>
           <h2>把经验沉淀成下一次出发的起点</h2>
           <p>所有资源先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。</p>
           <NuxtLink class="button button--dark" to="/resources">浏览资源中心</NuxtLink>
@@ -439,7 +439,7 @@ watch(
     <section class="recruitment-band">
       <div class="recruitment-band__inner shell">
         <div>
-          <p class="eyebrow">Join Us · 2026</p>
+          <p class="eyebrow">加入我们 · 2026</p>
           <h2>你的方向不必只有一种，先从一次参与开始</h2>
           <p>开发、摄影、设计、策划或组织成长，四大中心都有适合你的入口。</p>
         </div>

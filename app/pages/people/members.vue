@@ -68,7 +68,7 @@ watch(pageCount, (nextPageCount) => {
 <template>
   <div :data-directory-hydrated="isHydrated">
     <PageBanner
-      eyebrow="Public Members"
+      eyebrow="公开成员"
       title="全体成员名录"
       description="浏览正式成员默认公开的基础风采资料。白泽开发中心成员同时展示统一实践方向；头像未上传时使用白底 HSD 默认头像。"
       tone="dark"

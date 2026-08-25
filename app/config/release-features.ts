@@ -11,5 +11,5 @@ export const RELEASE_FEATURES: ReleaseFeatures = {
   recycleBin: true,
   uploadTasks: true,
   recruitmentBatches: true,
-  helpCenter: true
+  helpCenter: false
 };

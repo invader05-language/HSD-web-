@@ -10,6 +10,7 @@ import {
   mapRecruitmentApplicationDraft,
   mapRecruitmentApplicationResponse,
   isRecruitmentApplicantEligible,
+  getRecruitmentCenterOptions,
 } from "../../app/services/recruitment/recruitment-view-models";
 
 describe("production recruitment integration", () => {
@@ -133,6 +134,18 @@ describe("production recruitment integration", () => {
       openCenterIds: ["new-media"],
       openCenters: [{ id: "new-media", name: "新媒体中心" }],
     });
+  });
+
+  it("derives application center options from the current batch open-center projection", () => {
+    expect(getRecruitmentCenterOptions({
+      openCenters: [
+        { id: "new-media", name: "新媒体中心" },
+        { id: "talent-development", name: "人才发展中心" },
+      ],
+    })).toEqual([
+      ["new-media", "新媒体中心"],
+      ["talent-development", "人才发展中心"],
+    ]);
   });
 
   it("maps a real UUID profile and API application into form-safe values", () => {

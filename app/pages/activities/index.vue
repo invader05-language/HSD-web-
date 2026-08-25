@@ -44,9 +44,9 @@ useHead({ title: "动态与活动｜白云 HSD 开发者部落" });
 <template>
   <div>
     <PageBanner
-      eyebrow="Updates & Activities"
+      eyebrow="动态与活动"
       title="动态与活动"
-      description="查看公开新闻、公告与近期活动；活动详情无需登录，提交报名时再验证成员身份。"
+      description="汇集联盟新闻、公开公告与近期活动，持续了解部落动态与活动安排。"
       tone="warm"
       media-label="动态与活动视觉位"
       :visual="PAGE_VISUALS.activities"

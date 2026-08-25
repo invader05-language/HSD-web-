@@ -24,7 +24,7 @@ async function remove(item: typeof store.items[number]) { if (gateway) await sto
 <template>
   <main class="section">
     <div class="shell">
-      <p class="eyebrow">Private Growth</p>
+      <p class="eyebrow">个人成长</p>
       <h1>我的成长记录</h1>
       <p>这里的内容始终仅你本人可见，管理员也不能查看。</p>
       <p v-if="store.apiLoading" role="status">正在同步成长记录…</p>

@@ -17,7 +17,6 @@ import { SITE_CONFIG } from "~/data/site";
           <NuxtLink to="/activities">动态与活动</NuxtLink>
           <NuxtLink to="/resources">资源中心</NuxtLink>
           <NuxtLink to="/join">加入我们</NuxtLink>
-          <NuxtLink to="/help">帮助中心</NuxtLink>
         </div>
       </div>
       <div>

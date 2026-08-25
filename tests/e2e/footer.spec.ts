@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const notice =
   "本平台由学生社团自主建设，仅用于社团管理与校园交流，站内内容及图片不作任何商业用途。";
 
-test("desktop footer publishes the non-commercial notice with the Help Center link", async ({ page }) => {
+test("desktop footer publishes the non-commercial notice without the retired Help Center link", async ({ page }) => {
   await page.goto("/");
 
   const footer = page.locator(".site-footer");
@@ -12,7 +12,7 @@ test("desktop footer publishes the non-commercial notice with the Help Center li
 
   await expect(footer.getByText(notice, { exact: true })).toBeVisible();
   await expect(footer.getByText("© 2026 白云 HSD 开发者部落", { exact: true })).toBeVisible();
-  await expect(footer.getByRole("link", { name: /帮助/ })).toHaveCount(1);
+  await expect(footer.getByRole("link", { name: /帮助/ })).toHaveCount(0);
 
   const spacing = await footerGrid.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -37,14 +37,14 @@ test("desktop footer publishes the non-commercial notice with the Help Center li
   expect(overflow).toBe(false);
 });
 
-test("mobile footer stacks copyright and notice while keeping Help Center discoverable", async ({ page }) => {
+test("mobile footer stacks copyright and notice without the retired Help Center link", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
   const footer = page.locator(".site-footer");
   const copyright = footer.locator(".site-footer__copyright");
   const disclaimer = footer.locator(".site-footer__notice");
-  await expect(footer.getByRole("link", { name: /帮助/ })).toHaveCount(1);
+  await expect(footer.getByRole("link", { name: /帮助/ })).toHaveCount(0);
 
   const boxes = await Promise.all([
     copyright.boundingBox(),

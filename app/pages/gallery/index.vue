@@ -3,7 +3,7 @@ import { useGalleryStore } from "~/stores/gallery";
 import { useContentGateway } from "~/composables/useContentGateway";
 import type { GalleryAsset } from "~/data/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { galleryCategoryLabel } from "~/types/gallery";
+import { galleryCategoryLabel, normalizeGalleryCategory } from "~/types/gallery";
 import { PAGE_VISUALS } from "~/data/page-visuals";
 
 useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
@@ -13,15 +13,16 @@ const galleryStore = useGalleryStore();
 const gateway = useContentGateway();
 if (gateway) galleryStore.activateApiMode();
 if (import.meta.client && !gateway) galleryStore.hydrate();
-onMounted(() => { if (gateway) void galleryStore.refreshPublicFromApi(gateway); });
+onMounted(() => { if (gateway) void loadPage(); });
 const active = ref("全部");
 const pageSize = 6;
 const currentPage = ref(1);
-const filtered = computed(() => active.value === "全部"
+const filtered = computed(() => !gateway && active.value === "全部"
   ? galleryStore.getPublicAlbums()
-  : galleryStore.getPublicAlbums().filter((album) => galleryCategoryLabel(album.category) === active.value));
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)));
+  : !gateway ? galleryStore.getPublicAlbums().filter((album) => galleryCategoryLabel(album.category) === active.value) : galleryStore.getPublicAlbums());
+const pageCount = computed(() => Math.max(1, Math.ceil((gateway ? galleryStore.apiTotal : filtered.value.length) / pageSize)));
 const visible = computed(() => {
+  if (gateway) return filtered.value;
   const start = (currentPage.value - 1) * pageSize;
   return filtered.value.slice(start, start + pageSize);
 });
@@ -44,12 +45,21 @@ function toMediaItem(asset: GalleryAsset): ContentMediaAttachment {
   };
 }
 
+function serverCategory() {
+  return active.value === "全部" ? undefined : normalizeGalleryCategory({ "活动纪实": "event_documentary", "视觉创作": "visual_creation", "视频作品": "video_work", "人物风采": "people_stories" }[active.value] ?? "event_documentary");
+}
+async function loadPage() {
+  if (!gateway) return;
+  await galleryStore.refreshPublicFromApi(gateway, { page: currentPage.value, pageSize, ...(serverCategory() ? { category: serverCategory() } : {}) });
+}
 watch(active, () => {
   currentPage.value = 1;
+  void loadPage();
 });
 
 async function goToPage(page: number) {
   currentPage.value = Math.min(Math.max(page, 1), pageCount.value);
+  await loadPage();
   await nextTick();
   document.getElementById("gallery-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -58,7 +68,7 @@ async function goToPage(page: number) {
 <template>
   <div>
     <PageBanner
-      eyebrow="Media Gallery"
+      eyebrow="媒体画廊"
       title="把活动、人物与创作留在画面里"
       description="这里呈现新媒体中心与成员共同完成的摄影、设计、视频和人物内容。正式素材到位后会替换当前素材位。"
       tone="dark"

@@ -39,7 +39,7 @@ const project = computed(() => projectsStore.getPublicBySlug(slug) ?? ssrProject
     <section class="section section--cool">
       <div class="shell detail-layout">
         <article class="detail-main">
-          <p class="eyebrow">From Problem to Delivery</p>
+          <p class="eyebrow">从问题到交付</p>
           <h2>从问题到落地</h2>
           <h3>我们观察到的问题</h3>
           <p>{{ project.challenge }}</p>

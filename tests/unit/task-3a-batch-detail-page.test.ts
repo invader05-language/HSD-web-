@@ -303,7 +303,10 @@ describe("Task 3A production batch detail page", () => {
     routeState.params.batchId = "batch-b";
     routeState.path = "/admin/recruitment/batches/batch-b";
     await nextTick();
-    expect(fetcher).toHaveBeenCalledTimes(4);
+    // Real-mode detail pages also load the authoritative center options used by
+    // the draft editor on mount, so the initial detail/lifecycle pair plus the
+    // center catalog and the second detail/lifecycle pair total five requests.
+    expect(fetcher).toHaveBeenCalledTimes(5);
 
     resolveB(new Response(JSON.stringify({ ...apiBatch, id: "batch-b", name: "API B 批次" }), {
       status: 200,

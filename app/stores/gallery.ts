@@ -218,6 +218,7 @@ export const useGalleryStore = defineStore("gallery", {
       apiLoading: false,
       apiMutating: false,
       apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
+      apiTotal: 0,
       persistenceError: undefined as string | undefined,
     };
   },
@@ -228,12 +229,13 @@ export const useGalleryStore = defineStore("gallery", {
       if (clearData || !wasActive) this.albums = [];
       this.apiError = null;
     },
-    async refreshPublicFromApi(gateway: { galleries: { listPublic(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
+    async refreshPublicFromApi(gateway: { galleries: { listPublic(query?: { page?: number; pageSize?: number; category?: string }): Promise<{ items: Array<Record<string, unknown>>; total?: number }> } }, query?: { page?: number; pageSize?: number; category?: string }) {
       this.activateApiMode();
       this.apiLoading = true;
       try {
-        const response = await gateway.galleries.listPublic();
+        const response = await gateway.galleries.listPublic(query);
         this.albums = response.items.map(galleryFromPublicApi);
+        this.apiTotal = response.total ?? this.albums.length;
         this.publicDetails = {};
       } catch (error) {
         this.apiError = galleryApiError(error);

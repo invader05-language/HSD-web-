@@ -44,11 +44,10 @@ test("homepage renders every curated domain through the published portal project
   await expect(page.getByRole("link", { name: /年度活动影像记录/ })).toHaveAttribute("href", "/gallery/annual-activity-record");
 });
 
-test("Help Center routes remain enabled and discoverable", async ({ page }) => {
+test("Help Center routes are retired and no longer discoverable", async ({ page }) => {
   await page.goto("/help");
-  await expect(page).toHaveURL(/\/help$/);
-  await expect(page.getByRole("heading", { name: "先找到问题，再找到负责人" })).toBeVisible();
-  await expect(page.getByRole("contentinfo").locator('a[href="/help"]')).toHaveCount(1);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("contentinfo").locator('a[href="/help"]')).toHaveCount(0);
 
   await page.goto("/admin/content");
   await page.getByLabel("学号或成员账号").fill("admin-alliance");
@@ -60,8 +59,7 @@ test("Help Center routes remain enabled and discoverable", async ({ page }) => {
   )).not.toBeNull();
 
   await page.goto("/admin/content/help");
-  await expect(page).toHaveURL(/\/admin\/content\/help$/);
-  await expect(page.getByRole("heading", { name: "帮助中心管理" })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/content$/);
 });
 
 test("public detail remains open and personal signup continues through login", async ({ page }) => {

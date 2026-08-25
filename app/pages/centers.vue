@@ -22,7 +22,7 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
   <NuxtPage v-if="route.params.slug" />
   <div v-else>
     <PageBanner
-      eyebrow="Four Centers"
+      eyebrow="四大中心"
       title="研发、传播、策划、成长"
       description="四大中心各有专业方向，也围绕同一个项目目标共同协作。你可以从擅长的方向开始，再逐步探索更多能力。"
       tone="dark"
@@ -34,7 +34,7 @@ useHead({ title: "四大中心｜白云 HSD 开发者部落" });
         <OrganizationLeadershipPanel
           v-if="organizationGateway || publicCenters.allianceOwners.length"
           :people="publicCenters.allianceOwners"
-          eyebrow="Alliance Leadership"
+          eyebrow="联盟负责人"
           heading="联盟负责人"
           role-label="联盟负责人"
           count-label="负责人"

@@ -189,7 +189,7 @@ test("real batch list clears prior API rows and exposes a 403 instead of a fixtu
   expectCanonicalReads(requests, 2);
 });
 
-test("a center-read failure clears batch rows and reports the real-mode error state", async ({ page }) => {
+test("a center-read failure keeps batch rows but disables creation and reports the center error", async ({ page }) => {
   let centerFailure = false;
   const requests: RequestShape[] = [];
   await seedFixtureBatchStorage(page);
@@ -204,8 +204,9 @@ test("a center-read failure clears batch rows and reports the real-mode error st
   centerFailure = true;
   await page.getByRole("button", { name: "重新读取生产招新批次" }).click();
 
-  await expect(page.getByRole("alert")).toContainText("暂时无法读取生产招新批次");
-  await expect(page.getByText("qa-接口开放批次", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("alert")).toContainText("暂时无法读取开放中心");
+  await expect(page.getByText("qa-接口开放批次", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "新建招新批次" })).toBeDisabled();
   await expect(page.getByText("2026 秋季招新", { exact: true })).toHaveCount(0);
   await expect(page.getByText("本地 fixture 批次", { exact: true })).toHaveCount(0);
   expectCanonicalReads(requests, 2);

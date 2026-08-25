@@ -70,7 +70,7 @@ watch(pageCount, (nextPageCount) => {
 <template>
   <div :data-directory-hydrated="isHydrated">
     <PageBanner
-      eyebrow="Core People"
+      eyebrow="核心成员"
       title="核心人员名录"
       description="认识正在承担组织方向、项目推进与跨中心协作职责的核心人员。名录为公开信息，无需登录即可浏览。"
       tone="warm"
