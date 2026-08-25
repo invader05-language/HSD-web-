@@ -74,7 +74,7 @@ async function signOut() {
         <span>&lt; HSD &gt;</span>
         <strong>白云 HSD 开发者部落</strong>
       </div>
-      <p class="eyebrow">First Login Security</p>
+      <p class="eyebrow">首次登录安全设置</p>
       <h1 id="password-change-title">设置新的登录密码</h1>
       <p class="password-change-intro">当前账号仍在首次登录受限状态。完成密码修改后，才能继续进入成员空间。</p>
 

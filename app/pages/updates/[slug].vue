@@ -124,7 +124,7 @@ useHead(() => ({ title: `${update.value?.title ?? "动态详情"}｜动态与活
     <section class="section section--cool">
       <div class="shell detail-layout">
         <article class="detail-main public-update-detail">
-          <p class="eyebrow">Published Update</p>
+          <p class="eyebrow">已发布动态</p>
           <h2>{{ update.kind === "article" ? "新闻正文" : "公告正文" }}</h2>
           <template v-if="update.blocks.length">
             <template v-for="(block, index) in update.blocks" :key="index">

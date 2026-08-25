@@ -18,6 +18,7 @@ import {
   mapPublicRecruitmentBatch,
   mapRecruitmentApplicationDraft,
   mapRecruitmentApplicationResponse,
+  getRecruitmentCenterOptions,
   isRecruitmentApplicantEligible,
   type ProductionMemberProfile,
   type PublicRecruitmentBatchView,
@@ -90,6 +91,11 @@ const upcomingBatch = computed(() => isMockApi ? batchStore?.upcomingBatchAt(now
 const pausedBatch = computed(() => isMockApi
   ? batchStore?.currentPausedBatchAt(now.value)
   : productionBatch.value?.effectiveStatus === "paused" ? productionBatch.value : null);
+const applicationCenterOptions = computed(() => isMockApi
+  ? RECRUITMENT_CENTERS.map((name, index) => [String(index), name] as const)
+  : productionBatch.value
+    ? getRecruitmentCenterOptions(productionBatch.value)
+    : []);
 if (isMockApi) watch(now, (value) => batchStore?.syncLifecycle(value), { immediate: true });
 const step = ref<Step>(1);
 const profileDraft = reactive(createRegistrationProfileDraft(currentProfile.value));
@@ -393,33 +399,33 @@ onBeforeUnmount(() => {
 <template>
   <div class="task-page recruitment-application-page">
     <header class="task-page__header shell">
-      <p class="eyebrow">Member Registration · Recruitment</p>
+      <p class="eyebrow">成员注册与招新报名</p>
       <h1>成员注册与招新报名</h1>
       <p v-if="isMockApi">登录用于确认账号身份；在这里完善成员资料并提交本次招新志愿。当前为前端演示，刷新后会恢复示例数据。</p>
-      <p v-else>登录用于确认账号身份；页面将读取当前账号的真实成员资料和招新批次，不会使用本地示例数据替代。</p>
+      <p v-else>登录用于确认账号身份；页面将读取当前账号的成员资料和当前开放批次。</p>
     </header>
 
     <section class="task-page__body">
       <div class="shell">
         <section v-if="productionLoading" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
-          <p class="eyebrow">Recruitment</p>
+          <p class="eyebrow">招新报名</p>
           <h2>正在读取报名资格</h2>
           <p>正在确认当前账号、开放批次和既有报名记录，请稍候。</p>
         </section>
         <section v-else-if="productionError" class="recruitment-success recruitment-success--blocked" role="alert">
-          <p class="eyebrow">Recruitment Error</p>
+          <p class="eyebrow">报名读取异常</p>
           <h2>招新数据暂时不可用</h2>
           <p>{{ productionError }}</p>
           <div class="recruitment-success__actions"><button class="button" type="button" @click="loadProductionRecruitment">重新读取</button><NuxtLink class="button button--ghost" to="/join">返回加入我们</NuxtLink></div>
         </section>
         <section v-else-if="!isApplicantEligible" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
-          <p class="eyebrow">Recruitment Eligibility</p>
+          <p class="eyebrow">报名资格</p>
           <h2>当前账号无需填写招新报名表</h2>
           <p>当前账号身份为“{{ currentProfile.identity || "正式成员" }}”。正式成员不能重复提交招新报名；如需查看已有个人记录，请进入成员空间。</p>
           <div class="recruitment-success__actions"><NuxtLink class="button" to="/member">进入个人中心</NuxtLink><NuxtLink class="button button--ghost" to="/join">返回加入我们</NuxtLink></div>
         </section>
         <section v-else-if="submittedApplication" class="recruitment-success" role="status" aria-live="polite">
-          <p class="eyebrow">Submitted</p>
+          <p class="eyebrow">报名已提交</p>
           <h2>成员注册与招新报名已提交</h2>
           <p>你的报名已关联到“{{ submittedApplication.batchNameSnapshot }}”，并以预备成员身份进入后续流程。</p>
           <p v-if="!hasOpenBatch" class="recruitment-batch-context">当前批次{{ activeBatchStatus === "paused" ? "已暂停报名" : "已结束" }}，报名资料保留为只读状态。</p>
@@ -452,7 +458,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <section v-else-if="!hasOpenBatch" class="recruitment-success recruitment-success--blocked" role="status" aria-live="polite">
-          <p class="eyebrow">Recruitment Unavailable</p>
+          <p class="eyebrow">招新暂不可用</p>
           <h2>{{ pausedBatch ? "当前批次报名已暂停" : "当前暂无开放报名" }}</h2>
           <p v-if="pausedBatch">批次“{{ pausedBatch.name }}”暂时暂停报名，恢复后才能提交新的报名。</p>
           <p v-else>{{ upcomingBatch ? `下一批次“${upcomingBatch.name}”计划于 ${new Date(upcomingBatch.startAt).toLocaleDateString("zh-CN")} 开放。` : "当前没有已开放的招新批次。" }}</p>
@@ -490,9 +496,9 @@ onBeforeUnmount(() => {
               <section v-show="step === 2" aria-labelledby="application-choice-heading">
                 <header class="recruitment-section-heading"><span>02</span><div><h2 id="application-choice-heading">填写报名志愿</h2><p>按真实意愿排序；白泽开发中心可填任一志愿，选择后请补充一个实践方向。</p></div></header>
                 <div class="registration-fields">
-                  <label data-field="firstChoice"><span>第一志愿</span><select :value="applicationDraft.firstChoice || ''" :aria-invalid="Boolean(errors.firstChoice)" :aria-describedby="errors.firstChoice ? 'first-choice-error' : undefined" @change="updateFirstChoice"><option value="">请选择第一志愿</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.firstChoice" id="first-choice-error" class="form-error">{{ errors.firstChoice }}</small></label>
-                  <label data-field="secondChoice"><span>第二志愿（可选）</span><select v-model="applicationDraft.secondChoice" :aria-invalid="Boolean(errors.secondChoice)" :aria-describedby="errors.secondChoice ? 'second-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.secondChoice" id="second-choice-error" class="form-error">{{ errors.secondChoice }}</small></label>
-                  <label data-field="thirdChoice"><span>第三志愿（可选）</span><select v-model="applicationDraft.thirdChoice" :aria-invalid="Boolean(errors.thirdChoice)" :aria-describedby="errors.thirdChoice ? 'third-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="center in RECRUITMENT_CENTERS" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.thirdChoice" id="third-choice-error" class="form-error">{{ errors.thirdChoice }}</small></label>
+                  <label data-field="firstChoice"><span>第一志愿</span><select :value="applicationDraft.firstChoice || ''" :aria-invalid="Boolean(errors.firstChoice)" :aria-describedby="errors.firstChoice ? 'first-choice-error' : undefined" @change="updateFirstChoice"><option value="">请选择第一志愿</option><option v-for="[, center] in applicationCenterOptions" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.firstChoice" id="first-choice-error" class="form-error">{{ errors.firstChoice }}</small></label>
+                  <label data-field="secondChoice"><span>第二志愿（可选）</span><select v-model="applicationDraft.secondChoice" :aria-invalid="Boolean(errors.secondChoice)" :aria-describedby="errors.secondChoice ? 'second-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="[, center] in applicationCenterOptions" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.secondChoice" id="second-choice-error" class="form-error">{{ errors.secondChoice }}</small></label>
+                  <label data-field="thirdChoice"><span>第三志愿（可选）</span><select v-model="applicationDraft.thirdChoice" :aria-invalid="Boolean(errors.thirdChoice)" :aria-describedby="errors.thirdChoice ? 'third-choice-error' : undefined"><option :value="undefined">未填写</option><option v-for="[, center] in applicationCenterOptions" :key="center" :value="center">{{ center }}</option></select><small v-if="errors.thirdChoice" id="third-choice-error" class="form-error">{{ errors.thirdChoice }}</small></label>
                   <label v-if="hasBaizePreference" data-field="baizeDirection" class="registration-fields__wide"><span>白泽意向方向</span><select v-model="applicationDraft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" :aria-describedby="errors.baizeDirection ? 'baize-direction-error' : undefined"><option value="">请选择方向</option><option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option></select><small v-if="errors.baizeDirection" id="baize-direction-error" class="form-error">{{ errors.baizeDirection }}</small></label>
                 </div>
                 <fieldset data-field="acceptsAdjustment" class="registration-adjustment" :aria-describedby="errors.acceptsAdjustment ? 'adjustment-error' : undefined"><legend>是否接受调剂</legend><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="true">接受调剂</label><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="false">不接受调剂</label><small v-if="errors.acceptsAdjustment" id="adjustment-error" class="form-error">{{ errors.acceptsAdjustment }}</small></fieldset>
@@ -518,7 +524,7 @@ onBeforeUnmount(() => {
             </form>
           </div>
 
-          <aside class="recruitment-application-aside"><p class="eyebrow">Application Notes</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p v-if="isMockApi">当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p><p v-else>提交前请确认资料准确；报名会关联当前开放批次，并通过正式 API 写入当前账号的报名记录。</p></aside>
+          <aside class="recruitment-application-aside"><p class="eyebrow">报名说明</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p v-if="isMockApi">当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p><p v-else>提交前请确认资料准确；报名会关联当前开放批次，并通过正式 API 写入当前账号的报名记录。</p></aside>
         </div>
       </div>
     </section>

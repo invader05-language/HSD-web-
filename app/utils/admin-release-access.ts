@@ -2,8 +2,9 @@ import { RELEASE_FEATURES, type ReleaseFeatures } from "../config/release-featur
 import { ref } from "vue";
 
 const RELEASE_NOTICE = "当前版本暂未开放" as const;
+export const HELP_CENTER_NOTICE = "帮助中心已停用" as const;
 export const RETIRED_MEDIA_LIBRARY_NOTICE = "媒体素材库已取消，请在活动、项目或画廊的编辑页直接上传素材。" as const;
-const ADMIN_RELEASE_NOTICES = [RELEASE_NOTICE, RETIRED_MEDIA_LIBRARY_NOTICE] as const;
+const ADMIN_RELEASE_NOTICES = [RELEASE_NOTICE, HELP_CENTER_NOTICE, RETIRED_MEDIA_LIBRARY_NOTICE] as const;
 
 export interface DisabledAdminRoute {
   to: string;
@@ -40,10 +41,10 @@ export function resolveDisabledRoute(
   features: ReleaseFeatures = RELEASE_FEATURES
 ): DisabledAdminRoute | undefined {
   if (!features.helpCenter && isRouteOrChild(path, "/admin/content/help")) {
-    return { to: "/admin/content", notice: RELEASE_NOTICE };
+    return { to: "/admin/content", notice: HELP_CENTER_NOTICE };
   }
-  if (!features.helpCenter && isRouteOrChild(path, "/help")) {
-    return { to: "/", notice: RELEASE_NOTICE };
+  if (!features.helpCenter && (isRouteOrChild(path, "/help") || isRouteOrChild(path, "/help-center"))) {
+    return { to: "/", notice: HELP_CENTER_NOTICE };
   }
   if (!features.auditLog && path.startsWith("/admin/logs")) {
     return { to: "/admin", notice: RELEASE_NOTICE };

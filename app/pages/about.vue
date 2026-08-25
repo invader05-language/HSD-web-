@@ -30,7 +30,7 @@ const publicMembers = computed(() => publicMembersGateway
 <template>
   <div>
     <PageBanner
-      eyebrow="About HSD"
+      eyebrow="关于 HSD"
       title="不只学习技术，更在真实协作中成长"
       description="白云 HSD 开发者部落隶属学校华为 ICT 学院相关学生组织体系，覆盖技术研发、内容传播、活动策划与人才成长。"
       tone="warm"
@@ -41,7 +41,7 @@ const publicMembers = computed(() => publicMembersGateway
     <section class="section">
       <div class="shell about-intro">
         <div>
-          <p class="eyebrow">Our Mission</p>
+          <p class="eyebrow">我们的使命</p>
           <h2>让个人成长进入真实项目，也让每种创造力被看见</h2>
         </div>
         <div>
@@ -55,7 +55,7 @@ const publicMembers = computed(() => publicMembersGateway
       <div class="shell">
         <div class="section-heading section-heading--wide">
           <div>
-            <p class="eyebrow">Core Team</p>
+          <p class="eyebrow">核心团队</p>
             <h2>核心人员重点展示</h2>
           </div>
           <div class="section-heading__aside">
@@ -81,7 +81,7 @@ const publicMembers = computed(() => publicMembersGateway
       <div class="shell">
         <div class="section-heading section-heading--wide">
           <div>
-            <p class="eyebrow">Member Directory</p>
+          <p class="eyebrow">成员名录</p>
             <h2>成员风采</h2>
           </div>
           <div class="section-heading__aside">
@@ -107,7 +107,7 @@ const publicMembers = computed(() => publicMembersGateway
       <div class="shell">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Collaboration</p>
+          <p class="eyebrow">协作方式</p>
             <h2>四个中心，平等协作</h2>
           </div>
         </div>

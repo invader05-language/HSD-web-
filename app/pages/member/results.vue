@@ -119,12 +119,12 @@ onBeforeUnmount(() => {
       <div class="member-results-hero__grid shell">
         <div class="member-results-hero__main">
           <p class="member-results-breadcrumb">成员空间&nbsp; / &nbsp;<strong>结果中心</strong></p>
-          <p class="eyebrow">Member Result Center</p>
+          <p class="eyebrow">成员结果中心</p>
           <h1>结果中心</h1>
           <p>查看本人当前有效的招新录取与阶段考核结果。结果信息仅对当前登录账号开放。</p>
         </div>
         <aside class="member-results-hero__batch" aria-label="当前招新批次">
-          <span>Current Recruitment</span>
+          <span>当前招新批次</span>
           <h2>{{ result.batchLabel }}</h2>
           <dl>
             <div><dt>当前账号</dt><dd>{{ currentMember?.name ?? "当前登录成员" }}</dd></div>
@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
           </button>
           <span v-if="assessmentStore.myResultsLoading" role="status">正在加载服务器结果…</span>
           <span v-else-if="resultsError" role="alert">结果加载失败（{{ resultsError }}）</span>
-          <span v-else>{{ recruitmentGateway ? "仅显示服务器已发布结果" : "当前为前端演示数据" }}</span>
+          <span v-else>仅显示当前账号可查看的已发布结果</span>
         </div>
 
         <section
@@ -225,7 +225,7 @@ onBeforeUnmount(() => {
                 id="member-result-contact"
                 class="member-result-panel member-result-contact"
               >
-                <header><h2>对应负责人</h2><span>演示数据</span></header>
+                <header><h2>对应负责人</h2><span>负责人信息</span></header>
                 <div v-for="contact in result.responsibleContacts" :key="contact.personId ?? contact.name">
                   <p>{{ contact.role }}</p>
                   <h3>{{ contact.name }}</h3>

@@ -80,7 +80,7 @@ onMounted(loadProductionDiscovery);
   <NuxtPage v-if="!isJoinLanding" />
   <div v-else>
     <PageBanner
-      eyebrow="Join HSD · Recruitment"
+      eyebrow="加入 HSD · 招新"
       title="从你的兴趣出发，进入一次真实协作"
       description="无论你关注开发、摄影、设计、活动还是组织成长，都可以在四大中心找到适合的参与方式。"
       tone="red"
@@ -96,15 +96,15 @@ onMounted(loadProductionDiscovery);
     <section class="section section--compact" aria-live="polite">
       <div class="shell">
         <div v-if="discoveryError" class="join-batch-notice join-batch-notice--closed" role="alert">
-          <div><p class="eyebrow">Recruitment Schedule</p><h2>招新安排暂时不可用</h2><p>{{ discoveryError }}</p></div>
+          <div><p class="eyebrow">招新安排</p><h2>招新安排暂时不可用</h2><p>{{ discoveryError }}</p></div>
           <button type="button" class="button button--ghost" @click="loadProductionDiscovery">重新读取</button>
         </div>
         <div v-else-if="discoveryLoading" class="join-batch-notice join-batch-notice--closed" role="status">
-          <div><p class="eyebrow">Recruitment Schedule</p><h2>正在读取招新安排</h2><p>请稍候，页面不会使用本地示例批次替代真实数据。</p></div>
+          <div><p class="eyebrow">招新安排</p><h2>正在读取招新安排</h2><p>请稍候，正在读取当前开放批次。</p></div>
         </div>
         <div v-else-if="currentBatch" class="join-batch-notice">
           <div>
-            <p class="eyebrow">Current Recruitment Batch</p>
+            <p class="eyebrow">当前招新批次</p>
             <h2>{{ currentBatch.name }}</h2>
             <p>报名时间：{{ new Date(currentBatch.startAt).toLocaleDateString("zh-CN") }} — {{ new Date(currentBatch.endAt).toLocaleDateString("zh-CN") }}。系统会自动将本次报名关联到当前批次。</p>
           </div>
@@ -112,7 +112,7 @@ onMounted(loadProductionDiscovery);
         </div>
         <div v-else class="join-batch-notice join-batch-notice--closed" role="status">
           <div>
-            <p class="eyebrow">Recruitment Schedule</p>
+            <p class="eyebrow">招新安排</p>
             <h2>{{ pausedBatch ? `当前批次“${pausedBatch.name}”报名已暂停` : upcomingBatch ? `下一批次：${upcomingBatch.name}` : "当前暂无招新安排" }}</h2>
             <p v-if="pausedBatch">管理员暂时关闭了报名入口，已填写内容不会被提交；恢复报名后可继续提交。</p>
             <p v-else-if="upcomingBatch">报名将于 {{ new Date(upcomingBatch.startAt).toLocaleDateString("zh-CN") }} 开放，当前暂不能提交报名。</p>
@@ -125,7 +125,7 @@ onMounted(loadProductionDiscovery);
     <section class="section section--warm">
       <div class="shell">
         <div class="section-heading section-heading--wide">
-          <div><p class="eyebrow">Choose Your Direction</p><h2>四个方向，任选其一开始</h2></div>
+          <div><p class="eyebrow">选择发展方向</p><h2>四个方向，任选其一开始</h2></div>
           <p>报名时选择一个首选中心和一个兴趣方向，后续可在培训与项目中跨中心协作。</p>
         </div>
         <div class="join-directions">
@@ -137,7 +137,7 @@ onMounted(loadProductionDiscovery);
     </section>
     <section class="section">
       <div class="shell join-process">
-        <p class="eyebrow">Application Flow</p>
+        <p class="eyebrow">报名流程</p>
         <h2>报名流程</h2>
         <ol>
           <li><span>01</span><strong>登录并填写申请</strong><p>完善基础资料、方向偏好与个人介绍。</p></li>

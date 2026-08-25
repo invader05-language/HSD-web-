@@ -40,13 +40,13 @@ describe("admin release feature availability", () => {
     expect(resolveDisabledRoute("/admin/recruitment/batches", RELEASE_FEATURES)).toBeUndefined();
   });
 
-  it("enables Help Center routes and owner navigation after the production API is complete", () => {
-    expect(RELEASE_FEATURES.helpCenter).toBe(true);
-    expect(resolveDisabledRoute("/help", RELEASE_FEATURES)).toBeUndefined();
-    expect(resolveDisabledRoute("/admin/content/help", RELEASE_FEATURES)).toBeUndefined();
-    expect(resolveDisabledRoute("/help-center", RELEASE_FEATURES)).toBeUndefined();
+  it("permanently disables Help Center routes and navigation", () => {
+    expect(RELEASE_FEATURES.helpCenter).toBe(false);
+    expect(resolveDisabledRoute("/help", RELEASE_FEATURES)).toEqual({ to: "/", notice: "帮助中心已停用" });
+    expect(resolveDisabledRoute("/admin/content/help", RELEASE_FEATURES)).toEqual({ to: "/admin/content", notice: "帮助中心已停用" });
+    expect(resolveDisabledRoute("/help-center", RELEASE_FEATURES)).toEqual({ to: "/", notice: "帮助中心已停用" });
     const ids = getAdminNavigationForAccess({ canManageAdminAccounts: true }, RELEASE_FEATURES).flatMap((group) => group.items.map((item) => item.id));
-    expect(ids).toContain("help");
+    expect(ids).not.toContain("help");
     const adminIds = getAdminNavigationForAccess({ canManageAdminAccounts: false, canConfigurePortal: false }, RELEASE_FEATURES).flatMap((group) => group.items.map((item) => item.id));
     expect(adminIds).not.toContain("help");
   });

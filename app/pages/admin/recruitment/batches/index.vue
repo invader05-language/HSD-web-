@@ -44,7 +44,9 @@ const createMessage = ref("");
 const createError = ref("");
 const creating = ref(false);
 const productionLoading = ref(!isMockApi);
+const productionCenterLoading = ref(!isMockApi);
 const productionError = ref("");
+const productionCenterError = ref("");
 const productionBatches = ref<AdminRecruitmentBatchView[]>([]);
 const productionPage = ref(1);
 const productionPageSize = ref(20);
@@ -55,7 +57,7 @@ const draftForm = reactive({
   name: "",
   startAt: "",
   endAt: "",
-  openCenterIds: ["baize-development", "new-media", "tuowei-planning", "talent-development"],
+  openCenterIds: isMockApi ? ["baize-development", "new-media", "tuowei-planning", "talent-development"] : [],
 });
 const mockCenterOptions = [
   ["baize-development", RECRUITMENT_CENTERS[0]],
@@ -91,8 +93,15 @@ const applicantTotal = computed(() => visibleBatches.value.reduce((total, batch)
 const openCenterTotal = computed(() => visibleBatches.value.find((batch) => batch.statusKey === "open")?.centerCount ?? 0);
 const draftCount = computed(() => visibleBatches.value.filter((batch) => batch.statusKey === "draft").length);
 const productionPageCount = computed(() => Math.max(1, Math.ceil(productionTotal.value / productionPageSize.value)));
+const createDisabled = computed(() => creating.value || (!isMockApi && (
+  productionCenterLoading.value || productionCenterError.value.length > 0 || centerOptions.value.length === 0
+)));
 
 function openCreateDrawer() {
+  if (createDisabled.value) {
+    createError.value = productionCenterError.value || "开放中心尚未读取完成，暂不能新建批次。";
+    return;
+  }
   createError.value = "";
   draftForm.name = "";
   draftForm.startAt = "";
@@ -111,35 +120,36 @@ async function loadProductionBatches() {
   if (isMockApi || !recruitmentGateway) return;
   const requestGeneration = ++productionLoadGeneration;
   productionLoading.value = true;
+  productionCenterLoading.value = true;
   productionError.value = "";
-  try {
-    if (!organizationGateway) throw new Error("ADMIN_ORGANIZATION_GATEWAY_UNAVAILABLE");
-    const centersRequest = organizationGateway.listCenters().then((centers) => {
-      if (requestGeneration === productionLoadGeneration) {
-        productionCenterOptions.value = centers.items
-          .filter((center) => center.active)
-          .map((center) => [center.id, center.name] as const);
-      }
-      return centers;
-    });
-    const [response] = await Promise.all([
-      recruitmentGateway.listAdminBatches(productionPage.value, productionPageSize.value),
-      centersRequest,
-    ]);
-    if (requestGeneration !== productionLoadGeneration) return;
-    productionBatches.value = response.items.map(mapAdminRecruitmentBatch);
-    productionPage.value = response.page;
-    productionPageSize.value = response.pageSize;
-    productionTotal.value = response.total;
-  } catch {
-    if (requestGeneration !== productionLoadGeneration) return;
-    productionBatches.value = [];
-    productionTotal.value = 0;
-    productionCenterOptions.value = [];
-    productionError.value = "暂时无法读取生产招新批次，请稍后重试。";
-  } finally {
-    if (requestGeneration === productionLoadGeneration) productionLoading.value = false;
-  }
+  productionCenterError.value = "";
+  const batchRequest = recruitmentGateway.listAdminBatches(productionPage.value, productionPageSize.value)
+    .then((response) => {
+      if (requestGeneration !== productionLoadGeneration) return;
+      productionBatches.value = response.items.map(mapAdminRecruitmentBatch);
+      productionPage.value = response.page;
+      productionPageSize.value = response.pageSize;
+      productionTotal.value = response.total;
+    })
+    .catch(() => {
+      if (requestGeneration !== productionLoadGeneration) return;
+      productionBatches.value = [];
+      productionTotal.value = 0;
+      productionError.value = "暂时无法读取生产招新批次，请稍后重试。";
+    })
+    .finally(() => { if (requestGeneration === productionLoadGeneration) productionLoading.value = false; });
+  const centerRequest = (organizationGateway?.listCenters() ?? Promise.reject(new Error("ADMIN_ORGANIZATION_GATEWAY_UNAVAILABLE")))
+    .then((response) => {
+      if (requestGeneration !== productionLoadGeneration) return;
+      productionCenterOptions.value = response.items.filter((center) => center.active).map((center) => [center.id, center.name] as const);
+    })
+    .catch(() => {
+      if (requestGeneration !== productionLoadGeneration) return;
+      productionCenterOptions.value = [];
+      productionCenterError.value = "暂时无法读取开放中心，请稍后重试。";
+    })
+    .finally(() => { if (requestGeneration === productionLoadGeneration) productionCenterLoading.value = false; });
+  await Promise.all([batchRequest, centerRequest]);
 }
 
 async function saveDraft() {
@@ -191,12 +201,14 @@ watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
     >
       <template #actions>
         <button v-if="!isMockApi" type="button" class="button button--ghost" :disabled="productionLoading" aria-label="重新读取生产招新批次" @click="loadProductionBatches">重新读取</button>
-        <button v-if="session.canManageAdminAccounts" type="button" class="button" :disabled="creating" @click="openCreateDrawer">新建招新批次</button>
+        <button v-if="session.canManageAdminAccounts" type="button" class="button" :disabled="createDisabled" :title="createDisabled && !isMockApi ? '开放中心加载完成后才能新建批次' : undefined" @click="openCreateDrawer">新建招新批次</button>
       </template>
     </AdminPageHeading>
 
     <p v-if="productionLoading" class="admin-save-message" role="status">正在读取生产招新批次…</p>
     <p v-else-if="productionError" class="admin-save-message" role="alert">{{ productionError }} <button type="button" class="admin-text-action" @click="loadProductionBatches">重新读取</button></p>
+    <p v-if="productionCenterLoading" class="admin-save-message" role="status">正在读取开放中心…</p>
+    <p v-else-if="productionCenterError" class="admin-save-message" role="alert">{{ productionCenterError }} <button type="button" class="admin-text-action" @click="loadProductionBatches">重新读取</button></p>
     <p v-if="createMessage" class="admin-save-message" role="status">{{ createMessage }}</p>
 
     <section class="admin-summary-strip" aria-label="批次概览">

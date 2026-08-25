@@ -42,7 +42,7 @@ watch(active, () => {
   <NuxtPage v-if="route.params.slug" />
   <div v-else>
     <PageBanner
-      eyebrow="Resource Center"
+      eyebrow="资源中心"
       title="把方法、模板与学习路线沉淀下来"
       description="所有条目先进入详情页；当前文件类资源尚未接入，内部资料登录仅用于确认成员身份。"
       tone="warm"

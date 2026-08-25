@@ -13,9 +13,8 @@ describe("SITE_CONFIG", () => {
       "媒体画廊",
       "资源中心",
       "结果中心",
-      "加入我们",
-      "帮助中心"
+      "加入我们"
     ]);
-    expect(SITE_CONFIG.navigation.at(-1)).toEqual({ label: "帮助中心", to: "/help" });
+    expect(SITE_CONFIG.navigation.some((item) => item.to === "/help")).toBe(false);
   });
 });

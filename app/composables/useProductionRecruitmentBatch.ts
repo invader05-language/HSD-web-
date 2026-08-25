@@ -4,6 +4,7 @@ import type {
   ArchiveRecruitmentBatchPayload,
   RecruitmentBatchCommandDto,
   RecruitmentBatchLifecycleEventListDto,
+  UpdateRecruitmentBatchDto,
 } from "../../packages/api-client/src";
 import {
   mapAdminRecruitmentBatch,
@@ -17,6 +18,7 @@ interface AdminBatchGateway {
   listAdminBatchLifecycleEvents?(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
   archiveAdminBatch?(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
   runAdminBatchCommand?(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
+  updateAdminBatch?(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
 }
 
 type DetailStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "error";
@@ -253,6 +255,28 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
+  async function updateDraft(payload: UpdateRecruitmentBatchDto): Promise<boolean> {
+    if (!batch.value || !currentBatchId || !gateway.updateAdminBatch) {
+      commandError.value = "真实批次编辑接口暂不可用。";
+      return false;
+    }
+    const requestGeneration = loadGeneration;
+    commandError.value = "";
+    try {
+      const response = await gateway.updateAdminBatch(currentBatchId, payload);
+      if (requestGeneration !== loadGeneration) return false;
+      batch.value = mapAdminRecruitmentBatch(response);
+      await refreshLifecycle(currentBatchId, requestGeneration);
+      return true;
+    } catch (cause) {
+      if (requestGeneration === loadGeneration) {
+        commandError.value = errorMessage(cause, "批次草稿保存失败，请刷新后重试。");
+        if ((cause as { status?: number })?.status === 409) await refresh(currentBatchId, requestGeneration);
+      }
+      return false;
+    }
+  }
+
   return {
     batch,
     lifecycleEvents,
@@ -274,5 +298,6 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     loadLifecyclePage,
     archive,
     runCommand,
+    updateDraft,
   };
 }

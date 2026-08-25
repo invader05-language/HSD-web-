@@ -16,8 +16,27 @@ export function createApiContentGateway(options: ApiContentGatewayOptions) {
     return payload;
   };
   const client = createHsdApiClient(transport);
+  async function readPublicCollection(path: string): Promise<{ items: Array<Record<string, unknown>>; page?: number; pageSize?: number; total?: number }> {
+    const response = await fetcher(`${apiBase}${path}`, { method: "GET", credentials: "include", headers: { "X-Request-ID": requestId() } });
+    const payload: unknown = await response.json();
+    if (!response.ok) throw new ContentApiError(response.status, isError(payload) ? payload.code : "PUBLIC_CONTENT_REQUEST_FAILED", isError(payload) ? payload.message : "Public content request failed", isError(payload) ? payload.requestId : undefined);
+    if (!payload || typeof payload !== "object" || !Array.isArray((payload as { items?: unknown }).items)) throw new ContentApiError(502, "PUBLIC_COLLECTION_RESPONSE_CONTRACT_MISMATCH", "公开列表响应格式不正确");
+    return payload as { items: Array<Record<string, unknown>>; page?: number; pageSize?: number; total?: number };
+  }
+  const activities = {
+    ...client.activities,
+    listPublic: (query?: { page?: number; pageSize?: number }) => query
+      ? readPublicCollection(`/api/v1/public/activities?page=${query.page ?? 1}&pageSize=${query.pageSize ?? 12}`)
+      : client.activities.listPublic(),
+  };
+  const galleries = {
+    ...client.galleries,
+    listPublic: (query?: { page?: number; pageSize?: number; category?: string }) => query
+      ? readPublicCollection(`/api/v1/public/galleries?page=${query.page ?? 1}&pageSize=${query.pageSize ?? 12}${query.category ? `&category=${encodeURIComponent(query.category)}` : ""}`)
+      : client.galleries.listPublic(),
+  };
   return {
-    projects: client.projects, activities: client.activities, registrations: client.registrations, galleries: client.galleries, resources: client.resources, help: client.help, portal: client.portal, content: client.content, media: client.media, homepage: client.homepage,
+    projects: client.projects, activities, registrations: client.registrations, galleries, resources: client.resources, help: client.help, portal: client.portal, content: client.content, media: client.media, homepage: client.homepage,
     project: (slug: string) => client.projects.public(slug), activity: (slug: string) => client.activities.public(slug), gallery: (slug: string) => client.galleries.public(slug), resource: (slug: string) => client.resources.public(slug), resourceVersion: (slug: string, versionLabel: string) => client.resources.publicVersion(slug, versionLabel),
   };
 }

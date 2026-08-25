@@ -174,12 +174,12 @@ if (organizationGateway && center.value) {
     <section class="section section--warm">
       <div class="shell center-profile">
         <div class="center-profile__intro">
-          <p class="eyebrow">Center Mission</p>
+          <p class="eyebrow">中心使命</p>
           <h2>中心使命</h2>
           <p>{{ center.mission }}</p>
         </div>
         <section class="center-profile__topics" aria-labelledby="center-topics-title">
-          <p class="eyebrow">Focus Areas</p>
+          <p class="eyebrow">重点方向</p>
           <h2 id="center-topics-title">主要方向</h2>
           <ul>
             <li v-for="topic in center.topics" :key="topic">{{ topic }}</li>
@@ -187,7 +187,7 @@ if (organizationGateway && center.value) {
         </section>
         <div class="center-profile__tracks">
           <section>
-            <p class="eyebrow">Responsibilities</p>
+            <p class="eyebrow">职责范围</p>
             <h2>中心职责</h2>
             <ol>
               <li v-for="(item, index) in center.responsibilities" :key="item">
@@ -197,7 +197,7 @@ if (organizationGateway && center.value) {
             </ol>
           </section>
           <section>
-            <p class="eyebrow">Learning Path</p>
+            <p class="eyebrow">成长路径</p>
             <h2>成长路径</h2>
             <ol>
               <li v-for="(item, index) in center.learningPath" :key="item">
@@ -209,7 +209,7 @@ if (organizationGateway && center.value) {
         </div>
         <section class="center-profile__collaboration" aria-labelledby="center-collaboration-title">
           <div>
-            <p class="eyebrow">Collaboration</p>
+            <p class="eyebrow">协作方式</p>
             <h2 id="center-collaboration-title">协作方式</h2>
           </div>
           <p>{{ center.collaboration }}</p>
@@ -221,7 +221,7 @@ if (organizationGateway && center.value) {
       <div class="shell center-people">
         <OrganizationLeadershipPanel
           :people="ministers"
-          eyebrow="Center Leadership"
+          eyebrow="中心负责人"
           heading="中心管理团队"
           role-label="中心部长"
           count-label="部长"
@@ -234,7 +234,7 @@ if (organizationGateway && center.value) {
         />
         <div class="section-heading section-heading--wide">
           <div>
-            <p class="eyebrow">People</p>
+            <p class="eyebrow">成员</p>
             <h2>相关成员</h2>
           </div>
           <p>共 {{ people.length }} 位成员 · 当前显示 {{ activeFilterLabel }} {{ filteredPeople.length }} 人</p>
@@ -281,7 +281,7 @@ if (organizationGateway && center.value) {
     <section class="section">
       <div class="shell center-switcher">
         <div>
-          <p class="eyebrow">Four Centers</p>
+          <p class="eyebrow">四大中心</p>
           <h2>继续了解其他中心</h2>
         </div>
         <nav aria-label="四大中心详情导航">
@@ -309,7 +309,7 @@ if (organizationGateway && center.value) {
     <section class="recruitment-band">
       <div class="recruitment-band__inner shell">
         <div>
-          <p class="eyebrow">Join This Center</p>
+          <p class="eyebrow">加入这个中心</p>
           <h2>从一次真实参与开始</h2>
           <p>{{ center.joinHint }}</p>
         </div>

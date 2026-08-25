@@ -21,7 +21,9 @@ import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import type { RecruitmentBatch } from "~/types/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { createProductionRecruitmentBatchController } from "~/composables/useProductionRecruitmentBatch";
+import type { UpdateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
 
 definePageMeta({ layout: "admin" });
 
@@ -54,6 +56,7 @@ const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
 const applicationStore = isMockApi ? useRecruitmentApplicationStore() : undefined;
 const assessmentStore = isMockApi ? useRecruitmentAssessmentStore() : undefined;
 const recruitmentGateway = useRecruitmentGateway();
+const organizationGateway = useOrganizationGateway();
 const productionBatch = recruitmentGateway
   ? createProductionRecruitmentBatchController(recruitmentGateway)
   : undefined;
@@ -116,6 +119,7 @@ const canConfirmPendingAction = computed(() => {
 });
 const editOpen = ref(false);
 const editError = ref("");
+const productionCenterOptions = ref<ReadonlyArray<readonly [string, string]>>([]);
 const editForm = reactive({
   name: "",
   startAt: "",
@@ -127,6 +131,7 @@ const centerOptions = RECRUITMENT_CENTERS.map((label, index) => [
   ["baize-development", "new-media", "tuowei-planning", "talent-development"][index] ?? label,
   label,
 ] as const);
+const availableCenterOptions = computed<ReadonlyArray<readonly [string, string]>>(() => isMockApi ? centerOptions : productionCenterOptions.value);
 
 const applications = computed(() => batch.value
   ? applicationStore?.getApplicationsForBatch(batchId.value)
@@ -362,7 +367,7 @@ function toDateTime(value: string, endOfDay = false) {
 }
 
 function openEditor() {
-  if (!isMockApi || !batch.value || !canManage.value || !isDraft.value) return;
+  if (!batch.value || !canManage.value || !isDraft.value) return;
   editError.value = "";
   editForm.name = batch.value.name;
   editForm.startAt = dateInput(batch.value.startAt);
@@ -371,15 +376,23 @@ function openEditor() {
   editOpen.value = true;
 }
 
-function saveEditor() {
-  if (!isMockApi || !batch.value || !batchStore) return;
+async function saveEditor() {
+  if (!batch.value) return;
   try {
-    batchStore.updateBatch(batchId.value, {
+    const payload = {
       name: editForm.name,
       startAt: toDateTime(editForm.startAt),
       endAt: toDateTime(editForm.endAt, true),
       openCenterIds: editForm.openCenterIds,
-    }, "更新招新批次草稿");
+    };
+    if (!isMockApi) {
+      if (!productionBatch) return;
+      const saved = await productionBatch.updateDraft({ ...payload, expectedVersion: batch.value.version ?? 1, reason: "更新招新批次草稿" } satisfies UpdateRecruitmentBatchDto);
+      if (!saved) throw new Error(productionBatch.commandError.value || "批次草稿保存失败");
+    } else {
+      if (!batchStore) return;
+      batchStore.updateBatch(batchId.value, payload, "更新招新批次草稿");
+    }
     editOpen.value = false;
     editError.value = "";
     actionMessage.value = "批次草稿已更新，请重新完成发布检查。";
@@ -469,6 +482,16 @@ async function loadProductionBatch() {
 }
 
 onMounted(loadProductionBatch);
+onMounted(async () => {
+  if (!isMockApi && organizationGateway) {
+    try {
+      const response = await organizationGateway.listCenters();
+      productionCenterOptions.value = response.items.filter((center) => center.active).map((center) => [center.id, center.name] as const);
+    } catch {
+      productionCenterOptions.value = [];
+    }
+  }
+});
 watch(batchId, () => {
   clearActionState();
   void loadProductionBatch();
@@ -489,7 +512,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div class="admin-batch-actions">
           <NuxtLink class="button button--ghost" to="/admin/recruitment/batches">返回批次列表</NuxtLink>
           <NuxtLink class="button button--ghost" to="/join">查看用户端页面</NuxtLink>
-          <button v-if="isMockApi && isDraft && canManage" type="button" class="button button--ghost" @click="openEditor">编辑批次</button>
+          <button v-if="isDraft && canManage" type="button" class="button button--ghost" @click="openEditor">编辑批次</button>
           <button v-if="isMockApi && statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok" @click="requestAction('publish')">发布批次</button>
           <button v-if="isMockApi && statusKey === 'upcoming'" type="button" class="button" :disabled="!canManage" @click="requestAction('openNow')">立即开放</button>
           <button v-if="isMockApi && statusKey === 'open'" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('pause')">暂停报名</button>
@@ -597,12 +620,12 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </section>
     </div>
 
-    <div v-if="isMockApi && editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
+    <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="编辑招新批次">
         <header class="admin-drawer__header"><div><span>Edit Recruitment Cycle</span><h2>编辑招新批次</h2><p>仅草稿可以编辑，保存后需要重新完成发布准备检查。</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
         <div class="admin-drawer__body">
           <div class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
-          <section class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in centerOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
+          <section class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
           <p v-if="editError" class="admin-save-message admin-save-message--error" role="alert">{{ editError }}</p>
         </div>
         <footer class="admin-drawer__footer"><span>联盟总负责人编辑 · 保存为草稿</span><button type="button" class="button button--ghost" @click="editOpen = false">取消</button><button type="button" class="button" @click="saveEditor">保存修改</button></footer>

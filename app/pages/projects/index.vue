@@ -40,7 +40,7 @@ watch(activeFilter, () => {
 <template>
   <div>
     <PageBanner
-      eyebrow="Project Showcase"
+      eyebrow="项目成果"
       title="把问题变成可验证的解决方案"
       description="项目从真实校园问题出发，经过需求研究、技术验证、跨中心协作与持续迭代，形成可演示、可复盘的成果。"
       tone="dark"
