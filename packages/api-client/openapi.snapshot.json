@@ -8767,7 +8767,28 @@
     "/api/v1/public/activities": {
       "get": {
         "operationId": "ActivitiesPublicController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number; provide with pageSize for paginated output.",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -9659,7 +9680,42 @@
     "/api/v1/public/galleries": {
       "get": {
         "operationId": "GalleriesPublicController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number; provide with pageSize for paginated output.",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "event_documentary",
+                "visual_creation",
+                "video_work",
+                "people_stories"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -12042,6 +12098,91 @@
         "summary": "Check whether the API can reach its database",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/public/timeline": {
+      "get": {
+        "operationId": "PublicTimelineController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 12,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "activity",
+                "article",
+                "notice"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTimelineListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "summary": "List the public activity, news, and notice timeline",
+        "tags": [
+          "Public timeline"
         ]
       }
     }
@@ -17692,6 +17833,15 @@
             "items": {
               "$ref": "#/components/schemas/PublicActivityResponseDto"
             }
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
           }
         },
         "required": [
@@ -18168,6 +18318,15 @@
             "items": {
               "$ref": "#/components/schemas/PublicGalleryResponseDto"
             }
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
           }
         },
         "required": [
@@ -21017,6 +21176,85 @@
         "required": [
           "slug",
           "title"
+        ]
+      },
+      "PublicTimelineItemDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "activity",
+              "article",
+              "notice"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "eventAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "media": {
+            "type": "object",
+            "nullable": true
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "entityType",
+          "slug",
+          "title",
+          "summary",
+          "publishedAt",
+          "eventAt",
+          "available",
+          "to"
+        ]
+      },
+      "PublicTimelineListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicTimelineItemDto"
+            }
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
         ]
       }
     },

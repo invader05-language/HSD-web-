@@ -1277,6 +1277,9 @@ export type PromoteManagedMemberDto = {
 
 export type PublicActivityListResponseDto = {
   "items": Array<PublicActivityResponseDto>;
+  "page"?: number;
+  "pageSize"?: number;
+  "total"?: number;
 };
 
 export type PublicActivityResponseDto = {
@@ -1345,6 +1348,9 @@ export type PublicCoreRoleResponseDto = {
 
 export type PublicGalleryListResponseDto = {
   "items": Array<PublicGalleryResponseDto>;
+  "page"?: number;
+  "pageSize"?: number;
+  "total"?: number;
 };
 
 export type PublicGalleryMediaResponseDto = {
@@ -1497,6 +1503,25 @@ export type PublicResourceSummaryDto = {
   "format": "web" | "pdf" | "docx" | "zip" | "external";
   "versionLabel": string;
   "access": "public" | "member";
+};
+
+export type PublicTimelineItemDto = {
+  "entityType": "activity" | "article" | "notice";
+  "slug": string;
+  "title": string;
+  "summary": (string) | null;
+  "publishedAt": (string) | null;
+  "eventAt": (string) | null;
+  "available": boolean;
+  "media"?: (Record<string, unknown>) | null;
+  "to": string;
+};
+
+export type PublicTimelineListResponseDto = {
+  "items": Array<PublicTimelineItemDto>;
+  "page": number;
+  "pageSize": number;
+  "total": number;
 };
 
 export type PublishAssessmentDto = {
@@ -2091,6 +2116,7 @@ export const API_V1_PATHS = {
   adminActivityOffline: "/api/v1/admin/activities/{id}/offline",
   publicActivities: "/api/v1/public/activities",
   publicActivity: "/api/v1/public/activities/{slug}",
+  publicTimeline: "/api/v1/public/timeline",
   activityRegistrationCreate: "/api/v1/activities/{slug}/registrations",
   activityRegistrationMine: "/api/v1/activities/{slug}/registration",
   activityRegistrationCancel: "/api/v1/registrations/{id}/cancel",
@@ -2233,6 +2259,7 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/activities/{id}/offline": { method: "POST", path: "/api/v1/admin/activities/{id}/offline" },
   "GET /api/v1/public/activities": { method: "GET", path: "/api/v1/public/activities" },
   "GET /api/v1/public/activities/{slug}": { method: "GET", path: "/api/v1/public/activities/{slug}" },
+  "GET /api/v1/public/timeline": { method: "GET", path: "/api/v1/public/timeline" },
   "POST /api/v1/activities/{slug}/registrations": { method: "POST", path: "/api/v1/activities/{slug}/registrations" },
   "GET /api/v1/activities/{slug}/registration": { method: "GET", path: "/api/v1/activities/{slug}/registration" },
   "POST /api/v1/registrations/{id}/cancel": { method: "POST", path: "/api/v1/registrations/{id}/cancel" },
@@ -2381,6 +2408,7 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/activities/{id}/offline": AdminActivityResponseDto;
   "GET /api/v1/public/activities": PublicActivityListResponseDto;
   "GET /api/v1/public/activities/{slug}": PublicActivityResponseDto;
+  "GET /api/v1/public/timeline": PublicTimelineListResponseDto;
   "POST /api/v1/activities/{slug}/registrations": RegistrationResponseDto;
   "GET /api/v1/activities/{slug}/registration": RegistrationResponseDto;
   "POST /api/v1/registrations/{id}/cancel": RegistrationResponseDto;
@@ -2750,6 +2778,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/public/activities/{slug}": {
     "$ref": "#/components/schemas/PublicActivityResponseDto"
+  },
+  "GET /api/v1/public/timeline": {
+    "$ref": "#/components/schemas/PublicTimelineListResponseDto"
   },
   "POST /api/v1/activities/{slug}/registrations": {
     "$ref": "#/components/schemas/RegistrationResponseDto"
@@ -8483,6 +8514,15 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "$ref": "#/components/schemas/PublicActivityResponseDto"
         }
+      },
+      "page": {
+        "type": "number"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
       }
     },
     "required": [
@@ -8959,6 +8999,15 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "$ref": "#/components/schemas/PublicGalleryResponseDto"
         }
+      },
+      "page": {
+        "type": "number"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
       }
     },
     "required": [
@@ -11808,6 +11857,85 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "slug",
       "title"
+    ]
+  },
+  "PublicTimelineItemDto": {
+    "type": "object",
+    "properties": {
+      "entityType": {
+        "type": "string",
+        "enum": [
+          "activity",
+          "article",
+          "notice"
+        ]
+      },
+      "slug": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string",
+        "nullable": true
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "eventAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "media": {
+        "type": "object",
+        "nullable": true
+      },
+      "to": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "entityType",
+      "slug",
+      "title",
+      "summary",
+      "publishedAt",
+      "eventAt",
+      "available",
+      "to"
+    ]
+  },
+  "PublicTimelineListResponseDto": {
+    "type": "object",
+    "properties": {
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PublicTimelineItemDto"
+        }
+      },
+      "page": {
+        "type": "number"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "items",
+      "page",
+      "pageSize",
+      "total"
     ]
   }
 } as const;
