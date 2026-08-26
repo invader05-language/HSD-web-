@@ -139,10 +139,6 @@ const browserOperations = {
   adminHelpCreate: "POST /api/v1/admin/help",
   adminHelpUpdate: { operation: "PATCH /api/v1/admin/help/{id}/draft", successStatus: "200" },
   adminHelpPublish: "POST /api/v1/admin/help/{id}/publish",
-  adminRecycle: "GET /api/v1/admin/recycle-bin",
-  adminRecycleHonorSoftDelete: "POST /api/v1/admin/recycle-bin/honors/{publicId}",
-  adminRecycleHonorRestore: { operation: "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore", successStatus: "200" },
-  adminRecycleHonorHardDelete: { operation: "DELETE /api/v1/admin/recycle-bin/honors/{publicId}", successStatus: "200" },
   publicHelp: "GET /api/v1/public/help",
   publicHelpDetail: "GET /api/v1/public/help/{slug}",
 };

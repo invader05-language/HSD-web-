@@ -5,11 +5,9 @@ import { createApiHonorsGateway } from '../../app/services/honors/api-honors.gat
 import { createHonorsGatewayForRuntime } from '../../app/composables/useHonorsGateway'
 import { useHonorsStore } from '../../app/stores/honors'
 import { useMemberHonorsStore } from '../../app/stores/member-honors'
-import { computed, createSSRApp, defineComponent, nextTick, reactive, ref } from 'vue'
+import { computed, createSSRApp, defineComponent, reactive, ref } from 'vue'
 import { renderToString } from 'vue/server-renderer'
-import { flushPromises, mount } from '@vue/test-utils'
 import MemberHonorsPage from '../../app/pages/member/honors.vue'
-import AdminHonorsPage from '../../app/pages/admin/honors.vue'
 
 describe('Honors production API integration', () => {
   beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
@@ -26,52 +24,6 @@ describe('Honors production API integration', () => {
     expect(fetcher).toHaveBeenLastCalledWith(`https://api.example.test/api/v1/admin/honors/${approved.id}/approve`, {
       method: 'POST', credentials: 'include', headers: { 'X-Request-ID': 'honor-ui-1', 'Content-Type': 'application/json', 'X-CSRF-Token': 'csrf-token' }, body: JSON.stringify({ expectedVersion: 1 }),
     })
-  })
-
-  it('soft deletes an Honor from the production review store using confirmation, CSRF, version, and external id', async () => {
-    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5d', publicId: 'hon_external_soft_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Archive me', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
-    const recycled = { id: honor.id, type: 'honor', title: honor.title, centerName: 'Alpha', deletedAt: '2026-08-12T00:00:00.000Z', retentionEndsAt: '2026-09-11T00:00:00.000Z', version: 3, restoreEligible: true }
-    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(recycled), { status: 201, headers: { 'Content-Type': 'application/json' } }))
-    const gateway = createApiHonorsGateway({ apiBase: 'https://api.example.test', fetcher, readCookie: () => 'csrf-soft-delete', createRequestId: () => 'honor-soft-delete-ui' })
-    const store = useHonorsStore(); store.items = [honor]
-    const removed = await store.softDelete(gateway, honor.id, honor.publicId, honor.version, true)
-    expect(removed).toBe(true)
-    expect(store.items).toEqual([])
-    expect(fetcher).toHaveBeenCalledWith('https://api.example.test/api/v1/admin/recycle-bin/honors/hon_external_soft_delete', {
-      method: 'POST', credentials: 'include', headers: { 'X-Request-ID': 'honor-soft-delete-ui', 'Content-Type': 'application/json', 'X-CSRF-Token': 'csrf-soft-delete' }, body: JSON.stringify({ expectedVersion: 2 }),
-    })
-  })
-
-  it('keeps the Honor visible and exposes the API error when production soft delete fails', async () => {
-    const honor = { id: 'hon_failed_soft_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Keep me', type: 'service', description: '', awardedAt: '2026-08-01', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
-    const store = useHonorsStore(); store.items = [honor]
-    expect(await store.softDelete({ softDelete: vi.fn().mockRejectedValue(new Error('RECYCLE_WRITE_FAILED')) } as never, honor.id, honor.id, honor.version, true)).toBe(false)
-    expect(store.items).toEqual([honor])
-    expect(store.apiError).toMatchObject({ message: 'RECYCLE_WRITE_FAILED' })
-  })
-
-  it('moves a selected production Honor into Recycle from the mounted admin page', async () => {
-    const honor = { id: '9005f216-3ea1-4e37-86f8-15f906505e5e', publicId: 'hon_external_page_delete', personId: '5c3e57e2-379e-450c-866f-16745f6a54f1', centerId: 'd83e2372-3776-4854-9418-eaf831251bea', memberName: 'Member', title: 'Mounted archive', type: 'service', description: '', awardedAt: '2026-08-01', awardedDatePrecision: 'day', awardedDateLabel: '2026年8月1日', proofReference: '', publicConsent: true, status: 'approved', version: 2, submittedAt: '2026-08-01T00:00:00.000Z' }
-    const recycled = { id: honor.id, type: 'honor', title: honor.title, centerName: 'Alpha', deletedAt: '2026-08-12T00:00:00.000Z', retentionEndsAt: '2026-09-11T00:00:00.000Z', version: 3, restoreEligible: true }
-    const fetcher = vi.fn<typeof globalThis.fetch>()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [honor] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(recycled), { status: 201, headers: { 'Content-Type': 'application/json' } }))
-    vi.stubGlobal('fetch', fetcher); vi.stubGlobal('confirm', vi.fn(() => true))
-    document.cookie = 'hsd_csrf=mounted-csrf'
-    vi.stubGlobal('computed', computed); vi.stubGlobal('ref', ref); vi.stubGlobal('reactive', reactive)
-    vi.stubGlobal('useHead', vi.fn()); vi.stubGlobal('definePageMeta', vi.fn())
-    vi.stubGlobal('useRuntimeConfig', () => ({ public: { apiBase: 'https://api.example.test', useMockApi: false } }))
-    vi.stubGlobal('useAsyncData', async (_key: string, handler: () => Promise<unknown>) => { await handler(); return { data: ref(null) } })
-
-    const wrapper = mount(defineComponent({ components: { AdminHonorsPage }, template: '<Suspense><AdminHonorsPage /></Suspense>' }), { global: { stubs: { AdminPageHeading: true, AdminStatusPill: true, EmptyState: true } } })
-    await flushPromises(); await nextTick()
-    expect(wrapper.findAll('tbody tr')).toHaveLength(1)
-    await wrapper.get('tbody tr button').trigger('click'); await nextTick()
-    const drawerButtons = wrapper.findAll('.admin-drawer__footer button')
-    expect(drawerButtons).toHaveLength(2)
-    await drawerButtons[1]!.trigger('click'); await flushPromises(); await nextTick()
-    expect(useHonorsStore().items).toEqual([])
-    expect(fetcher.mock.calls.map(([url]) => url)).toContain('https://api.example.test/api/v1/admin/recycle-bin/honors/hon_external_page_delete')
   })
 
   it('keeps production Honors API-only through loading, error, and empty states', async () => {
@@ -182,14 +134,4 @@ describe('Honors explicit Mock integration', () => {
     expect(await gateway.listAdmin()).toEqual(stateAfterApproval)
   })
 
-  it('soft deletes by public id while each Mock gateway keeps an isolated fixture', async () => {
-    const firstGateway = createHonorsGatewayForRuntime({ apiBase: '', useMockApi: true })!
-    const secondGateway = createHonorsGatewayForRuntime({ apiBase: '', useMockApi: true })!
-    const victim = (await firstGateway.listAdmin()).items[0]!
-
-    await firstGateway.softDelete(victim.publicId, victim.version)
-
-    expect((await firstGateway.listAdmin()).items.some((item) => item.id === victim.id)).toBe(false)
-    expect((await secondGateway.listAdmin()).items.some((item) => item.id === victim.id)).toBe(true)
-  })
 })

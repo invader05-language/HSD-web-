@@ -1000,16 +1000,6 @@ export type HandoverCenterMinisterDto = {
   "reason"?: string;
 };
 
-export type HardDeleteRecycleDto = {
-  "expectedVersion": number;
-  "confirmed": boolean;
-};
-
-export type HardDeleteResponseDto = {
-  "deleted": boolean;
-  "id": string;
-};
-
 export type HealthLiveResponseDto = {
   "status": "ok";
   "service": "hsd-api";
@@ -1675,25 +1665,6 @@ export type RecruitmentResultBatchDto = {
   "name": string;
 };
 
-export type RecycleCommandDto = {
-  "expectedVersion": number;
-};
-
-export type RecycleItemResponseDto = {
-  "id": string;
-  "type": "honor";
-  "title": string;
-  "centerName": string;
-  "deletedAt": string;
-  "retentionEndsAt": string;
-  "version": number;
-  "restoreEligible": boolean;
-};
-
-export type RecycleListResponseDto = {
-  "items": Array<RecycleItemResponseDto>;
-};
-
 export type RegistrationCommandDto = {
   "expectedVersion": number;
 };
@@ -1722,17 +1693,6 @@ export type ResourceCommandDto = {
 export type ResourceOfflineDto = {
   "expectedVersion": number;
   "reason": string;
-};
-
-export type RestoredRecycleItemResponseDto = {
-  "id": string;
-  "type": "honor";
-  "title": string;
-  "centerName": string;
-  "deletedAt": (string) | null;
-  "retentionEndsAt": (string) | null;
-  "version": number;
-  "restoreEligible": false;
 };
 
 export type RetireCoreMemberDto = {
@@ -2160,10 +2120,6 @@ export const API_V1_PATHS = {
   adminHelpCreate: "/api/v1/admin/help",
   adminHelpUpdate: "/api/v1/admin/help/{id}/draft",
   adminHelpPublish: "/api/v1/admin/help/{id}/publish",
-  adminRecycle: "/api/v1/admin/recycle-bin",
-  adminRecycleHonorSoftDelete: "/api/v1/admin/recycle-bin/honors/{publicId}",
-  adminRecycleHonorRestore: "/api/v1/admin/recycle-bin/honors/{publicId}/restore",
-  adminRecycleHonorHardDelete: "/api/v1/admin/recycle-bin/honors/{publicId}",
   publicHelp: "/api/v1/public/help",
   publicHelpDetail: "/api/v1/public/help/{slug}",
 } as const;
@@ -2303,10 +2259,6 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/help": { method: "POST", path: "/api/v1/admin/help" },
   "PATCH /api/v1/admin/help/{id}/draft": { method: "PATCH", path: "/api/v1/admin/help/{id}/draft" },
   "POST /api/v1/admin/help/{id}/publish": { method: "POST", path: "/api/v1/admin/help/{id}/publish" },
-  "GET /api/v1/admin/recycle-bin": { method: "GET", path: "/api/v1/admin/recycle-bin" },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": { method: "POST", path: "/api/v1/admin/recycle-bin/honors/{publicId}" },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": { method: "POST", path: "/api/v1/admin/recycle-bin/honors/{publicId}/restore" },
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": { method: "DELETE", path: "/api/v1/admin/recycle-bin/honors/{publicId}" },
   "GET /api/v1/public/help": { method: "GET", path: "/api/v1/public/help" },
   "GET /api/v1/public/help/{slug}": { method: "GET", path: "/api/v1/public/help/{slug}" },
 } as const;
@@ -2452,10 +2404,6 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/help": AdminHelpResponseDto;
   "PATCH /api/v1/admin/help/{id}/draft": AdminHelpResponseDto;
   "POST /api/v1/admin/help/{id}/publish": AdminHelpResponseDto;
-  "GET /api/v1/admin/recycle-bin": RecycleListResponseDto;
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": RecycleItemResponseDto;
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": RestoredRecycleItemResponseDto;
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": HardDeleteResponseDto;
   "GET /api/v1/public/help": PublicHelpListResponseDto;
   "GET /api/v1/public/help/{slug}": PublicHelpResponseDto;
 }
@@ -2876,18 +2824,6 @@ const API_RESPONSE_SCHEMAS = {
   },
   "POST /api/v1/admin/help/{id}/publish": {
     "$ref": "#/components/schemas/AdminHelpResponseDto"
-  },
-  "GET /api/v1/admin/recycle-bin": {
-    "$ref": "#/components/schemas/RecycleListResponseDto"
-  },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": {
-    "$ref": "#/components/schemas/RecycleItemResponseDto"
-  },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": {
-    "$ref": "#/components/schemas/RestoredRecycleItemResponseDto"
-  },
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": {
-    "$ref": "#/components/schemas/HardDeleteResponseDto"
   },
   "GET /api/v1/public/help": {
     "$ref": "#/components/schemas/PublicHelpListResponseDto"
@@ -9765,7 +9701,7 @@ const API_COMPONENT_SCHEMAS = {
       },
       "publicId": {
         "type": "string",
-        "description": "Stable external honor identifier used by recycle routes."
+        "description": "Stable external honor identifier."
       },
       "personId": {
         "type": "string",
@@ -10269,159 +10205,6 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "items"
-    ]
-  },
-  "RecycleItemResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "description": "Stable external honor identifier; never an internal UUID."
-      },
-      "type": {
-        "type": "string",
-        "enum": [
-          "honor"
-        ]
-      },
-      "title": {
-        "type": "string"
-      },
-      "centerName": {
-        "type": "string"
-      },
-      "deletedAt": {
-        "type": "string"
-      },
-      "retentionEndsAt": {
-        "type": "string"
-      },
-      "version": {
-        "type": "number"
-      },
-      "restoreEligible": {
-        "type": "boolean"
-      }
-    },
-    "required": [
-      "id",
-      "type",
-      "title",
-      "centerName",
-      "deletedAt",
-      "retentionEndsAt",
-      "version",
-      "restoreEligible"
-    ]
-  },
-  "RecycleListResponseDto": {
-    "type": "object",
-    "properties": {
-      "items": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/RecycleItemResponseDto"
-        }
-      }
-    },
-    "required": [
-      "items"
-    ]
-  },
-  "RecycleCommandDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
-      }
-    },
-    "required": [
-      "expectedVersion"
-    ]
-  },
-  "RestoredRecycleItemResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "description": "Stable external honor identifier; never an internal UUID."
-      },
-      "type": {
-        "type": "string",
-        "enum": [
-          "honor"
-        ]
-      },
-      "title": {
-        "type": "string"
-      },
-      "centerName": {
-        "type": "string"
-      },
-      "deletedAt": {
-        "type": "string",
-        "nullable": true
-      },
-      "retentionEndsAt": {
-        "type": "string",
-        "nullable": true
-      },
-      "version": {
-        "type": "number"
-      },
-      "restoreEligible": {
-        "oneOf": [
-          {
-            "type": "boolean",
-            "enum": [
-              false
-            ]
-          }
-        ]
-      }
-    },
-    "required": [
-      "id",
-      "type",
-      "title",
-      "centerName",
-      "deletedAt",
-      "retentionEndsAt",
-      "version",
-      "restoreEligible"
-    ]
-  },
-  "HardDeleteRecycleDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "confirmed": {
-        "type": "boolean",
-        "description": "Explicit acknowledgement required for irreversible deletion."
-      }
-    },
-    "required": [
-      "expectedVersion",
-      "confirmed"
-    ]
-  },
-  "HardDeleteResponseDto": {
-    "type": "object",
-    "properties": {
-      "deleted": {
-        "type": "boolean"
-      },
-      "id": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "deleted",
-      "id"
     ]
   },
   "HealthLiveResponseDto": {

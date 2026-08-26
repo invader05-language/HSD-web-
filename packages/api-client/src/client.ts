@@ -52,8 +52,6 @@ import {
   type CreateHelpDto,
   type UpdateHelpDraftDto,
   type PublishHelpDto,
-  type RecycleCommandDto,
-  type HardDeleteRecycleDto,
   type HandoverCenterMinisterDto,
   type RevokeOrganizationPositionDto,
   type SetCoreMembershipDto,
@@ -278,12 +276,6 @@ export interface HsdApiClient {
     listPublic(): Promise<ApiResponseFor<"GET /api/v1/public/help">>;
     public(slug: string): Promise<ApiResponseFor<"GET /api/v1/public/help/{slug}">>;
   };
-  recycle: {
-    list(): Promise<ApiResponseFor<"GET /api/v1/admin/recycle-bin">>;
-    softDelete(publicId: string, payload: RecycleCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/recycle-bin/honors/{publicId}">>;
-    restore(publicId: string, payload: RecycleCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/recycle-bin/honors/{publicId}/restore">>;
-    hardDelete(publicId: string, payload: HardDeleteRecycleDto): Promise<ApiResponseFor<"DELETE /api/v1/admin/recycle-bin/honors/{publicId}">>;
-  };
   admin: { dashboard(): Promise<unknown> };
 }
 
@@ -481,12 +473,6 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       publish: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/help/{id}/publish", payload, `/api/v1/admin/help/${encodeURIComponent(id)}/publish`),
       listPublic: () => requestGenerated(transport, "GET /api/v1/public/help"),
       public: (slug) => requestGenerated(transport, "GET /api/v1/public/help/{slug}", undefined, `/api/v1/public/help/${encodeURIComponent(slug)}`),
-    },
-    recycle: {
-      list: () => requestGenerated(transport, "GET /api/v1/admin/recycle-bin"),
-      softDelete: (publicId, payload) => requestGenerated(transport, "POST /api/v1/admin/recycle-bin/honors/{publicId}", payload, `/api/v1/admin/recycle-bin/honors/${encodeURIComponent(publicId)}`),
-      restore: (publicId, payload) => requestGenerated(transport, "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore", payload, `/api/v1/admin/recycle-bin/honors/${encodeURIComponent(publicId)}/restore`),
-      hardDelete: (publicId, payload) => requestGenerated(transport, "DELETE /api/v1/admin/recycle-bin/honors/{publicId}", payload, `/api/v1/admin/recycle-bin/honors/${encodeURIComponent(publicId)}`),
     },
     admin: { dashboard: () => transport({ path: ADMIN_DASHBOARD_PATH, method: "GET" }) },
   };

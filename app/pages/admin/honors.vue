@@ -15,10 +15,6 @@ async function approveSelected() {
   const updated = await honorsStore.approve(gateway, selected.value.id, selected.value.version)
   if (updated) selected.value = updated
 }
-async function recycleSelected() {
-  if (!gateway || !selected.value || !confirm(`将“${selected.value.title}”移入回收站？`)) return
-  if (await honorsStore.softDelete(gateway, selected.value.id, selected.value.publicId, selected.value.version, true)) selected.value = null
-}
 </script>
 
 <template>
@@ -35,6 +31,6 @@ async function recycleSelected() {
       </div>
       <EmptyState v-else />
     </section>
-    <div v-if="selected" class="admin-drawer-backdrop" @click.self="selected = null"><aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="荣誉审核详情"><header class="admin-drawer__header"><div><span>Honor Review</span><h2>{{ selected.memberName }}</h2><p>{{ selected.type }} · {{ selected.awardedDateLabel }}</p></div><button type="button" aria-label="关闭荣誉审核" @click="selected = null">×</button></header><div class="admin-drawer__body"><section><header><span>01</span><h3>荣誉信息</h3></header><h2>{{ selected.title }}</h2><p>{{ selected.description }}</p><p class="admin-inline-note">证明材料仅管理员可见；公开成员页面只展示去标识的已发布信息，不提供排名。</p></section></div><footer class="admin-drawer__footer"><span>{{ selected.publicConsent ? '成员同意公开' : '成员未同意公开' }}</span><button type="button" class="button button--ghost" @click="selected = null">关闭</button><button type="button" class="button button--ghost" :disabled="honorsStore.apiLoading" @click="recycleSelected">移入回收站</button><button v-if="selected.status === 'pending'" type="button" class="button" :disabled="honorsStore.apiLoading" @click="approveSelected">审核通过</button></footer></aside></div>
+    <div v-if="selected" class="admin-drawer-backdrop" @click.self="selected = null"><aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="荣誉审核详情"><header class="admin-drawer__header"><div><span>Honor Review</span><h2>{{ selected.memberName }}</h2><p>{{ selected.type }} · {{ selected.awardedDateLabel }}</p></div><button type="button" aria-label="关闭荣誉审核" @click="selected = null">×</button></header><div class="admin-drawer__body"><section><header><span>01</span><h3>荣誉信息</h3></header><h2>{{ selected.title }}</h2><p>{{ selected.description }}</p><p class="admin-inline-note">证明材料仅管理员可见；公开成员页面只展示去标识的已发布信息，不提供排名。</p></section></div><footer class="admin-drawer__footer"><span>{{ selected.publicConsent ? '成员同意公开' : '成员未同意公开' }}</span><button type="button" class="button button--ghost" @click="selected = null">关闭</button><button v-if="selected.status === 'pending'" type="button" class="button" :disabled="honorsStore.apiLoading" @click="approveSelected">审核通过</button></footer></aside></div>
   </div>
 </template>

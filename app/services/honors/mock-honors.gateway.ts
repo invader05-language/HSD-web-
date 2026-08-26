@@ -65,12 +65,6 @@ export function createMockHonorsGateway() {
       record.version += 1
       return { ...record }
     },
-    async softDelete(publicId: string, expectedVersion: number) {
-      const index = records.findIndex((record) => record.publicId === publicId)
-      const record = assertVersion(records[index], expectedVersion)
-      records.splice(index, 1)
-      return { id: record.id, type: 'honor', title: record.title, version: record.version + 1 }
-    },
     async submit(input: Omit<MockHonorRecord, 'id' | 'publicId' | 'personId' | 'centerId' | 'memberName' | 'status' | 'version' | 'submittedAt' | 'awardedDatePrecision' | 'awardedDateLabel'> & { expectedVersion: number }) {
       if (input.expectedVersion !== 0) conflict()
       const next = records.length + 1
