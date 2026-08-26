@@ -8,10 +8,16 @@ import type { RecruitmentGateway } from "../../app/services/recruitment/recruitm
 import { useRecruitmentAssessmentStore } from "../../app/stores/recruitment-assessment";
 
 const EMPTY_BATCH: AssessmentBatchResponseDto = {
+  batch: { id: "batch-1", name: "Assessment batch", lifecycleStatus: "closed" },
   currentRound: 1,
   status: "ASSESSING",
   version: 3,
   publishedAt: null,
+  pending: 0,
+  adjustmentPending: 0,
+  canAdvance: true,
+  advanceBlocker: null,
+  nextAction: "ADVANCE_ROUND",
   items: [],
 };
 
@@ -348,6 +354,39 @@ describe("recruitment assessment API store mode", () => {
       reason: "发布结果",
     });
     expect(store.getBatchState("batch-1").version).toBe(7);
+  });
+
+  it("refreshes the authoritative round after advancing and keeps it on a later reload", async () => {
+    let currentRound = 1;
+    let version = 3;
+    const advanceAssessment = vi.fn<RecruitmentGateway["advanceAssessment"]>().mockImplementation(async () => {
+      currentRound = 2;
+      version = 4;
+      return { currentRound: 2, status: "ASSESSING", version, publishedAt: null };
+    });
+    const api = gateway({
+      getAssessmentBatch: vi.fn().mockImplementation(async () => ({
+        ...EMPTY_BATCH,
+        currentRound,
+        version,
+        nextAction: "ADVANCE_ROUND" as const,
+      })),
+      advanceAssessment,
+    });
+    const store = useRecruitmentAssessmentStore();
+
+    await store.refreshAssessmentBatch("batch-1", api);
+    await store.advanceAssessmentRoundFromApi(api, "batch-1", "推进到第二轮");
+
+    expect(advanceAssessment).toHaveBeenCalledWith("batch-1", {
+      expectedVersion: 3,
+      confirmed: true,
+      reason: "推进到第二轮",
+    });
+    expect(store.getBatchState("batch-1")).toMatchObject({ currentRound: 2, version: 4 });
+
+    await store.refreshAssessmentBatch("batch-1", api);
+    expect(store.getBatchState("batch-1")).toMatchObject({ currentRound: 2, version: 4 });
   });
 
   it("exposes a pending mutation state until publication and its refresh complete", async () => {

@@ -18,6 +18,7 @@ import {
   type SubmittedRecruitmentApplication,
 } from "../../data/recruitment-application";
 import type { MemberProfile } from "../../data/member-profile";
+import { normalizeMemberGrade, serializeMemberGrade } from "../../utils/member-profile-form";
 
 const CENTER_ID_BY_NAME: Record<RecruitmentCenter, string> = {
   "白泽开发中心": "baize-development",
@@ -224,7 +225,7 @@ export function mapMemberProfileResponse(dto: MemberProfileResponseDto): Product
     id: dto.id,
     name: dto.name,
     studentId: dto.studentId,
-    grade: dto.grade,
+    grade: normalizeMemberGrade(dto.grade),
     className: dto.className,
     center: membershipCenter?.name ?? status.center,
     ...(membershipCenter?.slug ? { centerSlug: membershipCenter.slug as MemberProfile["centerSlug"] } : {}),
@@ -251,7 +252,7 @@ export function mapMemberProfileUpdatePayload(
   return {
     expectedVersion: profile.version,
     name: draft.name.trim(),
-    grade: draft.grade.trim(),
+    grade: serializeMemberGrade(draft.grade),
     className: draft.className.trim(),
     bio: draft.bio.trim(),
     ...(draft.contact !== undefined ? { contact: draft.contact.trim() } : {}),

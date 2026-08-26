@@ -414,7 +414,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
 
     expect(controller.batch.value).toMatchObject({ lifecycleStatus: "closed", version: 9 });
     expect(controller.archiveStatus.value).toBe("forbidden");
-    expect(controller.archiveError.value).toContain("Owner only");
+    expect(controller.archiveError.value).toContain("权限");
   });
 
   it("refreshes detail and lifecycle after 409, preserving conflict state until a new-version confirmation", async () => {
@@ -491,6 +491,26 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
 
     expect(controller.archiveStatus.value).toBe("success");
     expect(controller.batch.value).toMatchObject({ lifecycleStatus: "archived", version: 10 });
+    expect(controller.lifecycleStatus.value).toBe("error");
+    expect(controller.lifecycleError.value).toContain("lifecycle unavailable");
+  });
+
+  it("reports command success separately when the lifecycle refresh fails", async () => {
+    const listAdminBatchLifecycleEvents = vi.fn()
+      .mockResolvedValueOnce({ ...lifecycleResponse, total: 0, items: [] })
+      .mockRejectedValueOnce(Object.assign(new Error("lifecycle unavailable"), { status: 503 }));
+    const controller = createProductionRecruitmentBatchController({
+      getAdminBatch: vi.fn().mockResolvedValue(closedBatch()),
+      listAdminBatchLifecycleEvents,
+      runAdminBatchCommand: vi.fn().mockResolvedValue(archivedBatch),
+    }) as ReturnType<typeof createProductionRecruitmentBatchController> & {
+      commandLifecycleRefreshed: { value: boolean };
+    };
+    await controller.load("batch-closed");
+
+    await expect(controller.runCommand("reopen")).resolves.toBe(true);
+
+    expect(controller.commandLifecycleRefreshed.value).toBe(false);
     expect(controller.lifecycleStatus.value).toBe("error");
     expect(controller.lifecycleError.value).toContain("lifecycle unavailable");
   });

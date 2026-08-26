@@ -3,16 +3,17 @@ import { RELEASE_FEATURES } from "../../app/config/release-features";
 import { getAdminNavigationForAccess } from "../../app/data/admin-platform";
 import {
   createReleaseNoticeState,
+  RECYCLE_BIN_RETIRED_NOTICE,
   RETIRED_MEDIA_LIBRARY_NOTICE,
   resolveDisabledRoute
 } from "../../app/utils/admin-release-access";
 
 describe("admin release feature availability", () => {
-  it("redirects disabled modules while leaving completed Recycle and upload tasks available", () => {
+  it("redirects retired modules while leaving audit and upload tasks available", () => {
     expect(resolveDisabledRoute("/admin/logs", RELEASE_FEATURES)).toBeUndefined();
     expect(resolveDisabledRoute("/admin/media", RELEASE_FEATURES)).toEqual({ to: "/admin", notice: RETIRED_MEDIA_LIBRARY_NOTICE });
     expect(resolveDisabledRoute("/admin/uploads", RELEASE_FEATURES)).toBeUndefined();
-    expect(resolveDisabledRoute("/admin/recycle-bin", RELEASE_FEATURES)).toBeUndefined();
+    expect(resolveDisabledRoute("/admin/recycle-bin", RELEASE_FEATURES)).toEqual({ to: "/admin", notice: RECYCLE_BIN_RETIRED_NOTICE });
   });
 
   it("accepts a new notice after the admin layout has already mounted", () => {
@@ -51,11 +52,10 @@ describe("admin release feature availability", () => {
     expect(adminIds).not.toContain("help");
   });
 
-  it("enables Recycle and the completed read-only upload queue without unrelated unfinished modules", () => {
+  it("enables the completed read-only queues without unrelated unfinished modules", () => {
     const ids = getAdminNavigationForAccess({ canManageAdminAccounts: true }, RELEASE_FEATURES).flatMap((group) => group.items.map((item) => item.id));
     expect(ids).toContain("logs");
     expect(ids).toContain("uploads");
-    expect(ids).toContain("recycle-bin");
     expect(ids).toContain("batches");
     expect(ids).toContain("accounts");
     expect(RELEASE_FEATURES.auditLog).toBe(true);

@@ -24,6 +24,8 @@ import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { createProductionRecruitmentBatchController } from "~/composables/useProductionRecruitmentBatch";
 import type { UpdateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
+import { copyTextToClipboard } from "~/utils/clipboard";
+import type { RecruitmentBatchLifecycleEventView } from "~/services/recruitment/recruitment-view-models";
 
 definePageMeta({ layout: "admin" });
 
@@ -112,10 +114,13 @@ const pendingAction = ref<PendingLifecycleAction | null>(null);
 const reason = ref("");
 const actionMessage = ref("");
 const actionError = ref("");
+const selectedLifecycleEvent = ref<RecruitmentBatchLifecycleEventView>();
+const lifecycleCopyMessage = ref("");
 const canConfirmPendingAction = computed(() => {
   if (!pendingAction.value) return false;
   if (isMockApi) return true;
-  return archiveConfirmationIssue(pendingAction.value) === undefined;
+  return lifecycleActionIssue(pendingAction.value.action) === undefined
+    && (pendingAction.value.action !== "archive" || archiveConfirmationIssue(pendingAction.value) === undefined);
 });
 const editOpen = ref(false);
 const editError = ref("");
@@ -238,6 +243,39 @@ function archiveConfirmationIssue(context: PendingLifecycleAction): string | und
   return undefined;
 }
 
+function lifecycleActionIssue(action: LifecycleAction): string | undefined {
+  if (isMockApi || !productionBatch?.batch.value) return undefined;
+  const current = productionBatch.batch.value;
+  const allowed: Record<LifecycleAction, readonly string[]> = {
+    publish: ["draft"],
+    openNow: ["upcoming"],
+    pause: ["open"],
+    resume: ["paused"],
+    close: ["open", "paused"],
+    reopen: ["closed"],
+    archive: ["closed"],
+  };
+  if (allowed[action].includes(current.effectiveStatus)) return undefined;
+  const statusLabels: Record<string, string> = {
+    draft: "草稿",
+    upcoming: "待开始",
+    open: "报名开放中",
+    paused: "报名已暂停",
+    closed: "报名已关闭",
+    archived: "批次已归档",
+  };
+  const actionLabels: Record<LifecycleAction, string> = {
+    publish: "发布批次",
+    openNow: "立即开放",
+    pause: "暂停报名",
+    resume: "恢复报名",
+    close: "提前关闭",
+    reopen: "重新开放",
+    archive: "归档批次",
+  };
+  return `当前状态为“${statusLabels[current.effectiveStatus] ?? current.effectiveStatus}”，不能${actionLabels[action]}。请刷新后重试。`;
+}
+
 function clearActionState() {
   pendingAction.value = null;
   reason.value = "";
@@ -253,13 +291,14 @@ function requestAction(action: LifecycleAction) {
       actionError.value = "只有联盟总负责人可以修改批次状态。";
       return;
     }
-    if (action === "archive" && statusKey.value !== "closed") {
-      actionError.value = "只有服务端判定为已关闭的批次才能提交归档确认。";
+    const statusIssue = lifecycleActionIssue(action);
+    if (statusIssue) {
+      actionError.value = statusIssue;
       return;
     }
     const expectedVersion = productionBatch?.batch.value?.version;
     if (!Number.isInteger(expectedVersion) || (expectedVersion ?? 0) < 1) {
-      actionError.value = "当前批次版本无效，无法提交归档确认。";
+      actionError.value = "当前批次版本无效，无法提交状态确认。";
       return;
     }
     pendingAction.value = { action, batchId: batchId.value, expectedVersion: expectedVersion as number };
@@ -289,7 +328,7 @@ async function invokeAction(context: PendingLifecycleAction) {
       if (issue) { actionError.value = issue; return; }
       const result = await productionBatch.archive({ batchId: context.batchId, expectedVersion: context.expectedVersion, reason: reason.value });
       if (context.batchId !== batchId.value || pendingAction.value !== context) return;
-      actionError.value = productionBatch.archiveError.value;
+      actionError.value = getRecruitmentBatchCommandMessage({ message: productionBatch.archiveError.value });
       if (!result.archived) {
         if (productionBatch.archiveStatus.value === "conflict") {
           const refreshedVersion = productionBatch.batch.value?.version;
@@ -301,10 +340,19 @@ async function invokeAction(context: PendingLifecycleAction) {
       actionMessage.value = result.lifecycleRefreshed ? "归档批次已完成，状态和生命周期记录已刷新。" : "归档批次已完成。";
     } else {
       const command = action === "openNow" ? "open-now" : action;
-      const ok = await productionBatch.runCommand(command, reason.value);
+      const ok = await productionBatch.runCommand(command, action === "pause" || action === "close" ? undefined : reason.value, context.expectedVersion);
       if (context.batchId !== batchId.value || pendingAction.value !== context) return;
-      if (!ok) { actionError.value = productionBatch.commandError.value; return; }
-      actionMessage.value = `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`;
+      if (!ok) {
+        actionError.value = getRecruitmentBatchCommandMessage({ message: productionBatch.commandError.value });
+        const refreshedVersion = productionBatch.batch.value?.version;
+        if (refreshedVersion && refreshedVersion !== context.expectedVersion) {
+          pendingAction.value = { ...context, expectedVersion: refreshedVersion };
+        }
+        return;
+      }
+      actionMessage.value = productionBatch.commandLifecycleRefreshed.value
+        ? `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`
+        : `${actionLabel(action)}已完成，批次状态已更新，但生命周期记录刷新失败，请稍后重试。`;
     }
     pendingAction.value = null;
     reason.value = "";
@@ -345,7 +393,38 @@ function confirmAction() {
       return;
     }
   }
+  if (!isMockApi) {
+    const issue = lifecycleActionIssue(pendingAction.value.action);
+    if (issue) {
+      actionError.value = issue;
+      return;
+    }
+  }
   void invokeAction(pendingAction.value);
+}
+
+function lifecycleSnapshotSummary(snapshot: Record<string, unknown> | null) {
+  if (!snapshot) return "—";
+  const status = lifecycleSnapshotValue(snapshot.lifecycleStatus);
+  const override = lifecycleSnapshotValue(snapshot.manualOverride);
+  const version = lifecycleSnapshotValue(snapshot.version);
+  return [status !== "空" ? `状态：${status}` : "", override !== "空" ? `覆盖：${override}` : "", version !== "空" ? `v${version}` : ""]
+    .filter(Boolean)
+    .join(" · ") || "已记录变更";
+}
+
+function showLifecycleDetails(record: RecruitmentBatchLifecycleEventView) {
+  selectedLifecycleEvent.value = record;
+  lifecycleCopyMessage.value = "";
+}
+
+function closeLifecycleDetails() {
+  selectedLifecycleEvent.value = undefined;
+  lifecycleCopyMessage.value = "";
+}
+
+async function copyLifecycleTarget(id: string) {
+  lifecycleCopyMessage.value = await copyTextToClipboard(id) ? "批次 ID 已复制" : "复制失败，请重试";
 }
 
 function dateInput(value?: string) {
@@ -477,6 +556,10 @@ function auditTimestamp(value: string) {
   }).format(date).replaceAll("/", "-");
 }
 
+function lifecycleSnapshotEntriesForEvent(snapshot: RecruitmentBatchLifecycleEventView["before"]) {
+  return lifecycleSnapshotEntries(snapshot as Record<string, unknown> | null);
+}
+
 async function loadProductionBatch() {
   if (!isMockApi) await productionBatch?.load(batchId.value);
 }
@@ -585,19 +668,21 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value !== 'success'" class="admin-save-message admin-save-message--error" role="alert">{{ lifecycleStateMessage(productionBatch?.lifecycleStatus.value) }}</p>
       <div v-else-if="!isMockApi" class="admin-table-scroll">
         <table aria-label="真实批次生命周期记录">
-          <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>变更前</th><th>变更后</th><th>实际时间</th><th>原因</th></tr></thead>
+          <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>变更前摘要</th><th>变更后摘要</th><th>实际时间</th><th>原因</th><th><span class="sr-only">详情</span></th></tr></thead>
           <tbody>
             <tr v-for="record in productionBatch?.lifecycleEvents.value ?? []" :key="record.id">
               <td><strong>{{ lifecycleActionLabel(record.action) }}</strong><small>{{ record.action }}</small></td>
               <td>{{ record.actorDisplayName }}</td>
-              <td>{{ record.target.type }} · {{ record.target.id }}</td>
-              <td><span v-if="!record.before">—</span><dl v-else><div v-for="entry in lifecycleSnapshotEntries(record.before)" :key="entry.key"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div></dl></td>
-              <td><span v-if="!record.after">—</span><dl v-else><div v-for="entry in lifecycleSnapshotEntries(record.after)" :key="entry.key"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></div></dl></td>
+              <td><span class="admin-lifecycle-target">{{ record.target.type }} · {{ record.target.id }}</span><button type="button" class="admin-inline-copy" @click="copyLifecycleTarget(record.target.id)">复制 ID</button></td>
+              <td>{{ lifecycleSnapshotSummary(record.before) }}</td>
+              <td>{{ lifecycleSnapshotSummary(record.after) }}</td>
               <td>{{ auditTimestamp(record.createdAt) }}</td>
               <td>{{ record.reason || "—" }}</td>
+              <td><button type="button" class="admin-inline-copy" @click="showLifecycleDetails(record)">查看详情</button></td>
             </tr>
           </tbody>
         </table>
+        <p v-if="lifecycleCopyMessage" class="admin-inline-note" role="status">{{ lifecycleCopyMessage }}</p>
       </div>
       <p v-else-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
       <div v-else class="admin-table-scroll"><table aria-label="批次生命周期审计"><thead><tr><th>操作</th><th>操作人</th><th>状态变化</th><th>原计划开始</th><th>实际时间</th><th>原因</th></tr></thead><tbody><tr v-for="record in auditRecords" :key="auditText(record, 'id')"><td>{{ auditActionLabel(auditText(record, 'action')) }}</td><td>{{ auditText(record, 'actorName', 'actor') }}</td><td>{{ auditStatusLabel(auditText(record, 'beforeStatus', 'before')) }} → {{ auditStatusLabel(auditText(record, 'afterStatus', 'after')) }}</td><td>{{ auditTimestamp(auditText(record, 'originalStartAt')) }}</td><td>{{ auditTimestamp(auditText(record, 'actualAt', 'createdAt')) }}</td><td>{{ auditText(record, 'reason') === 'create recruitment batch' ? '创建招新批次' : auditText(record, 'reason') }}</td></tr></tbody></table></div>
@@ -614,10 +699,23 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <section role="alertdialog" aria-modal="true" aria-labelledby="batch-action-confirm-title">
         <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction.action) }}？</h2>
         <p>该操作会改变当前批次的用户报名入口。操作人、原计划时间、实际执行时间和前后状态会写入生命周期记录。</p>
-        <label>操作原因（可选）<textarea v-model="reason" rows="3" maxlength="500" placeholder="填写本次批次状态变更原因"></textarea></label>
+        <label v-if="pendingAction.action !== 'pause' && pendingAction.action !== 'close'">操作原因（可选）<textarea v-model="reason" rows="3" maxlength="500" placeholder="填写本次批次状态变更原因"></textarea></label>
         <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
-        <div><button type="button" class="button button--ghost" :disabled="productionBatch?.archiving.value" @click="clearActionState">返回检查</button><button type="button" class="button" :disabled="productionBatch?.archiving.value || !canConfirmPendingAction" @click="confirmAction">确认{{ actionLabel(pendingAction.action) }}</button></div>
+        <div><button type="button" class="button button--ghost" :disabled="productionBatch?.archiving.value && pendingAction.action === 'archive'" @click="clearActionState">返回检查</button><button type="button" class="button" :disabled="(productionBatch?.archiving.value && pendingAction.action === 'archive') || !canConfirmPendingAction" @click="confirmAction">确认{{ actionLabel(pendingAction.action) }}</button></div>
       </section>
+    </div>
+
+    <div v-if="selectedLifecycleEvent" class="admin-drawer-backdrop" @click.self="closeLifecycleDetails">
+      <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="生命周期详情">
+        <header class="admin-drawer__header"><div><span>LIFECYCLE DETAIL</span><h2>{{ lifecycleActionLabel(selectedLifecycleEvent.action) }}</h2><p>{{ auditTimestamp(selectedLifecycleEvent.createdAt) }} · {{ selectedLifecycleEvent.actorDisplayName }}</p></div><button type="button" aria-label="关闭生命周期详情" @click="closeLifecycleDetails">×</button></header>
+        <div class="admin-drawer__body">
+          <section><header><span>01</span><h3>目标</h3></header><dl class="admin-detail-grid"><div><dt>类型</dt><dd>{{ selectedLifecycleEvent.target.type }}</dd></div><div><dt>ID</dt><dd class="admin-breakable-id">{{ selectedLifecycleEvent.target.id }}</dd></div><div v-if="selectedLifecycleEvent.reason"><dt>原因</dt><dd>{{ selectedLifecycleEvent.reason }}</dd></div></dl><button type="button" class="button button--ghost" @click="copyLifecycleTarget(selectedLifecycleEvent.target.id)">复制目标 ID</button></section>
+          <section><header><span>02</span><h3>变更前</h3></header><dl class="admin-detail-grid"><div v-for="entry in lifecycleSnapshotEntriesForEvent(selectedLifecycleEvent.before)" :key="entry.key"><dt>{{ entry.label }}</dt><dd class="admin-breakable-id">{{ entry.value }}</dd></div><div v-if="!selectedLifecycleEvent.before"><dd>—</dd></div></dl></section>
+          <section><header><span>03</span><h3>变更后</h3></header><dl class="admin-detail-grid"><div v-for="entry in lifecycleSnapshotEntriesForEvent(selectedLifecycleEvent.after)" :key="entry.key"><dt>{{ entry.label }}</dt><dd class="admin-breakable-id">{{ entry.value }}</dd></div><div v-if="!selectedLifecycleEvent.after"><dd>—</dd></div></dl></section>
+          <p v-if="lifecycleCopyMessage" class="admin-save-message" role="status">{{ lifecycleCopyMessage }}</p>
+        </div>
+        <footer class="admin-drawer__footer"><button type="button" class="button" @click="closeLifecycleDetails">关闭</button></footer>
+      </aside>
     </div>
 
     <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">

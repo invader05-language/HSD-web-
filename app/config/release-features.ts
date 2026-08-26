@@ -1,6 +1,5 @@
 export interface ReleaseFeatures {
   auditLog: boolean;
-  recycleBin: boolean;
   uploadTasks: boolean;
   recruitmentBatches: boolean;
   helpCenter: boolean;
@@ -8,7 +7,6 @@ export interface ReleaseFeatures {
 
 export const RELEASE_FEATURES: ReleaseFeatures = {
   auditLog: true,
-  recycleBin: true,
   uploadTasks: true,
   recruitmentBatches: true,
   helpCenter: false

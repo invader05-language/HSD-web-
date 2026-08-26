@@ -413,11 +413,28 @@ export type AssessmentAdjustmentTargetCatalogResponseDto = {
   "items": Array<AssessmentCenterDto>;
 };
 
+export type AssessmentAdvanceBlockerDto = {
+  "code": "ASSESSMENT_BATCH_NOT_CLOSED" | "ASSESSMENT_NOT_EDITABLE" | "ASSESSMENT_ROUND_INCOMPLETE" | "ASSESSMENT_ADJUSTMENT_PENDING";
+  "count": number;
+};
+
+export type AssessmentBatchDetailDto = {
+  "id": string;
+  "name": string;
+  "lifecycleStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
+};
+
 export type AssessmentBatchResponseDto = {
   "currentRound": number;
   "status": "ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED";
   "version": number;
   "publishedAt": (string) | null;
+  "batch": AssessmentBatchDetailDto;
+  "pending": number;
+  "adjustmentPending": number;
+  "canAdvance": boolean;
+  "advanceBlocker": (AssessmentAdvanceBlockerDto) | null;
+  "nextAction": "PUBLISH_BATCH" | "OPEN_BATCH" | "CLOSE_BATCH" | "RECORD_CURRENT_ROUND_RESULTS" | "SUBMIT_ADJUSTMENT_PROPOSALS" | "DECIDE_ADJUSTMENTS" | "ADVANCE_ROUND" | "PUBLISH_RESULTS" | "NONE";
   "items": Array<AssessmentCandidateDto>;
 };
 
@@ -728,6 +745,16 @@ export type CreateMediaAttachmentDto = {
   "sortOrder": number;
 };
 
+export type CreateMemberAvatarUploadIntentDto = {
+  "expectedVersion": number;
+  "centerId"?: string;
+  "fileName": string;
+  "mimeType": "image/jpeg" | "image/png" | "image/webp";
+  "byteSize": number;
+  "checksumSha256": string;
+  "kind": "image";
+};
+
 export type CreateMembershipDto = {
   "personId": string;
   "centerId": string;
@@ -983,16 +1010,6 @@ export type HandoverCenterMinisterDto = {
   "reason"?: string;
 };
 
-export type HardDeleteRecycleDto = {
-  "expectedVersion": number;
-  "confirmed": boolean;
-};
-
-export type HardDeleteResponseDto = {
-  "deleted": boolean;
-  "id": string;
-};
-
 export type HealthLiveResponseDto = {
   "status": "ok";
   "service": "hsd-api";
@@ -1085,6 +1102,58 @@ export type MediaDashboardSummaryDto = {
   "processing": number;
   "failed": number;
   "reviewPending": number;
+};
+
+export type MemberActivityRegistrationListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "totalPages": number;
+  "items": Array<MemberActivityRegistrationResponseDto>;
+};
+
+export type MemberActivityRegistrationResponseDto = {
+  "id": string;
+  "activityId": string;
+  "status": "registered" | "accepted" | "rejected" | "cancelled";
+  "version": number;
+  "createdAt": string;
+  "updatedAt": string;
+  "decidedAt": (string) | null;
+  "cancelledAt": (string) | null;
+  "activity": MemberActivitySummaryResponseDto;
+};
+
+export type MemberActivitySummaryResponseDto = {
+  "slug": string;
+  "title": string;
+  "type": string;
+  "date": string;
+  "time": string;
+  "location": string;
+  "summary": string;
+  "registrationEndAt": (string) | null;
+  "publishedAt": (string) | null;
+  "cover": (Record<string, unknown>) | null;
+  "available": boolean;
+};
+
+export type MemberAvatarUploadResponseDto = {
+  "id": string;
+  "centerId": string;
+  "createdBy": UploadActorResponseDto;
+  "fileName": string;
+  "mimeType": string;
+  "byteSize": number;
+  "kind": "image" | "video";
+  "status": "uploading" | "processing" | "ready" | "failed" | "expired";
+  "version": number;
+  "expiresAt": string;
+  "failureCode": (string) | null;
+  "completedAt": (string) | null;
+  "createdAt": string;
+  "updatedAt": string;
+  "assetId": string;
 };
 
 export type MemberProfileResponseDto = {
@@ -1658,25 +1727,6 @@ export type RecruitmentResultBatchDto = {
   "name": string;
 };
 
-export type RecycleCommandDto = {
-  "expectedVersion": number;
-};
-
-export type RecycleItemResponseDto = {
-  "id": string;
-  "type": "honor";
-  "title": string;
-  "centerName": string;
-  "deletedAt": string;
-  "retentionEndsAt": string;
-  "version": number;
-  "restoreEligible": boolean;
-};
-
-export type RecycleListResponseDto = {
-  "items": Array<RecycleItemResponseDto>;
-};
-
 export type RegistrationCommandDto = {
   "expectedVersion": number;
 };
@@ -1705,17 +1755,6 @@ export type ResourceCommandDto = {
 export type ResourceOfflineDto = {
   "expectedVersion": number;
   "reason": string;
-};
-
-export type RestoredRecycleItemResponseDto = {
-  "id": string;
-  "type": "honor";
-  "title": string;
-  "centerName": string;
-  "deletedAt": (string) | null;
-  "retentionEndsAt": (string) | null;
-  "version": number;
-  "restoreEligible": false;
 };
 
 export type RetireCoreMemberDto = {
@@ -2143,10 +2182,6 @@ export const API_V1_PATHS = {
   adminHelpCreate: "/api/v1/admin/help",
   adminHelpUpdate: "/api/v1/admin/help/{id}/draft",
   adminHelpPublish: "/api/v1/admin/help/{id}/publish",
-  adminRecycle: "/api/v1/admin/recycle-bin",
-  adminRecycleHonorSoftDelete: "/api/v1/admin/recycle-bin/honors/{publicId}",
-  adminRecycleHonorRestore: "/api/v1/admin/recycle-bin/honors/{publicId}/restore",
-  adminRecycleHonorHardDelete: "/api/v1/admin/recycle-bin/honors/{publicId}",
   publicHelp: "/api/v1/public/help",
   publicHelpDetail: "/api/v1/public/help/{slug}",
 } as const;
@@ -2286,10 +2321,6 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/help": { method: "POST", path: "/api/v1/admin/help" },
   "PATCH /api/v1/admin/help/{id}/draft": { method: "PATCH", path: "/api/v1/admin/help/{id}/draft" },
   "POST /api/v1/admin/help/{id}/publish": { method: "POST", path: "/api/v1/admin/help/{id}/publish" },
-  "GET /api/v1/admin/recycle-bin": { method: "GET", path: "/api/v1/admin/recycle-bin" },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": { method: "POST", path: "/api/v1/admin/recycle-bin/honors/{publicId}" },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": { method: "POST", path: "/api/v1/admin/recycle-bin/honors/{publicId}/restore" },
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": { method: "DELETE", path: "/api/v1/admin/recycle-bin/honors/{publicId}" },
   "GET /api/v1/public/help": { method: "GET", path: "/api/v1/public/help" },
   "GET /api/v1/public/help/{slug}": { method: "GET", path: "/api/v1/public/help/{slug}" },
 } as const;
@@ -2435,10 +2466,6 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/help": AdminHelpResponseDto;
   "PATCH /api/v1/admin/help/{id}/draft": AdminHelpResponseDto;
   "POST /api/v1/admin/help/{id}/publish": AdminHelpResponseDto;
-  "GET /api/v1/admin/recycle-bin": RecycleListResponseDto;
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": RecycleItemResponseDto;
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": RestoredRecycleItemResponseDto;
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": HardDeleteResponseDto;
   "GET /api/v1/public/help": PublicHelpListResponseDto;
   "GET /api/v1/public/help/{slug}": PublicHelpResponseDto;
 }
@@ -2860,18 +2887,6 @@ const API_RESPONSE_SCHEMAS = {
   "POST /api/v1/admin/help/{id}/publish": {
     "$ref": "#/components/schemas/AdminHelpResponseDto"
   },
-  "GET /api/v1/admin/recycle-bin": {
-    "$ref": "#/components/schemas/RecycleListResponseDto"
-  },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}": {
-    "$ref": "#/components/schemas/RecycleItemResponseDto"
-  },
-  "POST /api/v1/admin/recycle-bin/honors/{publicId}/restore": {
-    "$ref": "#/components/schemas/RestoredRecycleItemResponseDto"
-  },
-  "DELETE /api/v1/admin/recycle-bin/honors/{publicId}": {
-    "$ref": "#/components/schemas/HardDeleteResponseDto"
-  },
   "GET /api/v1/public/help": {
     "$ref": "#/components/schemas/PublicHelpListResponseDto"
   },
@@ -3166,6 +3181,307 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion"
     ]
   },
+  "CreateMemberAvatarUploadIntentDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Optional for members; formal members must match their current center. Preparatory members use a server-selected active center."
+      },
+      "fileName": {
+        "type": "string",
+        "maxLength": 180
+      },
+      "mimeType": {
+        "type": "string",
+        "enum": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ]
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "checksumSha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image"
+        ]
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "checksumSha256",
+      "kind"
+    ]
+  },
+  "UploadActorResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "username": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "username",
+      "displayName"
+    ]
+  },
+  "UploadDestinationDto": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string"
+      },
+      "headers": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "url",
+      "headers"
+    ]
+  },
+  "UploadIntentResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "processing",
+          "ready",
+          "failed",
+          "expired"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "failureCode": {
+        "type": "string",
+        "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "upload": {
+        "$ref": "#/components/schemas/UploadDestinationDto"
+      }
+    },
+    "required": [
+      "id",
+      "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "kind",
+      "status",
+      "version",
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt",
+      "upload"
+    ]
+  },
+  "UploadPartDto": {
+    "type": "object",
+    "properties": {
+      "partNumber": {
+        "type": "number",
+        "minimum": 1
+      },
+      "etag": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "partNumber",
+      "etag"
+    ]
+  },
+  "CompleteUploadDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "parts": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/UploadPartDto"
+        }
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "parts"
+    ]
+  },
+  "MemberAvatarUploadResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "processing",
+          "ready",
+          "failed",
+          "expired"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "failureCode": {
+        "type": "string",
+        "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "assetId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Ready media asset identifier accepted by PATCH /members/me"
+      }
+    },
+    "required": [
+      "id",
+      "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "kind",
+      "status",
+      "version",
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt",
+      "assetId"
+    ]
+  },
   "CreateManagedMemberDto": {
     "type": "object",
     "properties": {
@@ -3300,6 +3616,396 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion",
       "centerId",
       "duty"
+    ]
+  },
+  "UploadResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "createdBy": {
+        "$ref": "#/components/schemas/UploadActorResponseDto"
+      },
+      "fileName": {
+        "type": "string"
+      },
+      "mimeType": {
+        "type": "string"
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "uploading",
+          "processing",
+          "ready",
+          "failed",
+          "expired"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "expiresAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "failureCode": {
+        "type": "string",
+        "nullable": true
+      },
+      "completedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "centerId",
+      "createdBy",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "kind",
+      "status",
+      "version",
+      "expiresAt",
+      "failureCode",
+      "completedAt",
+      "createdAt",
+      "updatedAt"
+    ]
+  },
+  "UploadListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/UploadResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
+  "CreateUploadIntentDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "fileName": {
+        "type": "string",
+        "maxLength": 180
+      },
+      "mimeType": {
+        "type": "string",
+        "enum": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "video/mp4",
+          "video/webm"
+        ]
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "checksumSha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "centerId",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "checksumSha256",
+      "kind"
+    ]
+  },
+  "CreateMediaAttachmentDto": {
+    "type": "object",
+    "properties": {
+      "uploadId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "expectedUploadVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "ownerType": {
+        "type": "string",
+        "enum": [
+          "content",
+          "portal_home",
+          "portal_join",
+          "project",
+          "activity",
+          "gallery",
+          "resource"
+        ]
+      },
+      "ownerId": {
+        "type": "string"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "cover",
+          "detail",
+          "visual"
+        ]
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "title": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "alt": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "aspect": {
+        "type": "string",
+        "enum": [
+          "landscape",
+          "portrait",
+          "wide"
+        ]
+      },
+      "sortOrder": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "uploadId",
+      "expectedUploadVersion",
+      "ownerType",
+      "ownerId",
+      "centerId",
+      "role",
+      "kind",
+      "title",
+      "caption",
+      "alt",
+      "aspect",
+      "sortOrder"
+    ]
+  },
+  "MediaAttachmentResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "ownerType": {
+        "type": "string",
+        "enum": [
+          "content",
+          "portal_home",
+          "portal_join",
+          "project",
+          "activity",
+          "gallery",
+          "resource"
+        ]
+      },
+      "ownerId": {
+        "type": "string"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "cover",
+          "detail",
+          "visual"
+        ]
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      },
+      "title": {
+        "type": "string"
+      },
+      "caption": {
+        "type": "string"
+      },
+      "alt": {
+        "type": "string"
+      },
+      "aspect": {
+        "type": "string",
+        "enum": [
+          "landscape",
+          "portrait",
+          "wide"
+        ]
+      },
+      "sortOrder": {
+        "type": "number",
+        "minimum": 0
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ready",
+          "failed"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "uploadVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "url": {
+        "type": "string"
+      },
+      "thumbnailUrl": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "ownerType",
+      "ownerId",
+      "centerId",
+      "role",
+      "kind",
+      "title",
+      "caption",
+      "alt",
+      "aspect",
+      "sortOrder",
+      "status",
+      "version",
+      "uploadVersion",
+      "url"
+    ]
+  },
+  "UpdateMediaAttachmentDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "title": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "caption": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "alt": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "aspect": {
+        "type": "string",
+        "enum": [
+          "landscape",
+          "portrait",
+          "wide"
+        ]
+      },
+      "sortOrder": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "expectedVersion"
     ]
   },
   "Object": {
@@ -5508,229 +6214,6 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "CreateMediaAttachmentDto": {
-    "type": "object",
-    "properties": {
-      "uploadId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "expectedUploadVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "ownerType": {
-        "type": "string",
-        "enum": [
-          "content",
-          "portal_home",
-          "portal_join",
-          "project",
-          "activity",
-          "gallery",
-          "resource"
-        ]
-      },
-      "ownerId": {
-        "type": "string"
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "role": {
-        "type": "string",
-        "enum": [
-          "cover",
-          "detail",
-          "visual"
-        ]
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "image",
-          "video"
-        ]
-      },
-      "title": {
-        "type": "string",
-        "maxLength": 200
-      },
-      "caption": {
-        "type": "string",
-        "maxLength": 500
-      },
-      "alt": {
-        "type": "string",
-        "maxLength": 300
-      },
-      "aspect": {
-        "type": "string",
-        "enum": [
-          "landscape",
-          "portrait",
-          "wide"
-        ]
-      },
-      "sortOrder": {
-        "type": "number",
-        "minimum": 0
-      }
-    },
-    "required": [
-      "uploadId",
-      "expectedUploadVersion",
-      "ownerType",
-      "ownerId",
-      "centerId",
-      "role",
-      "kind",
-      "title",
-      "caption",
-      "alt",
-      "aspect",
-      "sortOrder"
-    ]
-  },
-  "MediaAttachmentResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "ownerType": {
-        "type": "string",
-        "enum": [
-          "content",
-          "portal_home",
-          "portal_join",
-          "project",
-          "activity",
-          "gallery",
-          "resource"
-        ]
-      },
-      "ownerId": {
-        "type": "string"
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "role": {
-        "type": "string",
-        "enum": [
-          "cover",
-          "detail",
-          "visual"
-        ]
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "image",
-          "video"
-        ]
-      },
-      "title": {
-        "type": "string"
-      },
-      "caption": {
-        "type": "string"
-      },
-      "alt": {
-        "type": "string"
-      },
-      "aspect": {
-        "type": "string",
-        "enum": [
-          "landscape",
-          "portrait",
-          "wide"
-        ]
-      },
-      "sortOrder": {
-        "type": "number",
-        "minimum": 0
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ready",
-          "failed"
-        ]
-      },
-      "version": {
-        "type": "number",
-        "minimum": 1
-      },
-      "uploadVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "url": {
-        "type": "string"
-      },
-      "thumbnailUrl": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "id",
-      "ownerType",
-      "ownerId",
-      "centerId",
-      "role",
-      "kind",
-      "title",
-      "caption",
-      "alt",
-      "aspect",
-      "sortOrder",
-      "status",
-      "version",
-      "uploadVersion",
-      "url"
-    ]
-  },
-  "UpdateMediaAttachmentDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "title": {
-        "type": "string",
-        "maxLength": 200
-      },
-      "caption": {
-        "type": "string",
-        "maxLength": 500
-      },
-      "alt": {
-        "type": "string",
-        "maxLength": 300
-      },
-      "aspect": {
-        "type": "string",
-        "enum": [
-          "landscape",
-          "portrait",
-          "wide"
-        ]
-      },
-      "sortOrder": {
-        "type": "number",
-        "minimum": 0
-      }
-    },
-    "required": [
-      "expectedVersion"
-    ]
-  },
   "AssessmentCenterDto": {
     "type": "object",
     "properties": {
@@ -5763,6 +6246,56 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "items"
+    ]
+  },
+  "AssessmentBatchDetailDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "lifecycleStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "upcoming",
+          "open",
+          "paused",
+          "closed",
+          "archived"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "lifecycleStatus"
+    ]
+  },
+  "AssessmentAdvanceBlockerDto": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "enum": [
+          "ASSESSMENT_BATCH_NOT_CLOSED",
+          "ASSESSMENT_NOT_EDITABLE",
+          "ASSESSMENT_ROUND_INCOMPLETE",
+          "ASSESSMENT_ADJUSTMENT_PENDING"
+        ]
+      },
+      "count": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "code",
+      "count"
     ]
   },
   "AssessmentPersonDto": {
@@ -6016,6 +6549,42 @@ const API_COMPONENT_SCHEMAS = {
         "format": "date-time",
         "nullable": true
       },
+      "batch": {
+        "$ref": "#/components/schemas/AssessmentBatchDetailDto"
+      },
+      "pending": {
+        "type": "number",
+        "minimum": 0
+      },
+      "adjustmentPending": {
+        "type": "number",
+        "minimum": 0
+      },
+      "canAdvance": {
+        "type": "boolean"
+      },
+      "advanceBlocker": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentAdvanceBlockerDto"
+          }
+        ]
+      },
+      "nextAction": {
+        "type": "string",
+        "enum": [
+          "PUBLISH_BATCH",
+          "OPEN_BATCH",
+          "CLOSE_BATCH",
+          "RECORD_CURRENT_ROUND_RESULTS",
+          "SUBMIT_ADJUSTMENT_PROPOSALS",
+          "DECIDE_ADJUSTMENTS",
+          "ADVANCE_ROUND",
+          "PUBLISH_RESULTS",
+          "NONE"
+        ]
+      },
       "items": {
         "type": "array",
         "items": {
@@ -6028,6 +6597,12 @@ const API_COMPONENT_SCHEMAS = {
       "status",
       "version",
       "publishedAt",
+      "batch",
+      "pending",
+      "adjustmentPending",
+      "canAdvance",
+      "advanceBlocker",
+      "nextAction",
       "items"
     ]
   },
@@ -7414,334 +7989,6 @@ const API_COMPONENT_SCHEMAS = {
       "warnings"
     ]
   },
-  "UploadActorResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "username": {
-        "type": "string"
-      },
-      "displayName": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "id",
-      "username",
-      "displayName"
-    ]
-  },
-  "UploadResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "createdBy": {
-        "$ref": "#/components/schemas/UploadActorResponseDto"
-      },
-      "fileName": {
-        "type": "string"
-      },
-      "mimeType": {
-        "type": "string"
-      },
-      "byteSize": {
-        "type": "number",
-        "minimum": 1
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "image",
-          "video"
-        ]
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "uploading",
-          "processing",
-          "ready",
-          "failed",
-          "expired"
-        ]
-      },
-      "version": {
-        "type": "number",
-        "minimum": 1
-      },
-      "expiresAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "failureCode": {
-        "type": "string",
-        "nullable": true
-      },
-      "completedAt": {
-        "type": "string",
-        "format": "date-time",
-        "nullable": true
-      },
-      "createdAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "updatedAt": {
-        "type": "string",
-        "format": "date-time"
-      }
-    },
-    "required": [
-      "id",
-      "centerId",
-      "createdBy",
-      "fileName",
-      "mimeType",
-      "byteSize",
-      "kind",
-      "status",
-      "version",
-      "expiresAt",
-      "failureCode",
-      "completedAt",
-      "createdAt",
-      "updatedAt"
-    ]
-  },
-  "UploadListResponseDto": {
-    "type": "object",
-    "properties": {
-      "page": {
-        "type": "integer",
-        "minimum": 1
-      },
-      "pageSize": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 100
-      },
-      "total": {
-        "type": "integer",
-        "minimum": 0
-      },
-      "items": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/UploadResponseDto"
-        }
-      }
-    },
-    "required": [
-      "page",
-      "pageSize",
-      "total",
-      "items"
-    ]
-  },
-  "CreateUploadIntentDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 0
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "fileName": {
-        "type": "string",
-        "maxLength": 180
-      },
-      "mimeType": {
-        "type": "string",
-        "enum": [
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-          "video/mp4",
-          "video/webm"
-        ]
-      },
-      "byteSize": {
-        "type": "number",
-        "minimum": 1
-      },
-      "checksumSha256": {
-        "type": "string",
-        "minLength": 64,
-        "maxLength": 64
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "image",
-          "video"
-        ]
-      }
-    },
-    "required": [
-      "expectedVersion",
-      "centerId",
-      "fileName",
-      "mimeType",
-      "byteSize",
-      "checksumSha256",
-      "kind"
-    ]
-  },
-  "UploadDestinationDto": {
-    "type": "object",
-    "properties": {
-      "url": {
-        "type": "string"
-      },
-      "headers": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "string"
-        }
-      }
-    },
-    "required": [
-      "url",
-      "headers"
-    ]
-  },
-  "UploadIntentResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "createdBy": {
-        "$ref": "#/components/schemas/UploadActorResponseDto"
-      },
-      "fileName": {
-        "type": "string"
-      },
-      "mimeType": {
-        "type": "string"
-      },
-      "byteSize": {
-        "type": "number",
-        "minimum": 1
-      },
-      "kind": {
-        "type": "string",
-        "enum": [
-          "image",
-          "video"
-        ]
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "uploading",
-          "processing",
-          "ready",
-          "failed",
-          "expired"
-        ]
-      },
-      "version": {
-        "type": "number",
-        "minimum": 1
-      },
-      "expiresAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "failureCode": {
-        "type": "string",
-        "nullable": true
-      },
-      "completedAt": {
-        "type": "string",
-        "format": "date-time",
-        "nullable": true
-      },
-      "createdAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "updatedAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "upload": {
-        "$ref": "#/components/schemas/UploadDestinationDto"
-      }
-    },
-    "required": [
-      "id",
-      "centerId",
-      "createdBy",
-      "fileName",
-      "mimeType",
-      "byteSize",
-      "kind",
-      "status",
-      "version",
-      "expiresAt",
-      "failureCode",
-      "completedAt",
-      "createdAt",
-      "updatedAt",
-      "upload"
-    ]
-  },
-  "UploadPartDto": {
-    "type": "object",
-    "properties": {
-      "partNumber": {
-        "type": "number",
-        "minimum": 1
-      },
-      "etag": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "partNumber",
-      "etag"
-    ]
-  },
-  "CompleteUploadDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "parts": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/UploadPartDto"
-        }
-      }
-    },
-    "required": [
-      "expectedVersion",
-      "parts"
-    ]
-  },
   "AdminProjectLeadSummaryDto": {
     "type": "object",
     "properties": {
@@ -8526,6 +8773,154 @@ const API_COMPONENT_SCHEMAS = {
       }
     },
     "required": [
+      "items"
+    ]
+  },
+  "MemberActivitySummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "slug": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "date": {
+        "type": "string"
+      },
+      "time": {
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "registrationEndAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "cover": {
+        "type": "object",
+        "nullable": true
+      },
+      "available": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "slug",
+      "title",
+      "type",
+      "date",
+      "time",
+      "location",
+      "summary",
+      "registrationEndAt",
+      "publishedAt",
+      "cover",
+      "available"
+    ]
+  },
+  "MemberActivityRegistrationResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "activityId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "registered",
+          "accepted",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      "version": {
+        "type": "number"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "decidedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "cancelledAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "activity": {
+        "$ref": "#/components/schemas/MemberActivitySummaryResponseDto"
+      }
+    },
+    "required": [
+      "id",
+      "activityId",
+      "status",
+      "version",
+      "createdAt",
+      "updatedAt",
+      "decidedAt",
+      "cancelledAt",
+      "activity"
+    ]
+  },
+  "MemberActivityRegistrationListResponseDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "totalPages": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MemberActivityRegistrationResponseDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "totalPages",
       "items"
     ]
   },
@@ -9656,7 +10051,7 @@ const API_COMPONENT_SCHEMAS = {
       },
       "publicId": {
         "type": "string",
-        "description": "Stable external honor identifier used by recycle routes."
+        "description": "Stable external honor identifier."
       },
       "personId": {
         "type": "string",
@@ -9760,13 +10155,16 @@ const API_COMPONENT_SCHEMAS = {
         "maximum": 0
       },
       "title": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 80
       },
       "type": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 40
       },
       "description": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 1000
       },
       "awardedAt": {
         "type": "string",
@@ -9775,7 +10173,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "proofReference": {
         "type": "string",
-        "description": "Private evidence reference; never published."
+        "description": "Private evidence reference; never published.",
+        "maxLength": 1000
       },
       "publicConsent": {
         "type": "boolean"
@@ -9887,16 +10286,16 @@ const API_COMPONENT_SCHEMAS = {
       },
       "title": {
         "type": "string",
-        "maxLength": 200
+        "maxLength": 60
       },
       "category": {
         "type": "string",
-        "maxLength": 80
+        "maxLength": 30
       },
       "reflection": {
         "type": "string",
         "description": "Private member reflection; never publicly projected.",
-        "maxLength": 5000
+        "maxLength": 1000
       },
       "occurredOn": {
         "type": "string",
@@ -9921,16 +10320,16 @@ const API_COMPONENT_SCHEMAS = {
       },
       "title": {
         "type": "string",
-        "maxLength": 200
+        "maxLength": 60
       },
       "category": {
         "type": "string",
-        "maxLength": 80
+        "maxLength": 30
       },
       "reflection": {
         "type": "string",
         "description": "Private member reflection; never publicly projected.",
-        "maxLength": 5000
+        "maxLength": 1000
       },
       "occurredOn": {
         "type": "string",
@@ -10162,157 +10561,83 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "RecycleItemResponseDto": {
+  "PublicTimelineItemDto": {
     "type": "object",
     "properties": {
-      "id": {
-        "type": "string",
-        "description": "Stable external honor identifier; never an internal UUID."
-      },
-      "type": {
+      "entityType": {
         "type": "string",
         "enum": [
-          "honor"
+          "activity",
+          "article",
+          "notice"
         ]
+      },
+      "slug": {
+        "type": "string"
       },
       "title": {
         "type": "string"
       },
-      "centerName": {
-        "type": "string"
+      "summary": {
+        "type": "string",
+        "nullable": true
       },
-      "deletedAt": {
-        "type": "string"
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       },
-      "retentionEndsAt": {
-        "type": "string"
+      "eventAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
       },
-      "version": {
-        "type": "number"
-      },
-      "restoreEligible": {
+      "available": {
         "type": "boolean"
+      },
+      "media": {
+        "type": "object",
+        "nullable": true
+      },
+      "to": {
+        "type": "string"
       }
     },
     "required": [
-      "id",
-      "type",
+      "entityType",
+      "slug",
       "title",
-      "centerName",
-      "deletedAt",
-      "retentionEndsAt",
-      "version",
-      "restoreEligible"
+      "summary",
+      "publishedAt",
+      "eventAt",
+      "available",
+      "to"
     ]
   },
-  "RecycleListResponseDto": {
+  "PublicTimelineListResponseDto": {
     "type": "object",
     "properties": {
       "items": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/RecycleItemResponseDto"
+          "$ref": "#/components/schemas/PublicTimelineItemDto"
         }
-      }
-    },
-    "required": [
-      "items"
-    ]
-  },
-  "RecycleCommandDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
-      }
-    },
-    "required": [
-      "expectedVersion"
-    ]
-  },
-  "RestoredRecycleItemResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "description": "Stable external honor identifier; never an internal UUID."
       },
-      "type": {
-        "type": "string",
-        "enum": [
-          "honor"
-        ]
-      },
-      "title": {
-        "type": "string"
-      },
-      "centerName": {
-        "type": "string"
-      },
-      "deletedAt": {
-        "type": "string",
-        "nullable": true
-      },
-      "retentionEndsAt": {
-        "type": "string",
-        "nullable": true
-      },
-      "version": {
+      "page": {
         "type": "number"
       },
-      "restoreEligible": {
-        "oneOf": [
-          {
-            "type": "boolean",
-            "enum": [
-              false
-            ]
-          }
-        ]
-      }
-    },
-    "required": [
-      "id",
-      "type",
-      "title",
-      "centerName",
-      "deletedAt",
-      "retentionEndsAt",
-      "version",
-      "restoreEligible"
-    ]
-  },
-  "HardDeleteRecycleDto": {
-    "type": "object",
-    "properties": {
-      "expectedVersion": {
-        "type": "number",
-        "minimum": 1
+      "pageSize": {
+        "type": "number"
       },
-      "confirmed": {
-        "type": "boolean",
-        "description": "Explicit acknowledgement required for irreversible deletion."
+      "total": {
+        "type": "number"
       }
     },
     "required": [
-      "expectedVersion",
-      "confirmed"
-    ]
-  },
-  "HardDeleteResponseDto": {
-    "type": "object",
-    "properties": {
-      "deleted": {
-        "type": "boolean"
-      },
-      "id": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "deleted",
-      "id"
+      "items",
+      "page",
+      "pageSize",
+      "total"
     ]
   },
   "HealthLiveResponseDto": {
@@ -11857,85 +12182,6 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "slug",
       "title"
-    ]
-  },
-  "PublicTimelineItemDto": {
-    "type": "object",
-    "properties": {
-      "entityType": {
-        "type": "string",
-        "enum": [
-          "activity",
-          "article",
-          "notice"
-        ]
-      },
-      "slug": {
-        "type": "string"
-      },
-      "title": {
-        "type": "string"
-      },
-      "summary": {
-        "type": "string",
-        "nullable": true
-      },
-      "publishedAt": {
-        "type": "string",
-        "format": "date-time",
-        "nullable": true
-      },
-      "eventAt": {
-        "type": "string",
-        "format": "date-time",
-        "nullable": true
-      },
-      "available": {
-        "type": "boolean"
-      },
-      "media": {
-        "type": "object",
-        "nullable": true
-      },
-      "to": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "entityType",
-      "slug",
-      "title",
-      "summary",
-      "publishedAt",
-      "eventAt",
-      "available",
-      "to"
-    ]
-  },
-  "PublicTimelineListResponseDto": {
-    "type": "object",
-    "properties": {
-      "items": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/PublicTimelineItemDto"
-        }
-      },
-      "page": {
-        "type": "number"
-      },
-      "pageSize": {
-        "type": "number"
-      },
-      "total": {
-        "type": "number"
-      }
-    },
-    "required": [
-      "items",
-      "page",
-      "pageSize",
-      "total"
     ]
   }
 } as const;

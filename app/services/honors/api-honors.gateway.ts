@@ -27,7 +27,6 @@ export function createApiHonorsGateway(options: ApiHonorsGatewayOptions) {
   return {
     listAdmin: () => client.honors.listAdmin(),
     approve: (id: string, expectedVersion: number) => client.honors.approve(id, { expectedVersion }),
-    softDelete: (publicId: string, expectedVersion: number) => client.recycle.softDelete(publicId, { expectedVersion }),
     listMine: () => client.members.honors(),
     submit: (input: Parameters<typeof client.members.submitHonor>[0]) => client.members.submitHonor(input),
     updateConsent: (id: string, expectedVersion: number, publicConsent: boolean) => client.members.updateHonorConsent(id, { expectedVersion, publicConsent }),

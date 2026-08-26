@@ -22,9 +22,9 @@ describe("generated browser API client", () => {
 
     const schemas = openapiSnapshot.components.schemas as Record<string, { properties?: Record<string, Record<string, unknown>> }>;
     for (const dto of ["CreateGrowthRecordDto", "UpdateGrowthRecordDto"]) {
-      expect(schemas[dto]?.properties?.title, dto).toMatchObject({ type: "string", maxLength: 200 });
-      expect(schemas[dto]?.properties?.category, dto).toMatchObject({ type: "string", maxLength: 80 });
-      expect(schemas[dto]?.properties?.reflection, dto).toMatchObject({ type: "string", maxLength: 5000 });
+      expect(schemas[dto]?.properties?.title, dto).toMatchObject({ type: "string", maxLength: 60 });
+      expect(schemas[dto]?.properties?.category, dto).toMatchObject({ type: "string", maxLength: 30 });
+      expect(schemas[dto]?.properties?.reflection, dto).toMatchObject({ type: "string", maxLength: 1000 });
     }
   });
 

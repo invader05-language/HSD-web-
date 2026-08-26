@@ -5,6 +5,7 @@ import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import {
   isSupportedAvatar,
+  normalizeMemberGrade,
   validateMemberProfileDraft,
   type MemberProfileFormErrors,
 } from "~/utils/member-profile-form";
@@ -165,7 +166,7 @@ async function saveProfile() {
   const previousAvatarUrl = currentProfile.value.avatarUrl;
   currentMember!.updateProfile({
     name: draft.name.trim(),
-    grade: draft.grade.trim(),
+    grade: normalizeMemberGrade(draft.grade),
     className: draft.className.trim(),
     baizeDirection: draft.center === "白泽开发中心" ? draft.baizeDirection : undefined,
     bio: draft.bio.trim(),
@@ -211,7 +212,7 @@ onMounted(() => {
     </div>
 
     <div class="member-profile-layout">
-      <MemberSpaceNav class="member-profile-aside" :profile="currentProfile" :avatar-src="currentProfileAvatarSource" active="profile" :signing-out="session.isSigningOut" :sign-out-error="session.signOutError" @sign-out="signOut" />
+      <MemberSpaceNav :profile="currentProfile" :avatar-src="currentProfileAvatarSource" active="profile" :signing-out="session.isSigningOut" :sign-out-error="session.signOutError" @sign-out="signOut" />
 
       <main id="profile-form" class="member-profile-main">
         <p class="member-profile-breadcrumb">成员空间　/　<strong>个人资料</strong></p>
@@ -244,19 +245,19 @@ onMounted(() => {
                 <span>姓名</span>
                 <input v-model="draft.name" maxlength="20" autocomplete="name" :aria-invalid="Boolean(errors.name)" aria-describedby="name-help name-error">
                 <small id="name-help">填写本人常用姓名，保存后同步到成员空间与公开展示。</small>
-                <small v-if="errors.name" id="name-error" class="member-profile-error">{{ errors.name }}</small>
+                <small id="name-error" class="member-profile-error member-profile-error-slot" :class="{ 'is-empty': !errors.name }" :aria-hidden="!errors.name" aria-live="polite">{{ errors.name || " " }}</small>
               </label>
               <label>
                 <span>年级</span>
                 <input v-model="draft.grade" maxlength="12" placeholder="如：2026 级" :aria-invalid="Boolean(errors.grade)" aria-describedby="grade-help grade-error">
                 <small id="grade-help">填写当前所属年级。</small>
-                <small v-if="errors.grade" id="grade-error" class="member-profile-error">{{ errors.grade }}</small>
+                <small id="grade-error" class="member-profile-error member-profile-error-slot" :class="{ 'is-empty': !errors.grade }" :aria-hidden="!errors.grade" aria-live="polite">{{ errors.grade || " " }}</small>
               </label>
               <label class="member-profile-field-wide">
                 <span>班级</span>
                 <input v-model="draft.className" maxlength="30" placeholder="如：软件工程 1 班" :aria-invalid="Boolean(errors.className)" aria-describedby="class-help class-error">
                 <small id="class-help">填写当前专业与班级信息。</small>
-                <small v-if="errors.className" id="class-error" class="member-profile-error">{{ errors.className }}</small>
+                <small id="class-error" class="member-profile-error member-profile-error-slot" :class="{ 'is-empty': !errors.className }" :aria-hidden="!errors.className" aria-live="polite">{{ errors.className || " " }}</small>
               </label>
             </div>
             <div class="member-profile-readonly-grid">
@@ -278,13 +279,13 @@ onMounted(() => {
                   <option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option>
                 </select>
                 <small id="baize-direction-help">{{ isMockApi ? "白泽开发中心统一使用五项实践方向。" : "当前资料接口暂不支持修改白泽实践方向。" }}</small>
-                <small v-if="errors.baizeDirection" id="baize-direction-error" class="member-profile-error">{{ errors.baizeDirection }}</small>
+                <small id="baize-direction-error" class="member-profile-error member-profile-error-slot" :class="{ 'is-empty': !errors.baizeDirection }" :aria-hidden="!errors.baizeDirection" aria-live="polite">{{ errors.baizeDirection || " " }}</small>
               </label>
               <label class="member-profile-field-wide">
                 <span>个人简介</span>
                 <textarea v-model="draft.bio" maxlength="500" rows="5" :aria-invalid="Boolean(errors.bio)" aria-describedby="bio-help bio-error"></textarea>
                 <small id="bio-help">选填。可介绍当前实践重点、协作经验或正在成长的方向。</small>
-                <small v-if="errors.bio" id="bio-error" class="member-profile-error">{{ errors.bio }}</small>
+                <small id="bio-error" class="member-profile-error member-profile-error-slot" :class="{ 'is-empty': !errors.bio }" :aria-hidden="!errors.bio" aria-live="polite">{{ errors.bio || " " }}</small>
               </label>
             </div>
           </section>

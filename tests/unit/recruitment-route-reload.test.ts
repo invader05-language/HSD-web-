@@ -69,10 +69,16 @@ function apiApplication(batchId: string, id: string, name: string) {
 
 function assessmentBatch(batchId: string, name: string) {
   return {
+    batch: { id: batchId, name: `${name} 批次`, lifecycleStatus: "open" },
     currentRound: 1,
     status: "ASSESSING",
     version: 1,
     publishedAt: null,
+    pending: 1,
+    adjustmentPending: 0,
+    canAdvance: false,
+    advanceBlocker: { code: "ASSESSMENT_BATCH_NOT_CLOSED", count: 0 },
+    nextAction: "CLOSE_BATCH",
     items: [{
       applicationId: `${batchId}-application`,
       person: {

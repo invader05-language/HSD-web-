@@ -78,8 +78,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     label: "系统管理",
     items: [
       { id: "accounts", label: "管理员资格配置", to: "/admin/accounts" },
-      { id: "logs", label: "操作日志", to: "/admin/logs", feature: "auditLog" },
-      { id: "recycle-bin", label: "回收站", to: "/admin/recycle-bin", feature: "recycleBin" }
+      { id: "logs", label: "操作日志", to: "/admin/logs", feature: "auditLog" }
     ]
   }
 ];

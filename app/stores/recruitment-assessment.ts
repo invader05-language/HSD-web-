@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import type {
+  AssessmentAdvanceBlockerDto,
   AssessmentBatchResponseDto,
   AssessmentAdjustmentTargetCatalogResponseDto,
   AssessmentCandidateDto,
@@ -62,6 +63,20 @@ export interface RecruitmentAssessmentBatchState {
   records: RecruitmentAssessmentRecord[];
   auditRecords: AssessmentAuditRecord[];
   publishedAt?: string;
+}
+
+export interface RecruitmentAssessmentBatchContext {
+  id: string;
+  name: string;
+  lifecycleStatus: "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
+}
+
+export interface RecruitmentAssessmentWorkflowSummary {
+  pending: number;
+  adjustmentPending: number;
+  canAdvance: boolean;
+  advanceBlocker?: AssessmentAdvanceBlockerDto;
+  nextAction?: AssessmentBatchResponseDto["nextAction"];
 }
 
 export interface RecruitmentAssessmentCandidate extends RecruitmentAssessmentRecord {
@@ -386,6 +401,36 @@ function mapApiAdjustmentTargets(response: AssessmentAdjustmentTargetCatalogResp
   return response.items.map((center) => ({ ...center }));
 }
 
+function apiBatchContext(response: AssessmentBatchResponseDto): RecruitmentAssessmentBatchContext | undefined {
+  const batch = response.batch;
+  if (!batch || typeof batch.id !== "string" || typeof batch.name !== "string") return undefined;
+  const lifecycleStatus = batch.lifecycleStatus;
+  if (![
+    "draft",
+    "upcoming",
+    "open",
+    "paused",
+    "closed",
+    "archived",
+  ].includes(lifecycleStatus as string)) return undefined;
+  return {
+    id: batch.id,
+    name: batch.name,
+    lifecycleStatus: lifecycleStatus as RecruitmentAssessmentBatchContext["lifecycleStatus"],
+  };
+}
+
+function apiWorkflowSummary(response: AssessmentBatchResponseDto): RecruitmentAssessmentWorkflowSummary | undefined {
+  const blocker = response.advanceBlocker ?? undefined;
+  return {
+    pending: response.pending,
+    adjustmentPending: response.adjustmentPending,
+    canAdvance: response.canAdvance,
+    ...(blocker ? { advanceBlocker: { ...blocker } } : {}),
+    nextAction: response.nextAction,
+  };
+}
+
 function isAssessableApplication(application: SubmittedRecruitmentApplication): boolean {
   return application.status !== "draft" && application.status !== "withdrawn";
 }
@@ -483,6 +528,8 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     apiMode: false,
     apiCandidateProfiles: {} as Record<string, Record<string, AdminCandidate>>,
     apiAdjustmentTargetsByBatch: {} as Record<string, AssessmentAdjustmentTargetCatalogResponseDto["items"]>,
+    apiBatchContextByBatch: {} as Record<string, RecruitmentAssessmentBatchContext | undefined>,
+    apiWorkflowByBatch: {} as Record<string, RecruitmentAssessmentWorkflowSummary | undefined>,
     apiLoadingByBatch: {} as Record<string, boolean>,
     apiMutatingByBatch: {} as Record<string, boolean>,
     apiErrorByBatch: {} as Record<string, string | undefined>,
@@ -497,6 +544,8 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.batches = {};
       this.apiCandidateProfiles = {};
       this.apiAdjustmentTargetsByBatch = {};
+      this.apiBatchContextByBatch = {};
+      this.apiWorkflowByBatch = {};
     },
     async refreshAssessmentBatch(batchId: string, gateway: RecruitmentGateway) {
       this.enableApiMode();
@@ -511,6 +560,8 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         this.batches[batchId] = mapped.state;
         this.apiCandidateProfiles[batchId] = mapped.profiles;
         this.apiAdjustmentTargetsByBatch[batchId] = mapApiAdjustmentTargets(adjustmentTargets);
+        this.apiBatchContextByBatch[batchId] = apiBatchContext(response);
+        this.apiWorkflowByBatch[batchId] = apiWorkflowSummary(response);
         return mapped.state;
       } catch (error) {
         this.apiErrorByBatch[batchId] = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
@@ -634,6 +685,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     getApiAdjustmentTarget(batchId: string, centerId: string) {
       const center = this.apiAdjustmentTargetsByBatch[batchId]?.find(({ id }) => id === centerId);
       return center ? { ...center } : undefined;
+    },
+    getApiBatchContext(batchId: string) {
+      const context = this.apiBatchContextByBatch[batchId];
+      return context ? { ...context } : undefined;
+    },
+    getApiWorkflowSummary(batchId: string) {
+      const summary = this.apiWorkflowByBatch[batchId];
+      return summary ? { ...summary, advanceBlocker: summary.advanceBlocker ? { ...summary.advanceBlocker } : undefined } : undefined;
     },
     getBatchState(batchId: string): RecruitmentAssessmentBatchState {
       if (this.apiMode) {
