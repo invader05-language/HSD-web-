@@ -87,7 +87,7 @@ describe("Task 3A production member profile", () => {
     expect(updateCurrentProfile).toHaveBeenCalledWith({
       expectedVersion: 3,
       name: "持久化姓名",
-      grade: "2026 级",
+      grade: "2026",
       className: "软件工程 1 班",
       bio: "持久化简介",
       contact: "13800000000",
