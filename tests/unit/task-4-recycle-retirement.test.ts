@@ -68,4 +68,32 @@ describe('Task 4 recycle-bin retirement', () => {
     expect(generated).not.toContain('Recycle')
     expect(generated).not.toContain('HardDeleteResponseDto')
   })
+
+  it('tracks the canonical member avatar and activity contract entries', () => {
+    const snapshot = JSON.parse(readFileSync('packages/api-client/openapi.snapshot.json', 'utf8')) as {
+      paths: Record<string, unknown>
+      components: { schemas: Record<string, unknown> }
+    }
+
+    expect(Object.keys(snapshot.paths)).toEqual(expect.arrayContaining([
+      '/api/v1/members/me/avatar/uploads/intents',
+      '/api/v1/members/me/avatar/uploads/{uploadId}/complete',
+      '/api/v1/members/me/avatar',
+      '/api/v1/members/me/activity-registrations',
+    ]))
+    expect(Object.keys(snapshot.components.schemas)).toEqual(expect.arrayContaining([
+      'CreateMemberAvatarUploadIntentDto',
+      'MemberAvatarUploadResponseDto',
+      'MemberActivitySummaryResponseDto',
+      'MemberActivityRegistrationResponseDto',
+      'MemberActivityRegistrationListResponseDto',
+    ]))
+  })
+
+  it('does not describe the retired recycle bin as an active system permission', () => {
+    const requirements = readFileSync('HSD需求文档.md', 'utf8')
+
+    expect(requirements).not.toMatch(/系统与权限包含管理员账号、角色权限矩阵、操作日志、回收站/)
+    expect(requirements).toContain('回收站已退役')
+  })
 })
