@@ -187,6 +187,7 @@ export interface ProductionMemberProfile extends MemberProfile {
   status: MemberProfileResponseDto["status"];
   publicProfileEnabled: boolean;
   avatarAssetId?: string;
+  centerId?: string;
 }
 
 export function mapPublicRecruitmentBatch(dto: PublicRecruitmentBatchDto): PublicRecruitmentBatchView {
@@ -227,6 +228,7 @@ export function mapMemberProfileResponse(dto: MemberProfileResponseDto): Product
     className: dto.className,
     center: membershipCenter?.name ?? status.center,
     ...(membershipCenter?.slug ? { centerSlug: membershipCenter.slug as MemberProfile["centerSlug"] } : {}),
+    ...(membershipCenter?.id ? { centerId: membershipCenter.id } : {}),
     memberDuty: dto.membership?.duty === "CORE" ? "核心人员" : status.memberDuty,
     identity: status.identity,
     ...(direction ? { baizeDirection: direction } : {}),
@@ -244,7 +246,7 @@ export function mapMemberProfileResponse(dto: MemberProfileResponseDto): Product
 
 export function mapMemberProfileUpdatePayload(
   profile: ProductionMemberProfile,
-  draft: Pick<ProductionMemberProfile, "name" | "grade" | "className" | "bio"> & { contact?: string },
+  draft: Pick<ProductionMemberProfile, "name" | "grade" | "className" | "bio" | "avatarAssetId"> & { contact?: string },
 ): UpdateMyProfileDto {
   return {
     expectedVersion: profile.version,
@@ -253,6 +255,7 @@ export function mapMemberProfileUpdatePayload(
     className: draft.className.trim(),
     bio: draft.bio.trim(),
     ...(draft.contact !== undefined ? { contact: draft.contact.trim() } : {}),
+    ...(draft.avatarAssetId !== undefined ? { avatarAssetId: draft.avatarAssetId } : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MemberSpaceNav from "~/components/member/MemberSpaceNav.vue";
 import { useSessionStore } from "~/stores/session";
 import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useCurrentMember } from "~/composables/useCurrentMember";
@@ -10,6 +11,7 @@ import {
 import { BAIZE_DIRECTIONS } from "~/data/recruitment-application";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { createProductionMemberProfileController } from "~/composables/useProductionMemberProfile";
+import { createApiMemberAvatarGateway } from "~/services/member-avatar/api-member-avatar.gateway";
 import type { MemberProfile } from "~/data/member-profile";
 
 definePageMeta({ middleware: "member" });
@@ -21,8 +23,11 @@ const apiRuntime = useRuntimeConfig() as { public: { apiBase: string; useMockApi
 const isMockApi = apiRuntime.public.useMockApi;
 const currentMember = isMockApi ? useCurrentMember() : undefined;
 const recruitmentGateway = useRecruitmentGateway();
+const productionAvatarGateway = !isMockApi
+  ? createApiMemberAvatarGateway({ apiBase: apiRuntime.public.apiBase })
+  : undefined;
 const productionProfile = recruitmentGateway
-  ? createProductionMemberProfileController({ gateway: recruitmentGateway, apiBase: apiRuntime.public.apiBase })
+  ? createProductionMemberProfileController({ gateway: recruitmentGateway, apiBase: apiRuntime.public.apiBase, avatarGateway: productionAvatarGateway })
   : undefined;
 const emptyProfile: MemberProfile = {
   id: "",
@@ -42,9 +47,13 @@ const draft = isMockApi ? reactive(currentMember!.createDraft()) : productionPro
 const errors = reactive<MemberProfileFormErrors & { avatar?: string }>({});
 const status = ref<"idle" | "saving" | "success" | "error">("idle");
 const fileInput = ref<HTMLInputElement | null>(null);
+const pendingAvatarPreview = ref<string>();
+const pendingAvatarFile = ref<File>();
 let draftObjectUrl: string | undefined;
 
-const avatarSource = computed(() => isMockApi ? draft.avatarUrl || undefined : productionProfile?.avatarSource.value);
+const avatarSource = computed(() => isMockApi
+  ? draft.avatarUrl || undefined
+  : pendingAvatarPreview.value || productionProfile?.avatarSource.value);
 const currentProfileAvatarSource = computed(() => isMockApi ? currentProfile.value.avatarUrl : productionProfile?.avatarSource.value);
 const productionLoading = computed(() => productionProfile?.status.value === "loading");
 const productionError = computed(() => productionProfile?.error.value ?? "");
@@ -59,11 +68,12 @@ function clearErrors() {
 }
 
 function releaseDraftObjectUrl() {
-  if (!isMockApi) return;
   if (draftObjectUrl && draftObjectUrl !== currentProfile.value.avatarUrl) {
     URL.revokeObjectURL(draftObjectUrl);
   }
   draftObjectUrl = undefined;
+  pendingAvatarPreview.value = undefined;
+  pendingAvatarFile.value = undefined;
 }
 
 function resetDraft() {
@@ -85,30 +95,43 @@ function chooseAvatar(event: Event) {
 
   delete errors.avatar;
   if (!isSupportedAvatar(file)) {
-    errors.avatar = "请选择 JPG、PNG、WEBP 或 GIF 图片，且文件不超过 5MB。";
+    errors.avatar = "请选择 JPG、PNG 或 WEBP 图片，且文件不超过 5MB。";
     (event.target as HTMLInputElement).value = "";
     return;
   }
 
   if (!isMockApi) {
-    errors.avatar = "头像上传尚未接入，当前仅显示已保存的 API 头像。";
-    (event.target as HTMLInputElement).value = "";
+    if (draftObjectUrl) URL.revokeObjectURL(draftObjectUrl);
+    draftObjectUrl = URL.createObjectURL(file);
+    pendingAvatarPreview.value = draftObjectUrl;
+    pendingAvatarFile.value = file;
+    status.value = "idle";
     return;
   }
 
   if (draftObjectUrl) URL.revokeObjectURL(draftObjectUrl);
   draftObjectUrl = URL.createObjectURL(file);
+  pendingAvatarPreview.value = draftObjectUrl;
+  pendingAvatarFile.value = file;
   draft.avatarUrl = draftObjectUrl;
   status.value = "idle";
 }
 
-function removeAvatar() {
+async function removeAvatar() {
   if (!isMockApi) {
-    errors.avatar = "头像删除尚未接入，请通过后续头像管理流程处理。";
+    if (draftObjectUrl) URL.revokeObjectURL(draftObjectUrl);
+    draftObjectUrl = undefined;
+    pendingAvatarPreview.value = undefined;
+    pendingAvatarFile.value = undefined;
+    if (fileInput.value) fileInput.value.value = "";
+    delete errors.avatar;
+    await productionProfile?.removeAvatar();
     return;
   }
   if (draftObjectUrl) URL.revokeObjectURL(draftObjectUrl);
   draftObjectUrl = undefined;
+  pendingAvatarPreview.value = undefined;
+  pendingAvatarFile.value = undefined;
   draft.avatarUrl = undefined;
   if (fileInput.value) fileInput.value.value = "";
   delete errors.avatar;
@@ -126,7 +149,14 @@ async function saveProfile() {
 
   status.value = "saving";
   if (!isMockApi) {
-    const saved = await productionProfile?.save();
+    let avatarCenterId = productionProfile?.profile.value?.centerId;
+    const saved = await productionProfile?.save({ avatarFile: pendingAvatarFile.value, avatarCenterId });
+    if (saved && draftObjectUrl) URL.revokeObjectURL(draftObjectUrl);
+    if (saved) {
+      draftObjectUrl = undefined;
+      pendingAvatarPreview.value = undefined;
+      pendingAvatarFile.value = undefined;
+    }
     if (saved) status.value = "success";
     else status.value = "error";
     return;
@@ -181,21 +211,7 @@ onMounted(() => {
     </div>
 
     <div class="member-profile-layout">
-      <aside class="member-profile-aside">
-        <div class="member-space__identity">
-          <HsdAvatar :name="currentProfile.name" :src="currentProfileAvatarSource" size="md" />
-          <div><strong>{{ currentProfile.name }}</strong><span>{{ currentProfile.identity }}</span></div>
-        </div>
-        <nav aria-label="成员空间导航">
-          <NuxtLink to="/member">个人概览</NuxtLink>
-          <a href="/member#application">申请进度</a>
-          <NuxtLink to="/member/results">结果中心</NuxtLink>
-          <a href="/member#activities">活动与比赛</a>
-          <a class="is-active" href="#profile-form" aria-current="page">个人资料</a>
-          <button type="button" :disabled="session.isSigningOut" @click="signOut">{{ session.isSigningOut ? "退出中…" : "退出登录" }}</button>
-        </nav>
-        <p v-if="session.signOutError" role="alert">{{ session.signOutError }}</p>
-      </aside>
+      <MemberSpaceNav class="member-profile-aside" :profile="currentProfile" :avatar-src="currentProfileAvatarSource" active="profile" :signing-out="session.isSigningOut" :sign-out-error="session.signOutError" @sign-out="signOut" />
 
       <main id="profile-form" class="member-profile-main">
         <p class="member-profile-breadcrumb">成员空间　/　<strong>个人资料</strong></p>
@@ -281,10 +297,10 @@ onMounted(() => {
               <HsdAvatar :name="draft.name" :src="avatarSource" size="lg" />
               <div class="member-profile-upload-box">
                 <strong>选择头像图片</strong>
-                <span>{{ isMockApi ? "当前仅进行浏览器本地预览，不会上传服务器；正式接入后，正式成员头像会作为基础展示资料默认公开。" : "已保存头像来自 API；新头像上传与删除尚未接入。" }}</span>
-                <input ref="fileInput" class="member-profile-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar">
-                <button class="text-link" type="button" @click="fileInput?.click()">{{ isMockApi ? "选择图片" : "选择图片（尚未接入）" }}</button>
-                <button v-if="draft.avatarUrl" class="text-link member-profile-remove-avatar" type="button" @click="removeAvatar">{{ isMockApi ? "移除当前预览" : "删除头像（尚未接入）" }}</button>
+                <span>{{ isMockApi ? "当前为浏览器本地预览，保存后不会写入服务器。" : "支持 JPG、PNG 或 WEBP，保存后会同步到成员资料并按规则公开展示。" }}</span>
+                <input ref="fileInput" class="member-profile-file-input" type="file" accept="image/jpeg,image/png,image/webp" @change="chooseAvatar">
+                <button class="text-link" type="button" @click="fileInput?.click()">选择图片</button>
+                <button v-if="draft.avatarUrl || currentProfileAvatarSource || pendingAvatarPreview" class="text-link member-profile-remove-avatar" type="button" @click="removeAvatar">移除头像</button>
                 <small v-if="errors.avatar" class="member-profile-error" role="alert">{{ errors.avatar }}</small>
               </div>
             </div>

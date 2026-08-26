@@ -157,7 +157,10 @@ test.describe("join recruitment application navigation", () => {
     await page.getByLabel("密码", { exact: true }).fill("demo-password");
     await page.getByRole("button", { name: "登录并继续" }).click();
     await page.getByRole("button", { name: /招新与考核/ }).click();
-    await page.getByRole("link", { name: "报名人员", exact: true }).click();
+    await page.getByRole("link", { name: "招新批次", exact: true }).click();
+    await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+      .getByRole("link", { name: /进入批次/ }).click();
+    await page.getByRole("link", { name: /报名名单/ }).click();
 
     const row = page.getByRole("row").filter({ hasText: "管理端联动同学" });
     await expect(row).toContainText("拓维策划中心");

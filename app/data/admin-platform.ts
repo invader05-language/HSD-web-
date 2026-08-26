@@ -33,10 +33,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     id: "recruitment",
     label: "招新与考核",
     items: [
-      { id: "batches", label: "招新批次", to: "/admin/recruitment/batches", feature: "recruitmentBatches" },
-      { id: "applications", label: "报名人员", to: "/admin/recruitment/batches/batch-current/applications" },
-      { id: "assessment", label: "预备成员考核", to: "/admin/recruitment" },
-      { id: "publication", label: "结果发布", to: "/admin/recruitment/publish" }
+      { id: "batches", label: "招新批次", to: "/admin/recruitment/batches", feature: "recruitmentBatches" }
     ]
   },
   {
@@ -98,12 +95,7 @@ export function getAdminNavigationForAccess(
 ) {
   const canManageOrganizationPersonnel = access.canManageOrganizationPersonnel ?? access.canManageAdminAccounts;
   const canConfigurePortal = access.canConfigurePortal ?? access.canManageAdminAccounts;
-  const navigation = runtime.useMockApi
-    ? ADMIN_NAVIGATION
-    : ADMIN_NAVIGATION.map((group) => group.id !== "recruitment" ? group : ({
-      ...group,
-      items: group.items.map((item) => ({ ...item, to: "/admin/recruitment/batches" })),
-    }));
+  const navigation = ADMIN_NAVIGATION;
   return navigation.map((group) => ({
     ...group,
     items: group.items.filter(

@@ -43,16 +43,16 @@ describe("administration platform navigation", () => {
     expect(destinations.map((item) => item.to)).not.toContain("/admin/media");
   });
 
-  it("uses the batch roster as the primary application entry and hides portal configuration without capability", () => {
+  it("keeps the recruitment sidebar scoped to the batch list and hides portal configuration without capability", () => {
     const centerAdminItems = getAdminNavigationForAccess({ canManageAdminAccounts: false })
       .flatMap((group) => group.items);
 
-    expect(centerAdminItems.find((item) => item.id === "applications")?.to)
-      .toBe("/admin/recruitment/batches/batch-current/applications");
+    expect(centerAdminItems.find((item) => item.id === "batches")?.to)
+      .toBe("/admin/recruitment/batches");
     expect(centerAdminItems.map((item) => item.id)).not.toContain("homepage");
   });
 
-  it("routes every production recruitment entry through the authoritative batch list", () => {
+  it("exposes only the authoritative batch entry in production recruitment navigation", () => {
     const recruitmentItems = getAdminNavigationForAccess(
       { canManageAdminAccounts: true },
       undefined,
@@ -61,9 +61,6 @@ describe("administration platform navigation", () => {
 
     expect(recruitmentItems.map((item) => [item.id, item.to])).toEqual([
       ["batches", "/admin/recruitment/batches"],
-      ["applications", "/admin/recruitment/batches"],
-      ["assessment", "/admin/recruitment/batches"],
-      ["publication", "/admin/recruitment/batches"],
     ]);
   });
 

@@ -84,7 +84,7 @@ describe("admin dashboard targets", () => {
     expect(dashboardTargetToRoute(
       { module: "recruitment", action: "assess" },
       { useMockApi: true },
-    )).toBe("/admin/recruitment");
+    )).toBe("/admin/recruitment/batches");
   });
 });
 

@@ -22,7 +22,7 @@ export const ADMIN_DASHBOARD_METRICS: AdminDashboardMetric[] = [
     label: "待处理事项",
     value: "12",
     description: "其中 5 项今天到期",
-    to: "/admin/recruitment?result=待处理",
+    to: "/admin/recruitment/batches",
     tone: "red"
   },
   {
@@ -48,7 +48,7 @@ export const ADMIN_TODOS: AdminTodo[] = [
     title: "2026 秋季招新有 5 条结果等待检查",
     meta: "今天 18:00 前 · 联盟总负责人",
     priority: "urgent",
-    to: "/admin/recruitment/publish"
+    to: "/admin/recruitment/batches"
   },
   {
     id: "todo-upload-failed",

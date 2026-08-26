@@ -199,10 +199,8 @@ async function goToStep(target: Step) {
 }
 
 function updateFirstChoice(event: Event) {
-  applicationStore?.setFirstChoice(
-    applicationDraft,
-    ((event.target as HTMLSelectElement).value || undefined) as RecruitmentCenter | undefined,
-  );
+  applicationDraft.firstChoice = ((event.target as HTMLSelectElement).value || undefined) as RecruitmentCenter | undefined;
+  if (applicationDraft.firstChoice !== "白泽开发中心") applicationDraft.baizeDirection = undefined;
   clearErrors("firstChoice", "baizeDirection");
 }
 
@@ -482,7 +480,7 @@ onBeforeUnmount(() => {
                   <HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="lg" />
                   <div><strong>头像（可选）</strong><p v-if="isMockApi">上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><p v-else>当前报名接口不接收头像文件；如需修改头像，请在正式媒体上传能力上线后通过成员资料页操作。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button v-if="isMockApi" class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="isMockApi && profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
                 </div>
-                <div class="registration-fields">
+                <div class="registration-fields registration-fields--choices">
                   <label data-field="name"><span>姓名</span><input v-model="profileDraft.name" autocomplete="name" maxlength="20" :aria-invalid="Boolean(errors.name)" :aria-describedby="errors.name ? 'name-error' : undefined"><small v-if="errors.name" id="name-error" class="form-error">{{ errors.name }}</small></label>
                   <label data-field="studentId"><span>学号</span><input v-model="profileDraft.studentId" inputmode="numeric" maxlength="14" :aria-invalid="Boolean(errors.studentId)" :aria-describedby="errors.studentId ? 'student-id-error' : undefined"><small v-if="errors.studentId" id="student-id-error" class="form-error">{{ errors.studentId }}</small></label>
                   <label data-field="grade"><span>年级</span><select v-model="profileDraft.grade" :aria-invalid="Boolean(errors.grade)" :aria-describedby="errors.grade ? 'grade-error' : undefined"><option value="">请选择年级</option><option v-for="grade in grades" :key="grade" :value="grade">{{ grade }}</option></select><small v-if="errors.grade" id="grade-error" class="form-error">{{ errors.grade }}</small></label>
@@ -524,7 +522,7 @@ onBeforeUnmount(() => {
             </form>
           </div>
 
-          <aside class="recruitment-application-aside"><p class="eyebrow">报名说明</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p v-if="isMockApi">当前为前端 Mock 演示，不会创建真实账号、上传文件或写入数据库。</p><p v-else>提交前请确认资料准确；报名会关联当前开放批次，并通过正式 API 写入当前账号的报名记录。</p></aside>
+          <aside class="recruitment-application-aside"><p class="eyebrow">报名说明</p><h2>填写说明</h2><ol><li>请使用真实个人资料，提交后可在个人中心继续维护头像与简介。</li><li>联系方式仅用于本次招新联系，不会进入公开成员展示。</li><li>报名提交后为预备成员，所属中心与组织职务将等待后续结果确定。</li></ol><p v-if="isMockApi">当前为演示环境，提交内容只用于本地流程预览。</p><p v-else>提交前请确认资料准确，报名信息将关联当前开放批次。</p></aside>
         </div>
       </div>
     </section>

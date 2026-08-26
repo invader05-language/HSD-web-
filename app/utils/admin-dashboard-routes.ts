@@ -22,10 +22,10 @@ export function dashboardTargetToRoute(
       return batchRoute(target.resourceId);
     }
     if (target.action === "assess") {
-      return runtime.useMockApi ? "/admin/recruitment" : "/admin/recruitment/batches";
+      return "/admin/recruitment/batches";
     }
     if (target.action === "publish-results") {
-      return runtime.useMockApi ? "/admin/recruitment/publish" : "/admin/recruitment/batches";
+      return "/admin/recruitment/batches";
     }
     return "/admin/recruitment/batches";
   }

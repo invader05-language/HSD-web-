@@ -103,7 +103,7 @@ test("avatar selection previews locally and the profile remains usable on mobile
     mimeType: "image/png",
     buffer: Buffer.from("not-a-real-image")
   });
-  await expect(page.getByRole("button", { name: "移除当前预览" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "移除头像" })).toBeVisible();
   await expect(page.locator("body")).toHaveJSProperty("scrollWidth", 390);
 });
 

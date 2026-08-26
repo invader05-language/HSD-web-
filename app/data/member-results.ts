@@ -118,6 +118,21 @@ export function memberResultFromApi(
   };
 }
 
+export function memberResultFromApplication(application: SubmittedRecruitmentApplication): MemberResultRecord {
+  return {
+    batchLabel: application.batchNameSnapshot,
+    status: "pending",
+    identity: "预备成员",
+    preferences: [application.firstChoice, application.secondChoice, application.thirdChoice]
+      .filter((center): center is NonNullable<typeof center> => Boolean(center))
+      .map((center, index) => ({ rank: (index + 1) as 1 | 2 | 3, center })),
+    acceptsTransfer: application.acceptsAdjustment,
+    baizeInterestDirection: application.baizeDirection,
+    currentStage: application.status === "processing" ? "面试" : "尚未开始",
+    currentConclusion: "待公布",
+  };
+}
+
 /**
  * The member center consumes only the final, published assessment fields.
  * Internal notes and per-round history deliberately do not cross this boundary.
