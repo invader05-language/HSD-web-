@@ -14,10 +14,11 @@ import { canEditAssessmentCandidate } from "~/utils/assessment-workbench-access"
 import { getEffectiveRecruitmentBatchStatus } from "~/utils/recruitment-batch-rules";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { getRecruitmentAssessmentMessage } from "~/utils/recruitment-assessment-messages";
+import { matchesAssessmentStage, type AssessmentStageFilter } from "~/utils/recruitment-assessment-filters";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
-type StageFilter = "当前待办" | "待调剂" | "已处理/历史结果" | "全部成员";
+type StageFilter = AssessmentStageFilter;
 type ResultFilter = "全部结果" | "考核中" | "待调剂处理";
 type RoundDraft = "" | "passed" | "failed";
 type AdjustmentDraft = "" | string;
@@ -126,10 +127,7 @@ const filteredCandidates = computed(() => {
       || source?.name.toLocaleLowerCase().includes(query)
       || source?.studentId.includes(query)
       || candidate.memberId.toLocaleLowerCase().includes(query);
-    const matchesStage = filters.stage === "全部成员"
-      || (filters.stage === "当前待办" && candidate.processingStatus === "assessing")
-      || (filters.stage === "待调剂" && candidate.processingStatus === "adjustment-suggestion-pending")
-      || (filters.stage === "已处理/历史结果" && candidate.processingStatus !== "assessing" && candidate.processingStatus !== "adjustment-suggestion-pending");
+    const matchesStage = matchesAssessmentStage(filters.stage, candidate, currentRoundLabel.value);
     const matchesResult = filters.result === "全部结果" || processingLabel(candidate) === filters.result;
     const matchesAdjustment = filters.adjustment === "全部"
       || (filters.adjustment === "接受调剂") === candidate.acceptsAdjustment;
