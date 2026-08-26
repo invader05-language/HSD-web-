@@ -90,6 +90,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
   const archiveError = ref("");
   const commanding = ref(false);
   const commandError = ref("");
+  const commandLifecycleRefreshed = ref(false);
   let loadGeneration = 0;
   let lifecycleLoadGeneration = 0;
   let currentBatchId = "";
@@ -259,6 +260,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     reason?: string,
     expectedVersion = batch.value?.version,
   ): Promise<boolean> {
+    commandLifecycleRefreshed.value = false;
     if (!batch.value || !currentBatchId || !gateway.runAdminBatchCommand) {
       commandError.value = "真实批次状态命令暂不可用。";
       return false;
@@ -284,7 +286,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
       const response = await gateway.runAdminBatchCommand(currentBatchId, command, payload);
       if (requestGeneration !== loadGeneration) return false;
       batch.value = mapAdminRecruitmentBatch(response);
-      await refreshLifecycle(currentBatchId, requestGeneration);
+      commandLifecycleRefreshed.value = await refreshLifecycle(currentBatchId, requestGeneration);
       return true;
     } catch (cause) {
       if (requestGeneration === loadGeneration) {
@@ -336,6 +338,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     archiveError,
     commanding,
     commandError,
+    commandLifecycleRefreshed,
     load,
     loadLifecyclePage,
     archive,

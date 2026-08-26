@@ -27,6 +27,7 @@ export function recruitmentBatchErrorCode(error: unknown): RecruitmentBatchComma
 
 export function getRecruitmentBatchCommandMessage(error: unknown, fallback = "批次操作未完成，请检查填写内容后重试。"): string {
   const code = recruitmentBatchErrorCode(error);
+  const status = errorRecord(error).status;
   const conflict = conflictFrom(error);
   const period = conflict
     ? formatRecruitmentBatchPeriod({
@@ -43,6 +44,11 @@ export function getRecruitmentBatchCommandMessage(error: unknown, fallback = "�
   if (typeof serverMessage === "string" && /[\u4e00-\u9fff]/.test(serverMessage)) {
     return serverMessage;
   }
+
+  if (status === 401) return "登录状态已失效，请重新登录后重试。";
+  if (status === 403) return "权限不足：只有联盟总负责人可以执行此操作。";
+  if (status === 404) return "招新批次不存在，请返回批次列表后重试。";
+  if (status === 409) return "批次版本已变化，请刷新后重新确认。";
 
   switch (code) {
     case "BATCH_SCHEDULE_OVERLAP":

@@ -350,7 +350,9 @@ async function invokeAction(context: PendingLifecycleAction) {
         }
         return;
       }
-      actionMessage.value = `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`;
+      actionMessage.value = productionBatch.commandLifecycleRefreshed.value
+        ? `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`
+        : `${actionLabel(action)}已完成，批次状态已更新，但生命周期记录刷新失败，请稍后重试。`;
     }
     pendingAction.value = null;
     reason.value = "";
