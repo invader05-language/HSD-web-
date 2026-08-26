@@ -149,8 +149,12 @@ test("real OWNER detail renders canonical lifecycle data and recursively exclude
   await expect(audit).toContainText("结果复核完成");
   await expect(audit).toContainText("CLOSED");
   await expect(audit).toContainText("ARCHIVED");
-  await expect(audit).toContainText("center-baize");
-  await expect(audit).toContainText("account-owner");
+  // Lifecycle rows intentionally render compact summaries; inspect the
+  // detail drawer for the canonical nested center/account identifiers.
+  await audit.getByRole("button", { name: "查看详情" }).click();
+  const lifecycleDetails = page.getByRole("dialog", { name: "生命周期详情" });
+  await expect(lifecycleDetails).toContainText("center-baize");
+  await expect(lifecycleDetails).toContainText("account-owner");
   await expect(audit).not.toContainText("198.51.100.10");
   await expect(audit).not.toContainText("private-request-id");
   await expect(audit).not.toContainText("nested-private-token");
