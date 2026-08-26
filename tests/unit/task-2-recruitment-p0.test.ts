@@ -1,0 +1,230 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import BatchDetailPage from "../../app/pages/admin/recruitment/batches/[batchId].vue";
+import RecruitmentAssessmentWorkbench from "../../app/components/admin/RecruitmentAssessmentWorkbench.vue";
+import { createProductionRecruitmentBatchController } from "../../app/composables/useProductionRecruitmentBatch";
+import { useSessionStore } from "../../app/stores/session";
+
+const routeState = reactive({
+  params: { batchId: "batch-p0" },
+  path: "/admin/recruitment/batches/batch-p0",
+});
+
+const baseBatch = {
+  id: "batch-p0",
+  name: "P0 API 招新",
+  startAt: "2026-08-01T00:00:00.000Z",
+  endAt: "2026-09-30T00:00:00.000Z",
+  timezone: "Asia/Shanghai",
+  lifecycleStatus: "PUBLISHED",
+  manualOverride: "NONE",
+  effectiveStatus: "open",
+  effectiveStatusReason: "within-window",
+  version: 3,
+  publishedAt: "2026-07-31T00:00:00.000Z",
+  actualOpenedAt: "2026-08-01T00:00:00.000Z",
+  closedAt: null,
+  archivedAt: null,
+  createdAt: "2026-07-30T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+  applicationCount: 0,
+  openCenters: [],
+  responsibleAccounts: [{
+    id: "account-owner",
+    username: "owner",
+    status: "ENABLED",
+    adminLevel: "OWNER",
+    person: { id: "person-owner", name: "联盟总负责人" },
+  }],
+};
+
+const lifecycle = {
+  page: 1,
+  pageSize: 50,
+  total: 1,
+  items: [{
+    id: "event-long-id",
+    action: "recruitment.batch.paused",
+    actor: {
+      type: "account",
+      accountId: "account-owner",
+      username: "owner",
+      displayName: "联盟总负责人",
+    },
+    target: { type: "RecruitmentBatch", id: "batch-p0" },
+    before: { lifecycleStatus: "PUBLISHED", manualOverride: "NONE", version: 3 },
+    after: { lifecycleStatus: "PUBLISHED", manualOverride: "PAUSED", version: 4 },
+    reason: null,
+    createdAt: "2026-08-08T00:00:00.000Z",
+  }],
+};
+
+const headingStub = {
+  props: ["title", "description"],
+  template: "<header><h1>{{ title }}</h1><p>{{ description }}</p><slot name='actions' /></header>",
+};
+const linkStub = { props: ["to"], template: "<a><slot /></a>" };
+
+function installOwnerSession() {
+  useSessionStore().applyApiSession({
+    account: {
+      id: "account-owner",
+      adminLevel: "OWNER",
+      adminCenterId: null,
+      capabilities: ["recruitment.batch.manage", "recruitment.assessment.edit"],
+    },
+    person: { id: "person-owner", name: "联盟总负责人", status: "FORMAL_MEMBER" },
+    mustChangePassword: false,
+  });
+}
+
+function installVueGlobals() {
+  vi.stubGlobal("computed", computed);
+  vi.stubGlobal("reactive", reactive);
+  vi.stubGlobal("ref", ref);
+  vi.stubGlobal("watch", watch);
+  vi.stubGlobal("nextTick", nextTick);
+  vi.stubGlobal("onMounted", onMounted);
+  vi.stubGlobal("onBeforeUnmount", onBeforeUnmount);
+  vi.stubGlobal("definePageMeta", vi.fn());
+  vi.stubGlobal("useHead", vi.fn());
+  vi.stubGlobal("useRoute", () => routeState);
+}
+
+function assessmentResponse(currentRound = 1, version = 3) {
+  return {
+    batch: { id: "batch-p0", name: "P0 API 招新", lifecycleStatus: "open" },
+    currentRound,
+    status: "ASSESSING",
+    version,
+    publishedAt: null,
+    pending: 0,
+    adjustmentPending: 0,
+    canAdvance: false,
+    advanceBlocker: { code: "ASSESSMENT_BATCH_NOT_CLOSED", count: 0 },
+    nextAction: "CLOSE_BATCH",
+    items: [],
+  };
+}
+
+describe("Task 2 recruitment P0 regressions", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setActivePinia(createPinia());
+    routeState.params.batchId = "batch-p0";
+    routeState.path = "/admin/recruitment/batches/batch-p0";
+    installVueGlobals();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a lifecycle command whose action does not match the authoritative status", async () => {
+    const runAdminBatchCommand = vi.fn();
+    const controller = createProductionRecruitmentBatchController({
+      getAdminBatch: vi.fn().mockResolvedValue(baseBatch),
+      listAdminBatchLifecycleEvents: vi.fn().mockResolvedValue({ page: 1, pageSize: 50, total: 0, items: [] }),
+      runAdminBatchCommand,
+    });
+
+    await controller.load("batch-p0");
+    await expect(controller.runCommand("resume")).resolves.toBe(false);
+    expect(runAdminBatchCommand).not.toHaveBeenCalled();
+    expect(controller.commandError.value).toContain("暂停");
+  });
+
+  it("maps a real command permission failure to visible Chinese copy", async () => {
+    const controller = createProductionRecruitmentBatchController({
+      getAdminBatch: vi.fn().mockResolvedValue(baseBatch),
+      listAdminBatchLifecycleEvents: vi.fn().mockResolvedValue({ page: 1, pageSize: 50, total: 0, items: [] }),
+      runAdminBatchCommand: vi.fn().mockRejectedValue(Object.assign(new Error("Owner only"), {
+        status: 403,
+        code: "OWNER_ONLY",
+      })),
+    });
+
+    await controller.load("batch-p0");
+    await expect(controller.runCommand("pause")).resolves.toBe(false);
+    expect(controller.commandError.value).toContain("权限");
+  });
+
+  it("disables assessment advance for an open production batch and explains that closing is required", async () => {
+    installOwnerSession();
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/adjustment-targets")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      if (url.endsWith("/assessments")) return new Response(JSON.stringify(assessmentResponse()), { status: 200 });
+      return new Response(JSON.stringify(baseBatch), { status: 200 });
+    }));
+
+    const wrapper = mount(RecruitmentAssessmentWorkbench, {
+      props: { batchId: "batch-p0" },
+      global: { stubs: {
+        NuxtLink: linkStub,
+      } },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const advance = wrapper.findAll("button").find((button) => button.text().includes("推进"));
+    expect(advance).toBeDefined();
+    expect(advance!.attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("关闭报名后才能推进");
+  });
+
+  it("does not render a reason textarea for pause confirmation and keeps confirmation enabled", async () => {
+    installOwnerSession();
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) return new Response(JSON.stringify({ ...lifecycle, total: 0, items: [] }), { status: 200 });
+      return new Response(JSON.stringify(baseBatch), { status: 200 });
+    }));
+
+    const wrapper = mount(BatchDetailPage, { global: {
+      stubs: {
+        AdminPageHeading: headingStub,
+        AdminStatusPill: true,
+        PaginationControls: true,
+        NuxtPage: true,
+        NuxtLink: linkStub,
+      },
+    } });
+    await flushPromises();
+    await nextTick();
+    await wrapper.findAll("button").find((button) => button.text() === "暂停报名")!.trigger("click");
+
+    const dialog = wrapper.get('[role="alertdialog"]');
+    expect(dialog.find("textarea").exists()).toBe(false);
+    expect(dialog.get("button:not(.button--ghost)").attributes("disabled")).toBeUndefined();
+  });
+
+  it("keeps lifecycle snapshots behind a detail interaction instead of expanding them in the main table", async () => {
+    installOwnerSession();
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/lifecycle-events")) return new Response(JSON.stringify(lifecycle), { status: 200 });
+      return new Response(JSON.stringify({ ...baseBatch, effectiveStatus: "closed", lifecycleStatus: "CLOSED", manualOverride: "FORCE_CLOSED" }), { status: 200 });
+    }));
+
+    const wrapper = mount(BatchDetailPage, { global: {
+      stubs: {
+        AdminPageHeading: headingStub,
+        AdminStatusPill: true,
+        PaginationControls: true,
+        NuxtPage: true,
+        NuxtLink: linkStub,
+      },
+    } });
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.text()).toContain("查看详情");
+    expect(wrapper.text()).not.toContain("人工覆盖");
+  });
+});

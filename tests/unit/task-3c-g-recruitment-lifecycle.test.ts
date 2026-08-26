@@ -414,7 +414,7 @@ describe("Task 3C-G production recruitment lifecycle controller", () => {
 
     expect(controller.batch.value).toMatchObject({ lifecycleStatus: "closed", version: 9 });
     expect(controller.archiveStatus.value).toBe("forbidden");
-    expect(controller.archiveError.value).toContain("Owner only");
+    expect(controller.archiveError.value).toContain("权限");
   });
 
   it("refreshes detail and lifecycle after 409, preserving conflict state until a new-version confirmation", async () => {

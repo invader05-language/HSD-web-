@@ -13,10 +13,11 @@ import { getAdminCenterScope } from "~/utils/admin-center-scope";
 import { canEditAssessmentCandidate } from "~/utils/assessment-workbench-access";
 import { getEffectiveRecruitmentBatchStatus } from "~/utils/recruitment-batch-rules";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { getRecruitmentAssessmentMessage } from "~/utils/recruitment-assessment-messages";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
-type StageFilter = "全部阶段" | "第一轮考核" | "第二轮考核" | "第三轮考核";
+type StageFilter = "当前待办" | "待调剂" | "已处理/历史结果" | "全部成员";
 type ResultFilter = "全部结果" | "考核中" | "待调剂处理";
 type RoundDraft = "" | "passed" | "failed";
 type AdjustmentDraft = "" | string;
@@ -28,12 +29,15 @@ const route = useRoute();
 const recruitmentGateway = useRecruitmentGateway();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 
-const batch = computed(() => recruitmentGateway ? undefined : batchStore.getBatch(props.batchId));
+const mockBatch = computed(() => recruitmentGateway ? undefined : batchStore.getBatch(props.batchId));
+const batch = computed(() => recruitmentGateway
+  ? assessmentStore.getApiBatchContext(props.batchId)
+  : mockBatch.value);
 const state = computed(() => assessmentStore.getBatchState(props.batchId));
 const effectiveBatchStatus = computed(() => (
   recruitmentGateway
-    ? "server-validated"
-    : batch.value ? getEffectiveRecruitmentBatchStatus(batch.value, new Date()).status : "closed"
+    ? assessmentStore.getApiBatchContext(props.batchId)?.lifecycleStatus ?? "server-validated"
+    : mockBatch.value ? getEffectiveRecruitmentBatchStatus(mockBatch.value, new Date()).status : "closed"
 ));
 const effectiveBatchStatusLabel = computed(() => ({
   draft: "批次草稿",
@@ -49,14 +53,18 @@ const centerScope = computed(() => recruitmentGateway
   : getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const allCandidates = computed(() => assessmentStore.getCandidates(props.batchId)
   .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
-const candidates = computed(() => assessmentStore.getActionableCandidates(props.batchId)
+const candidates = computed(() => allCandidates.value);
+const processedCandidates = computed(() => candidates.value.filter((candidate) => (
+  candidate.processingStatus !== "assessing" && candidate.processingStatus !== "adjustment-suggestion-pending"
+)));
+const actionableCandidates = computed(() => assessmentStore.getActionableCandidates(props.batchId)
   .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
 const currentRoundLabel = computed(() => `第${["一", "二", "三"][state.value.currentRound - 1]}轮考核`);
 const isOwner = computed(() => session.canManageAdminAccounts);
 const filters = reactive({
   center: "全部人员" as "全部人员" | RecruitmentCenter,
   query: "",
-  stage: "全部阶段" as StageFilter,
+  stage: "当前待办" as StageFilter,
   result: "全部结果" as ResultFilter,
   adjustment: "全部" as "全部" | "接受调剂" | "不接受调剂",
 });
@@ -82,6 +90,7 @@ const apiBusy = computed(() => Boolean(
   || assessmentStore.apiMutatingByBatch[props.batchId],
 ));
 const apiError = computed(() => assessmentStore.apiErrorByBatch[props.batchId]);
+const apiWorkflowSummary = computed(() => assessmentStore.getApiWorkflowSummary(props.batchId));
 
 let apiGeneration = 0;
 watch(() => props.batchId, async (batchId) => {
@@ -117,26 +126,42 @@ const filteredCandidates = computed(() => {
       || source?.name.toLocaleLowerCase().includes(query)
       || source?.studentId.includes(query)
       || candidate.memberId.toLocaleLowerCase().includes(query);
-    const matchesStage = filters.stage === "全部阶段" || candidate.currentPhase === filters.stage;
+    const matchesStage = filters.stage === "全部成员"
+      || (filters.stage === "当前待办" && candidate.processingStatus === "assessing")
+      || (filters.stage === "待调剂" && candidate.processingStatus === "adjustment-suggestion-pending")
+      || (filters.stage === "已处理/历史结果" && candidate.processingStatus !== "assessing" && candidate.processingStatus !== "adjustment-suggestion-pending");
     const matchesResult = filters.result === "全部结果" || processingLabel(candidate) === filters.result;
     const matchesAdjustment = filters.adjustment === "全部"
       || (filters.adjustment === "接受调剂") === candidate.acceptsAdjustment;
     return matchesCenter && matchesQuery && matchesStage && matchesResult && matchesAdjustment;
   });
 });
-const roundIncomplete = computed(() => candidates.value.length > 0);
+const roundIncomplete = computed(() => recruitmentGateway
+  ? (apiWorkflowSummary.value?.pending ?? actionableCandidates.value.filter((candidate) => candidate.processingStatus === "assessing").length) > 0
+  : actionableCandidates.value.some((candidate) => candidate.processingStatus === "assessing"));
 const canAdvance = computed(() => isOwner.value
-  && (Boolean(recruitmentGateway) || effectiveBatchStatus.value === "closed")
+  && effectiveBatchStatus.value === "closed"
+  && (!recruitmentGateway || apiWorkflowSummary.value?.canAdvance === true)
   && state.value.status === "assessing"
   && !roundIncomplete.value
   && !apiBusy.value);
 const advanceLabel = computed(() => {
   if (state.value.status !== "assessing") return "考核已完成，等待发布";
-  if (recruitmentGateway) return state.value.currentRound === 3
-    ? "结束考核并进入结果发布"
-    : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
   if (effectiveBatchStatus.value !== "closed") return "关闭报名后推进全局轮次";
+  if (roundIncomplete.value) return "完成当前轮后推进";
   return state.value.currentRound === 3 ? "结束考核并进入结果发布" : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
+});
+const advanceDisabledReason = computed(() => {
+  if (!isOwner.value) return "仅联盟总负责人可推进全局轮次。";
+  if (effectiveBatchStatus.value === "open" || effectiveBatchStatus.value === "paused") return "关闭报名后才能推进全局考核轮次。";
+  if (effectiveBatchStatus.value === "server-validated") return "正在等待服务器批次生命周期摘要。";
+  if (apiWorkflowSummary.value?.advanceBlocker?.code) {
+    return getRecruitmentAssessmentMessage({ code: apiWorkflowSummary.value.advanceBlocker.code });
+  }
+  if (roundIncomplete.value) return "当前轮仍有未完成的考核结果，请先完成当前轮。";
+  if (state.value.status !== "assessing") return "当前考核状态不允许推进。";
+  if (recruitmentGateway && apiWorkflowSummary.value?.canAdvance !== true) return "服务器尚未确认可以推进当前轮。";
+  return "";
 });
 const adjustmentTargets = computed(() => recruitmentGateway
   ? assessmentStore.getApiAdjustmentTargets(props.batchId)
@@ -167,7 +192,9 @@ function roundLabel(round: AssessmentRoundNumber) {
 }
 
 function phaseLabel(candidate: RecruitmentAssessmentCandidate) {
-  return candidate.currentPhase ?? "—";
+  if (candidate.processingStatus === "adjustment-suggestion-pending") return "待调剂";
+  if (candidate.processingStatus === "ready-to-publish" || candidate.processingStatus === "completed") return "已处理/历史结果";
+  return candidate.currentPhase ?? "当前待办";
 }
 
 function processingLabel(candidate: RecruitmentAssessmentCandidate): string {
@@ -211,6 +238,14 @@ function isRoundEditable(round: AssessmentRoundNumber) {
     && candidate.currentPhase === roundLabel(round)
     && state.value.currentRound === round);
 }
+
+const canSaveSelectedCandidate = computed(() => {
+  const candidate = selectedCandidate.value;
+  if (!candidate || !canEdit(candidate)) return false;
+  return selectedRounds.value.some(isRoundEditable)
+    || (candidate.processingStatus === "adjustment-suggestion-pending"
+      && Boolean(isOwner.value ? adjustmentDecision.value : adjustmentSuggestion.value));
+});
 
 function resetDrafts() {
   const candidate = selectedCandidate.value;
@@ -275,7 +310,7 @@ function requestSave() {
 }
 
 function errorText(error: unknown, fallback: string) {
-  return error instanceof Error ? `${fallback}（${error.message}）` : fallback;
+  return getRecruitmentAssessmentMessage(error, fallback);
 }
 
 async function confirmSave() {
@@ -402,23 +437,31 @@ async function confirmAdvance() {
         <span>当前批次</span>
         <strong>{{ batch?.name ?? batchId }}</strong>
         <small>batchId：{{ batchId }}</small>
+        <small>批次生命周期：{{ effectiveBatchStatusLabel }}</small>
         <small>全局当前轮次：{{ currentRoundLabel }}</small>
         <small>考核状态：{{ state.status === "assessing" ? "考核中" : state.status === "ready-to-publish" ? "等待发布" : "已发布" }}</small>
       </div>
     </section>
     <div class="admin-publication-warning" role="status">
       <strong>{{ effectiveBatchStatusLabel }}</strong>
-      <p v-if="effectiveBatchStatus === 'server-validated'">候选人、轮次和版本来自服务器；推进和发布条件由服务器再次校验。</p>
+      <p v-if="effectiveBatchStatus === 'server-validated'">候选人、批次生命周期、轮次和版本来自服务器；推进和发布条件由服务器再次校验。</p>
       <p v-else-if="effectiveBatchStatus === 'closed'">当前批次已关闭，候选人结果可继续录入；完成本轮后可推进全局考核或进入整批发布。</p>
       <p v-else-if="effectiveBatchStatus === 'open' || effectiveBatchStatus === 'paused'">可继续录入已有候选人的当前轮次结果；首次保存会锁定该报名。关闭报名后才能推进全局轮次或发布整批结果。</p>
       <p v-else>当前批次不可录入考核结果，请先完成批次发布或恢复可处理状态。</p>
     </div>
 
+    <section v-if="recruitmentGateway && batch" class="admin-assessment-workflow-summary" aria-label="批次生命周期与考核摘要">
+      <div><span>批次</span><strong>{{ batch.name }}</strong><small>{{ batch.lifecycleStatus === "closed" ? "已关闭，可按规则推进" : "关闭报名后才可推进" }}</small></div>
+      <div><span>下一步</span><strong>{{ apiWorkflowSummary?.nextAction === "PUBLISH_BATCH" ? "发布批次" : apiWorkflowSummary?.nextAction === "OPEN_BATCH" ? "立即开放" : apiWorkflowSummary?.nextAction === "CLOSE_BATCH" ? "关闭报名" : apiWorkflowSummary?.nextAction === "RECORD_CURRENT_ROUND_RESULTS" ? "完成当前轮" : apiWorkflowSummary?.nextAction === "SUBMIT_ADJUSTMENT_PROPOSALS" ? "提交调剂建议" : apiWorkflowSummary?.nextAction === "DECIDE_ADJUSTMENTS" ? "处理调剂" : apiWorkflowSummary?.nextAction === "ADVANCE_ROUND" ? "推进轮次" : apiWorkflowSummary?.nextAction === "PUBLISH_RESULTS" ? "发布结果" : apiWorkflowSummary?.nextAction === "NONE" ? "已完成" : "等待服务器确认" }}</strong><small>{{ advanceDisabledReason || "当前可执行推进" }}</small></div>
+      <div><span>服务器待办</span><strong>{{ apiWorkflowSummary?.pending ?? actionableCandidates.filter((candidate) => candidate.processingStatus === "assessing").length }}</strong><small>当前轮未完成</small></div>
+      <div><span>待调剂</span><strong>{{ apiWorkflowSummary?.adjustmentPending ?? candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>等待最终处理</small></div>
+    </section>
+
     <section class="admin-summary-strip" aria-label="批次考核概览">
       <div><span>本批次人员</span><strong>{{ allCandidates.length }}</strong><small>{{ batchId }}</small></div>
       <div><span>当前轮待处理</span><strong>{{ candidates.filter((candidate) => candidate.currentPhase === currentRoundLabel).length }}</strong><small>{{ currentRoundLabel }}</small></div>
       <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>负责人建议后由总负责人确认</small></div>
-      <div><span>已完成隐藏</span><strong>{{ allCandidates.length - candidates.length }}</strong><small>结果发布页可查</small></div>
+      <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 
     <section class="admin-roster">
@@ -436,14 +479,16 @@ async function confirmAdvance() {
           <div><span>Candidate Roster</span><h2>预备成员名单</h2></div>
           <div>
             <p>共 {{ filteredCandidates.length }} 人</p>
-            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="isOwner ? (recruitmentGateway ? '服务器将校验批次状态和当前版本' : effectiveBatchStatus === 'closed' ? '请先完成当前轮所有结果和调剂决定' : '关闭报名后才能推进全局轮次') : '仅联盟总负责人可推进全局轮次'" @click="requestAdvance">{{ apiBusy ? "处理中…" : advanceLabel }}</button>
+            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy ? "处理中…" : advanceLabel }}</button>
             <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
           </div>
         </header>
 
+        <p v-if="!canAdvance" class="admin-inline-note" role="status">{{ advanceDisabledReason }}</p>
+
         <div class="admin-filters">
           <label>搜索成员<input v-model="filters.query" type="search" placeholder="姓名或学号"></label>
-          <label>当前阶段<select v-model="filters.stage"><option>全部阶段</option><option>第一轮考核</option><option>第二轮考核</option><option>第三轮考核</option></select></label>
+          <label>当前阶段<select v-model="filters.stage"><option>当前待办</option><option>待调剂</option><option>已处理/历史结果</option><option>全部成员</option></select></label>
           <label>处理状态<select v-model="filters.result"><option>全部结果</option><option>考核中</option><option>待调剂处理</option></select></label>
           <label>调剂意愿<select v-model="filters.adjustment"><option>全部</option><option>接受调剂</option><option>不接受调剂</option></select></label>
         </div>
@@ -475,12 +520,12 @@ async function confirmAdvance() {
         <div class="admin-drawer__body">
           <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
-          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
+          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
           <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>{{ isOwner ? '最终调剂确认' : '调剂建议' }}</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '中心负责人只提交一个非白泽建议去向；跨中心转正由联盟总负责人最终确认。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">中心负责人建议：{{ selectedCandidate.adjustmentSuggestion }}</p><label>{{ isOwner ? '最终调剂结果' : '建议去向' }}<select v-if="isOwner" v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select><select v-else v-model="adjustmentSuggestion" aria-label="建议去向"><option value="">请选择非白泽中心</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">建议调剂至{{ target.name }}</option></select></label></section>
-          <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明"></textarea></label></section>
+          <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明" :disabled="!selectedCandidate.currentPhase || selectedCandidate.processingStatus !== 'assessing'"></textarea></label></section>
           <section class="admin-sync-preview"><strong>保存与发布边界</strong><p>保存只更新当前批次的内部考核状态；整批发布才会更新成员结果中心、正式成员关系和公开投影。真实后端接入后必须在同一事务中完成。</p></section>
         </div>
-        <footer class="admin-drawer__footer"><span aria-live="polite">{{ saveMessage }}</span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canEdit(selectedCandidate) || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
+        <footer class="admin-drawer__footer"><span aria-live="polite">{{ saveMessage }}</span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canSaveSelectedCandidate || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
         <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><span>Save Internal Assessment</span><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
       </aside>
     </div>

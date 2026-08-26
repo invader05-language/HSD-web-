@@ -413,11 +413,28 @@ export type AssessmentAdjustmentTargetCatalogResponseDto = {
   "items": Array<AssessmentCenterDto>;
 };
 
+export type AssessmentAdvanceBlockerDto = {
+  "code": "ASSESSMENT_BATCH_NOT_CLOSED" | "ASSESSMENT_NOT_EDITABLE" | "ASSESSMENT_ROUND_INCOMPLETE" | "ASSESSMENT_ADJUSTMENT_PENDING";
+  "count": number;
+};
+
+export type AssessmentBatchDetailDto = {
+  "id": string;
+  "name": string;
+  "lifecycleStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
+};
+
 export type AssessmentBatchResponseDto = {
   "currentRound": number;
   "status": "ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED";
   "version": number;
   "publishedAt": (string) | null;
+  "batch": AssessmentBatchDetailDto;
+  "pending": number;
+  "adjustmentPending": number;
+  "canAdvance": boolean;
+  "advanceBlocker": (AssessmentAdvanceBlockerDto) | null;
+  "nextAction": "PUBLISH_BATCH" | "OPEN_BATCH" | "CLOSE_BATCH" | "RECORD_CURRENT_ROUND_RESULTS" | "SUBMIT_ADJUSTMENT_PROPOSALS" | "DECIDE_ADJUSTMENTS" | "ADVANCE_ROUND" | "PUBLISH_RESULTS" | "NONE";
   "items": Array<AssessmentCandidateDto>;
 };
 
@@ -6016,6 +6033,42 @@ const API_COMPONENT_SCHEMAS = {
         "format": "date-time",
         "nullable": true
       },
+      "batch": {
+        "$ref": "#/components/schemas/AssessmentBatchDetailDto"
+      },
+      "pending": {
+        "type": "number",
+        "minimum": 0
+      },
+      "adjustmentPending": {
+        "type": "number",
+        "minimum": 0
+      },
+      "canAdvance": {
+        "type": "boolean"
+      },
+      "advanceBlocker": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentAdvanceBlockerDto"
+          }
+        ]
+      },
+      "nextAction": {
+        "type": "string",
+        "enum": [
+          "PUBLISH_BATCH",
+          "OPEN_BATCH",
+          "CLOSE_BATCH",
+          "RECORD_CURRENT_ROUND_RESULTS",
+          "SUBMIT_ADJUSTMENT_PROPOSALS",
+          "DECIDE_ADJUSTMENTS",
+          "ADVANCE_ROUND",
+          "PUBLISH_RESULTS",
+          "NONE"
+        ]
+      },
       "items": {
         "type": "array",
         "items": {
@@ -6028,7 +6081,63 @@ const API_COMPONENT_SCHEMAS = {
       "status",
       "version",
       "publishedAt",
+      "batch",
+      "pending",
+      "adjustmentPending",
+      "canAdvance",
+      "advanceBlocker",
+      "nextAction",
       "items"
+    ]
+  },
+  "AssessmentBatchDetailDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "lifecycleStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "upcoming",
+          "open",
+          "paused",
+          "closed",
+          "archived"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "lifecycleStatus"
+    ]
+  },
+  "AssessmentAdvanceBlockerDto": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "enum": [
+          "ASSESSMENT_BATCH_NOT_CLOSED",
+          "ASSESSMENT_NOT_EDITABLE",
+          "ASSESSMENT_ROUND_INCOMPLETE",
+          "ASSESSMENT_ADJUSTMENT_PENDING"
+        ]
+      },
+      "count": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "code",
+      "count"
     ]
   },
   "AdvanceAssessmentDto": {

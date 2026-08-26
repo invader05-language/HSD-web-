@@ -243,10 +243,16 @@ describe("recruitment API gateway", () => {
   it("uses the generated roster and private-result paths without mutation headers", async () => {
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({
+        batch: { id: "batch-2026", name: "2026 招新", lifecycleStatus: "closed" },
         currentRound: 1,
         status: "ASSESSING",
         version: 3,
         publishedAt: null,
+        pending: 0,
+        adjustmentPending: 0,
+        canAdvance: true,
+        advanceBlocker: null,
+        nextAction: "ADVANCE_ROUND",
         items: [],
       }), { status: 200, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), {

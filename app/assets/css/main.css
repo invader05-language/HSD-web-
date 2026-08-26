@@ -7668,7 +7668,42 @@ label small:not(:empty),
 }
 
 .admin-batch-audit .admin-table-scroll table {
-  min-width: 860px;
+  min-width: 1040px;
+}
+
+.admin-batch-audit .admin-table-scroll td {
+  white-space: normal;
+  vertical-align: middle;
+}
+
+.admin-lifecycle-target,
+.admin-breakable-id {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.admin-lifecycle-target {
+  display: block;
+  max-width: 190px;
+}
+
+.admin-inline-copy {
+  min-height: 26px;
+  border: 1px solid #d7dade;
+  border-radius: 4px;
+  padding: 0 8px;
+  background: #fff;
+  color: #9e1b26;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-inline-copy:hover {
+  border-color: #b1202b;
+  background: #b1202b;
+  color: #fff;
 }
 
 .admin-empty-copy {

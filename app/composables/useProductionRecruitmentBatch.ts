@@ -12,6 +12,7 @@ import {
   type AdminRecruitmentBatchView,
   type RecruitmentBatchLifecycleEventView,
 } from "../services/recruitment/recruitment-view-models";
+import { getRecruitmentBatchCommandMessage } from "../utils/recruitment-batch-messages";
 
 interface AdminBatchGateway {
   getAdminBatch(batchId: string): Promise<AdminRecruitmentBatchDto>;
@@ -24,6 +25,30 @@ interface AdminBatchGateway {
 type DetailStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "error";
 type LifecycleStatus = DetailStatus | "empty" | "unavailable";
 type ArchiveStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "conflict" | "stale" | "error" | "unavailable";
+
+export type ProductionRecruitmentBatchCommand = "publish" | "open-now" | "pause" | "resume" | "close" | "reopen";
+
+const COMMAND_ALLOWED_STATUSES: Record<ProductionRecruitmentBatchCommand, readonly string[]> = {
+  publish: ["draft"],
+  "open-now": ["upcoming"],
+  pause: ["open"],
+  resume: ["paused"],
+  close: ["open", "paused"],
+  reopen: ["closed"],
+};
+
+function commandStatusIssue(command: ProductionRecruitmentBatchCommand, status: string): string | undefined {
+  if (COMMAND_ALLOWED_STATUSES[command].includes(status)) return undefined;
+  const labels: Record<ProductionRecruitmentBatchCommand, string> = {
+    publish: "草稿批次",
+    "open-now": "待开始批次",
+    pause: "开放批次",
+    resume: "已暂停批次",
+    close: "开放或暂停批次",
+    reopen: "已关闭批次",
+  };
+  return `${labels[command]}才能执行“${command === "open-now" ? "立即开放" : command === "publish" ? "发布批次" : command === "pause" ? "暂停报名" : command === "resume" ? "恢复报名" : command === "close" ? "提前关闭" : "重新开放"}”。当前状态为“${status || "未知"}”。`;
+}
 
 export interface ArchiveRecruitmentBatchConfirmation {
   batchId: string;
@@ -221,7 +246,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
         };
       } else {
         archiveStatus.value = requestStatus(cause);
-        archiveError.value = errorMessage(cause, "批次归档失败，请稍后重试。");
+        archiveError.value = getRecruitmentBatchCommandMessage(cause, "批次归档失败，请稍后重试。");
       }
       return failed;
     } finally {
@@ -229,16 +254,33 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
-  async function runCommand(command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", reason?: string): Promise<boolean> {
+  async function runCommand(
+    command: ProductionRecruitmentBatchCommand,
+    reason?: string,
+    expectedVersion = batch.value?.version,
+  ): Promise<boolean> {
     if (!batch.value || !currentBatchId || !gateway.runAdminBatchCommand) {
       commandError.value = "真实批次状态命令暂不可用。";
+      return false;
+    }
+    if (!Number.isInteger(expectedVersion) || (expectedVersion ?? 0) < 1) {
+      commandError.value = "当前批次版本无效，请刷新后重试。";
+      return false;
+    }
+    if (expectedVersion !== batch.value.version) {
+      commandError.value = "批次版本已变化，请刷新后重新确认。";
+      return false;
+    }
+    const statusIssue = commandStatusIssue(command, batch.value.effectiveStatus);
+    if (statusIssue) {
+      commandError.value = statusIssue;
       return false;
     }
     const requestGeneration = loadGeneration;
     commanding.value = true;
     commandError.value = "";
     try {
-      const payload: RecruitmentBatchCommandDto = { expectedVersion: batch.value.version, confirmed: true, ...(reason?.trim() ? { reason: reason.trim() } : {}) };
+      const payload: RecruitmentBatchCommandDto = { expectedVersion, confirmed: true, ...(reason?.trim() ? { reason: reason.trim() } : {}) };
       const response = await gateway.runAdminBatchCommand(currentBatchId, command, payload);
       if (requestGeneration !== loadGeneration) return false;
       batch.value = mapAdminRecruitmentBatch(response);
@@ -246,7 +288,7 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
       return true;
     } catch (cause) {
       if (requestGeneration === loadGeneration) {
-        commandError.value = errorMessage(cause, "批次状态命令失败，请刷新后重试。");
+        commandError.value = getRecruitmentBatchCommandMessage(cause);
         if ((cause as { status?: number })?.status === 409) await refresh(currentBatchId, requestGeneration);
       }
       return false;
