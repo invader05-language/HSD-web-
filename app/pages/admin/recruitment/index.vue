@@ -8,18 +8,21 @@ definePageMeta({ layout: "admin" });
 
 const route = useRoute();
 const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
-const batchId = computed(() => resolveLegacyRecruitmentBatchId(
-  route.query.batchId,
-  runtime.public.useMockApi,
-));
+const requestedBatchId = typeof route.query.batchId === "string" ? route.query.batchId : undefined;
+const batchId = requestedBatchId
+  ? resolveLegacyRecruitmentBatchId(requestedBatchId, runtime.public.useMockApi)
+  : undefined;
 
-if (!runtime.public.useMockApi) {
-  await navigateTo(buildRecruitmentCompatibilityRoute("assessment", batchId.value), { replace: true });
-}
-
-useHead({ title: "预备成员考核台｜白云 HSD 开发者部落" });
+// The old route used to render the assessment workbench directly, which
+// silently selected a batch and made the global navigation ambiguous. Keep
+// deep links with an explicit batch id working, but make the bare entry point
+// land on the canonical batch list so an operator must choose the context.
+await navigateTo(
+  batchId
+    ? buildRecruitmentCompatibilityRoute("assessment", batchId)
+    : "/admin/recruitment/batches",
+  { replace: true },
+);
 </script>
 
-<template>
-  <AdminRecruitmentAssessmentWorkbench v-if="batchId" :batch-id="batchId" />
-</template>
+<template><div /></template>

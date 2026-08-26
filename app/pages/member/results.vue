@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import MemberSpaceNav from "~/components/member/MemberSpaceNav.vue";
 import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
   memberResultFromApi,
+  memberResultFromApplication,
   resultCenterMemberFromSession,
   describeAdmission,
   describeAssessment,
@@ -15,14 +17,19 @@ import { copyTextToClipboard } from "~/utils/clipboard";
 import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { useSessionGateway } from "~/composables/useSessionGateway";
+import { mapPublicRecruitmentBatch, mapRecruitmentApplicationResponse } from "~/services/recruitment/recruitment-view-models";
+import type { SubmittedRecruitmentApplication } from "~/data/recruitment-application";
 
 type ResultTab = "admission" | "assessment";
 
 useHead({ title: "结果中心｜白云 HSD 开发者部落" });
+definePageMeta({ middleware: "member" });
 
 const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const isMockApi = apiRuntime.public.useMockApi;
 const session = useSessionStore();
+const sessionGateway = useSessionGateway();
 const mockCurrentMember = isMockApi ? useCurrentMember() : undefined;
 const currentMember = computed(() => isMockApi
   ? mockCurrentMember?.profile.value
@@ -33,16 +40,44 @@ const currentMemberIdentity = computed<MemberIdentity | undefined>(() => {
     ? identity
     : undefined;
 });
+const memberNavProfile = computed(() => currentMember.value
+  ? { name: currentMember.value.name, identity: currentMember.value.identity }
+  : { name: "成员", identity: "成员" });
 const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
 const recruitmentGateway = useRecruitmentGateway();
+const productionApplication = ref<SubmittedRecruitmentApplication>();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
 onMounted(async () => {
   if (!recruitmentGateway) return;
   try {
+    const current = await recruitmentGateway.getCurrentBatch();
+    if (current.batch) {
+      const batch = mapPublicRecruitmentBatch(current.batch);
+      const own = await recruitmentGateway.getMyApplication(batch.id);
+      if (own.application) {
+        const profile = session.apiSession?.person;
+        if (profile) productionApplication.value = mapRecruitmentApplicationResponse(own.application, {
+          id: profile.id,
+          name: profile.name,
+          studentId: "",
+          grade: "",
+          className: "",
+          center: "待确定",
+          memberDuty: "普通成员",
+          identity: currentMemberIdentity.value ?? "预备成员",
+          bio: "",
+          version: 0,
+          contact: "",
+          biography: "",
+          status: profile.status,
+          publicProfileEnabled: false,
+        }, batch);
+      }
+    }
     await assessmentStore.refreshMyResults(recruitmentGateway);
   } catch {
     // The store exposes the server failure in-page; production never falls back to demo data.
@@ -68,7 +103,11 @@ const publishedAssessment = computed(() => {
   ))[0];
 });
 const result = computed(() => recruitmentGateway
-  ? memberResultFromApi(assessmentStore.myResults[0], currentMemberIdentity.value ?? "预备成员")
+  ? assessmentStore.myResults[0]
+    ? memberResultFromApi(assessmentStore.myResults[0], currentMemberIdentity.value ?? "预备成员")
+    : productionApplication.value
+      ? memberResultFromApplication(productionApplication.value)
+      : memberResultFromApi(undefined, currentMemberIdentity.value ?? "预备成员")
   : applyPublishedAssessmentProjection(
       getDemoMemberResult(currentMember.value?.id ?? "", applicationStore.submittedApplication),
       publishedAssessment.value,
@@ -111,10 +150,14 @@ async function copyContact(contact: { personId?: string; contact: string; name: 
 onBeforeUnmount(() => {
   if (copyResetTimer) window.clearTimeout(copyResetTimer);
 });
+
+async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig().public, sessionGateway)) await navigateTo("/"); }
 </script>
 
 <template>
-  <div class="member-results-page">
+  <div class="member-space member-space--subpage">
+    <MemberSpaceNav :profile="memberNavProfile" active="results" :signing-out="session.isSigningOut" :sign-out-error="session.signOutError" @sign-out="signOut" />
+    <div class="member-results-page">
     <section class="member-results-hero">
       <div class="member-results-hero__grid shell">
         <div class="member-results-hero__main">
@@ -284,5 +327,6 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </section>
+    </div>
   </div>
 </template>

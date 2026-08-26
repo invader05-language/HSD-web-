@@ -13,7 +13,7 @@ export type MemberProfileFormErrors = Partial<Record<keyof MemberProfileDraftVal
 
 export const MAX_BIO_LENGTH = 500;
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-export const SUPPORTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+export const SUPPORTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export function validateMemberProfileDraft(
   draft: MemberProfileDraftValues

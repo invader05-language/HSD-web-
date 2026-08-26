@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 async function completeAdminDemoLogin(
   page: import("@playwright/test").Page,
-  expectedPath = "/admin/recruitment"
+  expectedPath = "/admin/recruitment/batches"
 ) {
   await page.getByLabel("学号或成员账号").fill("admin-alliance");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
@@ -16,14 +16,18 @@ test("administration workbench uses a dedicated shell inside the same Web app", 
   await expect.poll(() => new URL(page.url()).searchParams.get("mode")).toBe("admin");
   await completeAdminDemoLogin(page);
 
-  await expect(page).toHaveURL(/\/admin\/recruitment$/);
-  await expect(page.getByRole("heading", { level: 1, name: "2026 秋季招新 · 预备成员考核" })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/recruitment\/batches$/);
+  await expect(page.getByRole("heading", { level: 1, name: "招新批次" })).toBeVisible();
   await expect(page.getByRole("link", { name: "HSD 管理台" })).toBeVisible();
   await expect(page.getByRole("link", { name: "返回官网" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "全部人员" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "白泽开发中心" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "预备成员名单" })).toBeVisible();
+  await expect(page.getByRole("article").filter({ hasText: "2026 秋季招新" })).toBeVisible();
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "2026 秋季招新" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "当前批次工作区" })).toContainText("报名名单");
+  await expect(page.getByRole("navigation", { name: "当前批次工作区" })).toContainText("预备成员考核");
+  await expect(page.getByRole("navigation", { name: "当前批次工作区" })).toContainText("结果发布");
 
   const hasOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth
@@ -32,8 +36,11 @@ test("administration workbench uses a dedicated shell inside the same Web app", 
 });
 
 test("candidate details follow the global round and center-specific round count", async ({ page }) => {
-  await page.goto("/admin/recruitment");
-  await completeAdminDemoLogin(page);
+  await page.goto("/admin/recruitment/batches");
+  await completeAdminDemoLogin(page, "/admin/recruitment/batches");
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
+  await page.getByRole("link", { name: /预备成员考核/ }).click();
 
   await page.getByRole("button", { name: "查看处理 林同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
@@ -48,18 +55,17 @@ test("candidate details follow the global round and center-specific round count"
 });
 
 test("offline adjustment records only regular-center destinations", async ({ page }) => {
-  await page.goto("/admin/recruitment");
-  await completeAdminDemoLogin(page);
+  await page.goto("/admin/recruitment/batches");
+  await completeAdminDemoLogin(page, "/admin/recruitment/batches");
 
   // Assessment writes are only allowed after the active recruitment batch is closed.
-  await page.getByRole("link", { name: "招新批次" }).click();
   await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
     .getByRole("link", { name: /进入批次/ }).click();
   await page.getByRole("button", { name: "提前关闭" }).click();
   const closeDialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
   await closeDialog.getByRole("button", { name: "确认提前关闭" }).click();
   await expect(page.getByRole("status")).toContainText("提前关闭已完成");
-  await page.getByRole("link", { name: "预备成员考核", exact: true }).click();
+  await page.getByRole("link", { name: /预备成员考核/ }).click();
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
   const drawer = page.getByRole("dialog", { name: "预备成员详情" });
@@ -109,11 +115,14 @@ test("recruitment batches and publication complete the administration workflow",
   await expect(page.getByRole("heading", { level: 1, name: "招新批次" })).toBeVisible();
   await expect(page.getByRole("button", { name: "新建招新批次" })).toBeVisible();
 
-  await page.getByRole("link", { name: "报名人员", exact: true }).click();
+  await page.getByRole("article").filter({ hasText: "2026 秋季招新" })
+    .getByRole("link", { name: /进入批次/ }).click();
+  await page.getByRole("link", { name: /报名名单/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "报名人员" })).toBeVisible();
   await expect(page.getByRole("table", { name: "批次报名人员" })).toBeVisible();
 
-  await page.getByRole("link", { name: "结果发布", exact: true }).click();
+  await page.getByRole("link", { name: "返回批次概览" }).click();
+  await page.getByRole("link", { name: /结果发布/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "结果发布" })).toBeVisible();
   await expect(page.getByRole("button", { name: "整批发布结果" })).toBeVisible();
   await expect(page.getByText("内部保存不等于对成员公开")).toBeVisible();
