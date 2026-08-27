@@ -18,7 +18,7 @@ async function closeBatchBeforeAssessment(page: import("@playwright/test").Page)
   await page.getByRole("button", { name: "提前关闭" }).click();
   const dialog = page.getByRole("alertdialog", { name: /确认提前关闭/ });
   await dialog.getByRole("button", { name: "确认提前关闭" }).click();
-  await expect(page.getByRole("status")).toContainText("提前关闭已完成");
+  await expect(page.getByTestId("admin-toast")).toContainText("提前关闭已完成");
 }
 
 test("batch links preserve batchId context across roster, assessment and publication", async ({ page }) => {
@@ -65,7 +65,7 @@ test("batch links preserve batchId context across roster, assessment and publica
   await reopenedCandidateDrawer.getByLabel("内部备注").fill("第一轮通过，等待全局推进。");
   await reopenedCandidateDrawer.getByRole("button", { name: "保存结果" }).click();
   await reopenedCandidateDrawer.getByRole("button", { name: "确认保存" }).click();
-  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
+  await expect(page.getByTestId("admin-toast")).toContainText("结果已保存");
   await expect(candidateDrawer).toHaveCount(0);
   await expect(page.getByRole("row", { name: /周同学/ })).toHaveCount(0);
 
@@ -140,7 +140,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "确认发布批次" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText("发布批次已完成");
+  await expect(page.getByTestId("admin-toast")).toContainText("发布批次已完成");
 });
 
 test("closed batches use a processing entry while archived batches use archive wording", async ({ page }) => {
@@ -161,7 +161,7 @@ test("an owner can record a not-admitted adjustment without choosing a destinati
   await drawer.getByLabel("第一轮结果").selectOption("failed");
   await drawer.getByRole("button", { name: "保存结果" }).click();
   await drawer.getByRole("button", { name: "确认保存" }).click();
-  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
+  await expect(page.getByTestId("admin-toast")).toContainText("结果已保存");
   await expect(drawer).toHaveCount(0);
 
   await page.getByRole("button", { name: "查看处理 陈同学" }).click();
@@ -170,7 +170,7 @@ test("an owner can record a not-admitted adjustment without choosing a destinati
   await adjustmentDrawer.getByRole("button", { name: "保存结果" }).click();
   await adjustmentDrawer.getByRole("button", { name: "确认保存" }).click();
 
-  await expect(page.locator('.admin-save-message[role="status"]')).toContainText("结果已保存");
+  await expect(page.getByTestId("admin-toast")).toContainText("结果已保存");
   await expect(page.getByRole("row", { name: /陈同学/ })).toHaveCount(0);
 });
 
