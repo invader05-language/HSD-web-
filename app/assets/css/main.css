@@ -745,6 +745,39 @@ a {
   font-size: 12px;
 }
 
+.project-member-input {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.project-member-input input { flex: 1; }
+
+.project-member-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-top: .6rem;
+}
+
+.project-member-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--line, #d9d2c5);
+  border-radius: 999px;
+  background: var(--surface-soft, #f7f3ec);
+}
+
+.project-member-tag button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  line-height: 1;
+}
+
 .admin-project-editor__centers {
   display: flex;
   flex-wrap: wrap;

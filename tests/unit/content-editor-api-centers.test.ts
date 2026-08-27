@@ -71,14 +71,26 @@ describe("production project and activity editor center/media behavior", () => {
     expect(activities.getById(activityId)?.cover).toMatchObject({ id: coverId, status: "processing", serverOwned: true });
   });
 
-  it("uses member selection and removes legacy technology and member-count inputs", async () => {
+  it("uses member name input and removes legacy technology and member-count inputs", async () => {
     session("OWNER");
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ currentPermission: { accountId: "66666666-6666-4666-8666-666666666666", personId: "77777777-7777-4777-8777-777777777777", adminLevel: "OWNER", adminCenterId: null, version: 1 }, items: [{ id: centerId, slug: "baize-development", name: "Baize", active: true, positions: [] }] }), { status: 200, headers: { "Content-Type": "application/json" } })));
     const project = mount(ProjectEditor, { props: { mode: "create" }, global: globalOptions });
     await flushPromises();
 
-    expect(project.find("select[multiple]").exists()).toBe(true);
+    expect(project.find("input[aria-label='项目成员姓名']").exists()).toBe(true);
     expect(project.find("[data-testid=project-member-count]").exists()).toBe(false);
     expect(project.find("textarea[placeholder]").exists()).toBe(false);
+  });
+
+  it("accepts project member names without loading the full member directory", async () => {
+    session("OWNER");
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ currentPermission: { accountId: "66666666-6666-4666-8666-666666666666", personId: "77777777-7777-4777-8777-777777777777", adminLevel: "OWNER", adminCenterId: null, version: 1 }, items: [{ id: centerId, slug: "baize-development", name: "Baize", active: true, positions: [] }] }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetcher);
+    const project = mount(ProjectEditor, { props: { mode: "create" }, global: globalOptions });
+    await flushPromises();
+
+    expect(project.find("select[multiple]").exists()).toBe(false);
+    expect(project.find("input[aria-label='项目成员姓名']").exists()).toBe(true);
+    expect(fetcher).not.toHaveBeenCalledWith(expect.stringContaining("/api/v1/admin/members"), expect.anything());
   });
 });
