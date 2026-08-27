@@ -174,6 +174,10 @@ describe("Task 2 recruitment P0 regressions", () => {
     expect(advance).toBeDefined();
     expect(advance!.attributes("disabled")).toBeDefined();
     expect(wrapper.text()).toContain("关闭报名后才能推进");
+    expect(wrapper.text()).not.toContain("Batch Assessment");
+    expect(wrapper.text()).not.toContain("Candidate Roster");
+    expect(wrapper.text()).not.toContain("batchId：");
+    expect(wrapper.text()).not.toContain("真实后端接入后");
   });
 
   it("does not render a reason textarea for pause confirmation and keeps confirmation enabled", async () => {
@@ -226,5 +230,63 @@ describe("Task 2 recruitment P0 regressions", () => {
 
     expect(wrapper.text()).toContain("查看详情");
     expect(wrapper.text()).not.toContain("人工覆盖");
+  });
+
+  it("keeps final adjustment entry with the alliance owner instead of exposing an online center suggestion", async () => {
+    useSessionStore().applyApiSession({
+      account: {
+        id: "account-media-admin",
+        adminLevel: "ADMIN",
+        adminCenterId: "center-media",
+        capabilities: ["recruitment.assessment.edit"],
+      },
+      person: { id: "person-media-admin", name: "新媒体中心负责人", status: "FORMAL_MEMBER" },
+      mustChangePassword: false,
+    });
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/adjustment-targets")) {
+        return new Response(JSON.stringify({ items: [{ id: "center-talent", slug: "talent-development", name: "人才发展中心" }] }), { status: 200 });
+      }
+      if (url.endsWith("/assessments")) {
+        return new Response(JSON.stringify({
+          batch: { id: "batch-p0", name: "P0 API 招新", lifecycleStatus: "closed" },
+          currentRound: 1,
+          status: "ASSESSING",
+          version: 3,
+          publishedAt: null,
+          pending: 0,
+          adjustmentPending: 1,
+          canAdvance: false,
+          advanceBlocker: { code: "ASSESSMENT_ADJUSTMENT_PENDING", count: 1 },
+          nextAction: "DECIDE_ADJUSTMENTS",
+          items: [{
+            applicationId: "application-adjustment",
+            person: { id: "person-candidate", name: "待调剂成员", studentId: "20260001", grade: "2026", className: "软件一班" },
+            acceptsAdjustment: true,
+            baizeDirection: null,
+            preferences: [{ rank: "FIRST", center: { id: "center-media", slug: "new-media", name: "新媒体中心" } }],
+            roundResults: [{ round: 1, outcome: "FAILED", internalNote: null, createdAt: "2026-08-08T00:00:00.000Z" }],
+            adjustmentProposal: null,
+            adjustmentDecision: null,
+            finalResult: null,
+          }],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify(baseBatch), { status: 200 });
+    }));
+
+    const wrapper = mount(RecruitmentAssessmentWorkbench, {
+      props: { batchId: "batch-p0" },
+      global: { stubs: { NuxtLink: linkStub } },
+    });
+    await flushPromises();
+    await nextTick();
+    await wrapper.get('button[aria-label="查看处理 待调剂成员"]').trigger("click");
+
+    expect(wrapper.text()).toContain("调剂结果由联盟总负责人直接录入");
+    expect(wrapper.text()).not.toContain("中心负责人只提交");
+    expect(wrapper.find('select[aria-label="建议去向"]').exists()).toBe(false);
   });
 });
