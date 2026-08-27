@@ -434,7 +434,7 @@ async function confirmAdvance() {
 
     <section v-if="recruitmentGateway && batch" class="admin-assessment-workflow-summary" aria-label="批次生命周期与考核摘要">
       <div><span>批次</span><strong>{{ batch.name }}</strong><small>{{ batch.lifecycleStatus === "closed" ? "已关闭，可按规则推进" : "关闭报名后才可推进" }}</small></div>
-      <div><span>下一步</span><strong>{{ apiWorkflowSummary?.nextAction === "PUBLISH_BATCH" ? "发布批次" : apiWorkflowSummary?.nextAction === "OPEN_BATCH" ? "立即开放" : apiWorkflowSummary?.nextAction === "CLOSE_BATCH" ? "关闭报名" : apiWorkflowSummary?.nextAction === "RECORD_CURRENT_ROUND_RESULTS" ? "完成当前轮" : apiWorkflowSummary?.nextAction === "SUBMIT_ADJUSTMENT_PROPOSALS" ? "提交调剂建议" : apiWorkflowSummary?.nextAction === "DECIDE_ADJUSTMENTS" ? "处理调剂" : apiWorkflowSummary?.nextAction === "ADVANCE_ROUND" ? "推进轮次" : apiWorkflowSummary?.nextAction === "PUBLISH_RESULTS" ? "发布结果" : apiWorkflowSummary?.nextAction === "NONE" ? "已完成" : "等待服务器确认" }}</strong><small>{{ advanceDisabledReason || "当前可执行推进" }}</small></div>
+      <div><span>下一步</span><strong>{{ apiWorkflowSummary?.nextAction === "PUBLISH_BATCH" ? "发布批次" : apiWorkflowSummary?.nextAction === "OPEN_BATCH" ? "立即开放" : apiWorkflowSummary?.nextAction === "CLOSE_BATCH" ? "关闭报名" : apiWorkflowSummary?.nextAction === "RECORD_CURRENT_ROUND_RESULTS" ? "完成当前轮" : apiWorkflowSummary?.nextAction === "DECIDE_ADJUSTMENTS" ? "处理调剂" : apiWorkflowSummary?.nextAction === "ADVANCE_ROUND" ? "推进轮次" : apiWorkflowSummary?.nextAction === "PUBLISH_RESULTS" ? "发布结果" : apiWorkflowSummary?.nextAction === "NONE" ? "已完成" : "等待服务器确认" }}</strong><small>{{ advanceDisabledReason || "当前可执行推进" }}</small></div>
       <div><span>服务器待办</span><strong>{{ apiWorkflowSummary?.pending ?? actionableCandidates.filter((candidate) => candidate.processingStatus === "assessing").length }}</strong><small>当前轮未完成</small></div>
       <div><span>待调剂</span><strong>{{ apiWorkflowSummary?.adjustmentPending ?? candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>等待最终处理</small></div>
     </section>
@@ -442,7 +442,7 @@ async function confirmAdvance() {
     <section class="admin-summary-strip" aria-label="批次考核概览">
       <div><span>本批次人员</span><strong>{{ allCandidates.length }}</strong><small>当前批次</small></div>
       <div><span>当前轮待处理</span><strong>{{ candidates.filter((candidate) => candidate.currentPhase === currentRoundLabel).length }}</strong><small>{{ currentRoundLabel }}</small></div>
-      <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>负责人建议后由总负责人确认</small></div>
+      <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>由联盟总负责人直接录入最终结果</small></div>
       <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 

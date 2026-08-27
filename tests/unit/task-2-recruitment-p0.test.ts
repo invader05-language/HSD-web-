@@ -287,6 +287,7 @@ describe("Task 2 recruitment P0 regressions", () => {
 
     expect(wrapper.text()).toContain("调剂结果由联盟总负责人直接录入");
     expect(wrapper.text()).not.toContain("中心负责人只提交");
+    expect(wrapper.text()).not.toContain("负责人建议后由总负责人确认");
     expect(wrapper.find('select[aria-label="建议去向"]').exists()).toBe(false);
   });
 });
