@@ -9,7 +9,6 @@ import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachmen
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { PROJECT_CATEGORY_LABELS, type ManagedProject, type ProjectCategory, type ProjectDraftInput, type ProjectMember } from "~/types/project";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
-import { ADMIN_MEMBERS } from "~/data/admin-members";
 import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{
@@ -62,6 +61,7 @@ const form = reactive<ProjectForm>({
   challenge: "",
   solution: "",
   memberPersonIds: [],
+  memberNames: [],
   displayOrder: 9999,
   ownerCenterId: defaultOwnerCenterId(),
   cover: null,
@@ -81,11 +81,8 @@ const detailItems = computed<ContentMediaAttachment[]>({
   set: (value) => { form.details = value.slice(0, 12); },
 });
 const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
-const memberOptions = ref<Array<{ id: string; name: string }>>([]);
-const selectedMembers = computed<ProjectMember[]>(() => form.memberPersonIds.flatMap((personId) => {
-  const member = memberOptions.value.find((item) => item.id === personId);
-  return member ? [{ personId: member.id, name: member.name }] : [];
-}));
+const memberNameInput = ref("");
+const selectedMembers = computed<ProjectMember[]>(() => form.memberNames.map((name, index) => ({ name, ...(form.memberPersonIds[index] ? { personId: form.memberPersonIds[index] } : {}) })));
 const mediaOwner = computed(() => props.project ? { centerId: props.project.ownerCenterId, ownerType: "project" as const, ownerId: props.project.id } : undefined);
 
 function completeDetail(item: ContentMediaAttachment) {
@@ -105,7 +102,7 @@ const missingFields = computed(() => {
     [form.solution, "解决方案"],
     [form.ownerCenterId, "归属中心"],
   ] as const) if (!String(value).trim()) missing.push(label);
-  if (!form.memberPersonIds.length) missing.push("项目成员");
+  if (!form.memberNames.length) missing.push("项目成员");
   if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("项目封面");
   if (form.details.some((item) => !completeDetail(item))) missing.push("详情素材信息");
   return missing;
@@ -116,12 +113,7 @@ const ownerOptions = computed(() => session.adminLevel === "owner"
   : centerOptions.value.filter((center) => center.id === (session.currentAccount?.adminCenterId ?? form.ownerCenterId)));
 
 onMounted(async () => {
-  if (!organizationGateway) {
-    memberOptions.value = ADMIN_MEMBERS
-      .filter((member) => member.identity === "正式成员")
-      .map((member) => ({ id: member.id, name: member.name }));
-    return;
-  }
+  if (!organizationGateway) return;
   try {
     const response = await organizationGateway.listCenters();
     centerOptions.value = response.items.map((center) => ({ id: center.id, label: center.name }));
@@ -129,14 +121,6 @@ onMounted(async () => {
     if (assignedCenterId) form.ownerCenterId = assignedCenterId;
     else if (props.mode === "create" && !centerOptions.value.some((center) => center.id === form.ownerCenterId)) form.ownerCenterId = centerOptions.value[0]?.id ?? "";
   } catch (caught) { formError.value = caught instanceof Error ? `中心加载失败：${caught.message}` : "中心加载失败。"; }
-  try {
-    const response = await organizationGateway.listManagedMembers();
-    memberOptions.value = response.items
-      .filter((member) => member.status === "FORMAL_MEMBER" && member.membership)
-      .map((member) => ({ id: member.id, name: member.name }));
-  } catch {
-    memberOptions.value = [];
-  }
 });
 
 function loadProject(project?: ManagedProject) {
@@ -150,6 +134,7 @@ function loadProject(project?: ManagedProject) {
     challenge: project.challenge,
     solution: project.solution,
     memberPersonIds: [...project.memberPersonIds],
+    memberNames: [...(project.memberNames?.length ? project.memberNames : project.members.map((member) => member.name))],
     displayOrder: project.displayOrder,
     ownerCenterId: project.ownerCenterId,
     // Pinia exposes reactive proxies; JSON cloning keeps the form independent
@@ -166,6 +151,7 @@ function loadProject(project?: ManagedProject) {
     challenge: "",
     solution: "",
     memberPersonIds: [],
+    memberNames: [],
     displayOrder: 9999,
     ownerCenterId: defaultOwnerCenterId(),
     cover: null,
@@ -188,12 +174,35 @@ function toPayload(): ProjectDraftInput {
     challenge: form.challenge,
     solution: form.solution,
     memberPersonIds: [...form.memberPersonIds],
+    memberNames: [...form.memberNames],
     members: selectedMembers.value,
     displayOrder: form.displayOrder,
     ownerCenterId: form.ownerCenterId,
     cover: form.cover ? JSON.parse(JSON.stringify(form.cover)) as ContentMediaAttachment : null,
     details: form.details.map((item) => JSON.parse(JSON.stringify(item)) as ContentMediaAttachment),
   };
+}
+
+function addMemberName() {
+  const name = memberNameInput.value.trim();
+  if (!name || form.memberNames.includes(name)) {
+    memberNameInput.value = "";
+    return;
+  }
+  form.memberNames.push(name);
+  memberNameInput.value = "";
+}
+
+function onMemberNameKeydown(event: KeyboardEvent) {
+  if (event.key === "Enter" || event.key === "," || event.key === "，") {
+    event.preventDefault();
+    addMemberName();
+  }
+}
+
+function removeMemberName(index: number) {
+  form.memberNames.splice(index, 1);
+  form.memberPersonIds.splice(index, 1);
 }
 
 function validateForm() {
@@ -273,10 +282,17 @@ async function offlineProject() {
         <label>项目阶段<input v-model="form.projectStage" type="text"></label>
         <label>当前成果<input v-model="form.achievement" type="text"></label>
         <label class="is-wide">项目成员
-          <select v-model="form.memberPersonIds" multiple aria-label="项目成员选择">
-            <option v-for="member in memberOptions" :key="member.id" :value="member.id">{{ member.name }}</option>
-          </select>
-          <small>仅可选择正式成员；公开页面只展示姓名。</small>
+          <div class="project-member-input">
+            <input v-model="memberNameInput" aria-label="项目成员姓名" placeholder="填写成员姓名，按 Enter 添加" @keydown="onMemberNameKeydown">
+            <button type="button" class="button button--text" @click="addMemberName">添加</button>
+          </div>
+          <div v-if="form.memberNames.length" class="project-member-tags" aria-label="已添加项目成员">
+            <span v-for="(name, index) in form.memberNames" :key="`${name}-${index}`" class="project-member-tag">
+              {{ name }}
+              <button type="button" :aria-label="`移除成员 ${name}`" @click="removeMemberName(index)">×</button>
+            </span>
+          </div>
+          <small>直接填写成员姓名即可，公开页面只展示姓名。</small>
         </label>
         <label>展示排序<input v-model.number="form.displayOrder" data-testid="project-display-order" type="number" min="0"></label>
         <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>

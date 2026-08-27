@@ -26,6 +26,7 @@ export interface ProjectDraftInput {
   challenge: string;
   solution: string;
   memberPersonIds: string[];
+  memberNames: string[];
   members: ProjectMember[];
   displayOrder: number;
   ownerCenterId: string;
@@ -33,7 +34,7 @@ export interface ProjectDraftInput {
   details: ContentMediaAttachment[];
 }
 
-export interface PublishedProject extends Omit<ProjectDraftInput, "memberPersonIds" | "members"> {
+export interface PublishedProject extends Omit<ProjectDraftInput, "memberPersonIds" | "memberNames" | "members"> {
   id: string;
   slug: string;
   members: Array<Pick<ProjectMember, "name">>;
@@ -44,6 +45,7 @@ export interface PublishedProject extends Omit<ProjectDraftInput, "memberPersonI
 
 export interface ManagedProject extends PublishedProject {
   memberPersonIds: string[];
+  memberNames: string[];
   members: ProjectMember[];
   publicationStatus: ProjectPublicationStatus;
   version: number;

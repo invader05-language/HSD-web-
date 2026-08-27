@@ -17391,6 +17391,18 @@
               "format": "uuid"
             }
           },
+          "memberNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
           "coverAttachmentId": {
             "type": "string",
             "format": "uuid",
@@ -17400,6 +17412,20 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "cover": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+              }
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachmentResponseDto"
             }
           },
           "revisionNumber": {
@@ -17431,8 +17457,12 @@
           "challenge",
           "solution",
           "memberPersonIds",
+          "memberNames",
+          "members",
           "coverAttachmentId",
           "detailAttachmentIds",
+          "cover",
+          "details",
           "revisionNumber",
           "lead"
         ]
@@ -17508,6 +17538,13 @@
               "format": "uuid"
             }
           },
+          "memberNames": {
+            "description": "Project member names in display order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "coverAttachmentId": {
             "type": "string",
             "format": "uuid"
@@ -17530,8 +17567,7 @@
           "projectStage",
           "challenge",
           "solution",
-          "category",
-          "memberPersonIds"
+          "category"
         ]
       },
       "UpdateProjectDto": {
@@ -17584,6 +17620,13 @@
             "items": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          "memberNames": {
+            "description": "Project member names in display order",
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           },
           "coverAttachmentId": {
@@ -17797,6 +17840,20 @@
               "type": "string"
             }
           },
+          "cover": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+              }
+            ]
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+            }
+          },
           "revisionNumber": {
             "type": "number"
           }
@@ -17820,6 +17877,8 @@
           "registrationEndAt",
           "coverAttachmentId",
           "detailAttachmentIds",
+          "cover",
+          "details",
           "revisionNumber"
         ]
       },

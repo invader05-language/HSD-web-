@@ -249,4 +249,20 @@ describe("project, activity, and registration API gateway", () => {
     expect(projects.apiError).toMatchObject({ code: "VERSION_CONFLICT" });
     expect(activities.getById("activity-api-1")).toMatchObject({ registrationOpen: true, version: 5 });
   });
+
+  it("hydrates complete project and activity attachments returned by the admin API", async () => {
+    const projects = useProjectsStore();
+    const activities = useActivitiesStore();
+    const projectAttachment = { id: "project-cover-1", ownerType: "project", ownerId: "project-api-1", centerId: "center-1", role: "cover", kind: "image", title: "Project cover", caption: "", alt: "Project cover", aspect: "wide", sortOrder: 0, status: "ready", version: 2, uploadVersion: 1, url: "/api/v1/admin/uploads/project-upload/preview", thumbnailUrl: "/api/v1/admin/uploads/project-upload/preview" };
+    const projectDetail = { ...projectAttachment, id: "project-detail-1", role: "detail", title: "Project detail", sortOrder: 0 };
+    const activityAttachment = { ...projectAttachment, id: "activity-cover-1", ownerType: "activity", ownerId: "activity-api-1", url: "/api/v1/admin/uploads/activity-upload/preview" };
+    const activityDetail = { ...activityAttachment, id: "activity-detail-1", role: "detail", title: "Activity detail", sortOrder: 0 };
+    await projects.refreshFromApi({ projects: { listAdmin: vi.fn().mockResolvedValue({ items: [{ ...projectRecord, cover: projectAttachment, details: [projectDetail] }] }) } });
+    await activities.refreshFromApi({ activities: { listAdmin: vi.fn().mockResolvedValue({ items: [{ ...activityRecord, cover: activityAttachment, details: [activityDetail] }] }) } });
+
+    expect(projects.getById("project-api-1")?.cover).toMatchObject({ id: "project-cover-1", url: projectAttachment.url, status: "ready", title: "Project cover" });
+    expect(projects.getById("project-api-1")?.details).toEqual([expect.objectContaining({ id: "project-detail-1", url: projectDetail.url, status: "ready", title: "Project detail" })]);
+    expect(activities.getById("activity-api-1")?.cover).toMatchObject({ id: "activity-cover-1", url: activityAttachment.url, status: "ready", title: "Project cover" });
+    expect(activities.getById("activity-api-1")?.details).toEqual([expect.objectContaining({ id: "activity-detail-1", url: activityDetail.url, status: "ready", title: "Activity detail" })]);
+  });
 });

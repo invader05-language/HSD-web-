@@ -59,6 +59,8 @@ export type AdminActivityResponseDto = {
   "registrationEndAt": string;
   "coverAttachmentId": (string) | null;
   "detailAttachmentIds": Array<string>;
+  "cover": (MediaAttachmentResponseDto) | null;
+  "details": Array<MediaAttachmentResponseDto>;
   "revisionNumber": number;
 };
 
@@ -226,8 +228,12 @@ export type AdminProjectResponseDto = {
   "challenge": string;
   "solution": string;
   "memberPersonIds": Array<string>;
+  "memberNames": Array<string>;
+  "members": Array<Record<string, unknown>>;
   "coverAttachmentId": (string) | null;
   "detailAttachmentIds": Array<string>;
+  "cover": (MediaAttachmentResponseDto) | null;
+  "details": Array<MediaAttachmentResponseDto>;
   "revisionNumber": number;
   "lead": (AdminProjectLeadSummaryDto) | null;
 };
@@ -775,7 +781,8 @@ export type CreateProjectDto = {
   "solution": string;
   "category": "CAMPUS_SERVICE" | "AI_APPLICATION" | "SMART_HARDWARE" | "INDUSTRY_DIGITALIZATION";
   "displayOrder"?: (number) | null;
-  "memberPersonIds": Array<string>;
+  "memberPersonIds"?: Array<string>;
+  "memberNames"?: Array<string>;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
 };
@@ -1969,6 +1976,7 @@ export type UpdateProjectDto = {
   "category"?: "CAMPUS_SERVICE" | "AI_APPLICATION" | "SMART_HARDWARE" | "INDUSTRY_DIGITALIZATION";
   "displayOrder"?: (number) | null;
   "memberPersonIds"?: Array<string>;
+  "memberNames"?: Array<string>;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
   "expectedVersion": number;
@@ -8075,6 +8083,18 @@ const API_COMPONENT_SCHEMAS = {
           "format": "uuid"
         }
       },
+      "memberNames": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "members": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
       "coverAttachmentId": {
         "type": "string",
         "format": "uuid",
@@ -8084,6 +8104,20 @@ const API_COMPONENT_SCHEMAS = {
         "type": "array",
         "items": {
           "type": "string"
+        }
+      },
+      "cover": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+          }
+        ]
+      },
+      "details": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MediaAttachmentResponseDto"
         }
       },
       "revisionNumber": {
@@ -8115,8 +8149,12 @@ const API_COMPONENT_SCHEMAS = {
       "challenge",
       "solution",
       "memberPersonIds",
+      "memberNames",
+      "members",
       "coverAttachmentId",
       "detailAttachmentIds",
+      "cover",
+      "details",
       "revisionNumber",
       "lead"
     ]
@@ -8192,6 +8230,13 @@ const API_COMPONENT_SCHEMAS = {
           "format": "uuid"
         }
       },
+      "memberNames": {
+        "description": "Project member names in display order",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
       "coverAttachmentId": {
         "type": "string",
         "format": "uuid"
@@ -8214,8 +8259,7 @@ const API_COMPONENT_SCHEMAS = {
       "projectStage",
       "challenge",
       "solution",
-      "category",
-      "memberPersonIds"
+      "category"
     ]
   },
   "UpdateProjectDto": {
@@ -8268,6 +8312,13 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "type": "string",
           "format": "uuid"
+        }
+      },
+      "memberNames": {
+        "description": "Project member names in display order",
+        "type": "array",
+        "items": {
+          "type": "string"
         }
       },
       "coverAttachmentId": {
@@ -8481,6 +8532,20 @@ const API_COMPONENT_SCHEMAS = {
           "type": "string"
         }
       },
+      "cover": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+          }
+        ]
+      },
+      "details": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MediaAttachmentResponseDto"
+        }
+      },
       "revisionNumber": {
         "type": "number"
       }
@@ -8504,6 +8569,8 @@ const API_COMPONENT_SCHEMAS = {
       "registrationEndAt",
       "coverAttachmentId",
       "detailAttachmentIds",
+      "cover",
+      "details",
       "revisionNumber"
     ]
   },
