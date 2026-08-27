@@ -179,6 +179,7 @@ async function signOut() {
         </p>
         <slot />
       </main>
+      <AdminToastHost />
     </div>
   </div>
 </template>

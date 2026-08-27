@@ -26,6 +26,7 @@ import { createProductionRecruitmentBatchController } from "~/composables/usePro
 import type { UpdateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
 import { copyTextToClipboard } from "~/utils/clipboard";
 import type { RecruitmentBatchLifecycleEventView } from "~/services/recruitment/recruitment-view-models";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 definePageMeta({ layout: "admin" });
 
@@ -59,6 +60,7 @@ const applicationStore = isMockApi ? useRecruitmentApplicationStore() : undefine
 const assessmentStore = isMockApi ? useRecruitmentAssessmentStore() : undefined;
 const recruitmentGateway = useRecruitmentGateway();
 const organizationGateway = useOrganizationGateway();
+const adminToast = useAdminToast();
 const productionBatch = recruitmentGateway
   ? createProductionRecruitmentBatchController(recruitmentGateway)
   : undefined;
@@ -125,6 +127,11 @@ const canConfirmPendingAction = computed(() => {
 const editOpen = ref(false);
 const editError = ref("");
 const productionCenterOptions = ref<ReadonlyArray<readonly [string, string]>>([]);
+// Keep the transient toast scoped to the current page.  Some lightweight
+// route fixtures (and older Nuxt test harnesses) expose only `path`, while
+// the real router provides `fullPath`; accepting both keeps navigation
+// cleanup consistent without changing runtime behaviour.
+watch(() => route.fullPath ?? route.path, () => adminToast.dismiss());
 const editForm = reactive({
   name: "",
   startAt: "",
@@ -338,6 +345,7 @@ async function invokeAction(context: PendingLifecycleAction) {
         return;
       }
       actionMessage.value = result.lifecycleRefreshed ? "归档批次已完成，状态和生命周期记录已刷新。" : "归档批次已完成。";
+      adminToast.success(actionMessage.value);
     } else {
       const command = action === "openNow" ? "open-now" : action;
       const ok = await productionBatch.runCommand(command, action === "pause" || action === "close" ? undefined : reason.value, context.expectedVersion);
@@ -353,6 +361,7 @@ async function invokeAction(context: PendingLifecycleAction) {
       actionMessage.value = productionBatch.commandLifecycleRefreshed.value
         ? `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`
         : `${actionLabel(action)}已完成，批次状态已更新，但生命周期记录刷新失败，请稍后重试。`;
+      adminToast.success(actionMessage.value);
     }
     pendingAction.value = null;
     reason.value = "";
@@ -375,6 +384,7 @@ async function invokeAction(context: PendingLifecycleAction) {
       throw new Error("BATCH_COMMAND_FAILED");
     }
     actionMessage.value = `${actionLabel(action)}已完成，状态和生命周期记录已刷新。`;
+    adminToast.success(actionMessage.value);
     pendingAction.value = null;
     reason.value = "";
   } catch (error) {
@@ -424,7 +434,8 @@ function closeLifecycleDetails() {
 }
 
 async function copyLifecycleTarget(id: string) {
-  lifecycleCopyMessage.value = await copyTextToClipboard(id) ? "批次 ID 已复制" : "复制失败，请重试";
+  lifecycleCopyMessage.value = await copyTextToClipboard(id) ? "批次标识已复制" : "复制失败，请重试";
+  if (lifecycleCopyMessage.value === "批次标识已复制") adminToast.success(lifecycleCopyMessage.value);
 }
 
 function dateInput(value?: string) {
@@ -475,6 +486,7 @@ async function saveEditor() {
     editOpen.value = false;
     editError.value = "";
     actionMessage.value = "批次草稿已更新，请重新完成发布检查。";
+    adminToast.success(actionMessage.value);
   } catch (error) {
     editError.value = getRecruitmentBatchCommandMessage(error);
   }
@@ -503,6 +515,10 @@ function lifecycleActionLabel(action: string) {
     "recruitment.batch.reopened": "重新开放",
     "recruitment.batch.archived": "归档批次",
   } as Record<string, string>)[action] ?? action;
+}
+
+function lifecycleTargetLabel(type: string) {
+  return type === "RecruitmentBatch" ? "招新批次" : type === "RecruitmentApplication" ? "报名记录" : type;
 }
 
 const lifecycleSnapshotLabels = {
@@ -587,7 +603,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
   <NuxtPage v-if="isNestedRoute" />
   <div v-else-if="batch" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
-      eyebrow="Recruitment Batch Context"
+      eyebrow="招新批次"
       :title="batch.name"
       :description="!isMockApi ? `当前展示 ${batch.name} 的真实批次概要、生命周期与工作区。` : isArchived ? '归档批次仅供追溯与导出，数据和流程状态不可修改。' : `所有报名、考核、结果发布和导出均限定在 ${batch.name} 内。`"
     >
@@ -614,7 +630,6 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </template>
     </AdminPageHeading>
 
-    <p v-if="actionMessage" class="admin-save-message" role="status">{{ actionMessage }}</p>
     <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
     <p v-if="!isMockApi && productionBatch?.commandError.value" class="admin-save-message admin-save-message--error" role="alert">{{ productionBatch.commandError.value }}</p>
 
@@ -634,7 +649,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     </section>
 
     <section v-if="isMockApi && isDraft" class="admin-batch-readiness" aria-label="发布准备检查">
-      <header><div><span>Publish Readiness</span><h2>发布准备检查</h2></div><p>发布前先解决所有阻塞项，避免提交后才发现批次冲突。</p></header>
+      <header><div><span>发布准备</span><h2>发布准备检查</h2></div><p>发布前先解决所有阻塞项，避免提交后才发现批次冲突。</p></header>
       <div class="admin-batch-readiness__body">
         <div :class="['admin-batch-readiness__status', publishReadiness.ok ? 'is-ready' : 'is-blocked']">
           <strong>{{ publishReadiness.ok ? "可以发布" : "暂不可发布" }}</strong>
@@ -649,7 +664,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     </section>
 
     <section class="admin-list-card admin-batch-workspace">
-      <header><div><span>Batch Workflow</span><h2>批次工作区</h2></div><p>{{ isArchived ? "归档批次只允许查看和导出" : canManage ? "当前账号具备批次管理权限" : "当前账号仅可查看与处理授权数据" }}</p></header>
+      <header><div><span>批次流程</span><h2>批次工作区</h2></div><p>{{ isArchived ? "归档批次只允许查看和导出" : canManage ? "当前账号具备批次管理权限" : "当前账号仅可查看与处理授权数据" }}</p></header>
       <nav class="admin-batch-context-nav" aria-label="当前批次工作区">
         <NuxtLink v-for="item in workflowItems" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
           <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
@@ -662,7 +677,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     </section>
 
     <section class="admin-list-card admin-batch-audit" aria-label="生命周期记录">
-      <header><div><span>Lifecycle Audit</span><h2>生命周期记录</h2></div><p v-if="!isMockApi">共 {{ productionBatch?.lifecycleTotal.value ?? 0 }} 条 · 第 {{ productionBatch?.lifecyclePage.value ?? 1 }} / {{ lifecyclePageCount }} 页</p><p v-else>原计划时间、操作人和实际执行时间随命令保存</p></header>
+      <header><div><span>生命周期记录</span><h2>生命周期记录</h2></div><p v-if="!isMockApi">共 {{ productionBatch?.lifecycleTotal.value ?? 0 }} 条 · 第 {{ productionBatch?.lifecyclePage.value ?? 1 }} / {{ lifecyclePageCount }} 页</p><p v-else>原计划时间、操作人和实际执行时间随命令保存</p></header>
       <p v-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'loading'" class="admin-empty-copy">正在读取生命周期记录…</p>
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value === 'empty'" class="admin-empty-copy">当前批次暂无生命周期记录。</p>
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value !== 'success'" class="admin-save-message admin-save-message--error" role="alert">{{ lifecycleStateMessage(productionBatch?.lifecycleStatus.value) }}</p>
@@ -671,9 +686,9 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
           <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>变更前摘要</th><th>变更后摘要</th><th>实际时间</th><th>原因</th><th><span class="sr-only">详情</span></th></tr></thead>
           <tbody>
             <tr v-for="record in productionBatch?.lifecycleEvents.value ?? []" :key="record.id">
-              <td><strong>{{ lifecycleActionLabel(record.action) }}</strong><small>{{ record.action }}</small></td>
+              <td><strong>{{ lifecycleActionLabel(record.action) }}</strong></td>
               <td>{{ record.actorDisplayName }}</td>
-              <td><span class="admin-lifecycle-target">{{ record.target.type }} · {{ record.target.id }}</span><button type="button" class="admin-inline-copy" @click="copyLifecycleTarget(record.target.id)">复制 ID</button></td>
+              <td><span class="admin-lifecycle-target">{{ lifecycleTargetLabel(record.target.type) }}</span></td>
               <td>{{ lifecycleSnapshotSummary(record.before) }}</td>
               <td>{{ lifecycleSnapshotSummary(record.after) }}</td>
               <td>{{ auditTimestamp(record.createdAt) }}</td>
@@ -682,7 +697,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
             </tr>
           </tbody>
         </table>
-        <p v-if="lifecycleCopyMessage" class="admin-inline-note" role="status">{{ lifecycleCopyMessage }}</p>
+        <p v-if="lifecycleCopyMessage && lifecycleCopyMessage !== '批次标识已复制'" class="admin-inline-note" role="status">{{ lifecycleCopyMessage }}</p>
       </div>
       <p v-else-if="auditRecords.length === 0" class="admin-empty-copy">当前批次尚无生命周期审计记录</p>
       <div v-else class="admin-table-scroll"><table aria-label="批次生命周期审计"><thead><tr><th>操作</th><th>操作人</th><th>状态变化</th><th>原计划开始</th><th>实际时间</th><th>原因</th></tr></thead><tbody><tr v-for="record in auditRecords" :key="auditText(record, 'id')"><td>{{ auditActionLabel(auditText(record, 'action')) }}</td><td>{{ auditText(record, 'actorName', 'actor') }}</td><td>{{ auditStatusLabel(auditText(record, 'beforeStatus', 'before')) }} → {{ auditStatusLabel(auditText(record, 'afterStatus', 'after')) }}</td><td>{{ auditTimestamp(auditText(record, 'originalStartAt')) }}</td><td>{{ auditTimestamp(auditText(record, 'actualAt', 'createdAt')) }}</td><td>{{ auditText(record, 'reason') === 'create recruitment batch' ? '创建招新批次' : auditText(record, 'reason') }}</td></tr></tbody></table></div>
@@ -697,7 +712,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <div v-if="pendingAction" class="admin-modal-backdrop">
       <section role="alertdialog" aria-modal="true" aria-labelledby="batch-action-confirm-title">
-        <span>Recruitment Lifecycle</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction.action) }}？</h2>
+        <span>批次生命周期</span><h2 id="batch-action-confirm-title">确认{{ actionLabel(pendingAction.action) }}？</h2>
         <p>该操作会改变当前批次的用户报名入口。操作人、原计划时间、实际执行时间和前后状态会写入生命周期记录。</p>
         <label v-if="pendingAction.action !== 'pause' && pendingAction.action !== 'close'">操作原因（可选）<textarea v-model="reason" rows="3" maxlength="500" placeholder="填写本次批次状态变更原因"></textarea></label>
         <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
@@ -707,12 +722,12 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <div v-if="selectedLifecycleEvent" class="admin-drawer-backdrop" @click.self="closeLifecycleDetails">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="生命周期详情">
-        <header class="admin-drawer__header"><div><span>LIFECYCLE DETAIL</span><h2>{{ lifecycleActionLabel(selectedLifecycleEvent.action) }}</h2><p>{{ auditTimestamp(selectedLifecycleEvent.createdAt) }} · {{ selectedLifecycleEvent.actorDisplayName }}</p></div><button type="button" aria-label="关闭生命周期详情" @click="closeLifecycleDetails">×</button></header>
+        <header class="admin-drawer__header"><div><span>生命周期详情</span><h2>{{ lifecycleActionLabel(selectedLifecycleEvent.action) }}</h2><p>{{ auditTimestamp(selectedLifecycleEvent.createdAt) }} · {{ selectedLifecycleEvent.actorDisplayName }}</p></div><button type="button" aria-label="关闭生命周期详情" @click="closeLifecycleDetails">×</button></header>
         <div class="admin-drawer__body">
-          <section><header><span>01</span><h3>目标</h3></header><dl class="admin-detail-grid"><div><dt>类型</dt><dd>{{ selectedLifecycleEvent.target.type }}</dd></div><div><dt>ID</dt><dd class="admin-breakable-id">{{ selectedLifecycleEvent.target.id }}</dd></div><div v-if="selectedLifecycleEvent.reason"><dt>原因</dt><dd>{{ selectedLifecycleEvent.reason }}</dd></div></dl><button type="button" class="button button--ghost" @click="copyLifecycleTarget(selectedLifecycleEvent.target.id)">复制目标 ID</button></section>
+          <section><header><span>01</span><h3>目标</h3></header><dl class="admin-detail-grid"><div><dt>类型</dt><dd>{{ lifecycleTargetLabel(selectedLifecycleEvent.target.type) }}</dd></div><div v-if="selectedLifecycleEvent.reason"><dt>原因</dt><dd>{{ selectedLifecycleEvent.reason }}</dd></div></dl></section>
           <section><header><span>02</span><h3>变更前</h3></header><dl class="admin-detail-grid"><div v-for="entry in lifecycleSnapshotEntriesForEvent(selectedLifecycleEvent.before)" :key="entry.key"><dt>{{ entry.label }}</dt><dd class="admin-breakable-id">{{ entry.value }}</dd></div><div v-if="!selectedLifecycleEvent.before"><dd>—</dd></div></dl></section>
           <section><header><span>03</span><h3>变更后</h3></header><dl class="admin-detail-grid"><div v-for="entry in lifecycleSnapshotEntriesForEvent(selectedLifecycleEvent.after)" :key="entry.key"><dt>{{ entry.label }}</dt><dd class="admin-breakable-id">{{ entry.value }}</dd></div><div v-if="!selectedLifecycleEvent.after"><dd>—</dd></div></dl></section>
-          <p v-if="lifecycleCopyMessage" class="admin-save-message" role="status">{{ lifecycleCopyMessage }}</p>
+          <p v-if="lifecycleCopyMessage && lifecycleCopyMessage !== '批次标识已复制'" class="admin-inline-note" role="status">{{ lifecycleCopyMessage }}</p>
         </div>
         <footer class="admin-drawer__footer"><button type="button" class="button" @click="closeLifecycleDetails">关闭</button></footer>
       </aside>
@@ -720,7 +735,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="编辑招新批次">
-        <header class="admin-drawer__header"><div><span>Edit Recruitment Cycle</span><h2>编辑招新批次</h2><p>仅草稿可以编辑，保存后需要重新完成发布准备检查。</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
+        <header class="admin-drawer__header"><div><span>编辑批次</span><h2>编辑招新批次</h2><p>仅草稿可以编辑，保存后需要重新完成发布准备检查。</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
         <div class="admin-drawer__body">
           <div class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
           <section class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
@@ -732,7 +747,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
   </div>
   <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
-      eyebrow="Recruitment Batch Context"
+      eyebrow="招新批次"
       :title="!isMockApi && productionBatch?.loading.value ? '正在读取批次…' : !isMockApi && productionBatch?.error.value ? '批次读取失败' : '批次不存在'"
       :description="!isMockApi && productionBatch?.error.value ? productionBatch.error.value : '请从招新批次列表重新进入。'"
     >

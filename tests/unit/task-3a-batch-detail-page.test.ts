@@ -8,6 +8,7 @@ import {
   useRecruitmentBatchStore,
 } from "../../app/stores/recruitment-batch";
 import { useSessionStore } from "../../app/stores/session";
+import { useAdminToast } from "../../app/composables/useAdminToast";
 
 const routeState = reactive({
   params: { batchId: "batch-api-only" },
@@ -419,7 +420,7 @@ describe("Task 3A production batch detail page", () => {
     const confirm = wrapper.findAll("button").find((button) => button.text() === "确认归档批次");
     await confirm!.trigger("click");
     await flushPromises();
-    expect(wrapper.get('[role="status"]').text()).toContain("归档批次已完成");
+    expect(useAdminToast().toast.value?.message).toContain("归档批次已完成");
 
     routeState.params.batchId = "batch-b";
     routeState.path = "/admin/recruitment/batches/batch-b";
@@ -428,6 +429,6 @@ describe("Task 3A production batch detail page", () => {
     await nextTick();
 
     expect(wrapper.get("h1").text()).toBe("API B 已关闭批次");
-    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+    expect(useAdminToast().toast.value).toBeNull();
   });
 });

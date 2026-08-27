@@ -142,10 +142,9 @@ test("real OWNER detail renders canonical lifecycle data and recursively exclude
 
   await expect(page.getByRole("heading", { name: "真实终态招新批次" })).toBeVisible();
   const audit = page.getByRole("region", { name: "生命周期记录" });
-  await expect(audit).toContainText("recruitment.batch.archived");
   await expect(audit).toContainText("归档批次");
   await expect(audit).toContainText("API 归档负责人");
-  await expect(audit).toContainText("RecruitmentBatch · batch-real-closed");
+  await expect(audit).toContainText("招新批次");
   await expect(audit).toContainText("结果复核完成");
   await expect(audit).toContainText("CLOSED");
   await expect(audit).toContainText("ARCHIVED");
@@ -190,13 +189,13 @@ test("real lifecycle pagination requests page two and replaces page-one events",
 
   await page.goto("/admin/recruitment/batches/batch-real-closed");
   const audit = page.getByRole("region", { name: "生命周期记录" });
-  await expect(audit).toContainText("recruitment.batch.archived");
+  await expect(audit).toContainText("归档批次");
 
   await audit.getByRole("button", { name: "2", exact: true }).click();
 
-  await expect(audit).toContainText("recruitment.batch.closed");
+  await expect(audit).toContainText("提前关闭");
   await expect(audit).toContainText("第二页关闭记录");
-  await expect(audit).not.toContainText("recruitment.batch.archived");
+  await expect(audit).not.toContainText("归档批次");
   expect(lifecycleRequests).toEqual(["?page=1&pageSize=50", "?page=2&pageSize=50"]);
 });
 
@@ -276,10 +275,10 @@ test("real OWNER archive posts the current version with CSRF, maps the response,
   await dialog.getByLabel("操作原因（可选）").fill("结果复核完成");
   await dialog.getByRole("button", { name: "确认归档批次" }).click();
 
-  await expect(page.getByRole("status")).toContainText("归档批次已完成");
+  await expect(page.getByTestId("admin-toast")).toContainText("归档批次已完成");
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("已归档");
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("v10");
-  await expect(page.getByRole("region", { name: "生命周期记录" })).toContainText("recruitment.batch.archived");
+  await expect(page.getByRole("region", { name: "生命周期记录" })).toContainText("归档批次");
   expect(lifecycleReads).toBe(2);
   expect(archiveRequest).toMatchObject({
     method: "POST",
@@ -310,7 +309,7 @@ test("real archive confirms success without claiming a failed lifecycle refresh"
   await page.getByRole("button", { name: "归档批次" }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "确认归档批次" }).click();
 
-  const success = page.getByRole("status");
+  const success = page.getByTestId("admin-toast");
   await expect(success).toContainText("归档批次已完成");
   await expect(success).not.toContainText("状态和生命周期记录已刷新");
   await expect(page.getByRole("region", { name: "批次概览" })).toContainText("已归档");
@@ -331,7 +330,7 @@ test("real ADMIN cannot start archive and a server 403 never produces success", 
 
   await expect(page.getByRole("button", { name: "归档批次" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toContainText("当前账号无权读取该批次的生命周期记录。");
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.getByTestId("admin-toast")).toHaveCount(0);
 });
 
 test("real MEMBER receives the admin 403 view and can never submit archive", async ({ page }) => {
@@ -352,7 +351,7 @@ test("real MEMBER receives the admin 403 view and can never submit archive", asy
 
   await expect(page.getByRole("heading", { level: 1, name: "当前账号没有此项管理权限" })).toBeVisible();
   await expect(page.getByRole("button", { name: /归档批次/ })).toHaveCount(0);
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.getByTestId("admin-toast")).toHaveCount(0);
   expect(adminRequests).toBe(0);
   expect(archivePosts).toBe(0);
 });
@@ -382,7 +381,7 @@ for (const status of [403, 422] as const) {
     await expect(dialog.getByRole("alert")).toContainText(status === 403 ? "只有 OWNER 可以归档。" : "结果尚未就绪，不能归档。");
     await expect(page.getByRole("region", { name: "批次概览" })).toContainText("已关闭");
     await expect(page.getByRole("region", { name: "批次概览" })).toContainText("v9");
-    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(page.getByTestId("admin-toast")).toHaveCount(0);
   });
 }
 
@@ -423,7 +422,7 @@ test("real archive keeps reason and confirmation context across 409 refresh, the
   expect(archiveBodies[0]).toEqual({ expectedVersion: 9, confirmed: true, reason: "保留这段原因" });
 
   await dialog.getByRole("button", { name: "确认归档批次" }).click();
-  await expect(page.getByRole("status")).toContainText("归档批次已完成");
+  await expect(page.getByTestId("admin-toast")).toContainText("归档批次已完成");
   expect(archiveBodies[1]).toEqual({ expectedVersion: 10, confirmed: true, reason: "保留这段原因" });
 });
 

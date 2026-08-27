@@ -14,6 +14,7 @@ import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { isContentMediaAttachmentComplete } from "~/utils/content-media";
+import { useAdminToast } from "~/composables/useAdminToast";
 import ContentMediaUploader from "~/components/admin/ContentMediaUploader.vue";
 import ContentMediaView from "~/components/ContentMediaView.vue";
 import { resolvePortalTabKey, type PortalConfigView } from "~/utils/portal-tabs";
@@ -25,6 +26,7 @@ const route = useRoute();
 const router = useRouter();
 const configStore = usePortalConfigStore();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 const contentGateway = useContentGateway();
 const runtimeConfig = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const projectsStore = useProjectsStore();
@@ -153,6 +155,7 @@ async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]
     }
     errorMessage.value = "";
     statusMessage.value = "更改已保存到门户草稿，公开页面未受影响。";
+    adminToast.success(statusMessage.value);
   } catch (error) {
     errorMessage.value = portalErrorMessage(error);
     statusMessage.value = "";
@@ -214,6 +217,7 @@ async function publishConfiguration() {
     closeDialog("publish");
     errorMessage.value = "";
     statusMessage.value = "门户配置已整份发布，用户端现在读取新版本。";
+    adminToast.success(statusMessage.value);
   } catch (error) {
     closeDialog("publish");
     errorMessage.value = portalErrorMessage(error);

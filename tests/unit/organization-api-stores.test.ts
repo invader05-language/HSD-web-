@@ -89,6 +89,43 @@ describe("organization production Pinia gateways", () => {
     localStorage.clear();
   });
 
+  it("keeps a successfully loaded member list when centers fail independently", async () => {
+    const store = useMemberAdministrationStore();
+    store.activateApiMode();
+    const organization = gateway({
+      listCenters: vi.fn(async () => { throw Object.assign(new Error("center service unavailable"), { code: "CENTER_API_DOWN" }); }),
+    });
+
+    const result = await store.refreshFromApi(organization);
+
+    expect(result).toBe(false);
+    expect(store.apiManagedMembers).toHaveLength(1);
+    expect(store.apiManagedMembers[0]?.studentId).toBe("2026001001");
+    expect(store.apiCenters).toEqual([]);
+    expect(store.apiError).toMatchObject({ code: "CENTER_API_DOWN" });
+    expect(store.apiLoading).toBe(false);
+  });
+
+  it("ignores stale refresh responses so an older request cannot overwrite newer data", async () => {
+    const store = useMemberAdministrationStore();
+    store.activateApiMode();
+    let resolveFirst: ((value: { items: typeof managedMember[] }) => void) | undefined;
+    const firstMembers = new Promise<{ items: typeof managedMember[] }>((resolve) => { resolveFirst = resolve; });
+    const organization = gateway({
+      listManagedMembers: vi.fn()
+        .mockReturnValueOnce(firstMembers)
+        .mockResolvedValue({ items: [{ ...managedMember, studentId: "2026001002" }] }),
+    });
+
+    const first = store.refreshFromApi(organization);
+    const second = store.refreshFromApi(organization);
+    await second;
+    resolveFirst?.({ items: [{ ...managedMember, studentId: "2026001001" }] });
+    await first;
+
+    expect(store.apiManagedMembers[0]?.studentId).toBe("2026001002");
+  });
+
   it("loads authoritative members and updates membership core level with the server version", async () => {
     const organization = gateway();
     const store = useMemberAdministrationStore();

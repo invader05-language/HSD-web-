@@ -8,11 +8,13 @@ import { isContentMediaAttachmentComplete } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import ContentMediaView from "~/components/ContentMediaView.vue";
 import type { ContentMediaAttachment } from "~/types/content-media";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{ record?: PortalContentRecord; initialKind?: PortalContentKind }>();
 const emit = defineEmits<{ saved: [id: string] }>();
 const content = usePortalContentStore();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 const kind = ref<PortalContentKind>(props.record?.kind ?? props.initialKind ?? "article");
 const title = ref(props.record?.title ?? "");
 const summary = ref(props.record?.summary ?? "");
@@ -76,6 +78,7 @@ function saveDraft() {
       ? content.updateDraft(props.record.id, buildInput())
       : content.createDraft(buildInput());
     notice.value = "草稿已保存。";
+    adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
     error.value = caught instanceof Error && caught.message === "PORTAL_CONTENT_DUPLICATE_SLUG"
@@ -92,6 +95,7 @@ function submitForReview() {
   try {
     content.submitForReview(props.record.id);
     notice.value = "已提交审核。";
+    adminToast.success(notice.value);
   } catch {
     error.value = "当前内容无法提交审核。";
   }
@@ -109,6 +113,7 @@ function completeAction(action: "return" | "approve" | "publish" | "unpublish") 
     notice.value = action === "return"
       ? "已退回草稿。"
       : action === "approve" ? "审核通过，内容进入待发布。" : action === "publish" ? "已发布到官网。" : "内容已下架。";
+    adminToast.success(notice.value);
   } catch (caught) {
     error.value = caught instanceof Error && caught.message === "PORTAL_CONTENT_PERMISSION_REQUIRED"
       ? "只有联盟总负责人可以执行此操作。"

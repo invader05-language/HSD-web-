@@ -7378,6 +7378,65 @@ label small:not(:empty),
   color: #9e1b26;
 }
 
+.admin-toast-viewport {
+  position: fixed;
+  z-index: 1000;
+  top: 76px;
+  right: 24px;
+  width: min(420px, calc(100vw - 48px));
+  pointer-events: none;
+}
+
+.admin-toast {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #cfe4d7;
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: #eef7f1;
+  box-shadow: 0 12px 28px rgb(31 38 44 / 14%);
+  color: #2f7450;
+  font-size: 11px;
+  line-height: 1.5;
+  pointer-events: auto;
+}
+
+.admin-toast--warning {
+  border-color: #ecd8bc;
+  background: #fff7ed;
+  color: #8b541d;
+}
+
+.admin-toast--error {
+  border-color: #ebc7ca;
+  background: #fff1f2;
+  color: #9e1b26;
+}
+
+.admin-toast button {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.admin-toast-enter-active,
+.admin-toast-leave-active {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.admin-toast-enter-from,
+.admin-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .admin-batch-context-summary {
   display: grid;
   grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(120px, 1fr));
@@ -7789,6 +7848,17 @@ label small:not(:empty),
 .admin-publication-list article > div {
   display: grid;
   gap: 3px;
+}
+
+.admin-publication-list article > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-publication-list article > span strong {
+  color: #24282d;
+  font-size: 12px;
 }
 
 .admin-publication-list article > small {
@@ -8603,17 +8673,14 @@ label small:not(:empty),
   background: #faf7f7;
 }
 
-.admin-table-scroll td:first-child {
-  display: grid;
-  align-content: center;
-}
-
 .admin-table-scroll td:first-child strong {
+  display: block;
   color: #24282d;
   font-size: 12px;
 }
 
 .admin-table-scroll td:first-child small {
+  display: block;
   color: #989da3;
   font-family: Consolas, monospace;
   font-size: 9px;

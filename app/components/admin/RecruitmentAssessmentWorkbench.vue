@@ -15,6 +15,7 @@ import { getEffectiveRecruitmentBatchStatus } from "~/utils/recruitment-batch-ru
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { getRecruitmentAssessmentMessage } from "~/utils/recruitment-assessment-messages";
 import { matchesAssessmentStage, type AssessmentStageFilter } from "~/utils/recruitment-assessment-filters";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
@@ -28,6 +29,7 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const route = useRoute();
 const recruitmentGateway = useRecruitmentGateway();
+const adminToast = useAdminToast();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 
 const mockBatch = computed(() => recruitmentGateway ? undefined : batchStore.getBatch(props.batchId));
@@ -375,6 +377,7 @@ async function confirmSave() {
     saveMessage.value = recruitmentGateway
       ? "结果已保存到服务器，尚未对成员发布。"
       : "结果已保存到当前批次的内部状态，尚未对成员发布。";
+    adminToast.success(saveMessage.value);
     selectedCandidateId.value = undefined;
   } catch (error) {
     showSaveConfirmation.value = false;
@@ -401,6 +404,7 @@ async function confirmAdvance() {
     showAdvanceConfirmation.value = false;
     saveError.value = "";
     saveMessage.value = "全局考核轮次已更新，已保存的上一轮结果保持锁定。";
+    adminToast.success(saveMessage.value);
   } catch (error) {
     showAdvanceConfirmation.value = false;
     saveError.value = errorText(error, "无法推进轮次");
@@ -470,7 +474,6 @@ async function confirmAdvance() {
 
         <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
         <p v-else-if="apiError" class="admin-save-message" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
-        <p v-if="saveMessage" class="admin-save-message" role="status">{{ saveMessage }}</p>
         <div class="admin-table-scroll" tabindex="0" aria-label="预备成员名单表格区域">
           <table aria-label="预备成员名单">
             <thead><tr><th>成员</th><th>第一志愿</th><th>白泽方向</th><th>当前阶段</th><th>处理状态</th><th>当前结果</th><th>调剂</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead>
@@ -499,7 +502,7 @@ async function confirmAdvance() {
           <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明" :disabled="!selectedCandidate.currentPhase || selectedCandidate.processingStatus !== 'assessing'"></textarea></label></section>
         </div>
-        <footer class="admin-drawer__footer"><span aria-live="polite">{{ saveMessage }}</span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canSaveSelectedCandidate || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
+        <footer class="admin-drawer__footer"><span aria-live="polite"></span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canSaveSelectedCandidate || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
         <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
       </aside>
     </div>

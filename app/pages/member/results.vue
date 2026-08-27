@@ -217,7 +217,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
           <div class="member-results-grid">
             <article class="member-result-card">
               <header class="member-result-card__header">
-                <span>Admission Result · 当前有效结果</span>
+                <span>录取结果</span>
                 <strong class="member-result-status member-result-status--success">{{ admission.badge }}</strong>
               </header>
 
@@ -292,7 +292,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
           <div class="member-results-grid">
             <article class="member-result-card">
               <header class="member-result-card__header">
-                <span>Assessment Status · 当前阶段</span>
+                <span>考核进度</span>
                 <strong class="member-result-status member-result-status--pending">{{ assessment.badge }}</strong>
               </header>
 

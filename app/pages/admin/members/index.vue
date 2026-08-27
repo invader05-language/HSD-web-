@@ -9,7 +9,6 @@ import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { hasOrganizationPosition, organizationMemberLabel } from "~/utils/organization-member-display";
 import {
   BAIZE_DIRECTIONS,
-  DEFAULT_FORMAL_MEMBER_PASSWORD,
   MEMBER_DUTIES,
   RECRUITMENT_CENTERS,
   type CreateFormalMemberErrors,
@@ -185,7 +184,7 @@ onBeforeUnmount(() => {
           <form class="admin-drawer__body" novalidate @submit.prevent="submitCreateMember">
             <section>
               <header><span>01</span><h3>帐号与身份</h3></header>
-              <p class="admin-inline-note">身份固定为“正式成员”。登录帐号使用学号，初始密码为 {{ DEFAULT_FORMAL_MEMBER_PASSWORD }}，首次登录必须修改密码。</p>
+              <p class="admin-inline-note">身份固定为“正式成员”。登录帐号使用学号，系统会安全生成初始密码，首次登录必须修改密码。</p>
               <div class="admin-form-grid">
                 <label>姓名<input v-model="createMember.name" type="text" autocomplete="off" :aria-invalid="Boolean(createErrors.name)"><small v-if="createErrors.name" class="member-profile-error">{{ createErrors.name }}</small></label>
                 <label>学号 / 登录帐号<input v-model="createMember.studentId" type="text" inputmode="numeric" autocomplete="off" :aria-invalid="Boolean(createErrors.studentId)"><small v-if="createErrors.studentId" class="member-profile-error">{{ createErrors.studentId }}</small></label>

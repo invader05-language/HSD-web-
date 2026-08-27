@@ -4,6 +4,7 @@ import { useResourceGateway } from "~/composables/useResourceGateway";
 import { createAdminResourceListController, type AdminResourceAccess, type AdminResourceAvailability, type AdminResourceFormat, type AdminResourceKind, type AdminResourceStatus } from "~/services/resources/admin-resource-list";
 import { createAdminResourceDetailController } from "~/services/resources/admin-resource-detail";
 import { useSessionStore } from "~/stores/session";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "学习资料｜HSD 管理台" });
@@ -11,6 +12,7 @@ const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const useMockApi = runtime.public.useMockApi;
 const gateway = useResourceGateway();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 const mockSelected = ref<(typeof ADMIN_RESOURCES)[number] | null>(null);
 const realList = !useMockApi && gateway ? createAdminResourceListController(gateway) : undefined;
 const realDetail = !useMockApi && gateway ? createAdminResourceDetailController(gateway) : undefined;
@@ -33,28 +35,28 @@ async function createRealResource() {
   resetMutationState(); mutationBusy.value = true;
   try {
     await gateway.create({ expectedVersion: 0, ...createForm });
-    showCreate.value = false; mutationMessage.value = "资料草稿已创建。"; await realList?.load();
+     showCreate.value = false; mutationMessage.value = "资料草稿已创建。"; adminToast.success(mutationMessage.value); await realList?.load();
   } catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料创建失败。"; }
   finally { mutationBusy.value = false; }
 }
 async function appendRealVersion() {
   const record = realDetail?.resource.value; if (!gateway || !record) return;
   resetMutationState(); mutationBusy.value = true;
-  try { await gateway.appendVersion(record.id, { expectedVersion: record.version, ...versionForm }); versionForm.versionLabel = ""; versionForm.content = ""; mutationMessage.value = "新版本已保存。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+   try { await gateway.appendVersion(record.id, { expectedVersion: record.version, ...versionForm }); versionForm.versionLabel = ""; versionForm.content = ""; mutationMessage.value = "新版本已保存。"; adminToast.success(mutationMessage.value); await Promise.all([realDetail?.load(record.id), realList?.load()]); }
   catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "追加版本失败。"; }
   finally { mutationBusy.value = false; }
 }
 async function publishRealResource() {
   const record = realDetail?.resource.value; if (!gateway || !record) return;
   resetMutationState(); mutationBusy.value = true;
-  try { await gateway.publish(record.id, { expectedVersion: record.version }); mutationMessage.value = "资料已发布。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+   try { await gateway.publish(record.id, { expectedVersion: record.version }); mutationMessage.value = "资料已发布。"; adminToast.success(mutationMessage.value); await Promise.all([realDetail?.load(record.id), realList?.load()]); }
   catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料发布失败。"; }
   finally { mutationBusy.value = false; }
 }
 async function offlineRealResource() {
   const record = realDetail?.resource.value; if (!gateway || !record || !offlineReason.value.trim()) return;
   resetMutationState(); mutationBusy.value = true;
-  try { await gateway.offline(record.id, { expectedVersion: record.version, reason: offlineReason.value.trim() }); offlineReason.value = ""; mutationMessage.value = "资料已下架。"; await Promise.all([realDetail?.load(record.id), realList?.load()]); }
+   try { await gateway.offline(record.id, { expectedVersion: record.version, reason: offlineReason.value.trim() }); offlineReason.value = ""; mutationMessage.value = "资料已下架。"; adminToast.success(mutationMessage.value); await Promise.all([realDetail?.load(record.id), realList?.load()]); }
   catch (cause) { mutationError.value = cause instanceof Error ? cause.message : "资料下架失败。"; }
   finally { mutationBusy.value = false; }
 }
@@ -62,13 +64,13 @@ async function offlineRealResource() {
 
 <template>
   <div v-if="useMockApi" class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Learning Resources" title="学习资料" description="本地 Mock 资料演示。"><template #actions><button type="button" class="button">上传学习资料</button></template></AdminPageHeading>
+     <AdminPageHeading eyebrow="学习资料" title="学习资料" description="本地演示资料。"><template #actions><button type="button" class="button">上传学习资料</button></template></AdminPageHeading>
     <section class="admin-list-card"><header><div><span>Resource Management</span><h2>学习资料管理列表</h2></div><p>Mock 演示数据</p></header><div class="admin-table-scroll"><table aria-label="学习资料管理列表"><thead><tr><th>资料</th><th>分类</th><th>格式</th><th>访问范围</th><th>状态</th><th>下载记录</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="resource in ADMIN_RESOURCES" :key="resource.id"><td><strong>{{ resource.title }}</strong><small>{{ resource.description }}</small></td><td>{{ resource.category }}</td><td>{{ resource.format }}</td><td>{{ getResourceAccessLabel(resource.access) }}</td><td><AdminStatusPill :status="resource.status" /></td><td>{{ resource.downloads }}</td><td><button type="button" :aria-label="`编辑资源 ${resource.title}`" @click="mockSelected = resource">查看 / 编辑</button></td></tr></tbody></table></div></section>
     <Teleport to="body"><div v-if="mockSelected" class="admin-drawer-backdrop" @click.self="mockSelected = null"><aside class="admin-candidate-drawer" aria-label="学习资料编辑器"><header class="admin-drawer__header"><div><span>RESOURCE EDITOR</span><h2>{{ mockSelected.title }}</h2><p>{{ mockSelected.format }} · {{ getResourceAccessLabel(mockSelected.access) }}</p></div><button type="button" aria-label="关闭资源编辑器" @click="mockSelected = null">×</button></header><div class="admin-drawer__body"><p>{{ mockSelected.description }}</p><section><header><span>02</span><h3>版本历史</h3></header><div class="admin-version-list"><article v-for="version in mockSelected.versions" :key="version.version"><span>{{ version.version }}</span><div><strong>{{ version.fileName }}</strong><small>{{ version.size }} · {{ version.uploadedAt }} · {{ version.owner }}</small></div></article></div></section><p class="admin-inline-note">病毒扫描与 Office 转换将在后端接入；PDF 在线预览、临时签名下载地址和访问日志也属于文件服务范围。</p></div><footer class="admin-drawer__footer"><span>本页仅维护前端 Mock 数据</span><button type="button" class="button">保存资源</button></footer></aside></div></Teleport>
   </div>
 
   <div v-else class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Learning Resources" title="学习资料" description="服务端分页读取资料详情、版本、访问范围与可用状态。"><template #actions><button v-if="isOwner" type="button" class="button" @click="showCreate = true">新建资料</button></template></AdminPageHeading>
+     <AdminPageHeading eyebrow="学习资料" title="学习资料" description="分页读取资料详情、版本、访问范围与可用状态。"><template #actions><button v-if="isOwner" type="button" class="button" @click="showCreate = true">新建资料</button></template></AdminPageHeading>
     <p v-if="mutationMessage" class="admin-save-message" role="status">{{ mutationMessage }}</p><p v-if="mutationError" class="admin-save-message" role="alert">{{ mutationError }}</p>
     <section class="admin-summary-strip" aria-label="资料概览"><div><span>匹配资料</span><strong>{{ total }}</strong><small>服务端查询结果</small></div><div><span>当前页</span><strong>{{ rows.length }}</strong><small>仅 API 返回项目</small></div><div><span>页码</span><strong>{{ page }}</strong><small>共 {{ pageCount }} 页</small></div><div><span>读取模式</span><strong>API</strong><small>不使用本地资料缓存</small></div></section>
     <section class="admin-list-card"><header><div><span>Resource Management</span><h2>学习资料管理列表</h2></div><p>数据仅来自服务端分页查询</p></header><div class="admin-filters"><label>搜索资料<input v-model="query" type="search" placeholder="标题或摘要"></label><label>发布状态<select v-model="status"><option value="">全部状态</option><option value="draft">草稿</option><option value="published">已发布</option><option value="offline">已下架</option></select></label><label>资料类型<select v-model="kind"><option value="">全部类型</option><option value="article">文章</option><option value="pdf">PDF</option><option value="docx">DOCX</option><option value="archive">归档包</option><option value="external">外部链接</option></select></label><label>格式<select v-model="format"><option value="">全部格式</option><option value="web">网页</option><option value="pdf">PDF</option><option value="docx">DOCX</option><option value="zip">ZIP</option><option value="external">外部链接</option></select></label><label>访问范围<select v-model="access"><option value="">全部范围</option><option value="public">公开访问</option><option value="member">登录成员</option></select></label><label>可用状态<select v-model="availability"><option value="">全部可用状态</option><option value="available">可用</option><option value="unavailable">暂不可用</option></select></label><label v-if="isOwner">中心 ID<input v-model="centerId" type="search" placeholder="可选中心 ID"></label></div>

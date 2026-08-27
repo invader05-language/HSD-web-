@@ -10,6 +10,7 @@ import type { ContentMediaAttachment } from "~/types/content-media";
 import { PROJECT_CATEGORY_LABELS, type ManagedProject, type ProjectCategory, type ProjectDraftInput, type ProjectMember } from "~/types/project";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { ADMIN_MEMBERS } from "~/data/admin-members";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{
   project?: ManagedProject;
@@ -37,6 +38,7 @@ const projectsStore = useProjectsStore();
 const gateway = useContentGateway();
 const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 function defaultOwnerCenterId() {
   if (session.currentAccount?.adminCenterId) return session.currentAccount.adminCenterId;
   if (gateway) return "";
@@ -216,6 +218,7 @@ async function saveDraft() {
   try {
     const saved = await persistDraft();
     notice.value = "项目草稿已保存，用户端仍保持原公开版本。";
+    adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `保存失败：${caught.message}` : "保存失败。";
@@ -232,6 +235,7 @@ async function publishProject() {
     if (gateway) await projectsStore.publishFromApi(gateway, saved.id);
     else projectsStore.publish(saved.id);
     notice.value = "项目已发布，用户端将显示最新公开快照。";
+    adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
@@ -247,6 +251,7 @@ async function offlineProject() {
     if (gateway) await projectsStore.offlineFromApi(gateway, props.project.id, "管理员下线");
     else projectsStore.unpublish(props.project.id, "管理员下线");
     notice.value = "项目已下线，公开页面不再显示该项目。";
+    adminToast.success(notice.value);
     emit("offline", props.project.id);
   } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
   finally { isOfflining.value = false; }
@@ -256,12 +261,11 @@ async function offlineProject() {
 <template>
   <section class="admin-list-card admin-project-editor" aria-label="项目编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "Draft Editor" : "Project Editor" }}</span><h2>{{ mode === "create" ? "新建项目" : "编辑项目" }}</h2></div>
+      <div><span>{{ mode === "create" ? "新建项目" : "项目编辑" }}</span><h2>{{ mode === "create" ? "新建项目" : "编辑项目" }}</h2></div>
       <p>保存草稿不会改变用户端；确认发布后才会替换公开快照。</p>
     </header>
     <div class="admin-project-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
-      <p v-else-if="notice" class="admin-save-message" role="status">{{ notice }}</p>
       <div class="admin-editor-grid">
         <label>标题<input v-model="form.title" type="text"></label>
         <label>分类<select v-model="form.category"><option v-for="[code, label] in CATEGORY_OPTIONS" :key="code" :value="code">{{ label }}</option></select></label>

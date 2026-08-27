@@ -129,7 +129,7 @@ function exportRecruitmentCsv() {
   <NuxtPage v-if="route.params.id" />
   <div v-else-if="useMockApi" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
-      eyebrow="Batch Applications"
+      eyebrow="报名管理"
       :title="`${batch?.name ?? '未知批次'} · 报名人员`"
       :description="batch ? `报名时间：${formatRecruitmentBatchPeriod(batch)}` : '批次不存在，无法读取报名名单。'"
     >
@@ -141,7 +141,7 @@ function exportRecruitmentCsv() {
 
     <section class="admin-list-card">
       <header>
-        <div><span>Application Roster</span><h2>{{ batch?.name ?? "批次不存在" }}报名</h2></div>
+        <div><span>报名名单</span><h2>{{ batch?.name ?? "批次不存在" }}报名</h2></div>
         <p>共 {{ visible.length }} 人 · 当前批次</p>
       </header>
       <div class="admin-filters">
@@ -181,7 +181,7 @@ function exportRecruitmentCsv() {
       </template>
     </AdminPageHeading>
     <section class="admin-list-card">
-      <header><div><span>Application Roster</span><h2>{{ apiBatch?.name ?? "报名名单" }}</h2></div><p>服务端分页 · 共 {{ apiTotal }} 人</p></header>
+      <header><div><span>报名名单</span><h2>{{ apiBatch?.name ?? "报名名单" }}</h2></div><p>共 {{ apiTotal }} 人</p></header>
       <div class="admin-filters">
         <label>搜索报名人<input v-model="query" type="search" placeholder="姓名或学号"></label>
         <label>排序<select v-model="sort"><option value="submittedAt.desc">最新提交</option><option value="submittedAt.asc">最早提交</option></select></label>

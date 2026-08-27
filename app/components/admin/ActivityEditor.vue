@@ -9,6 +9,7 @@ import type { ActivityDraftInput, ManagedActivity } from "~/types/activity";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{
   activity?: ManagedActivity;
@@ -27,6 +28,7 @@ const activitiesStore = useActivitiesStore();
 const gateway = useContentGateway();
 const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 
 const CENTER_OPTIONS = [
   { id: "baize-development", label: "白泽开发中心" },
@@ -184,6 +186,7 @@ async function saveDraft() {
   try {
     const saved = await persistDraft();
     notice.value = "草稿已保存。发布前的编辑不会影响用户端。";
+    adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
     notice.value = "";
@@ -203,6 +206,7 @@ async function publishActivity() {
     if (gateway) await activitiesStore.publishFromApi(gateway, saved.id);
     else activitiesStore.publish(saved.id);
     notice.value = "活动已发布，用户端将显示最新公开快照。";
+    adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
@@ -218,6 +222,7 @@ async function offlineActivity() {
     if (gateway) await activitiesStore.offlineFromApi(gateway, props.activity.id, "管理员下线");
     else activitiesStore.unpublish(props.activity.id, "管理员下线");
     notice.value = "活动已下线，报名已关闭。";
+    adminToast.success(notice.value);
     emit("offline", props.activity.id);
   } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
   finally { isOfflining.value = false; }
@@ -227,12 +232,11 @@ async function offlineActivity() {
 <template>
   <section class="admin-list-card admin-activity-editor" aria-label="活动编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "Draft Editor" : "Activity Editor" }}</span><h2>{{ mode === "create" ? "新建活动" : "编辑活动" }}</h2></div>
+      <div><span>{{ mode === "create" ? "新建活动" : "活动编辑" }}</span><h2>{{ mode === "create" ? "新建活动" : "编辑活动" }}</h2></div>
       <p>保存草稿不会改变用户端；确认发布后才会替换公开快照。</p>
     </header>
     <div class="admin-activity-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
-      <p v-else-if="notice" class="admin-save-message" role="status">{{ notice }}</p>
       <div class="admin-editor-grid">
         <label>标题<input v-model="form.title" type="text" autocomplete="off"></label>
         <label>分类<select v-model="form.type"><option v-for="option in ACTIVITY_TYPE_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
