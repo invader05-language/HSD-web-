@@ -1,11 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import BatchDetailPage from "../../app/pages/admin/recruitment/batches/[batchId].vue";
 import RecruitmentAssessmentWorkbench from "../../app/components/admin/RecruitmentAssessmentWorkbench.vue";
+import RecruitmentPublicationWorkbench from "../../app/components/admin/RecruitmentPublicationWorkbench.vue";
 import { createProductionRecruitmentBatchController } from "../../app/composables/useProductionRecruitmentBatch";
 import { useSessionStore } from "../../app/stores/session";
+import { getRecruitmentAssessmentMessage } from "../../app/utils/recruitment-assessment-messages";
+
+const root = resolve(__dirname, "../..");
+const read = (file: string) => readFileSync(resolve(root, file), "utf8");
 
 const routeState = reactive({
   params: { batchId: "batch-p0" },
@@ -179,6 +186,36 @@ describe("Task 2 recruitment P0 regressions", () => {
     expect(wrapper.text()).not.toContain("batchId：");
     expect(wrapper.text()).not.toContain("真实后端接入后");
     expect(wrapper.text()).not.toContain("负责人建议后由总负责人确认");
+    expect(wrapper.text()).not.toContain("GROUP BY FIRST CHOICE");
+    expect(wrapper.find(".admin-assessment-workflow-summary").exists()).toBe(false);
+    expect(wrapper.find(".admin-sync-preview").exists()).toBe(false);
+  });
+
+  it("maps final adjustment API errors to business-facing Chinese messages", () => {
+    expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_NOT_ALLOWED" })).toContain("不符合最终调剂条件");
+    expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_TARGET_FORBIDDEN" })).toContain("不能将成员调剂至该中心");
+    expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_DECISION_ALREADY_EXISTS" })).toContain("已经存在最终处理结果");
+    expect(getRecruitmentAssessmentMessage({ code: "OWNER_PERMISSION_REQUIRED" })).toContain("无权提交最终调剂结果");
+  });
+
+  it("keeps publication workbench copy business-facing and avoids exposing raw API errors", () => {
+    const source = read("app/components/admin/RecruitmentPublicationWorkbench.vue");
+
+    expect(source).toContain("整批发布复核");
+    expect(source).toContain("结果发布确认");
+    expect(source).not.toContain("Publication Review");
+    expect(source).not.toContain("Publish Recruitment Results");
+    expect(source).not.toContain("服务器请求失败（{{ apiError }}）");
+    expect(source).not.toMatch(/reason instanceof Error \? `(?:加载|发布)失败（\$\{reason\.message\}）`/);
+    expect(source).toContain("getRecruitmentAssessmentMessage");
+    expect(RecruitmentPublicationWorkbench).toBeDefined();
+  });
+
+  it("keeps the mobile assessment selector rule syntactically valid after removing retired copy", () => {
+    const css = read("app/assets/css/main.css");
+
+    expect(css).toMatch(/\.admin-preference-list,\s*\.admin-rounds\s*\{[^}]*grid-template-columns:\s*1fr/s);
+    expect(css).not.toMatch(/\.admin-rounds,\s*\.admin-drawer__footer\s*>\s*span\s*\{/s);
   });
 
   it("does not render a reason textarea for pause confirmation and keeps confirmation enabled", async () => {
