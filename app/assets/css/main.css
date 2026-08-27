@@ -4727,7 +4727,14 @@ label small:not(:empty),
 .member-space__content {
   width: auto !important;
   max-width: none !important;
+  min-width: 0;
+  margin: 0;
   padding-block: 0 !important;
+}
+
+.member-space--subpage > .member-space__content {
+  justify-self: stretch;
+  margin: 0;
 }
 
 .member-space__content > .shell {
@@ -4917,7 +4924,7 @@ label small:not(:empty),
 .member-record-status { color: var(--brand-red); font-size: 13px; font-weight: 700; }
 .member-record-consent { display: inline-flex !important; grid-template-columns: auto 1fr !important; align-items: center; color: var(--muted) !important; font-size: 13px; font-weight: 400 !important; }
 
-.member-space > main {
+.member-space:not(.member-space--subpage) > main {
   width: min(calc(100% - 64px), var(--content-width));
   margin: 0 auto;
   padding-block: 72px;
@@ -6237,7 +6244,7 @@ label small:not(:empty),
     margin-top: 54px;
   }
 
-  .member-space > main {
+  .member-space:not(.member-space--subpage) > main {
     width: min(calc(100% - 32px), var(--content-width));
     padding-block: 52px;
   }
@@ -8890,54 +8897,6 @@ body.is-admin-drawer-open {
   line-height: 1.6;
 }
 
-.admin-drawer__body .admin-sync-preview {
-  margin-top: 24px;
-  border: 1px solid #dce5df;
-  border-radius: 5px;
-  padding: 17px 18px;
-  background: #f1f7f3;
-}
-
-.admin-sync-preview > strong {
-  color: #2b6545;
-  font-size: 11px;
-}
-
-.admin-sync-preview ul {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin: 11px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.admin-sync-preview li {
-  position: relative;
-  padding-left: 14px;
-  color: #4e6b5b;
-  font-size: 10px;
-}
-
-.admin-sync-preview li::before {
-  position: absolute;
-  top: 0.75em;
-  left: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #439064;
-  content: "";
-  transform: translateY(-50%);
-}
-
-.admin-sync-preview p {
-  margin: 0;
-  color: #7d9687;
-  font-size: 9px;
-  line-height: 1.55;
-}
-
 .admin-drawer__footer {
   display: flex;
   min-height: 76px;
@@ -11175,8 +11134,7 @@ body.is-admin-drawer-open {
   }
 
   .admin-preference-list,
-  .admin-rounds,
-  .admin-sync-preview ul {
+  .admin-rounds {
     grid-template-columns: 1fr;
   }
 

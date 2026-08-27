@@ -24,11 +24,20 @@ describe("Task 3 member space layout and grade compatibility", () => {
 
     expect(css).not.toContain("1050px");
     expect(css).toContain(".member-space__content > .shell");
-    expect(css).toContain(".member-space > main");
+    expect(css).toContain(".member-space:not(.member-space--subpage) > main");
     expect(css).toContain(".member-profile-main");
     expect(css).toMatch(/\.member-space__content > \.shell\s*\{[^}]*var\(--content-width\)/s);
-    expect(css).toMatch(/\.member-space > main\s*\{[^}]*var\(--content-width\)/s);
+    expect(css).toMatch(/\.member-space:not\(\.member-space--subpage\) > main\s*\{[^}]*var\(--content-width\)/s);
     expect(css).toMatch(/\.member-profile-main\s*\{[^}]*var\(--content-width\)/s);
+  });
+
+  it("keeps subpage content from inheriting the overview auto-margin width rule", () => {
+    const css = read("app/assets/css/main.css");
+
+    expect(css).toContain(".member-space:not(.member-space--subpage) > main");
+    expect(css).toMatch(/\.member-space--subpage\s*>\s*\.member-space__content\s*\{[^}]*justify-self:\s*stretch/s);
+    expect(css).toMatch(/\.member-space--subpage\s*>\s*\.member-space__content\s*\{[^}]*margin:\s*0/s);
+    expect(css).not.toMatch(/\.member-space\s*>\s*main\s*\{/s);
   });
 
   it("keeps MemberSpaceNav styles self-contained, including the aligned sign-out action", () => {

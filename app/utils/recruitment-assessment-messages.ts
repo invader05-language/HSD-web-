@@ -21,14 +21,21 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
       return "当前轮仍有未完成的考核结果，请先完成当前轮。";
     case "ASSESSMENT_ADJUSTMENT_PENDING":
       return "仍有待调剂事项，请先完成调剂处理。";
+    case "ADJUSTMENT_NOT_ALLOWED":
+      return "当前成员不符合最终调剂条件。";
+    case "ADJUSTMENT_TARGET_FORBIDDEN":
+      return "不能将成员调剂至该中心。";
+    case "ADJUSTMENT_DECISION_ALREADY_EXISTS":
+      return "当前成员已经存在最终处理结果。";
     case "ASSESSMENT_NOT_EDITABLE":
       return "当前考核状态不允许修改。";
     case "ASSESSMENT_VERSION_CONFLICT":
     case "RECRUITMENT_ASSESSMENT_VERSION_CONFLICT":
       return "考核版本已变化，请刷新后重新确认。";
     case "OWNER_ONLY":
+    case "OWNER_PERMISSION_REQUIRED":
     case "FORBIDDEN":
-      return "当前账号没有执行该考核操作的权限。";
+      return code === "OWNER_PERMISSION_REQUIRED" ? "当前账号无权提交最终调剂结果。" : "当前账号没有执行该考核操作的权限。";
     case "ASSESSMENT_ADJUSTMENT_OWNER_ONLY":
       return "调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。";
     case "RECRUITMENT_BATCH_NOT_FOUND":
