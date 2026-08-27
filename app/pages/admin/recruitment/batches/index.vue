@@ -18,6 +18,7 @@ import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { mapAdminRecruitmentBatch, type AdminRecruitmentBatchView } from "~/services/recruitment/recruitment-view-models";
 import type { CreateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "招新批次｜HSD 管理台" });
@@ -36,6 +37,7 @@ const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMock
 const isMockApi = runtimeConfig.public.useMockApi;
 const recruitmentGateway = useRecruitmentGateway();
 const organizationGateway = useOrganizationGateway();
+const adminToast = useAdminToast();
 const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
 const session = useSessionStore();
 const now = useRecruitmentNow();
@@ -181,6 +183,7 @@ async function saveDraft() {
     showCreate.value = false;
     createError.value = "";
     createMessage.value = "招新批次已保存为草稿，可进入批次继续复核并发布。";
+    adminToast.success(createMessage.value);
   } catch (error) {
     createError.value = getRecruitmentBatchCommandMessage(error);
   } finally {
@@ -195,7 +198,7 @@ watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
 <template>
   <div class="admin-recruitment-page admin-section-page">
     <AdminPageHeading
-      eyebrow="Recruitment Cycles"
+      eyebrow="招新管理"
       title="招新批次"
       description="统一管理报名时间、开放中心和批次状态；关闭后的历史批次继续保留只读记录。"
     >
@@ -209,7 +212,6 @@ watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
     <p v-else-if="productionError" class="admin-save-message" role="alert">{{ productionError }} <button type="button" class="admin-text-action" @click="loadProductionBatches">重新读取</button></p>
     <p v-if="productionCenterLoading" class="admin-save-message" role="status">正在读取开放中心…</p>
     <p v-else-if="productionCenterError" class="admin-save-message" role="alert">{{ productionCenterError }} <button type="button" class="admin-text-action" @click="loadProductionBatches">重新读取</button></p>
-    <p v-if="createMessage" class="admin-save-message" role="status">{{ createMessage }}</p>
 
     <section class="admin-summary-strip" aria-label="批次概览">
       <div><span>开放批次</span><strong>{{ String(openBatchCount).padStart(2, "0") }}</strong><small v-if="isMockApi">全站同一时间最多一个</small></div>
@@ -220,13 +222,13 @@ watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
 
     <section class="admin-list-card">
       <header>
-        <div><span>Recruitment Batch List</span><h2>全部招新批次</h2></div>
+        <div><span>批次列表</span><h2>全部招新批次</h2></div>
         <p>共 {{ isMockApi ? visibleBatches.length : productionTotal }} 个批次</p>
       </header>
       <div v-if="!productionLoading" class="admin-batch-list">
         <p v-if="!visibleBatches.length" class="admin-empty-state">当前生产数据库暂无招新批次。</p>
         <article v-for="batch in visibleBatches" :key="batch.id">
-          <div class="admin-batch-list__index">{{ batch.statusKey === "open" ? "OPEN" : batch.id.slice(0, 4) }}</div>
+          <div class="admin-batch-list__index">{{ batch.statusKey === "open" ? "进行中" : "批次" }}</div>
           <div>
             <AdminStatusPill :status="batch.statusLabel" />
             <h3>{{ batch.name }}</h3>
@@ -248,7 +250,7 @@ watch(productionPage, () => { if (!isMockApi) void loadProductionBatches(); });
     <div v-if="showCreate && session.canManageAdminAccounts" class="admin-drawer-backdrop" @click.self="showCreate = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="新建招新批次">
         <header class="admin-drawer__header">
-          <div><span>New Recruitment Cycle</span><h2>新建招新批次</h2><p>保存后形成草稿，报名统一使用用户端当前招新表单。</p></div>
+          <div><span>新建批次</span><h2>新建招新批次</h2><p>保存后形成草稿，报名统一使用用户端当前招新表单。</p></div>
           <button type="button" aria-label="关闭新建批次" @click="showCreate = false">×</button>
         </header>
         <div class="admin-drawer__body">

@@ -114,6 +114,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
   const apiErrorState = ref<OrganizationStoreError | null>(null);
   const apiManagedMembers = ref<ManagedMemberResponseDto[]>([]);
   const apiCenters = ref<AdminCenterResponseDto[]>([]);
+  let refreshRequestSequence = 0;
   const apiAdminMembers = computed<AdminMember[]>(() => apiManagedMembers.value.map((member) => {
     const isCore = member.membership?.duty === "CORE";
     const center = (member.membership?.center.name ?? "未分配中心") as AdminCenter;
@@ -144,22 +145,30 @@ export const useMemberAdministrationStore = defineStore("member-administration",
   }
 
   async function refreshFromApi(gateway: OrganizationGateway): Promise<boolean> {
+    const requestSequence = ++refreshRequestSequence;
     apiLoading.value = true;
     apiErrorState.value = null;
-    try {
-      const [members, centers] = await Promise.all([
-        gateway.listManagedMembers(),
-        gateway.listCenters(),
-      ]);
-      apiManagedMembers.value = members.items;
-      apiCenters.value = centers.items;
-      return true;
-    } catch (cause) {
-      apiErrorState.value = apiError(cause);
-      return false;
-    } finally {
-      apiLoading.value = false;
+    const [membersResult, centersResult] = await Promise.allSettled([
+      gateway.listManagedMembers(),
+      gateway.listCenters(),
+    ]);
+    if (requestSequence !== refreshRequestSequence) return false;
+
+    let succeeded = true;
+    if (membersResult.status === "fulfilled") {
+      apiManagedMembers.value = membersResult.value.items;
+    } else {
+      succeeded = false;
+      apiErrorState.value = apiError(membersResult.reason);
     }
+    if (centersResult.status === "fulfilled") {
+      apiCenters.value = centersResult.value.items;
+    } else if (succeeded) {
+      succeeded = false;
+      apiErrorState.value = apiError(centersResult.reason);
+    }
+    apiLoading.value = false;
+    return succeeded;
   }
 
   async function createFormalMemberFromApi(

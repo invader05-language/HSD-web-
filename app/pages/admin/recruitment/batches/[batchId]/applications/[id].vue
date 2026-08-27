@@ -61,7 +61,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
       <template #actions><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${batchId}/applications`">返回{{ batch?.name ?? "批次" }}报名人员</NuxtLink></template>
     </AdminPageHeading>
     <section class="admin-list-card">
-      <header><div><span>Submitted Information</span><h2>报名资料</h2></div><p>{{ formatRecruitmentApplicationSubmittedAt(application) }} 提交 · {{ batchId }}</p></header>
+      <header><div><span>报名资料</span><h2>报名资料</h2></div><p>{{ formatRecruitmentApplicationSubmittedAt(application) }} 提交</p></header>
       <div class="admin-detail-form"><div class="admin-form-grid">
         <label>姓名<input :value="application.name" readonly></label>
         <label>学号<input :value="application.studentId" readonly></label>
@@ -88,7 +88,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
       <template #actions><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
     <section class="admin-list-card">
-      <header><div><span>Submitted Information</span><h2>报名资料</h2></div><p>{{ formatAdminApplicationSubmittedAt(apiApplication.submittedAt) }} 提交 · {{ apiApplication.batchId }}</p></header>
+      <header><div><span>报名资料</span><h2>报名资料</h2></div><p>{{ formatAdminApplicationSubmittedAt(apiApplication.submittedAt) }} 提交</p></header>
       <div class="admin-detail-form"><div class="admin-form-grid">
         <label>姓名<input :value="apiApplication.name" readonly></label><label>学号<input :value="apiApplication.studentId" readonly></label><label>年级<input :value="apiApplication.grade" readonly></label><label>班级<input :value="apiApplication.className" readonly></label><label>联系方式<input :value="apiApplication.contact" readonly></label>
         <label>第一志愿<input :value="apiApplication.preferences[0] || '—'" readonly></label><label>第二志愿<input :value="apiApplication.preferences[1] || '—'" readonly></label><label>第三志愿<input :value="apiApplication.preferences[2] || '—'" readonly></label><label>白泽方向<input :value="apiApplication.baizeDirection || '—'" readonly></label><label>是否接受调剂<input :value="apiApplication.acceptsAdjustment ? '接受' : '不接受'" readonly></label><label>状态<input :value="apiApplication.status" readonly></label>

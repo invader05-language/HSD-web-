@@ -4,6 +4,7 @@ import { useContentGateway } from "~/composables/useContentGateway";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import { formatActivityRegistrationNotice } from "~/utils/activity-registration-notice";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "活动管理｜HSD 管理台" });
@@ -12,6 +13,7 @@ const activitiesStore = useActivitiesStore();
 const gateway = useContentGateway();
 if (gateway) activitiesStore.activateApiMode();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 const route = useRoute();
 if (import.meta.client && !gateway) activitiesStore.hydrate();
 onMounted(() => { if (gateway) void activitiesStore.refreshFromApi(gateway); });
@@ -35,6 +37,7 @@ function toggleRegistration(activity: typeof activitiesStore.activities[number])
       ? await activitiesStore.setRegistrationOpenFromApi(gateway, activity.id, !activity.registrationOpen)
       : activitiesStore.setRegistrationOpen(activity.id, !activity.registrationOpen);
     activityActionNotice.value = formatActivityRegistrationNotice(saved.registrationOpen);
+    adminToast.success(activityActionNotice.value);
   } catch (caught) {
     activityActionNotice.value = caught instanceof Error ? `操作失败：${caught.message}` : "操作失败。";
   }
@@ -53,7 +56,7 @@ function openRegistration(activityId: string) {
   <div v-else class="admin-recruitment-page admin-section-page">
     <p v-if="activitiesStore.apiError" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
     <p v-if="activitiesStore.apiLoading" role="status">正在加载活动…</p>
-    <AdminPageHeading eyebrow="Activities" title="活动管理" description="编辑活动草稿，直接发布到用户端，并处理报名的录取或不录取结果。活动不设候补和人数上限。">
+    <AdminPageHeading eyebrow="活动管理" title="活动管理" description="编辑活动草稿，直接发布到用户端，并处理报名的录取或不录取结果。活动不设候补和人数上限。">
       <template #actions>
         <NuxtLink class="button button--ghost" to="/admin/activities/registrations">报名名单</NuxtLink>
         <NuxtLink class="button" to="/admin/activities/new">新建活动</NuxtLink>
@@ -69,10 +72,9 @@ function openRegistration(activityId: string) {
 
     <section class="admin-list-card" aria-labelledby="activity-registration-control-title">
       <header>
-        <div><span>Activity Workspace</span><h2 id="activity-registration-control-title">活动发布与报名状态</h2></div>
+        <div><span>活动工作区</span><h2 id="activity-registration-control-title">活动发布与报名状态</h2></div>
         <p>中心负责人仅能管理本中心活动，联盟总负责人可管理全部活动。</p>
       </header>
-      <p v-if="activityActionNotice" role="status">{{ activityActionNotice }}</p>
       <div class="admin-table-scroll">
         <table aria-label="活动发布与报名状态">
           <thead><tr><th>活动</th><th>发布状态</th><th>报名截止</th><th>报名</th><th><span class="sr-only">操作</span></th></tr></thead>

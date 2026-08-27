@@ -10,6 +10,7 @@ import { GALLERY_CATEGORY_CODES, galleryCategoryLabel, normalizeGalleryCategory,
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
+import { useAdminToast } from "~/composables/useAdminToast";
 
 const props = defineProps<{
   album?: ManagedGalleryAlbum;
@@ -36,6 +37,7 @@ const galleryStore = useGalleryStore();
 const gateway = useContentGateway();
 const organizationGateway = useOrganizationGateway();
 const session = useSessionStore();
+const adminToast = useAdminToast();
 
 function defaultOwnerCenterId() {
   if (session.currentAccount?.adminCenterId) return session.currentAccount.adminCenterId;
@@ -270,6 +272,7 @@ async function saveDraft() {
     await persistMediaMetadata();
     const saved = await persistDraft();
     notice.value = "画廊草稿已保存，用户端仍保持原公开版本。";
+    adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `保存失败：${caught.message}` : "保存失败。";
@@ -287,6 +290,7 @@ async function publishGallery() {
     if (gateway) await galleryStore.publishFromApi(gateway, saved.id);
     else galleryStore.publish(saved.id);
     notice.value = "画廊专题已发布，用户端将渲染最新公开快照。";
+    adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
@@ -303,6 +307,7 @@ async function offlineGallery() {
     if (gateway) await galleryStore.offlineFromApi(gateway, props.album.id, "管理员下线");
     else galleryStore.unpublish(props.album.id, "管理员下线");
     notice.value = "画廊专题已下线，公开页面不再显示该专题。";
+    adminToast.success(notice.value);
     emit("offline", props.album.id);
   } catch (caught) {
     formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。";
@@ -315,12 +320,11 @@ async function offlineGallery() {
 <template>
   <section class="admin-list-card admin-gallery-editor" aria-label="画廊编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "Draft Editor" : "Gallery Editor" }}</span><h2>{{ mode === "create" ? "新建画廊专题" : "编辑画廊专题" }}</h2></div>
+      <div><span>{{ mode === "create" ? "新建专题" : "专题编辑" }}</span><h2>{{ mode === "create" ? "新建画廊专题" : "编辑画廊专题" }}</h2></div>
       <p>封面和详情素材分开保存；封面不计入详情素材 20 张上限，保存草稿不会改变用户端。</p>
     </header>
     <div class="admin-gallery-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
-      <p v-else-if="notice" class="admin-save-message" role="status">{{ notice }}</p>
       <div class="admin-editor-grid">
         <label>标题<input v-model="form.title" type="text"></label>
         <label>分类<select v-model="form.category"><option v-for="option in CATEGORY_OPTIONS" :key="option" :value="option">{{ galleryCategoryLabel(option) }}</option></select></label>
