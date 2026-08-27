@@ -241,8 +241,9 @@ const canSaveSelectedCandidate = computed(() => {
   const candidate = selectedCandidate.value;
   if (!candidate || !canEdit(candidate)) return false;
   return selectedRounds.value.some(isRoundEditable)
-    || (candidate.processingStatus === "adjustment-suggestion-pending"
-      && Boolean(isOwner.value ? adjustmentDecision.value : adjustmentSuggestion.value));
+    || (isOwner.value
+      && candidate.processingStatus === "adjustment-suggestion-pending"
+      && Boolean(adjustmentDecision.value));
 });
 
 function resetDrafts() {
@@ -298,13 +299,16 @@ function requestSave() {
     return;
   }
   if (candidate.processingStatus === "adjustment-suggestion-pending"
-    && (isOwner.value ? adjustmentDecision.value : adjustmentSuggestion.value)) {
+    && isOwner.value
+    && adjustmentDecision.value) {
     showSaveConfirmation.value = true;
     return;
   }
   saveError.value = isOwner.value
     ? "请先为当前可编辑考核轮次选择通过或不通过，或确认最终调剂结果。"
-    : "请先为当前可编辑考核轮次选择通过或不通过，或提交调剂建议。";
+    : candidate.processingStatus === "adjustment-suggestion-pending"
+      ? "调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。"
+      : "请先为当前可编辑考核轮次选择通过或不通过。";
 }
 
 function errorText(error: unknown, fallback: string) {
@@ -360,27 +364,8 @@ async function confirmSave() {
             now: new Date(),
           });
         }
-      } else if (!isOwner.value && adjustmentSuggestion.value) {
-        if (recruitmentGateway) {
-          const targetCenterId = adjustmentSuggestion.value;
-          if (!targetCenterId || !assessmentStore.getApiAdjustmentTarget(props.batchId, targetCenterId)) {
-            throw new Error("ASSESSMENT_TARGET_CENTER_UNAVAILABLE");
-          }
-          await assessmentStore.recordAdjustmentSuggestionFromApi(recruitmentGateway, {
-            batchId: props.batchId,
-            candidateId: candidate.candidateId,
-            targetCenterId,
-          });
-        } else {
-          assessmentStore.recordAdjustmentSuggestion({
-            batchId: props.batchId,
-            candidateId: candidate.candidateId,
-            suggestedCenter: adjustmentSuggestion.value as AdjustmentDestination,
-            now: new Date(),
-          });
-        }
       } else {
-        throw new Error("ASSESSMENT_DRAFT_INCOMPLETE");
+        throw new Error("ASSESSMENT_ADJUSTMENT_OWNER_ONLY");
       }
     } else {
       throw new Error("ASSESSMENT_DRAFT_INCOMPLETE");
@@ -389,7 +374,7 @@ async function confirmSave() {
     saveError.value = "";
     saveMessage.value = recruitmentGateway
       ? "结果已保存到服务器，尚未对成员发布。"
-      : "结果已保存到当前批次的内部 Mock 状态，尚未对成员发布。";
+      : "结果已保存到当前批次的内部状态，尚未对成员发布。";
     selectedCandidateId.value = undefined;
   } catch (error) {
     showSaveConfirmation.value = false;
@@ -427,14 +412,13 @@ async function confirmAdvance() {
   <div class="admin-recruitment-page">
     <section class="admin-page-heading">
       <div>
-        <p class="eyebrow">Batch Assessment</p>
+        <p class="eyebrow">招新考核</p>
         <h1>{{ batch?.name ?? "未知批次" }} · 预备成员考核</h1>
-        <p class="admin-page-heading__intro">考核范围限定为当前 batchId：{{ batchId }}。内部保存不会提前公开结果或改变成员身份。</p>
+        <p class="admin-page-heading__intro">当前批次的考核结果仅在完成整批发布后向成员公开。</p>
       </div>
       <div class="admin-batch-card">
         <span>当前批次</span>
         <strong>{{ batch?.name ?? batchId }}</strong>
-        <small>batchId：{{ batchId }}</small>
         <small>批次生命周期：{{ effectiveBatchStatusLabel }}</small>
         <small>全局当前轮次：{{ currentRoundLabel }}</small>
         <small>考核状态：{{ state.status === "assessing" ? "考核中" : state.status === "ready-to-publish" ? "等待发布" : "已发布" }}</small>
@@ -442,7 +426,7 @@ async function confirmAdvance() {
     </section>
     <div class="admin-publication-warning" role="status">
       <strong>{{ effectiveBatchStatusLabel }}</strong>
-      <p v-if="effectiveBatchStatus === 'server-validated'">候选人、批次生命周期、轮次和版本来自服务器；推进和发布条件由服务器再次校验。</p>
+      <p v-if="effectiveBatchStatus === 'server-validated'">批次名单与考核轮次已同步，提交操作时会再次校验当前状态。</p>
       <p v-else-if="effectiveBatchStatus === 'closed'">当前批次已关闭，候选人结果可继续录入；完成本轮后可推进全局考核或进入整批发布。</p>
       <p v-else-if="effectiveBatchStatus === 'open' || effectiveBatchStatus === 'paused'">可继续录入已有候选人的当前轮次结果；首次保存会锁定该报名。关闭报名后才能推进全局轮次或发布整批结果。</p>
       <p v-else>当前批次不可录入考核结果，请先完成批次发布或恢复可处理状态。</p>
@@ -450,15 +434,15 @@ async function confirmAdvance() {
 
     <section v-if="recruitmentGateway && batch" class="admin-assessment-workflow-summary" aria-label="批次生命周期与考核摘要">
       <div><span>批次</span><strong>{{ batch.name }}</strong><small>{{ batch.lifecycleStatus === "closed" ? "已关闭，可按规则推进" : "关闭报名后才可推进" }}</small></div>
-      <div><span>下一步</span><strong>{{ apiWorkflowSummary?.nextAction === "PUBLISH_BATCH" ? "发布批次" : apiWorkflowSummary?.nextAction === "OPEN_BATCH" ? "立即开放" : apiWorkflowSummary?.nextAction === "CLOSE_BATCH" ? "关闭报名" : apiWorkflowSummary?.nextAction === "RECORD_CURRENT_ROUND_RESULTS" ? "完成当前轮" : apiWorkflowSummary?.nextAction === "SUBMIT_ADJUSTMENT_PROPOSALS" ? "提交调剂建议" : apiWorkflowSummary?.nextAction === "DECIDE_ADJUSTMENTS" ? "处理调剂" : apiWorkflowSummary?.nextAction === "ADVANCE_ROUND" ? "推进轮次" : apiWorkflowSummary?.nextAction === "PUBLISH_RESULTS" ? "发布结果" : apiWorkflowSummary?.nextAction === "NONE" ? "已完成" : "等待服务器确认" }}</strong><small>{{ advanceDisabledReason || "当前可执行推进" }}</small></div>
+      <div><span>下一步</span><strong>{{ apiWorkflowSummary?.nextAction === "PUBLISH_BATCH" ? "发布批次" : apiWorkflowSummary?.nextAction === "OPEN_BATCH" ? "立即开放" : apiWorkflowSummary?.nextAction === "CLOSE_BATCH" ? "关闭报名" : apiWorkflowSummary?.nextAction === "RECORD_CURRENT_ROUND_RESULTS" ? "完成当前轮" : apiWorkflowSummary?.nextAction === "DECIDE_ADJUSTMENTS" ? "处理调剂" : apiWorkflowSummary?.nextAction === "ADVANCE_ROUND" ? "推进轮次" : apiWorkflowSummary?.nextAction === "PUBLISH_RESULTS" ? "发布结果" : apiWorkflowSummary?.nextAction === "NONE" ? "已完成" : "等待服务器确认" }}</strong><small>{{ advanceDisabledReason || "当前可执行推进" }}</small></div>
       <div><span>服务器待办</span><strong>{{ apiWorkflowSummary?.pending ?? actionableCandidates.filter((candidate) => candidate.processingStatus === "assessing").length }}</strong><small>当前轮未完成</small></div>
       <div><span>待调剂</span><strong>{{ apiWorkflowSummary?.adjustmentPending ?? candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>等待最终处理</small></div>
     </section>
 
     <section class="admin-summary-strip" aria-label="批次考核概览">
-      <div><span>本批次人员</span><strong>{{ allCandidates.length }}</strong><small>{{ batchId }}</small></div>
+      <div><span>本批次人员</span><strong>{{ allCandidates.length }}</strong><small>当前批次</small></div>
       <div><span>当前轮待处理</span><strong>{{ candidates.filter((candidate) => candidate.currentPhase === currentRoundLabel).length }}</strong><small>{{ currentRoundLabel }}</small></div>
-      <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>负责人建议后由总负责人确认</small></div>
+      <div><span>待调剂处理</span><strong>{{ candidates.filter((candidate) => candidate.processingStatus === "adjustment-suggestion-pending").length }}</strong><small>由联盟总负责人直接录入最终结果</small></div>
       <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 
@@ -474,7 +458,7 @@ async function confirmAdvance() {
 
       <div class="admin-roster__main">
         <header class="admin-roster__header">
-          <div><span>Candidate Roster</span><h2>预备成员名单</h2></div>
+          <div><h2>预备成员名单</h2></div>
           <div>
             <p>共 {{ filteredCandidates.length }} 人</p>
             <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy ? "处理中…" : advanceLabel }}</button>
@@ -492,7 +476,7 @@ async function confirmAdvance() {
         </div>
 
         <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
-        <p v-else-if="apiError" class="admin-save-message" role="alert">服务器请求失败（{{ apiError }}）</p>
+        <p v-else-if="apiError" class="admin-save-message" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
         <p v-if="saveMessage" class="admin-save-message" role="status">{{ saveMessage }}</p>
         <div class="admin-table-scroll" tabindex="0" aria-label="预备成员名单表格区域">
           <table aria-label="预备成员名单">
@@ -514,20 +498,20 @@ async function confirmAdvance() {
 
     <div v-if="selectedCandidate" class="admin-drawer-backdrop" @click.self="closeCandidate">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="预备成员详情" @keydown="handleDrawerKeydown">
-        <header class="admin-drawer__header"><div><span>Candidate Record</span><h2>{{ candidateName(selectedCandidate) }}</h2><p>{{ selectedCandidate.candidate?.studentId ?? selectedCandidate.memberId }} · {{ selectedCandidate.center }}</p></div><button ref="closeButton" type="button" aria-label="关闭详情" @click="closeCandidate">×</button></header>
+        <header class="admin-drawer__header"><div><h2>{{ candidateName(selectedCandidate) }}</h2><p>{{ selectedCandidate.candidate?.studentId ?? selectedCandidate.memberId }} · {{ selectedCandidate.center }}</p></div><button ref="closeButton" type="button" aria-label="关闭详情" @click="closeCandidate">×</button></header>
         <div class="admin-drawer__body">
           <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
           <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
-          <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>{{ isOwner ? '最终调剂确认' : '调剂建议' }}</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '中心负责人只提交一个非白泽建议去向；跨中心转正由联盟总负责人最终确认。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">中心负责人建议：{{ selectedCandidate.adjustmentSuggestion }}</p><label>{{ isOwner ? '最终调剂结果' : '建议去向' }}<select v-if="isOwner" v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select><select v-else v-model="adjustmentSuggestion" aria-label="建议去向"><option value="">请选择非白泽中心</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">建议调剂至{{ target.name }}</option></select></label></section>
+          <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明" :disabled="!selectedCandidate.currentPhase || selectedCandidate.processingStatus !== 'assessing'"></textarea></label></section>
-          <section class="admin-sync-preview"><strong>保存与发布边界</strong><p>保存只更新当前批次的内部考核状态；整批发布才会更新成员结果中心、正式成员关系和公开投影。真实后端接入后必须在同一事务中完成。</p></section>
+          <section class="admin-sync-preview"><strong>保存与发布</strong><p>保存只更新当前批次的内部考核状态，整批发布后成员才能查看结果。</p></section>
         </div>
         <footer class="admin-drawer__footer"><span aria-live="polite">{{ saveMessage }}</span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canSaveSelectedCandidate || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
-        <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><span>Save Internal Assessment</span><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
+        <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
       </aside>
     </div>
 
-    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><span>Advance Global Assessment</span><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>推进后，上一轮结果将保持锁定；本操作只影响 {{ batch?.name ?? batchId }}。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
+    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>推进后，上一轮结果将保持锁定；本操作只影响 {{ batch?.name ?? batchId }}。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
   </div>
 </template>

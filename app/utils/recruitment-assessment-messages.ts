@@ -29,6 +29,8 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
     case "OWNER_ONLY":
     case "FORBIDDEN":
       return "当前账号没有执行该考核操作的权限。";
+    case "ASSESSMENT_ADJUSTMENT_OWNER_ONLY":
+      return "调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。";
     case "RECRUITMENT_BATCH_NOT_FOUND":
       return "招新批次不存在，请返回批次列表后重试。";
     case "RECRUITMENT_CSRF_TOKEN_MISSING":

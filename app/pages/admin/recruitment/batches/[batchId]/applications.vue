@@ -142,7 +142,7 @@ function exportRecruitmentCsv() {
     <section class="admin-list-card">
       <header>
         <div><span>Application Roster</span><h2>{{ batch?.name ?? "批次不存在" }}报名</h2></div>
-        <p>共 {{ visible.length }} 人 · 当前 batchId：{{ batchId }}</p>
+        <p>共 {{ visible.length }} 人 · 当前批次</p>
       </header>
       <div class="admin-filters">
         <label>搜索报名人<input v-model="query" type="search" placeholder="姓名或学号"></label>
