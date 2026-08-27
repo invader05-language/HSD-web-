@@ -129,7 +129,7 @@ async function publish() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="结果发布" :title="`${batch?.name ?? '未知批次'} · 结果发布`" description="发布范围为当前批次全部候选人；内部考核保存不会提前公开。">
+    <AdminPageHeading eyebrow="结果发布" :title="`${batch?.name ?? '未知批次'} · 结果发布`" description="发布范围：当前批次全部候选人；内部考核保存不会提前公开。">
       <template #actions>
         <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
         <button type="button" class="button" :disabled="!canPublishResults || !summary.canPublish || state.status === 'published' || apiBusy" :title="canPublishResults ? (recruitmentGateway ? '服务器将校验批次状态和当前版本' : effectiveBatchStatus === 'closed' ? '需先完成全批次考核与调剂处理' : '关闭报名后才能整批发布') : '仅联盟总负责人可整批发布'" @click="showConfirmation = true">{{ apiBusy ? "处理中…" : "整批发布结果" }}</button>
