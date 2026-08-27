@@ -178,6 +178,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     expect(wrapper.text()).not.toContain("Candidate Roster");
     expect(wrapper.text()).not.toContain("batchId：");
     expect(wrapper.text()).not.toContain("真实后端接入后");
+    expect(wrapper.text()).not.toContain("负责人建议后由总负责人确认");
   });
 
   it("does not render a reason textarea for pause confirmation and keeps confirmation enabled", async () => {
