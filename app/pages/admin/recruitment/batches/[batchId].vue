@@ -27,6 +27,7 @@ import type { UpdateRecruitmentBatchDto } from "../../../../../packages/api-clie
 import { copyTextToClipboard } from "~/utils/clipboard";
 import type { RecruitmentBatchLifecycleEventView } from "~/services/recruitment/recruitment-view-models";
 import { useAdminToast } from "~/composables/useAdminToast";
+import { lifecycleChangeSummary, lifecycleSnapshotValue } from "~/utils/recruitment-lifecycle-copy";
 
 definePageMeta({ layout: "admin" });
 
@@ -178,9 +179,9 @@ const workflowItems = computed(() => [
   {
     step: "01",
     title: "报名名单",
-    description: "查看报名资料、筛选与导出",
+    description: "",
     state: !isMockApi ? "服务端名单已接入" : isArchived.value ? "已封存" : statusKey.value === "open" ? "报名收集中" : statusKey.value === "paused" ? "报名已暂停" : statusKey.value === "closed" ? "报名已结束" : "等待报名",
-    detail: !isMockApi ? `批次 API 已报告 ${applicantCount.value} 人；名单支持服务端筛选、分页与详情` : `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
+    detail: !isMockApi ? "" : `${applicantCount.value} 人${statusKey.value === "open" ? " · 报名入口已开放" : statusKey.value === "paused" ? " · 可恢复报名" : ""}`,
     count: `${applicantCount.value} 人`,
     section: "applications" as const,
     action: isArchived.value ? "查看名单" : "进入名单",
@@ -188,7 +189,7 @@ const workflowItems = computed(() => [
   {
     step: "02",
     title: "预备成员考核",
-    description: "分阶段审批、调剂与推进",
+    description: "",
     state: !isMockApi ? "服务端考核已接入" : isArchived.value ? "已完成" : actionableCandidates.value.length > 0 ? "有待处理人员" : statusKey.value === "draft" ? "批次发布后开启" : "尚未开始",
     detail: !isMockApi ? "考核台读取服务端候选人、轮次和版本，并提交真实结果" : `${actionableCandidates.value.length} 人待处理 · ${candidates.value.length} 人进入本批次`,
     count: !isMockApi ? "服务端" : `${candidates.value.length} 人`,
@@ -198,7 +199,7 @@ const workflowItems = computed(() => [
   {
     step: "03",
     title: "结果发布",
-    description: "核对名单并发布用户端结果",
+    description: "",
     state: !isMockApi ? "服务端发布已接入" : isArchived.value ? "已发布" : publicationSummary.value.canPublish ? "满足发布条件" : "等待考核完成",
     detail: !isMockApi ? "发布台读取服务端考核状态，并由服务器执行最终事务校验" : `${publicationSummary.value.ready} 人已形成结果 · ${publicationSummary.value.pending} 人待处理`,
     count: !isMockApi ? "服务端" : publicationSummary.value.total ? `${publicationSummary.value.ready}/${publicationSummary.value.total}` : "—",
@@ -413,16 +414,6 @@ function confirmAction() {
   void invokeAction(pendingAction.value);
 }
 
-function lifecycleSnapshotSummary(snapshot: Record<string, unknown> | null) {
-  if (!snapshot) return "—";
-  const status = lifecycleSnapshotValue(snapshot.lifecycleStatus);
-  const override = lifecycleSnapshotValue(snapshot.manualOverride);
-  const version = lifecycleSnapshotValue(snapshot.version);
-  return [status !== "空" ? `状态：${status}` : "", override !== "空" ? `覆盖：${override}` : "", version !== "空" ? `v${version}` : ""]
-    .filter(Boolean)
-    .join(" · ") || "已记录变更";
-}
-
 function showLifecycleDetails(record: RecruitmentBatchLifecycleEventView) {
   selectedLifecycleEvent.value = record;
   lifecycleCopyMessage.value = "";
@@ -538,13 +529,6 @@ function lifecycleSnapshotEntries(snapshot: Record<string, unknown> | null) {
   return Object.entries(lifecycleSnapshotLabels)
     .filter(([key]) => Object.hasOwn(snapshot, key))
     .map(([key, label]) => ({ key, label, value: lifecycleSnapshotValue(snapshot[key]) }));
-}
-
-function lifecycleSnapshotValue(value: unknown): string {
-  if (Array.isArray(value)) return value.map((item) => lifecycleSnapshotValue(item)).join("、") || "空列表";
-  if (value === null || value === undefined || value === "") return "空";
-  if (typeof value === "boolean") return value ? "是" : "否";
-  return String(value);
 }
 
 function lifecycleStateMessage(status: string | undefined) {
@@ -668,8 +652,8 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <nav class="admin-batch-context-nav" aria-label="当前批次工作区">
         <NuxtLink v-for="item in workflowItems" :key="item.section" :to="sectionRoute(item.section)" class="admin-batch-workflow-row">
           <span class="admin-batch-workflow-row__step">{{ item.step }}</span>
-          <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
-          <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small>{{ item.detail }}</small></span>
+          <span class="admin-batch-workflow-row__name"><strong>{{ item.title }}</strong><small v-if="item.description">{{ item.description }}</small></span>
+          <span class="admin-batch-workflow-row__state"><strong>{{ item.state }}</strong><small v-if="item.detail">{{ item.detail }}</small></span>
           <span class="admin-batch-workflow-row__count">{{ item.count }}</span>
           <span class="admin-batch-workflow-row__action">{{ item.action }} <span aria-hidden="true">→</span></span>
         </NuxtLink>
@@ -683,14 +667,13 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       <p v-else-if="!isMockApi && productionBatch?.lifecycleStatus.value !== 'success'" class="admin-save-message admin-save-message--error" role="alert">{{ lifecycleStateMessage(productionBatch?.lifecycleStatus.value) }}</p>
       <div v-else-if="!isMockApi" class="admin-table-scroll">
         <table aria-label="真实批次生命周期记录">
-          <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>变更前摘要</th><th>变更后摘要</th><th>实际时间</th><th>原因</th><th><span class="sr-only">详情</span></th></tr></thead>
+          <thead><tr><th>操作</th><th>操作人</th><th>目标</th><th>状态变化</th><th>实际时间</th><th>原因</th><th><span class="sr-only">详情</span></th></tr></thead>
           <tbody>
             <tr v-for="record in productionBatch?.lifecycleEvents.value ?? []" :key="record.id">
               <td><strong>{{ lifecycleActionLabel(record.action) }}</strong></td>
               <td>{{ record.actorDisplayName }}</td>
               <td><span class="admin-lifecycle-target">{{ lifecycleTargetLabel(record.target.type) }}</span></td>
-              <td>{{ lifecycleSnapshotSummary(record.before) }}</td>
-              <td>{{ lifecycleSnapshotSummary(record.after) }}</td>
+              <td>{{ lifecycleChangeSummary(record.before, record.after) }}</td>
               <td>{{ auditTimestamp(record.createdAt) }}</td>
               <td>{{ record.reason || "—" }}</td>
               <td><button type="button" class="admin-inline-copy" @click="showLifecycleDetails(record)">查看详情</button></td>

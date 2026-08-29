@@ -232,8 +232,7 @@ async function offlineActivity() {
 <template>
   <section class="admin-list-card admin-activity-editor" aria-label="活动编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "新建活动" : "活动编辑" }}</span><h2>{{ mode === "create" ? "新建活动" : "编辑活动" }}</h2></div>
-      <p>保存草稿不会改变用户端；确认发布后才会替换公开快照。</p>
+      <div><h2>{{ mode === "create" ? "新建活动" : "编辑活动" }}</h2></div>
     </header>
     <div class="admin-activity-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>

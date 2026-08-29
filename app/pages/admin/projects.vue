@@ -38,7 +38,7 @@ function status(project: typeof projects.value[number]) {
       <div><span>关联素材</span><strong>{{ mediaCount }}</strong><small>封面与详情素材</small></div>
     </section>
     <section class="admin-list-card" role="table" aria-label="项目管理列表">
-      <header><div><span>PROJECT WORKSPACE</span><h2>项目发布与素材状态</h2></div><p>草稿素材仅在当前编辑页可见，重新发布后才替换公开快照。</p></header>
+      <header><div><h2>项目发布与素材状态</h2></div></header>
       <div v-if="projects.length" class="admin-project-list">
         <article v-for="project in projects" :key="project.id" class="admin-project-list__item">
           <div>

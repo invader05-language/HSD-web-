@@ -231,7 +231,6 @@ onMounted(async () => {
     <Teleport to="body">
       <div v-if="qualificationDialog" class="admin-drawer-backdrop admin-modal-center" @click.self="closeAddDialog" @keydown.esc="closeAddDialog">
         <section class="admin-system-confirm admin-qualification-dialog" :class="{ 'is-owner': qualificationDialog === 'owner' }" role="dialog" aria-modal="true" :aria-label="qualificationDialog === 'owner' ? '增设联盟总负责人' : '添加管理员'">
-          <span>ADMINISTRATION ACCESS</span>
           <h2>{{ qualificationDialog === "owner" ? "增设联盟总负责人" : "添加管理员" }}</h2>
           <p>{{ qualificationDialog === "owner" ? "从平台全部用户中选择第二位联盟总负责人。负责人席位最多两人。" : "从平台全部用户中选择账号，并绑定一个中心负责人管理级别。" }}</p>
           <label class="admin-dialog-field">搜索平台用户<input v-model="candidateQuery" aria-label="搜索平台用户" type="search" placeholder="姓名、成员账号或成员编号" /></label>
@@ -255,7 +254,6 @@ onMounted(async () => {
 
       <div v-if="pendingChange" class="admin-drawer-backdrop admin-modal-center" @click.self="closeConfirmation" @keydown.esc="closeConfirmation">
         <section class="admin-system-confirm" role="alertdialog" aria-modal="true" aria-labelledby="qualification-confirm-title" aria-describedby="qualification-confirm-description">
-          <span>ADMINISTRATION ACCESS</span>
           <h2 id="qualification-confirm-title">确认{{ actionLabels[pendingChange.change] }}？</h2>
           <p id="qualification-confirm-description">你将对 {{ pendingChange.name }} 的管理资格执行此操作。变更会立即影响其后续登录、导航和路由访问。</p>
           <dl><div><dt>操作</dt><dd>{{ actionLabels[pendingChange.change] }}</dd></div><div><dt>执行人</dt><dd>{{ session.currentAccount?.name ?? "-" }}</dd></div></dl>
