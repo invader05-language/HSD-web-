@@ -32,3 +32,6 @@ Thumbs.db
 
 .vercel
 .gstack/
+
+# Local development server logs
+dev-*.log
