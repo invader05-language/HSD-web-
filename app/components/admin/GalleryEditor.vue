@@ -320,8 +320,7 @@ async function offlineGallery() {
 <template>
   <section class="admin-list-card admin-gallery-editor" aria-label="画廊编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "新建专题" : "专题编辑" }}</span><h2>{{ mode === "create" ? "新建画廊专题" : "编辑画廊专题" }}</h2></div>
-      <p>封面和详情素材分开保存；封面不计入详情素材 20 张上限，保存草稿不会改变用户端。</p>
+      <div><h2>{{ mode === "create" ? "新建画廊专题" : "编辑画廊专题" }}</h2></div>
     </header>
     <div class="admin-gallery-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>

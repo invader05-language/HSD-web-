@@ -111,7 +111,6 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown));
 <template>
   <div v-if="open" class="admin-modal-backdrop" @click.self="closeDialog">
     <section ref="dialog" role="dialog" aria-modal="true" aria-labelledby="organization-position-title" aria-describedby="organization-position-description" tabindex="-1">
-      <span>Organization Position</span>
       <h2 id="organization-position-title">任命{{ actionLabel[action] }}</h2>
       <p id="organization-position-description">确认将{{ actionLabel[action] }}授予 {{ memberName }}？任命成功后会按组织规则自动成为核心成员。</p>
 

@@ -95,7 +95,7 @@ function retryAutomationDraft(automationKey: string) {
       <div class="admin-table-scroll"><table aria-label="快讯自动化失败列表"><thead><tr><th>语义键</th><th>错误码</th><th>时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody><tr v-for="failure in unresolvedAutomationFailures" :key="failure.automationKey"><td><code>{{ failure.automationKey }}</code></td><td>{{ failure.errorCode }}</td><td>{{ failure.updatedAt.slice(0, 16).replace('T', ' ') }}</td><td><button type="button" @click="retryAutomationDraft(failure.automationKey)">按语义键重试</button></td></tr></tbody></table></div>
     </section>
     <section class="admin-list-card admin-content-list">
-      <header><div><span>Official Content</span><h2>官网内容列表</h2></div><p>{{ useMockApi ? "刷新后继续读取版本化本地 Mock 存储" : "数据仅来自服务端分页查询" }}</p></header>
+      <header><div><h2>官网内容列表</h2></div></header>
       <div class="admin-filters">
         <label>搜索内容<input v-model="query" type="search" placeholder="标题、摘要或创建人"></label>
         <label>发布状态<select v-model="status"><option value="">全部状态</option><template v-if="useMockApi"><option v-for="label in Object.values(PORTAL_CONTENT_STATUS_LABELS)" :key="label" :value="label">{{ label }}</option></template><template v-else><option v-for="option in canonicalStatuses" :key="option.value" :value="option.value">{{ option.label }}</option></template></select></label>

@@ -72,7 +72,7 @@ async function stubPositionApi(page: Page) {
     if (pathname === "/api/v1/admin/projects" && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{
         id: projectId, centerId, slug: "zhixun-xianfeng", displayOrder: 1, status: "published", version: 1, publishedAt: "2030-01-01T00:00:00.000Z",
-        title: "智巡先锋", category: "AI_APPLICATION", year: "2030", description: "项目描述", achievement: "项目成果", projectStage: "持续开发", challenge: "项目挑战", solution: "项目方案", memberPersonIds: [], coverAttachmentId: null, detailAttachmentIds: [], revisionNumber: 1,
+        title: "智巡先锋", category: "AI_APPLICATION", year: "2030", description: "项目描述", achievement: "项目成果", projectStage: "持续开发", challenge: "项目挑战", solution: "项目方案", memberPersonIds: [], memberNames: [], members: [], coverAttachmentId: null, detailAttachmentIds: [], cover: null, details: [], revisionNumber: 1,
         lead: appointed ? { personId, name: "陈同学", positionVersion: 1 } : null,
       }] }) });
       return;

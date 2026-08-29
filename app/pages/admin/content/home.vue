@@ -324,7 +324,7 @@ onBeforeUnmount(() => {
 
     <section v-else id="portal-panel-visuals" class="admin-portal-visuals" role="tabpanel" aria-labelledby="portal-tab-visuals" tabindex="0">
       <article v-for="visual in [{ id: 'home' as const, label: '官网首页', note: '首页首屏主视觉' }, { id: 'join' as const, label: '加入我们', note: '招新页面主视觉' }]" :key="visual.id">
-        <header><div><span>PREDEFINED VISUAL</span><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
+          <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
         <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
         <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
@@ -337,7 +337,7 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div v-if="showPreview" class="admin-drawer-backdrop" @click.self="closeDialog('preview')" @keydown="handleDialogKeydown($event, 'preview')">
         <aside ref="previewDialog" class="admin-candidate-drawer admin-portal-preview" role="dialog" aria-modal="true" aria-labelledby="portal-preview-title" aria-describedby="portal-preview-description">
-          <header class="admin-drawer__header"><div><span>DRAFT PREVIEW</span><h2 id="portal-preview-title">门户草稿预览</h2><p id="portal-preview-description">此视图只读取草稿版本 {{ configStore.draftConfig.revision }}，不会改变公开页面。</p></div><button ref="previewCloseButton" type="button" aria-label="关闭预览" @click="closeDialog('preview')">×</button></header>
+          <header class="admin-drawer__header"><div><h2 id="portal-preview-title">门户草稿预览</h2></div><button ref="previewCloseButton" type="button" aria-label="关闭预览" @click="closeDialog('preview')">×</button></header>
           <div class="admin-drawer__body"><section v-for="slot in HOMEPAGE_SLOTS" :key="slot.id"><header><span>{{ slot.capacity }}</span><h3>{{ slot.label }}</h3></header><ol :aria-label="`${slot.label}预览`"><li v-for="item in previewProjection.slots[slot.id]" :key="item.sourceId"><strong>{{ item.title }}</strong><small v-if="item.fallbackFor">自动补位：替代 {{ item.fallbackFor }}</small></li><li v-if="!previewProjection.slots[slot.id].length">暂无可用内容</li></ol></section></div>
         </aside>
       </div>

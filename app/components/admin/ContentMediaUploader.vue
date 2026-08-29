@@ -114,7 +114,6 @@ function moveItem(index: number, direction: -1 | 1) {
   <section class="content-media-uploader" :data-mode="mode">
     <header class="content-media-uploader__header">
       <div>
-        <p class="eyebrow">CONTENT MEDIA</p>
         <h3>{{ title }}</h3>
         <p>{{ description }}</p>
       </div>

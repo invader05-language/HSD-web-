@@ -131,11 +131,11 @@ async function moveTab(event: KeyboardEvent, current: ResultTab) {
   document.querySelector<HTMLButtonElement>(`#result-tab-${nextTab}`)?.focus();
 }
 
-async function copyContact(contact: { personId?: string; contact: string; name: string }) {
+async function copyContact(contact: { personId?: string; contact: string; name: string }, resultId: string) {
   if (copyResetTimer) window.clearTimeout(copyResetTimer);
   try {
-    const complete = recruitmentGateway && contact.personId && assessmentStore.myResults[0]
-      ? await recruitmentGateway.getMyResponsibleContact(assessmentStore.myResults[0].id, contact.personId)
+    const complete = recruitmentGateway && contact.personId
+      ? await recruitmentGateway.getMyResponsibleContact(resultId, contact.personId)
       : { contact: contact.contact };
     const succeeded = await copyTextToClipboard(complete.contact);
     copyStatus.value = { ...copyStatus.value, [contact.personId ?? contact.name]: succeeded ? "success" : "error" };
@@ -273,7 +273,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
                   <p>{{ contact.role }}</p>
                   <h3>{{ contact.name }}</h3>
                   <span>{{ contact.displayContact }}</span>
-                  <button type="button" @click="copyContact(contact)">
+                  <button type="button" @click="copyContact(contact, result.id)">
                     {{ copyStatus[contact.personId ?? contact.name] === "success" ? "已复制" : copyStatus[contact.personId ?? contact.name] === "error" ? "复制失败，请重试" : "复制联系方式" }}
                   </button>
                 </div>

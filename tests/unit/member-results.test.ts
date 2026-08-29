@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import {
@@ -14,6 +16,13 @@ import { useMemberRepository } from "../../app/composables/useMemberRepository";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 
 describe("member result presentation", () => {
+  it("uses the result card id when copying a responsible contact", () => {
+    const source = readFileSync(resolve(process.cwd(), "app/pages/member/results.vue"), "utf8");
+    expect(source).toContain("async function copyContact(contact: { personId?: string; contact: string; name: string }, resultId: string)");
+    expect(source).toContain("getMyResponsibleContact(resultId, contact.personId)");
+    expect(source).toContain('@click="copyContact(contact, result.id)"');
+  });
+
   it("keeps an opted-out formal profile out of the public directory", () => {
     setActivePinia(createPinia());
     const profiles = useMemberProfileStore();
@@ -42,6 +51,7 @@ describe("member result presentation", () => {
       ],
       publishedAt: "2026-08-07T09:00:00.000Z",
     })).toEqual({
+      id: "result-1",
       batchLabel: "2026 秋季招新",
       status: "admitted",
       identity: "正式成员",
@@ -70,6 +80,7 @@ describe("member result presentation", () => {
       publishedAt: "2026-08-07T09:00:00.000Z",
     }).acceptsTransfer).toBeUndefined();
     expect(memberResultFromApi()).toMatchObject({
+      id: "no-published-result",
       batchLabel: "暂无已发布结果",
       status: "no-application",
       currentStage: "尚未开始",
@@ -87,6 +98,7 @@ describe("member result presentation", () => {
       identity: "正式成员",
     });
     expect(memberResultFromApi(undefined, "正式成员")).toMatchObject({
+      id: "no-published-result",
       status: "no-application",
       identity: "正式成员",
     });

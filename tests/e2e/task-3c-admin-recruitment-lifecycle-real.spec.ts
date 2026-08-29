@@ -146,8 +146,8 @@ test("real OWNER detail renders canonical lifecycle data and recursively exclude
   await expect(audit).toContainText("API 归档负责人");
   await expect(audit).toContainText("招新批次");
   await expect(audit).toContainText("结果复核完成");
-  await expect(audit).toContainText("CLOSED");
-  await expect(audit).toContainText("ARCHIVED");
+  await expect(audit).toContainText("已关闭");
+  await expect(audit).toContainText("已归档");
   // Lifecycle rows intentionally render compact summaries; inspect the
   // detail drawer for the canonical nested center/account identifiers.
   await audit.getByRole("button", { name: "查看详情" }).click();

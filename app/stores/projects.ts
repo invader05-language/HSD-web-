@@ -32,7 +32,7 @@ function getStorage(): Storage | undefined {
 
 function slugify(value: string) {
   const slug = value.trim().toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
   return slug || `project-${Date.now()}`;
 }
@@ -188,7 +188,7 @@ export const useProjectsStore = defineStore("projects", {
       apiModeActive: false,
       apiLoading: false,
       apiMutating: false,
-      apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
+      apiError: null as { status?: number; code: string; message: string; requestId?: string; fieldErrors?: Record<string, string> } | null,
       persistenceError: undefined as string | undefined,
     };
   },
@@ -232,7 +232,7 @@ export const useProjectsStore = defineStore("projects", {
       const current = this.getById(projectId); if (!current) throw new Error("PROJECT_NOT_FOUND");
       this.apiMutating = true; this.apiError = null;
       try {
-        const saved = projectFromAdminApi(await gateway.projects.update(projectId, { ...projectCreatePayload(input), expectedVersion: current.version }));
+        const saved = projectFromAdminApi(await gateway.projects.update(projectId, { ...projectUpdatePayload(input), expectedVersion: current.version }));
         this.projects = this.projects.map((item) => item.id === saved.id ? saved : item);
         return saved;
       } catch (error) { this.apiError = apiError(error); throw error; } finally { this.apiMutating = false; }
@@ -439,7 +439,21 @@ export const useProjectsStore = defineStore("projects", {
   },
 });
 
-function apiError(error: unknown) { const api = error as { status?: unknown; code?: unknown; requestId?: unknown }; return error instanceof Error ? { status: typeof api.status === "number" ? api.status : undefined, code: typeof api.code === "string" ? api.code : "PROJECT_API_REQUEST_FAILED", message: error.message, requestId: typeof api.requestId === "string" ? api.requestId : undefined } : { code: "PROJECT_API_REQUEST_FAILED", message: "Project API request failed" }; }
+function apiError(error: unknown) {
+  const api = error as { status?: unknown; code?: unknown; requestId?: unknown; fieldErrors?: unknown };
+  const fieldErrors = api.fieldErrors && typeof api.fieldErrors === "object" && !Array.isArray(api.fieldErrors)
+    ? Object.fromEntries(Object.entries(api.fieldErrors).filter(([, value]) => typeof value === "string"))
+    : undefined;
+  return error instanceof Error
+    ? {
+        status: typeof api.status === "number" ? api.status : undefined,
+        code: typeof api.code === "string" ? api.code : "PROJECT_API_REQUEST_FAILED",
+        message: error.message,
+        requestId: typeof api.requestId === "string" ? api.requestId : undefined,
+        ...(fieldErrors && Object.keys(fieldErrors).length ? { fieldErrors } : {}),
+      }
+    : { code: "PROJECT_API_REQUEST_FAILED", message: "项目请求失败，请稍后重试。" };
+}
 function projectCreatePayload(input: ProjectDraftInput) {
   return {
     expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title,
@@ -450,6 +464,11 @@ function projectCreatePayload(input: ProjectDraftInput) {
     ...(input.cover ? { coverAttachmentId: input.cover.id } : {}),
     ...(input.details.length ? { detailAttachmentIds: input.details.map((item) => item.id) } : {}),
   };
+}
+
+function projectUpdatePayload(input: ProjectDraftInput) {
+  const { slug: _slug, ...payload } = projectCreatePayload(input);
+  return payload;
 }
 
 function projectMembers(value: unknown, memberPersonIds: readonly string[] = [], memberNames: readonly string[] = []): ProjectMember[] {
@@ -483,7 +502,7 @@ function uniqueMemberNames(value: unknown): string[] {
 }
 
 function normalizeDisplayOrder(value: unknown): number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 9999;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 ? value : 9999;
 }
 
 function projectFromPublicApi(item: Record<string, unknown>): ManagedProject {
