@@ -34,6 +34,92 @@ describe("project, activity, and registration API gateway", () => {
     expect(createContentGatewayForRuntime({ apiBase: "https://api.example.test", useMockApi: false })).toBeDefined();
   });
 
+  it("does not resend a published project's slug when updating its Chinese title", async () => {
+    const projects = useProjectsStore();
+    const record = {
+      ...projectRecord,
+      id: "project-chinese-title",
+      centerId: "11111111-1111-4111-8111-111111111111",
+      slug: "zhixun-xianfeng",
+      title: "智巡先锋",
+      category: "SMART_HARDWARE",
+      memberNames: ["成员甲"],
+      members: [{ name: "成员甲" }],
+    };
+    const api = {
+      projects: {
+        listAdmin: vi.fn().mockResolvedValue({ items: [record] }),
+        update: vi.fn().mockResolvedValue({ ...record, version: 4, title: "智巡先锋（更新）" }),
+      },
+    };
+    await projects.refreshFromApi(api);
+
+    await projects.updateDraftFromApi(api, record.id, {
+      ...projects.getById(record.id)!,
+      title: "智巡先锋（更新）",
+    });
+
+    expect(api.projects.update).toHaveBeenCalledWith(record.id, expect.objectContaining({
+      expectedVersion: 3,
+      title: "智巡先锋（更新）",
+    }));
+    expect(api.projects.update.mock.calls[0]?.[1]).not.toHaveProperty("slug");
+  });
+
+  it("generates an ASCII slug when creating a project with a Chinese title", async () => {
+    const projects = useProjectsStore();
+    const api = {
+      projects: {
+        create: vi.fn().mockResolvedValue({
+          ...projectRecord,
+          id: "project-new-chinese",
+          centerId: "11111111-1111-4111-8111-111111111111",
+          slug: "project-123",
+          title: "中文项目",
+          category: "SMART_HARDWARE",
+          memberNames: ["成员甲"],
+          members: [{ name: "成员甲" }],
+        }),
+      },
+    };
+
+    await projects.createDraftFromApi(api, {
+      title: "中文项目",
+      category: "SMART_HARDWARE",
+      year: "2026",
+      description: "项目简介",
+      achievement: "项目成果",
+      projectStage: "开发中",
+      challenge: "项目问题",
+      solution: "项目方案",
+      memberPersonIds: [],
+      memberNames: ["成员甲"],
+      members: [{ name: "成员甲" }],
+      displayOrder: 1,
+      ownerCenterId: "11111111-1111-4111-8111-111111111111",
+      cover: null,
+      details: [],
+    });
+
+    expect(api.projects.create.mock.calls[0]?.[0].slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  });
+
+  it("preserves field-level API validation errors", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: "VALIDATION_FAILED",
+      message: "字段校验失败",
+      requestId: "project-validation-1",
+      fieldErrors: { slug: "项目地址只能使用英文、数字和连字符" },
+    }), { status: 400, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiContentGateway({ apiBase: "https://api.example.test", fetcher, readCookie: () => "csrf" });
+
+    await expect(gateway.projects.update("project-1", { expectedVersion: 3, title: "项目" })).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      fieldErrors: { slug: "项目地址只能使用英文、数字和连字符" },
+      requestId: "project-validation-1",
+    });
+  });
+
   it("exposes gallery reads through the generated production gateway instead of mock fixtures", () => {
     const gateway = createApiContentGateway({ apiBase: "https://api.example.test" });
     expect(gateway.galleries).toBeDefined();

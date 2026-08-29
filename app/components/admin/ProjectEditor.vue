@@ -102,6 +102,7 @@ const missingFields = computed(() => {
     [form.solution, "解决方案"],
     [form.ownerCenterId, "归属中心"],
   ] as const) if (!String(value).trim()) missing.push(label);
+  if (!Number.isInteger(form.displayOrder) || form.displayOrder < 1) missing.push("展示排序");
   if (!form.memberNames.length) missing.push("项目成员");
   if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("项目封面");
   if (form.details.some((item) => !completeDetail(item))) missing.push("详情素材信息");
@@ -210,6 +211,40 @@ function validateForm() {
   return !formError.value;
 }
 
+const projectFieldLabels: Record<string, string> = {
+  slug: "项目地址",
+  title: "标题",
+  category: "分类",
+  year: "年份",
+  description: "项目简介",
+  achievement: "当前成果",
+  projectStage: "项目阶段",
+  challenge: "问题",
+  solution: "解决方案",
+  centerId: "归属中心",
+  displayOrder: "展示排序",
+  memberNames: "项目成员",
+  coverAttachmentId: "项目封面",
+};
+
+function projectErrorMessage(caught: unknown, action: string) {
+  const error = caught as { code?: unknown; fieldErrors?: unknown };
+  if (error.fieldErrors && typeof error.fieldErrors === "object") {
+    const entries = Object.entries(error.fieldErrors).filter(([, value]) => typeof value === "string");
+    if (entries.length) return entries.map(([field, message]) => `${projectFieldLabels[field] ?? field}：${message}`).join("；");
+  }
+  const messages: Record<string, string> = {
+    PROJECT_VERSION_CONFLICT: "项目已被其他人修改，请刷新后重试。",
+    PROJECT_SLUG_IMMUTABLE: "已发布项目的地址不能修改。",
+    PROJECT_SLUG_CONFLICT: "项目地址已存在，请更换标题或地址。",
+    PROJECT_DISPLAY_ORDER_CONFLICT: "展示排序已被占用，请换一个数字。",
+    PROJECT_INCOMPLETE: "请补齐必填信息和项目封面后再发布。",
+    PROJECT_MEMBER_REQUIRED: "请至少添加一名项目成员。",
+    MEDIA_NOT_READY: "项目素材尚未完成处理，请稍后重试。",
+  };
+  return messages[String(error.code)] ?? `${action}失败，请检查填写内容后重试。`;
+}
+
 async function persistDraft() {
   const payload = toPayload();
   if (gateway) return props.mode === "edit" && props.project
@@ -230,7 +265,7 @@ async function saveDraft() {
     adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `保存失败：${caught.message}` : "保存失败。";
+    formError.value = projectErrorMessage(caught, "保存");
   } finally {
     isSaving.value = false;
   }
@@ -247,7 +282,7 @@ async function publishProject() {
     adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
+    formError.value = projectErrorMessage(caught, "发布");
   } finally {
     isPublishing.value = false;
   }
@@ -262,7 +297,7 @@ async function offlineProject() {
     notice.value = "项目已下线，公开页面不再显示该项目。";
     adminToast.success(notice.value);
     emit("offline", props.project.id);
-  } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
+  } catch (caught) { formError.value = projectErrorMessage(caught, "下线"); }
   finally { isOfflining.value = false; }
 }
 </script>
@@ -270,8 +305,7 @@ async function offlineProject() {
 <template>
   <section class="admin-list-card admin-project-editor" aria-label="项目编辑器">
     <header>
-      <div><span>{{ mode === "create" ? "新建项目" : "项目编辑" }}</span><h2>{{ mode === "create" ? "新建项目" : "编辑项目" }}</h2></div>
-      <p>保存草稿不会改变用户端；确认发布后才会替换公开快照。</p>
+      <div><h2>{{ mode === "create" ? "新建项目" : "编辑项目" }}</h2></div>
     </header>
     <div class="admin-project-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
@@ -294,7 +328,7 @@ async function offlineProject() {
           </div>
           <small>直接填写成员姓名即可，公开页面只展示姓名。</small>
         </label>
-        <label>展示排序<input v-model.number="form.displayOrder" data-testid="project-display-order" type="number" min="0"></label>
+        <label>展示排序<input v-model.number="form.displayOrder" data-testid="project-display-order" type="number" min="1"></label>
         <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>
         <label class="is-wide">项目简介<textarea v-model="form.description" rows="3"></textarea></label>
         <label class="is-wide">问题<textarea v-model="form.challenge" rows="3"></textarea></label>
@@ -303,7 +337,7 @@ async function offlineProject() {
       <ContentMediaUploader v-model="coverItems" mode="cover" :owner="mediaOwner" title="项目封面" description="项目封面会显示在项目列表、详情页和首页项目槽位。" />
       <ContentMediaUploader v-model="detailItems" mode="collection" :owner="mediaOwner" title="项目详情素材" description="可选。用于项目成果、过程记录和现场展示。" />
       <section class="admin-project-editor__preview" aria-label="项目公开预览">
-        <div><span class="eyebrow">PUBLIC PREVIEW</span><h3>{{ form.title || "项目标题预览" }}</h3><p>{{ form.description || "项目简介会显示在用户端项目卡片。" }}</p></div>
+        <div><h3>{{ form.title || "项目标题预览" }}</h3><p>{{ form.description || "项目简介会显示在用户端项目卡片。" }}</p></div>
         <ContentMediaView v-if="form.cover" :item="form.cover" preview="thumbnail" :controls="false" />
         <div v-if="form.details.length" class="admin-project-editor__preview-details"><ContentMediaView v-for="item in form.details" :key="item.id" :item="item" preview="thumbnail" :controls="false" /></div>
       </section>
