@@ -34,6 +34,8 @@ export interface ResponsibleContact {
 }
 
 export interface MemberResultRecord {
+  /** Stable result/application identifier used for authenticated contact lookups. */
+  id: string;
   batchLabel: string;
   status: AdmissionStatus;
   identity: MemberIdentity;
@@ -80,6 +82,7 @@ export function memberResultFromApi(
 ): MemberResultRecord {
   if (!result) {
     return {
+      id: "no-published-result",
       batchLabel: "暂无已发布结果",
       status: "no-application",
       identity: fallbackIdentity,
@@ -91,6 +94,7 @@ export function memberResultFromApi(
   const admitted = result.decision === "ADMITTED";
   const rank = { FIRST: 1, SECOND: 2, THIRD: 3 } as const;
   return {
+    id: result.id,
     batchLabel: result.batch.name,
     status: admitted
       ? result.admissionSource === "ADJUSTMENT" ? "adjusted-admission" : "admitted"
@@ -120,6 +124,7 @@ export function memberResultFromApi(
 
 export function memberResultFromApplication(application: SubmittedRecruitmentApplication): MemberResultRecord {
   return {
+    id: application.id,
     batchLabel: application.batchNameSnapshot,
     status: "pending",
     identity: "预备成员",
@@ -147,6 +152,7 @@ export interface PublishedAssessmentProjection {
 }
 
 export const DEMO_MEMBER_RESULT: MemberResultRecord = {
+  id: "demo-member-result",
   batchLabel: "2026 秋季招新",
   status: "admitted",
   identity: "正式成员",
@@ -176,6 +182,7 @@ export function getDemoMemberResult(
   if (memberId === DEMO_MEMBER_PROFILE.id) return DEMO_MEMBER_RESULT;
   if (memberId !== DEMO_APPLICANT_PROFILE.id) {
     return {
+      id: "demo-no-application",
       batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
       status: "no-application",
       identity: "正式成员",
@@ -193,6 +200,7 @@ export function getDemoMemberResult(
     : [];
 
   return {
+    id: application?.id ?? "demo-applicant-result",
     batchLabel: application?.batchNameSnapshot ?? "暂无报名批次",
     status: application ? "pending" : "no-application",
     identity: "预备成员",
