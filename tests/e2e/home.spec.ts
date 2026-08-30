@@ -80,14 +80,12 @@ test("authenticated activity signup uses the current session without asking for 
   await page.getByRole("button", { name: "登录并继续" }).click();
   await expect(page).toHaveURL(/\/activities\/harmonyos-salon$/);
 
-  const signupLinks = page.getByRole("link", { name: "立即报名", exact: true });
-  await expect(signupLinks).toHaveCount(2);
+  const signupButtons = page.getByRole("button", { name: "立即报名", exact: true });
+  await expect(signupButtons).toHaveCount(2);
   await expect(page.getByText("登录后报名", { exact: true })).toHaveCount(0);
   await expect(page.getByText("登录后提交报名", { exact: true })).toHaveCount(0);
 
-  for (let index = 0; index < 2; index += 1) {
-    await expect(signupLinks.nth(index)).toHaveAttribute("href", "/activities/harmonyos-salon?signup=1");
-  }
+  await expect(signupButtons).toHaveCount(2);
 });
 
 test("homepage resource cards open their own detail pages before any file action", async ({ page }) => {

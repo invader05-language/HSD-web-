@@ -16,23 +16,28 @@ test("owner can publish an activity and review a member registration", async ({ 
   await page.getByLabel("标题").fill("端到端活动闭环验证");
   await page.getByLabel("分类").selectOption({ label: "技术沙龙" });
   await page.getByLabel("日期").fill("2026-09-20");
-  await page.getByLabel("时间").selectOption({ label: "19:00–21:00" });
+  await page.getByLabel("开始时间").fill("19:00");
+  await page.getByLabel("结束时间").fill("21:00");
   await page.getByLabel("地点").fill("线上会议室");
   await page.getByLabel("报名截止").fill("2026-09-19T23:59");
   await page.getByLabel("摘要").fill("验证管理端发布与用户端报名审核联动。");
   await page.getByLabel("活动内容").fill("参与联动验收的成员");
   await page.getByLabel("活动流程").fill("发布\n报名\n审核");
+  await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/admin\/activities\/activity-/);
+  await expect(page.getByRole("status")).toContainText("草稿已保存");
   await page.locator('input[type="file"]').first().setInputFiles({
     name: "activity-cover.png",
     mimeType: "image/png",
     buffer: Buffer.from("activity-cover"),
   });
+  await expect(page.getByLabel("替代文本").first()).toBeVisible();
   await page.getByLabel("替代文本").first().fill("端到端活动封面");
-  await page.getByRole("button", { name: "保存草稿" }).click();
-  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/admin\/activities\/activity-/);
-  await expect(page.getByRole("status")).toContainText("草稿已保存");
   await page.getByRole("button", { name: "直接发布" }).click();
   await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/activities");
+  const activityRow = page.getByRole("row", { name: /端到端活动闭环验证/ });
+  await activityRow.getByRole("button", { name: "开放报名", exact: true }).click();
+  await expect(activityRow).toContainText("开放");
 
   const activitySlug = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem("baiyun-hsd.activities") ?? "{}");
@@ -42,12 +47,17 @@ test("owner can publish an activity and review a member registration", async ({ 
   await signIn(page, "demo-member", `/activities/${encodeURIComponent(activitySlug)}`);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "端到端活动闭环验证" })).toBeVisible();
-  await page.getByRole("link", { name: "立即报名", exact: true }).first().click();
+  await page.getByRole("button", { name: "立即报名", exact: true }).first().click();
   await expect(page.getByRole("status")).toContainText("报名已提交");
 
   await signIn(page, "admin-alliance", "/admin/activities/registrations");
-  await expect(page.getByRole("button", { name: "配置报名字段（暂不可用）" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "导出当前名单（暂不可用）" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "配置报名字段", exact: true })).toBeEnabled();
+  await page.getByRole("link", { name: "配置报名字段", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "配置报名字段" })).toBeVisible();
+  await page.getByRole("link", { name: "返回报名名单", exact: true }).click();
+  await expect(page.getByRole("button", { name: "导出当前名单", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "导出当前名单", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("请先选择一个活动");
   await expect(page.getByRole("row", { name: /端到端活动闭环验证/ })).toContainText("待审核");
   await page.getByRole("row", { name: /端到端活动闭环验证/ }).getByRole("button", { name: "录取", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("报名已录取");
