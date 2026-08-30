@@ -13,10 +13,12 @@ const props = withDefaults(defineProps<{
   description?: string;
   owner?: Omit<ContentMediaUploadOwner, "role" | "sortOrder">;
   disabled?: boolean;
+  metadataProfile?: "full" | "activity";
 }>(), {
   title: "上传素材",
   description: "支持图片或视频，上传后可在此预览和编辑素材信息。",
   disabled: false,
+  metadataProfile: "full",
 });
 
 const emit = defineEmits<{ "update:modelValue": [value: ContentMediaAttachment[]] }>();
@@ -24,6 +26,8 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const items = ref<ContentMediaAttachment[]>([...props.modelValue]);
 const uploadError = ref("");
 const isUploading = ref(false);
+const pendingMetadata = new Set<Promise<void>>();
+const metadataQueues = new Map<string, Promise<void>>();
 const { upload, updateDetails, updateMetadata } = useContentMediaUpload();
 
 const accept = computed(() => props.mode === "cover" ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,video/mp4,video/webm");
@@ -87,17 +91,60 @@ function updateItem(index: number, patch: Partial<ContentMediaAttachment>) {
   publishItems();
 }
 
-async function persistMetadata(index: number) {
+async function persistMetadataNow(id: string) {
+  const index = items.value.findIndex((item) => item.id === id);
   const current = items.value[index];
   if (!current?.serverOwned || !current.version) return;
+  const requested = { ...current };
   try {
-    const updated = await updateMetadata(current);
-    items.value[index] = updated;
+    const updated = await updateMetadata(requested);
+    const latestIndex = items.value.findIndex((item) => item.id === id);
+    const latest = items.value[latestIndex];
+    if (!latest) return;
+    const metadataChanged = latest.title !== requested.title
+      || latest.caption !== requested.caption
+      || latest.alt !== requested.alt
+      || latest.aspect !== requested.aspect
+      || latest.sortOrder !== requested.sortOrder;
+    items.value[latestIndex] = metadataChanged ? { ...latest, version: updated.version } : updated;
     publishItems();
   } catch (error) {
     uploadError.value = `素材信息保存失败：${localizeActivityError(error)}`;
+    throw error;
   }
 }
+
+function persistMetadata(index: number) {
+  const current = items.value[index];
+  if (!current?.serverOwned || !current.version) return Promise.resolve();
+  const previous = metadataQueues.get(current.id) ?? Promise.resolve();
+  const task = previous.catch(() => undefined).then(() => persistMetadataNow(current.id));
+  metadataQueues.set(current.id, task);
+  pendingMetadata.add(task);
+  task.then(
+    () => {
+      pendingMetadata.delete(task);
+      if (metadataQueues.get(current.id) === task) metadataQueues.delete(current.id);
+    },
+    () => {
+      pendingMetadata.delete(task);
+      if (metadataQueues.get(current.id) === task) metadataQueues.delete(current.id);
+    },
+  );
+  // The blur handler cannot await the request; flushPendingMetadata observes the same rejection.
+  task.catch(() => undefined);
+  return task;
+}
+
+async function flushPendingMetadata() {
+  while (pendingMetadata.size) {
+    const results = await Promise.allSettled([...pendingMetadata]);
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (rejected) throw rejected.reason;
+  }
+}
+
+defineExpose({ flushPendingMetadata });
 
 function statusLabel(status: ContentMediaAttachment["status"]) {
   return status === "ready" ? "可发布" : status === "processing" ? "处理中" : status === "uploading" ? "上传中" : "处理失败";
@@ -171,10 +218,10 @@ function moveItem(index: number, direction: -1 | 1) {
             <strong>{{ item.kind === "video" ? "视频" : "图片" }} · {{ statusLabel(item.status) }}</strong>
             <button type="button" class="button button--text" @click="removeItem(index)">移除</button>
           </div>
-          <label v-if="item.role === 'detail'">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })" @blur="persistMetadata(index)"></label>
-          <label v-if="item.role === 'detail'">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })" @blur="persistMetadata(index)"></textarea></label>
-          <label>替代文本<input :value="item.alt" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })" @blur="persistMetadata(index)"></label>
-          <label v-if="item.role === 'detail'">比例<select :value="item.aspect" @change="updateItem(index, { aspect: aspectValue($event) }); persistMetadata(index)"><option value="landscape">横向</option><option value="portrait">纵向</option><option value="wide">宽幅</option></select></label>
+          <label v-if="item.role === 'detail' && metadataProfile === 'full'">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })" @blur="void persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail' && metadataProfile === 'full'">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })" @blur="void persistMetadata(index)"></textarea></label>
+          <label>{{ metadataProfile === 'activity' ? '图片内容描述' : '替代文本' }}<input :value="item.alt" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })" @blur="void persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail'">比例<select :value="item.aspect" @change="updateItem(index, { aspect: aspectValue($event) }); void persistMetadata(index)"><option value="landscape">横向</option><option value="portrait">纵向</option><option value="wide">宽幅</option></select></label>
           <div v-if="mode === 'collection'" class="content-media-uploader__sort-actions">
             <button type="button" class="button button--text" :disabled="index === 0" @click="moveItem(index, -1)">上移</button>
             <button type="button" class="button button--text" :disabled="index === items.length - 1" @click="moveItem(index, 1)">下移</button>

@@ -72,6 +72,12 @@ export function isContentMediaAttachmentComplete(attachment: ContentMediaAttachm
   return Boolean(attachment.title.trim() && attachment.caption.trim() && attachment.aspect);
 }
 
+export function isActivityContentMediaAttachmentComplete(attachment: ContentMediaAttachment) {
+  if (attachment.status !== "ready" || !attachment.alt.trim()) return false;
+  if (attachment.role === "cover") return attachment.kind === "image";
+  return attachment.role === "detail" && Boolean(attachment.aspect);
+}
+
 export function isRetainedServerContentMediaAttachment(attachment: ContentMediaAttachment) {
   return attachment.serverOwned === true && attachment.status === "processing" && !attachment.url && !attachment.thumbnailUrl && !attachment.localBlobId && !attachment.legacyAssetId;
 }

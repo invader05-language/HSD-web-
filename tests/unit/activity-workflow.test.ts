@@ -219,7 +219,7 @@ describe("activity publishing and registration workflow", () => {
     expect(JSON.parse(localStorage.getItem("baiyun-hsd.activities") ?? "{}").version).toBe(2);
   });
 
-  it("requires a reviewed cover and complete detail metadata before publishing", () => {
+  it("requires a reviewed cover and activity detail image description before publishing", () => {
     const store = useActivitiesStore();
     useSessionStore().signIn("admin-alliance", { requireAdmin: true });
     const draft = store.createDraft(activityInput({
@@ -235,7 +235,7 @@ describe("activity publishing and registration workflow", () => {
         id: "activity-detail",
         role: "detail" as const,
         kind: "video" as const,
-        title: "现场视频",
+        title: "",
         caption: "",
         alt: "活动现场视频",
         aspect: "wide" as const,
@@ -243,7 +243,42 @@ describe("activity publishing and registration workflow", () => {
         status: "ready" as const,
       }],
     }, NOW);
-    expect(() => store.publish(draft.id, NOW)).toThrow("ACTIVITY_INCOMPLETE");
+    expect(() => store.publish(draft.id, NOW)).not.toThrow();
+  });
+
+  it("keeps partially entered activity times while editing start and end inputs", () => {
+    expect(composeActivityTime("19:00", "")).toBe("19:00");
+    expect(composeActivityTime("19:00", "21:00")).toBe("19:00-21:00");
+    expect(splitActivityTime("19:00-21:00")).toEqual(["19:00", "21:00"]);
+    expect(isValidActivityTime("19:00")).toBe(true);
+    expect(isValidActivityTime("21:00-19:00")).toBe(false);
+  });
+
+  it("automatically closes registration after the deadline", () => {
+    const store = useActivitiesStore();
+    useSessionStore().signIn("admin-alliance", { requireAdmin: true });
+    const draft = store.createDraft(activityInput({
+      slug: "expired-registration",
+      registrationEndAt: "2026-08-05T23:59:59.000Z",
+    }), NOW);
+    store.publish(draft.id, NOW);
+    store.setRegistrationOpen(draft.id, true, new Date("2026-08-05T12:00:00.000Z"));
+
+    useSessionStore().signIn("demo-member");
+    expect(() => store.registerCurrentUser(draft.id, NOW)).toThrow("ACTIVITY_REGISTRATION_CLOSED");
+  });
+
+  it("requires an explicit override when reopening after the deadline", () => {
+    const store = useActivitiesStore();
+    useSessionStore().signIn("admin-alliance", { requireAdmin: true });
+    const draft = store.createDraft(activityInput({
+      slug: "manual-reopen-registration",
+      registrationEndAt: "2026-08-05T23:59:59.000Z",
+    }), NOW);
+    store.publish(draft.id, NOW);
+
+    expect(() => store.setRegistrationOpen(draft.id, true, NOW)).toThrow("ACTIVITY_REGISTRATION_CLOSED");
+    expect(store.setRegistrationOpen(draft.id, true, NOW, true).registrationOpen).toBe(true);
   });
 
   it("keeps partially entered activity times while editing start and end inputs", () => {

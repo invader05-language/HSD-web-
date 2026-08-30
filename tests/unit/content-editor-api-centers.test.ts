@@ -71,6 +71,51 @@ describe("production project and activity editor center/media behavior", () => {
     expect(activities.getById(activityId)?.cover).toMatchObject({ id: coverId, status: "processing", serverOwned: true });
   });
 
+  it("publishes an unchanged activity without issuing a draft PATCH", async () => {
+    session("ADMIN");
+    document.cookie = "hsd_csrf=test-csrf";
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => {
+      calls.push(url);
+      const payload = url.includes("/publish")
+        ? { ...activityRecord, time: "09:00-10:00", status: "published", version: 5, publishedAt: "2026-08-31T00:00:00.000Z" }
+        : { currentPermission: { accountId: "66666666-6666-4666-8666-666666666666", personId: "77777777-7777-4777-8777-777777777777", adminLevel: "ADMIN", adminCenterId: centerId, version: 1 }, items: [{ id: centerId, slug: "baize-development", name: "Baize", active: true, positions: [] }] };
+      return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    const activities = useActivitiesStore();
+    await activities.refreshFromApi({ activities: { listAdmin: vi.fn().mockResolvedValue({ items: [{ ...activityRecord, time: "09:00-10:00" }] }) } });
+    const wrapper = mount(ActivityEditor, { props: { mode: "edit", activity: activities.getById(activityId)! }, global: globalOptions });
+    await flushPromises();
+
+    const publishButton = wrapper.findAll("button").find((button) => button.text() === "直接发布");
+    expect(publishButton).toBeDefined();
+    await publishButton!.trigger("click");
+    await flushPromises();
+
+    expect(calls.some((url) => url.includes(`/activities/${activityId}/publish`))).toBe(true);
+    expect(calls.some((url) => url.includes(`/activities/${activityId}`) && !url.includes("/publish"))).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("saves changed activity fields before publishing with the updated version", async () => {
+    session("ADMIN");
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "", useMockApi: true } }));
+    const activities = useActivitiesStore();
+    await activities.refreshFromApi({ activities: { listAdmin: vi.fn().mockResolvedValue({ items: [{ ...activityRecord, time: "09:00-10:00" }] }) } });
+    const wrapper = mount(ActivityEditor, { props: { mode: "edit", activity: activities.getById(activityId)! }, global: globalOptions });
+    await flushPromises();
+    const update = vi.spyOn(activities, "updateDraft");
+    const publish = vi.spyOn(activities, "publish");
+    await wrapper.find("input[type='text']").setValue("Changed activity");
+    await wrapper.findAll("button").find((button) => button.text() === "直接发布")!.trigger("click");
+    await flushPromises();
+
+    expect(update).toHaveBeenCalledWith(activityId, expect.objectContaining({ title: "Changed activity" }));
+    expect(publish).toHaveBeenCalledWith(activityId);
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0]);
+    wrapper.unmount();
+  });
+
   it("uses member name input and removes legacy technology and member-count inputs", async () => {
     session("OWNER");
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify({ currentPermission: { accountId: "66666666-6666-4666-8666-666666666666", personId: "77777777-7777-4777-8777-777777777777", adminLevel: "OWNER", adminCenterId: null, version: 1 }, items: [{ id: centerId, slug: "baize-development", name: "Baize", active: true, positions: [] }] }), { status: 200, headers: { "Content-Type": "application/json" } })));

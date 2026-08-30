@@ -7,11 +7,12 @@ import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import type { ActivityDraftInput, ManagedActivity } from "~/types/activity";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
+import { isActivityContentMediaAttachmentComplete, isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { useAdminToast } from "~/composables/useAdminToast";
 import { composeActivityTime, isValidActivityTime, splitActivityTime } from "~/utils/activity-time";
 import { localizeActivityError } from "~/utils/activity-errors";
+import { activityDraftFingerprint } from "~/utils/activity-api-payload";
 
 const props = defineProps<{
   activity?: ManagedActivity;
@@ -74,10 +75,14 @@ const form = reactive<ActivityForm>(emptyForm());
 const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
 const formError = ref("");
 const fieldErrors = ref<Record<string, string>>({});
+const serverFieldErrors = ref<Record<string, string>>({});
+const initialFingerprint = ref("");
 const notice = ref("");
 const isSaving = ref(false);
 const isPublishing = ref(false);
 const isOfflining = ref(false);
+const coverUploader = ref<{ flushPendingMetadata?: () => Promise<void> } | null>(null);
+const detailUploader = ref<{ flushPendingMetadata?: () => Promise<void> } | null>(null);
 const coverItems = computed<ContentMediaAttachment[]>({
   get: () => form.cover ? [form.cover] : [],
   set: (value) => { form.cover = value[0] ?? null; },
@@ -109,7 +114,7 @@ const missingFields = computed(() => {
   if (!form.content.trim()) missing.push("活动内容");
   if (!form.agenda.split(/\r?\n/).some((item) => item.trim())) missing.push("活动流程");
   if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("活动封面");
-  if (form.details.some((item) => item.role !== "detail" || (!isRetainedServerContentMediaAttachment(item) && !isContentMediaAttachmentComplete(item)))) missing.push("详情素材信息");
+  if (form.details.some((item) => item.role !== "detail" || (!isRetainedServerContentMediaAttachment(item) && !isActivityContentMediaAttachmentComplete(item)))) missing.push("详情素材信息");
   return missing;
 });
 
@@ -117,6 +122,13 @@ const isComplete = computed(() => missingFields.value.length === 0);
 const ownerOptions = computed(() => session.adminLevel === "owner"
   ? centerOptions.value
   : centerOptions.value.filter((center) => center.id === (session.currentAccount?.adminCenterId ?? form.ownerCenterId)));
+
+async function flushMediaMetadata() {
+  await Promise.all([
+    coverUploader.value?.flushPendingMetadata?.(),
+    detailUploader.value?.flushPendingMetadata?.(),
+  ]);
+}
 
 onMounted(async () => {
   if (!organizationGateway) return;
@@ -147,8 +159,10 @@ function loadActivity(activity?: ManagedActivity) {
     registrationEndAt: activity.registrationEndAt,
   } : emptyForm();
   Object.assign(form, source);
+  initialFingerprint.value = props.mode === "edit" && activity ? activityDraftFingerprint(toPayload()) : "";
   formError.value = "";
   fieldErrors.value = {};
+  serverFieldErrors.value = {};
   notice.value = props.initialNotice ?? "";
 }
 
@@ -175,8 +189,41 @@ function validateForm() {
   const errors: Record<string, string> = {};
   for (const field of missingFields.value) errors[field] = `${field}不能为空`;
   fieldErrors.value = errors;
+  serverFieldErrors.value = {};
   formError.value = missingFields.value.length ? `请补充：${missingFields.value.join("、")}` : "";
   return missingFields.value.length === 0;
+}
+
+const isDirty = computed(() => props.mode === "edit" && Boolean(props.activity) && initialFingerprint.value !== activityDraftFingerprint(toPayload()));
+
+function fieldError(key: string, label: string) {
+  return serverFieldErrors.value[key] ?? fieldErrors.value[label] ?? "";
+}
+
+function applyServerFieldErrors(error: unknown) {
+  const raw = error && typeof error === "object" ? (error as { fieldErrors?: unknown }).fieldErrors : undefined;
+  const code = error && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
+    ? (error as { code: string }).code : "";
+  const mediaFieldByCode: Record<string, [string, string]> = {
+    MEDIA_COVER_INCOMPLETE: ["coverAttachmentId", "活动封面"],
+    MEDIA_COVER_INVALID: ["coverAttachmentId", "活动封面"],
+    MEDIA_DETAIL_INCOMPLETE: ["detailAttachmentIds", "详情素材"],
+    MEDIA_DETAIL_LIMIT_EXCEEDED: ["detailAttachmentIds", "详情素材"],
+  };
+  const mediaField = mediaFieldByCode[code];
+  if ((!raw || typeof raw !== "object" || Array.isArray(raw)) && !mediaField) return false;
+  const mapped = mediaField
+    ? { [mediaField[0]]: localizeActivityError(error) }
+    : Object.fromEntries(Object.entries(raw as Record<string, unknown>)
+      .filter(([, value]) => typeof value === "string")
+      .map(([key]) => [key, key === "slug" ? "活动链接标识格式不正确，请刷新页面后重试。" : "字段校验未通过，请检查后重试。"]));
+  serverFieldErrors.value = mapped;
+  const labels = Object.keys(mapped).map((key) => ({
+    title: "标题", type: "分类", date: "日期", time: "时间", location: "地点", registrationEndAt: "报名截止",
+    centerId: "归属中心", summary: "摘要", content: "活动内容", agenda: "活动流程", coverAttachmentId: "活动封面", detailAttachmentIds: "详情素材", slug: "slug",
+  }[key] ?? key));
+  formError.value = labels.includes("slug") ? mapped.slug ?? "活动链接标识格式不正确，请刷新页面后重试。" : `请检查：${labels.join("、")}`;
+  return Object.keys(mapped).length > 0;
 }
 
 async function persistDraft() {
@@ -194,13 +241,16 @@ async function saveDraft() {
   isSaving.value = true;
   formError.value = "";
   try {
+    await flushMediaMetadata();
     const saved = await persistDraft();
+    fieldErrors.value = {};
+    serverFieldErrors.value = {};
     notice.value = "草稿已保存。发布前的编辑不会影响用户端。";
     adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
     notice.value = "";
-    formError.value = `保存失败：${localizeActivityError(caught)}`;
+    if (!applyServerFieldErrors(caught)) formError.value = `保存失败：${localizeActivityError(caught)}`;
   } finally {
     isSaving.value = false;
   }
@@ -212,14 +262,19 @@ async function publishActivity() {
   isPublishing.value = true;
   notice.value = "";
   try {
-    const saved = await persistDraft();
+    await flushMediaMetadata();
+    const saved = isDirty.value ? await persistDraft() : props.activity;
+    if (!saved) throw new Error("ACTIVITY_NOT_FOUND");
+    if (props.mode === "edit") initialFingerprint.value = activityDraftFingerprint(toPayload());
     if (gateway) await activitiesStore.publishFromApi(gateway, saved.id);
     else activitiesStore.publish(saved.id);
     notice.value = "活动已发布，用户端将显示最新公开快照。";
+    fieldErrors.value = {};
+    serverFieldErrors.value = {};
     adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
-    formError.value = `发布失败：${localizeActivityError(caught)}`;
+    if (!applyServerFieldErrors(caught)) formError.value = `发布失败：${localizeActivityError(caught)}`;
   } finally {
     isPublishing.value = false;
   }
@@ -232,6 +287,8 @@ async function offlineActivity() {
     if (gateway) await activitiesStore.offlineFromApi(gateway, props.activity.id, "管理员下线");
     else activitiesStore.unpublish(props.activity.id, "管理员下线");
     notice.value = "活动已下线，报名已关闭。";
+    fieldErrors.value = {};
+    serverFieldErrors.value = {};
     adminToast.success(notice.value);
     emit("offline", props.activity.id);
   } catch (caught) { formError.value = `下线失败：${localizeActivityError(caught)}`; }
@@ -247,34 +304,40 @@ async function offlineActivity() {
     <div class="admin-activity-editor__body">
       <p v-if="formError" class="admin-save-message admin-save-message--error" role="alert">{{ formError }}</p>
       <div class="admin-editor-grid">
-        <label>标题<input v-model="form.title" type="text" autocomplete="off"></label>
-        <label>分类<select v-model="form.type"><option v-for="option in ACTIVITY_TYPE_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
-        <label>日期<input v-model="form.date" type="date"></label>
+        <label>标题<input v-model="form.title" type="text" autocomplete="off"><small v-if="fieldError('title', '标题')" class="field-error">{{ fieldError('title', '标题') }}</small></label>
+        <label>分类<select v-model="form.type"><option v-for="option in ACTIVITY_TYPE_OPTIONS" :key="option" :value="option">{{ option }}</option></select><small v-if="fieldError('type', '分类')" class="field-error">{{ fieldError('type', '分类') }}</small></label>
+        <label>日期<input v-model="form.date" type="date"><small v-if="fieldError('date', '日期')" class="field-error">{{ fieldError('date', '日期') }}</small></label>
         <label>开始时间<input v-model="timeStart" type="time"></label>
-        <label>结束时间<input v-model="timeEnd" type="time"></label>
-        <label>地点<input v-model="form.location" type="text"></label>
-        <label>报名截止<input v-model="form.registrationEndAt" type="datetime-local"></label>
-        <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>
-        <label class="is-wide">摘要<textarea v-model="form.summary" rows="3"></textarea></label>
-        <label class="is-wide">活动内容<textarea v-model="form.content" rows="3"></textarea></label>
-        <label class="is-wide">活动流程<textarea v-model="form.agenda" rows="4" placeholder="每行一个环节"></textarea></label>
+        <label>结束时间<input v-model="timeEnd" type="time"><small v-if="fieldError('time', '时间')" class="field-error">{{ fieldError('time', '时间') }}</small></label>
+        <label>地点<input v-model="form.location" type="text"><small v-if="fieldError('location', '地点')" class="field-error">{{ fieldError('location', '地点') }}</small></label>
+        <label>报名截止<input v-model="form.registrationEndAt" type="datetime-local"><small v-if="fieldError('registrationEndAt', '报名截止')" class="field-error">{{ fieldError('registrationEndAt', '报名截止') }}</small></label>
+        <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select><small v-if="fieldError('centerId', '归属中心')" class="field-error">{{ fieldError('centerId', '归属中心') }}</small></label>
+        <label class="is-wide">摘要<textarea v-model="form.summary" rows="3"></textarea><small v-if="fieldError('summary', '摘要')" class="field-error">{{ fieldError('summary', '摘要') }}</small></label>
+        <label class="is-wide">活动内容<textarea v-model="form.content" rows="3"></textarea><small v-if="fieldError('content', '活动内容')" class="field-error">{{ fieldError('content', '活动内容') }}</small></label>
+        <label class="is-wide">活动流程<textarea v-model="form.agenda" rows="4" placeholder="每行一个环节"></textarea><small v-if="fieldError('agenda', '活动流程')" class="field-error">{{ fieldError('agenda', '活动流程') }}</small></label>
       </div>
       <ContentMediaUploader
+        ref="coverUploader"
         v-model="coverItems"
         mode="cover"
         :owner="mediaOwner"
         :disabled="mode === 'create' && !activity"
+        metadata-profile="activity"
         title="活动封面"
         :description="mode === 'create' && !activity ? '请先保存草稿，再上传活动封面。' : '封面会出现在活动列表、活动详情页和公开导航中。'"
       />
+      <small v-if="fieldError('coverAttachmentId', '活动封面')" class="field-error">{{ fieldError('coverAttachmentId', '活动封面') }}</small>
       <ContentMediaUploader
+        ref="detailUploader"
         v-model="detailItems"
         mode="collection"
         :owner="mediaOwner"
         :disabled="mode === 'create' && !activity"
+        metadata-profile="activity"
         title="活动详情素材"
         description="可选。用于活动详情中的现场照片、视频或补充记录。"
       />
+      <small v-if="fieldError('detailAttachmentIds', '详情素材')" class="field-error">{{ fieldError('detailAttachmentIds', '详情素材') }}</small>
     </div>
     <footer class="admin-drawer__footer">
       <span>{{ isComplete ? "必填信息已完整，可直接发布。" : "草稿可暂存，直接发布前需补齐全部信息。" }}</span>
