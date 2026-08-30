@@ -68,7 +68,7 @@ test("owner can publish a gallery and the public detail renders its snapshot", a
   await page.getByLabel("标题").fill("端到端画廊闭环验证");
   await page.getByLabel("摘要").fill("验证画廊编辑、发布与用户端渲染联动。");
   await page.getByLabel("制作团队").fill("新媒体中心 · 验收组");
-  await page.locator('input[type="file"]').first().setInputFiles({
+  await page.locator('input[type="file"]').nth(1).setInputFiles({
     name: "gallery-image.png",
     mimeType: "image/png",
     buffer: Buffer.from("gallery-image"),
@@ -88,5 +88,5 @@ test("owner can publish a gallery and the public detail renders its snapshot", a
   if (!gallerySlug) throw new Error("gallery slug was not persisted");
   await page.goto(`/gallery/${encodeURIComponent(gallerySlug)}`);
   await expect(page.getByRole("heading", { level: 1, name: "端到端画廊闭环验证" })).toBeVisible();
-  await expect(page.getByTestId("gallery-media")).toHaveCount(1);
+  await expect(page.getByTestId("gallery-media")).toHaveCount(2);
 });

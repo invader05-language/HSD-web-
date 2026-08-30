@@ -17,6 +17,12 @@ function createSlug(input: ActivityDraftInput, suffix: string) {
   return `${stem.slice(0, maxStemLength)}-${normalizedSuffix}`;
 }
 
+function defaultSlugSuffix() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.floor(Math.random() * 36 ** 6).toString(36).padStart(6, "0");
+  return `${timestamp}-${random}`;
+}
+
 function mutableActivityPayload(input: ActivityDraftInput) {
   return {
     centerId: input.ownerCenterId,
@@ -34,7 +40,7 @@ function mutableActivityPayload(input: ActivityDraftInput) {
   };
 }
 
-export function activityCreatePayload(input: ActivityDraftInput, suffix = `${Date.now()}`) {
+export function activityCreatePayload(input: ActivityDraftInput, suffix = defaultSlugSuffix()) {
   return {
     expectedVersion: 0,
     slug: createSlug(input, suffix),

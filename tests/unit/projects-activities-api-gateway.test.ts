@@ -87,6 +87,26 @@ describe("project, activity, and registration API gateway", () => {
     expect(activityUpdatePayload({ ...input, slug: "历史中文标题" }, 4)).not.toHaveProperty("slug");
   });
 
+  it("adds a changing short suffix to generated activity slugs", () => {
+    const input = {
+      title: "中文活动", type: "Workshop", date: "2026-09-01", time: "09:00-10:00", location: "Room 1",
+      summary: "Summary", content: "Content", agenda: ["Start"], ownerCenterId: "center", registrationEndAt: "2026-08-31T00:00:00.000Z",
+      cover: null, details: [],
+    };
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_757_000_000_000);
+    const random = vi.spyOn(Math, "random").mockReturnValueOnce(0.111111).mockReturnValueOnce(0.222222);
+    try {
+      const first = activityCreatePayload(input).slug;
+      const second = activityCreatePayload(input).slug;
+      expect(first).not.toBe(second);
+      expect(first).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      expect(first.length).toBeLessThanOrEqual(120);
+    } finally {
+      now.mockRestore();
+      random.mockRestore();
+    }
+  });
+
   it("preserves activity API field validation errors in the store", async () => {
     const activities = useActivitiesStore();
     const error = Object.assign(new Error("字段校验失败"), {
