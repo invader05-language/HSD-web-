@@ -9273,6 +9273,68 @@
         ]
       }
     },
+    "/api/v1/activities/{slug}/registration-form": {
+      "get": {
+        "operationId": "RegistrationsMemberController_form",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityRegistrationFormResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
     "/api/v1/activities/{slug}/registration": {
       "get": {
         "operationId": "RegistrationsMemberController_mine",
@@ -9415,9 +9477,206 @@
         ]
       }
     },
-    "/api/v1/admin/activities/{activityId}/registrations": {
+    "/api/v1/admin/registration-template": {
       "get": {
-        "operationId": "RegistrationsAdminController_list",
+        "operationId": "RegistrationsAdminController_template",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/registration-template/draft": {
+      "post": {
+        "operationId": "RegistrationsAdminController_saveTemplate",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRegistrationTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/registration-template/publish": {
+      "post": {
+        "operationId": "RegistrationsAdminController_publishTemplate",
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRegistrationTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/activities/{activityId}/registration-form": {
+      "get": {
+        "operationId": "RegistrationsAdminController_form",
         "parameters": [
           {
             "name": "activityId",
@@ -9434,7 +9693,394 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/ActivityRegistrationFormResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/activities/{activityId}/registrations/export.csv": {
+      "get": {
+        "operationId": "RegistrationsAdminController_export",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activityId",
+            "required": false,
+            "in": "query",
+            "description": "按活动筛选；省略时查询当前管理员可见的全部活动",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "姓名或学号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "registered",
+                "accepted",
+                "rejected",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "UTF-8 BOM-prefixed activity registration roster",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/activities/{activityId}/registrations": {
+      "get": {
+        "operationId": "RegistrationsAdminController_list",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activityId",
+            "required": false,
+            "in": "query",
+            "description": "按活动筛选；省略时查询当前管理员可见的全部活动",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "姓名或学号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "registered",
+                "accepted",
+                "rejected",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
                   "$ref": "#/components/schemas/RegistrationListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/registrations": {
+      "get": {
+        "operationId": "RegistrationsAdminController_listAll",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": false,
+            "in": "query",
+            "description": "按活动筛选；省略时查询当前管理员可见的全部活动",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "姓名或学号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "registered",
+                "accepted",
+                "rejected",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Activity registrations"
+        ]
+      }
+    },
+    "/api/v1/admin/registrations/{id}": {
+      "get": {
+        "operationId": "RegistrationsAdminController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResponseDto"
                 }
               }
             }
@@ -17793,6 +18439,14 @@
           "registrationOpen": {
             "type": "boolean"
           },
+          "registrationOverride": {
+            "type": "boolean"
+          },
+          "registrationTemplateRevisionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "publishedAt": {
             "type": "string",
             "format": "date-time",
@@ -17827,7 +18481,8 @@
           },
           "registrationEndAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "coverAttachmentId": {
             "type": "string",
@@ -17865,6 +18520,8 @@
           "status",
           "version",
           "registrationOpen",
+          "registrationOverride",
+          "registrationTemplateRevisionId",
           "publishedAt",
           "title",
           "type",
@@ -17940,7 +18597,8 @@
           },
           "registrationEndAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "coverAttachmentId": {
             "type": "string",
@@ -17965,8 +18623,7 @@
           "location",
           "summary",
           "content",
-          "agenda",
-          "registrationEndAt"
+          "agenda"
         ]
       },
       "UpdateActivityDto": {
@@ -18008,7 +18665,8 @@
           },
           "registrationEndAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "coverAttachmentId": {
             "type": "string",
@@ -18036,6 +18694,10 @@
           "expectedVersion": {
             "type": "number",
             "minimum": 1
+          },
+          "overrideDeadline": {
+            "type": "boolean",
+            "description": "允许在截止时间后由管理员手动重新开放报名"
           }
         },
         "required": [
@@ -18048,6 +18710,10 @@
           "expectedVersion": {
             "type": "number",
             "minimum": 1
+          },
+          "overrideDeadline": {
+            "type": "boolean",
+            "description": "允许在截止时间后由管理员手动重新开放报名"
           },
           "reason": {
             "type": "string"
@@ -18250,6 +18916,13 @@
           },
           "activity": {
             "$ref": "#/components/schemas/MemberActivitySummaryResponseDto"
+          },
+          "templateRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "answers": {
+            "type": "object"
           }
         },
         "required": [
@@ -18261,7 +18934,9 @@
           "updatedAt",
           "decidedAt",
           "cancelledAt",
-          "activity"
+          "activity",
+          "templateRevisionId",
+          "answers"
         ]
       },
       "MemberActivityRegistrationListResponseDto": {
@@ -18306,6 +18981,13 @@
             "type": "number",
             "minimum": 0,
             "maximum": 0
+          },
+          "templateRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "answers": {
+            "type": "object"
           }
         },
         "required": [
@@ -18359,6 +19041,16 @@
           },
           "memberName": {
             "type": "string"
+          },
+          "templateRevisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "answers": {
+            "type": "object"
+          },
+          "studentId": {
+            "type": "string"
           }
         },
         "required": [
@@ -18370,7 +19062,93 @@
           "updatedAt",
           "decidedAt",
           "cancelledAt",
-          "decisionReason"
+          "decisionReason",
+          "templateRevisionId",
+          "answers"
+        ]
+      },
+      "RegistrationTemplateFieldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "textarea",
+              "phone",
+              "number",
+              "date",
+              "single",
+              "multi",
+              "checkbox"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "helpText": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "order": {
+            "type": "number"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "minLength": {
+            "type": "number"
+          },
+          "maxLength": {
+            "type": "number"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "maxItems": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "required",
+          "order"
+        ]
+      },
+      "ActivityRegistrationFormResponseDto": {
+        "type": "object",
+        "properties": {
+          "revisionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "number"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationTemplateFieldResponseDto"
+            }
+          }
+        },
+        "required": [
+          "revisionId",
+          "version",
+          "fields"
         ]
       },
       "RegistrationCommandDto": {
@@ -18385,9 +19163,197 @@
           "expectedVersion"
         ]
       },
+      "RegistrationTemplateRevisionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revisionNumber": {
+            "type": "number"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationTemplateFieldResponseDto"
+            }
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "revisionNumber",
+          "fields",
+          "publishedAt",
+          "createdAt"
+        ]
+      },
+      "RegistrationTemplateResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "workingRevision": {
+            "$ref": "#/components/schemas/RegistrationTemplateRevisionResponseDto"
+          },
+          "publishedRevision": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationTemplateRevisionResponseDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "version",
+          "workingRevision",
+          "publishedRevision"
+        ]
+      },
+      "RegistrationTemplateFieldDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "textarea",
+              "phone",
+              "number",
+              "date",
+              "single",
+              "multi",
+              "checkbox"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "helpText": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "order": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "options": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "minLength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5000
+          },
+          "maxLength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5000
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "maxItems": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "label",
+          "required",
+          "order"
+        ]
+      },
+      "SaveRegistrationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegistrationTemplateFieldDto"
+            }
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "fields"
+        ]
+      },
+      "PublishRegistrationTemplateDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ]
+      },
       "RegistrationListResponseDto": {
         "type": "object",
         "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          },
           "items": {
             "type": "array",
             "items": {
@@ -18396,6 +19362,10 @@
           }
         },
         "required": [
+          "page",
+          "pageSize",
+          "total",
+          "totalPages",
           "items"
         ]
       },
@@ -20118,6 +21088,9 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "studentId": {
+            "type": "string"
           },
           "name": {
             "type": "string"

@@ -7,11 +7,19 @@
 
 export type ActivityCommandDto = {
   "expectedVersion": number;
+  "overrideDeadline"?: boolean;
 };
 
 export type ActivityOfflineDto = {
   "expectedVersion": number;
+  "overrideDeadline"?: boolean;
   "reason": string;
+};
+
+export type ActivityRegistrationFormResponseDto = {
+  "revisionId": string;
+  "version": number;
+  "fields": Array<RegistrationTemplateFieldResponseDto>;
 };
 
 export type AdminAccountListResponseDto = {
@@ -47,6 +55,8 @@ export type AdminActivityResponseDto = {
   "status": "draft" | "published" | "offline";
   "version": number;
   "registrationOpen": boolean;
+  "registrationOverride": boolean;
+  "registrationTemplateRevisionId": (string) | null;
   "publishedAt": (string) | null;
   "title": string;
   "type": string;
@@ -56,7 +66,7 @@ export type AdminActivityResponseDto = {
   "summary": string;
   "content": string;
   "agenda": Array<string>;
-  "registrationEndAt": string;
+  "registrationEndAt": (string) | null;
   "coverAttachmentId": (string) | null;
   "detailAttachmentIds": Array<string>;
   "cover": (MediaAttachmentResponseDto) | null;
@@ -655,7 +665,7 @@ export type CreateActivityDto = {
   "summary": string;
   "content": string;
   "agenda": Array<string>;
-  "registrationEndAt": string;
+  "registrationEndAt"?: (string) | null;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
 };
@@ -798,6 +808,8 @@ export type CreateRecruitmentBatchDto = {
 
 export type CreateRegistrationDto = {
   "expectedVersion": number;
+  "templateRevisionId"?: string;
+  "answers"?: Record<string, unknown>;
 };
 
 export type CreateResourceDto = {
@@ -1129,6 +1141,8 @@ export type MemberActivityRegistrationResponseDto = {
   "decidedAt": (string) | null;
   "cancelledAt": (string) | null;
   "activity": MemberActivitySummaryResponseDto;
+  "templateRevisionId": string;
+  "answers": Record<string, unknown>;
 };
 
 export type MemberActivitySummaryResponseDto = {
@@ -1628,6 +1642,10 @@ export type PublishPortalConfigurationDto = {
   "confirmed": boolean;
 };
 
+export type PublishRegistrationTemplateDto = {
+  "expectedVersion": number;
+};
+
 export type ReasonedContentCommandDto = {
   "expectedVersion": number;
   "reason": string;
@@ -1739,6 +1757,10 @@ export type RegistrationCommandDto = {
 };
 
 export type RegistrationListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "totalPages": number;
   "items": Array<RegistrationResponseDto>;
 };
 
@@ -1753,6 +1775,55 @@ export type RegistrationResponseDto = {
   "cancelledAt": (string) | null;
   "decisionReason": (string) | null;
   "memberName"?: string;
+  "templateRevisionId": string;
+  "answers": Record<string, unknown>;
+  "studentId"?: string;
+};
+
+export type RegistrationTemplateFieldDto = {
+  "id": string;
+  "type": "text" | "textarea" | "phone" | "number" | "date" | "single" | "multi" | "checkbox";
+  "label": string;
+  "helpText"?: string;
+  "required": boolean;
+  "order": number;
+  "options"?: Array<string>;
+  "minLength"?: number;
+  "maxLength"?: number;
+  "min"?: number;
+  "max"?: number;
+  "maxItems"?: number;
+};
+
+export type RegistrationTemplateFieldResponseDto = {
+  "id": string;
+  "type": "text" | "textarea" | "phone" | "number" | "date" | "single" | "multi" | "checkbox";
+  "label": string;
+  "helpText"?: string;
+  "required": boolean;
+  "order": number;
+  "options"?: Array<string>;
+  "minLength"?: number;
+  "maxLength"?: number;
+  "min"?: number;
+  "max"?: number;
+  "maxItems"?: number;
+};
+
+export type RegistrationTemplateResponseDto = {
+  "id": string;
+  "key": string;
+  "version": number;
+  "workingRevision": RegistrationTemplateRevisionResponseDto;
+  "publishedRevision": (RegistrationTemplateRevisionResponseDto) | null;
+};
+
+export type RegistrationTemplateRevisionResponseDto = {
+  "id": string;
+  "revisionNumber": number;
+  "fields": Array<RegistrationTemplateFieldResponseDto>;
+  "publishedAt": (string) | null;
+  "createdAt": string;
 };
 
 export type ResourceCommandDto = {
@@ -1827,6 +1898,11 @@ export type SavePortalConfigurationDto = {
   "visuals"?: PortalVisualsDto;
 };
 
+export type SaveRegistrationTemplateDto = {
+  "expectedVersion": number;
+  "fields": Array<RegistrationTemplateFieldDto>;
+};
+
 export type SessionAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
@@ -1836,6 +1912,7 @@ export type SessionAccountResponseDto = {
 
 export type SessionPersonResponseDto = {
   "id": string;
+  "studentId"?: string;
   "name": string;
   "status": "PREPARATORY" | "FORMAL_MEMBER" | "NOT_ADMITTED";
 };
@@ -1863,7 +1940,7 @@ export type UpdateActivityDto = {
   "summary"?: string;
   "content"?: string;
   "agenda"?: Array<string>;
-  "registrationEndAt"?: string;
+  "registrationEndAt"?: (string) | null;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
   "expectedVersion": number;
@@ -2055,6 +2132,14 @@ export type WithdrawApplicationDto = {
   "expectedVersion": number;
 };
 
+export type ListActivityRegistrationsDto = {
+  "activityId"?: string;
+  "search"?: string;
+  "status"?: "registered" | "accepted" | "rejected" | "cancelled";
+  "page"?: Object;
+  "pageSize"?: Object;
+};
+
 export const API_V1_PATHS = {
   authLogin: "/api/v1/auth/login",
   authSession: "/api/v1/auth/session",
@@ -2165,9 +2250,16 @@ export const API_V1_PATHS = {
   publicActivity: "/api/v1/public/activities/{slug}",
   publicTimeline: "/api/v1/public/timeline",
   activityRegistrationCreate: "/api/v1/activities/{slug}/registrations",
+  activityRegistrationForm: "/api/v1/activities/{slug}/registration-form",
   activityRegistrationMine: "/api/v1/activities/{slug}/registration",
   activityRegistrationCancel: "/api/v1/registrations/{id}/cancel",
+  adminRegistrationTemplate: "/api/v1/admin/registration-template",
+  adminRegistrationTemplateDraft: "/api/v1/admin/registration-template/draft",
+  adminRegistrationTemplatePublish: "/api/v1/admin/registration-template/publish",
+  adminActivityRegistrationForm: "/api/v1/admin/activities/{activityId}/registration-form",
   adminActivityRegistrations: "/api/v1/admin/activities/{activityId}/registrations",
+  adminRegistrations: "/api/v1/admin/registrations",
+  adminRegistrationDetail: "/api/v1/admin/registrations/{id}",
   adminActivityRegistrationDecision: "/api/v1/admin/registrations/{id}/decision",
   adminGalleries: "/api/v1/admin/galleries",
   adminGalleryCreate: "/api/v1/admin/galleries",
@@ -2304,9 +2396,16 @@ export const API_OPERATIONS = {
   "GET /api/v1/public/activities/{slug}": { method: "GET", path: "/api/v1/public/activities/{slug}" },
   "GET /api/v1/public/timeline": { method: "GET", path: "/api/v1/public/timeline" },
   "POST /api/v1/activities/{slug}/registrations": { method: "POST", path: "/api/v1/activities/{slug}/registrations" },
+  "GET /api/v1/activities/{slug}/registration-form": { method: "GET", path: "/api/v1/activities/{slug}/registration-form" },
   "GET /api/v1/activities/{slug}/registration": { method: "GET", path: "/api/v1/activities/{slug}/registration" },
   "POST /api/v1/registrations/{id}/cancel": { method: "POST", path: "/api/v1/registrations/{id}/cancel" },
+  "GET /api/v1/admin/registration-template": { method: "GET", path: "/api/v1/admin/registration-template" },
+  "POST /api/v1/admin/registration-template/draft": { method: "POST", path: "/api/v1/admin/registration-template/draft" },
+  "POST /api/v1/admin/registration-template/publish": { method: "POST", path: "/api/v1/admin/registration-template/publish" },
+  "GET /api/v1/admin/activities/{activityId}/registration-form": { method: "GET", path: "/api/v1/admin/activities/{activityId}/registration-form" },
   "GET /api/v1/admin/activities/{activityId}/registrations": { method: "GET", path: "/api/v1/admin/activities/{activityId}/registrations" },
+  "GET /api/v1/admin/registrations": { method: "GET", path: "/api/v1/admin/registrations" },
+  "GET /api/v1/admin/registrations/{id}": { method: "GET", path: "/api/v1/admin/registrations/{id}" },
   "POST /api/v1/admin/registrations/{id}/decision": { method: "POST", path: "/api/v1/admin/registrations/{id}/decision" },
   "GET /api/v1/admin/galleries": { method: "GET", path: "/api/v1/admin/galleries" },
   "POST /api/v1/admin/galleries": { method: "POST", path: "/api/v1/admin/galleries" },
@@ -2449,9 +2548,16 @@ export interface ApiResponseByOperation {
   "GET /api/v1/public/activities/{slug}": PublicActivityResponseDto;
   "GET /api/v1/public/timeline": PublicTimelineListResponseDto;
   "POST /api/v1/activities/{slug}/registrations": RegistrationResponseDto;
+  "GET /api/v1/activities/{slug}/registration-form": ActivityRegistrationFormResponseDto;
   "GET /api/v1/activities/{slug}/registration": RegistrationResponseDto;
   "POST /api/v1/registrations/{id}/cancel": RegistrationResponseDto;
+  "GET /api/v1/admin/registration-template": RegistrationTemplateResponseDto;
+  "POST /api/v1/admin/registration-template/draft": RegistrationTemplateResponseDto;
+  "POST /api/v1/admin/registration-template/publish": RegistrationTemplateResponseDto;
+  "GET /api/v1/admin/activities/{activityId}/registration-form": ActivityRegistrationFormResponseDto;
   "GET /api/v1/admin/activities/{activityId}/registrations": RegistrationListResponseDto;
+  "GET /api/v1/admin/registrations": RegistrationListResponseDto;
+  "GET /api/v1/admin/registrations/{id}": RegistrationResponseDto;
   "POST /api/v1/admin/registrations/{id}/decision": RegistrationResponseDto;
   "GET /api/v1/admin/galleries": AdminGalleryListResponseDto;
   "POST /api/v1/admin/galleries": AdminGalleryResponseDto;
@@ -2820,14 +2926,35 @@ const API_RESPONSE_SCHEMAS = {
   "POST /api/v1/activities/{slug}/registrations": {
     "$ref": "#/components/schemas/RegistrationResponseDto"
   },
+  "GET /api/v1/activities/{slug}/registration-form": {
+    "$ref": "#/components/schemas/ActivityRegistrationFormResponseDto"
+  },
   "GET /api/v1/activities/{slug}/registration": {
     "$ref": "#/components/schemas/RegistrationResponseDto"
   },
   "POST /api/v1/registrations/{id}/cancel": {
     "$ref": "#/components/schemas/RegistrationResponseDto"
   },
+  "GET /api/v1/admin/registration-template": {
+    "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+  },
+  "POST /api/v1/admin/registration-template/draft": {
+    "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+  },
+  "POST /api/v1/admin/registration-template/publish": {
+    "$ref": "#/components/schemas/RegistrationTemplateResponseDto"
+  },
+  "GET /api/v1/admin/activities/{activityId}/registration-form": {
+    "$ref": "#/components/schemas/ActivityRegistrationFormResponseDto"
+  },
   "GET /api/v1/admin/activities/{activityId}/registrations": {
     "$ref": "#/components/schemas/RegistrationListResponseDto"
+  },
+  "GET /api/v1/admin/registrations": {
+    "$ref": "#/components/schemas/RegistrationListResponseDto"
+  },
+  "GET /api/v1/admin/registrations/{id}": {
+    "$ref": "#/components/schemas/RegistrationResponseDto"
   },
   "POST /api/v1/admin/registrations/{id}/decision": {
     "$ref": "#/components/schemas/RegistrationResponseDto"
@@ -8485,6 +8612,14 @@ const API_COMPONENT_SCHEMAS = {
       "registrationOpen": {
         "type": "boolean"
       },
+      "registrationOverride": {
+        "type": "boolean"
+      },
+      "registrationTemplateRevisionId": {
+        "type": "string",
+        "format": "uuid",
+        "nullable": true
+      },
       "publishedAt": {
         "type": "string",
         "format": "date-time",
@@ -8519,7 +8654,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "registrationEndAt": {
         "type": "string",
-        "format": "date-time"
+        "format": "date-time",
+        "nullable": true
       },
       "coverAttachmentId": {
         "type": "string",
@@ -8557,6 +8693,8 @@ const API_COMPONENT_SCHEMAS = {
       "status",
       "version",
       "registrationOpen",
+      "registrationOverride",
+      "registrationTemplateRevisionId",
       "publishedAt",
       "title",
       "type",
@@ -8632,7 +8770,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "registrationEndAt": {
         "type": "string",
-        "format": "date-time"
+        "format": "date-time",
+        "nullable": true
       },
       "coverAttachmentId": {
         "type": "string",
@@ -8657,8 +8796,7 @@ const API_COMPONENT_SCHEMAS = {
       "location",
       "summary",
       "content",
-      "agenda",
-      "registrationEndAt"
+      "agenda"
     ]
   },
   "UpdateActivityDto": {
@@ -8700,7 +8838,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "registrationEndAt": {
         "type": "string",
-        "format": "date-time"
+        "format": "date-time",
+        "nullable": true
       },
       "coverAttachmentId": {
         "type": "string",
@@ -8728,6 +8867,10 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion": {
         "type": "number",
         "minimum": 1
+      },
+      "overrideDeadline": {
+        "type": "boolean",
+        "description": "允许在截止时间后由管理员手动重新开放报名"
       }
     },
     "required": [
@@ -8740,6 +8883,10 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion": {
         "type": "number",
         "minimum": 1
+      },
+      "overrideDeadline": {
+        "type": "boolean",
+        "description": "允许在截止时间后由管理员手动重新开放报名"
       },
       "reason": {
         "type": "string"
@@ -8942,6 +9089,13 @@ const API_COMPONENT_SCHEMAS = {
       },
       "activity": {
         "$ref": "#/components/schemas/MemberActivitySummaryResponseDto"
+      },
+      "templateRevisionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "answers": {
+        "type": "object"
       }
     },
     "required": [
@@ -8953,7 +9107,9 @@ const API_COMPONENT_SCHEMAS = {
       "updatedAt",
       "decidedAt",
       "cancelledAt",
-      "activity"
+      "activity",
+      "templateRevisionId",
+      "answers"
     ]
   },
   "MemberActivityRegistrationListResponseDto": {
@@ -8998,6 +9154,13 @@ const API_COMPONENT_SCHEMAS = {
         "type": "number",
         "minimum": 0,
         "maximum": 0
+      },
+      "templateRevisionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "answers": {
+        "type": "object"
       }
     },
     "required": [
@@ -9051,6 +9214,16 @@ const API_COMPONENT_SCHEMAS = {
       },
       "memberName": {
         "type": "string"
+      },
+      "templateRevisionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "answers": {
+        "type": "object"
+      },
+      "studentId": {
+        "type": "string"
       }
     },
     "required": [
@@ -9062,7 +9235,93 @@ const API_COMPONENT_SCHEMAS = {
       "updatedAt",
       "decidedAt",
       "cancelledAt",
-      "decisionReason"
+      "decisionReason",
+      "templateRevisionId",
+      "answers"
+    ]
+  },
+  "RegistrationTemplateFieldResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "text",
+          "textarea",
+          "phone",
+          "number",
+          "date",
+          "single",
+          "multi",
+          "checkbox"
+        ]
+      },
+      "label": {
+        "type": "string"
+      },
+      "helpText": {
+        "type": "string"
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "order": {
+        "type": "number"
+      },
+      "options": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "minLength": {
+        "type": "number"
+      },
+      "maxLength": {
+        "type": "number"
+      },
+      "min": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "maxItems": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "id",
+      "type",
+      "label",
+      "required",
+      "order"
+    ]
+  },
+  "ActivityRegistrationFormResponseDto": {
+    "type": "object",
+    "properties": {
+      "revisionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "version": {
+        "type": "number"
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RegistrationTemplateFieldResponseDto"
+        }
+      }
+    },
+    "required": [
+      "revisionId",
+      "version",
+      "fields"
     ]
   },
   "RegistrationCommandDto": {
@@ -9077,9 +9336,197 @@ const API_COMPONENT_SCHEMAS = {
       "expectedVersion"
     ]
   },
+  "RegistrationTemplateRevisionResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "revisionNumber": {
+        "type": "number"
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RegistrationTemplateFieldResponseDto"
+        }
+      },
+      "publishedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "id",
+      "revisionNumber",
+      "fields",
+      "publishedAt",
+      "createdAt"
+    ]
+  },
+  "RegistrationTemplateResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "key": {
+        "type": "string"
+      },
+      "version": {
+        "type": "number"
+      },
+      "workingRevision": {
+        "$ref": "#/components/schemas/RegistrationTemplateRevisionResponseDto"
+      },
+      "publishedRevision": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RegistrationTemplateRevisionResponseDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "key",
+      "version",
+      "workingRevision",
+      "publishedRevision"
+    ]
+  },
+  "RegistrationTemplateFieldDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "text",
+          "textarea",
+          "phone",
+          "number",
+          "date",
+          "single",
+          "multi",
+          "checkbox"
+        ]
+      },
+      "label": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "helpText": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "order": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "options": {
+        "maxItems": 100,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "minLength": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 5000
+      },
+      "maxLength": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 5000
+      },
+      "min": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "maxItems": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "id",
+      "type",
+      "label",
+      "required",
+      "order"
+    ]
+  },
+  "SaveRegistrationTemplateDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "fields": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RegistrationTemplateFieldDto"
+        }
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "fields"
+    ]
+  },
+  "PublishRegistrationTemplateDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 1
+      }
+    },
+    "required": [
+      "expectedVersion"
+    ]
+  },
   "RegistrationListResponseDto": {
     "type": "object",
     "properties": {
+      "page": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 500
+      },
+      "total": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "totalPages": {
+        "type": "integer",
+        "minimum": 0
+      },
       "items": {
         "type": "array",
         "items": {
@@ -9088,6 +9535,10 @@ const API_COMPONENT_SCHEMAS = {
       }
     },
     "required": [
+      "page",
+      "pageSize",
+      "total",
+      "totalPages",
       "items"
     ]
   },
@@ -10810,6 +11261,9 @@ const API_COMPONENT_SCHEMAS = {
       "id": {
         "type": "string",
         "format": "uuid"
+      },
+      "studentId": {
+        "type": "string"
       },
       "name": {
         "type": "string"
