@@ -19,7 +19,7 @@ function onCancelled() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
-    <AdminPageHeading eyebrow="Activities" title="新建活动" description="先保存草稿，再在信息完整后直接发布到用户端。活动不设候补和人数上限。">
+    <AdminPageHeading eyebrow="活动管理" title="新建活动" description="先保存草稿，再在信息完整后直接发布到用户端。活动不设候补和人数上限。">
       <template #actions><NuxtLink class="button button--ghost" to="/admin/activities">返回活动管理</NuxtLink></template>
     </AdminPageHeading>
     <ActivityEditor mode="create" @saved="onSaved" @published="onPublished" @cancelled="onCancelled" />

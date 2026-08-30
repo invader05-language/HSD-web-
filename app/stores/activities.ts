@@ -5,7 +5,9 @@ import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-cent
 import { useSessionStore } from "./session";
 import { usePortalContentStore } from "./portal-content";
 import { isContentMediaAttachmentComplete } from "../utils/content-media";
+import { isActivityRegistrationOpen } from "../utils/activity-registration";
 import type { ContentMediaAttachment } from "../types/content-media";
+import type { ActivityRegistrationAnswers, ActivityRegistrationForm } from "../types/activity-registration";
 import type { ActivityRegistrationOpenedPayload, PortalAutomationResult } from "../types/portal-content";
 import type {
   ActivityAuditRecord,
@@ -93,7 +95,7 @@ function createSeedActivity(activity: (typeof ACTIVITY_DETAILS)[number], index: 
     cover,
     details: [],
     ownerCenterId: centerForSeed(activity.slug),
-    registrationEndAt: `${activity.date}T23:59:59.000Z`,
+    registrationEndAt: activity.status === "报名中" ? "2099-12-31T23:59:59.000Z" : `${activity.date}T23:59:59.000Z`,
     registrationMode: "unlimited",
     publishedAt,
     revision: 1,
@@ -284,6 +286,7 @@ export const useActivitiesStore = defineStore("activities", {
       activities: persisted?.activities ?? seedActivities(),
       registrations: persisted?.registrations ?? [] as ActivityRegistration[],
       apiRegistrationsBySlug: {} as Record<string, ActivityRegistration>,
+      apiRegistrationFormsBySlug: {} as Record<string, ActivityRegistrationForm>,
       apiModeActive: false,
       apiLoading: false,
       apiMutating: false,
@@ -293,7 +296,7 @@ export const useActivitiesStore = defineStore("activities", {
     };
   },
   actions: {
-    activateApiMode() { this.apiModeActive = true; this.activities = []; this.registrations = []; this.apiRegistrationsBySlug = {}; this.apiError = null; },
+    activateApiMode() { this.apiModeActive = true; this.activities = []; this.registrations = []; this.apiRegistrationsBySlug = {}; this.apiRegistrationFormsBySlug = {}; this.apiError = null; },
     async refreshPublicFromApi(gateway: { activities: { listPublic(): Promise<{ items: Array<Record<string, unknown>> }> } }) {
       this.activateApiMode(); this.apiLoading = true;
       try { const response = await gateway.activities.listPublic(); this.activities = response.items.map((item) => activityFromPublicApi(item)); }
@@ -331,12 +334,17 @@ export const useActivitiesStore = defineStore("activities", {
     },
     async setRegistrationOpenFromApi(gateway: any, activityId: string, isOpen: boolean) {
       const current = this.getById(activityId); if (!current) throw new Error("ACTIVITY_NOT_FOUND"); this.apiMutating = true; this.apiError = null;
-      try { const result = isOpen ? await gateway.activities.openRegistration(activityId, { expectedVersion: current.version }) : await gateway.activities.closeRegistration(activityId, { expectedVersion: current.version }); const saved = activityFromAdminApi(result); this.activities = this.activities.map((item) => item.id === saved.id ? saved : item); return saved; }
+      try { const deadline = current.registrationEndAt ? new Date(current.registrationEndAt) : undefined; const overrideDeadline = isOpen && (!deadline || Number.isNaN(deadline.getTime()) || deadline <= new Date()); const result = isOpen ? await gateway.activities.openRegistration(activityId, { expectedVersion: current.version, ...(overrideDeadline ? { overrideDeadline: true } : {}) }) : await gateway.activities.closeRegistration(activityId, { expectedVersion: current.version }); const saved = activityFromAdminApi(result); this.activities = this.activities.map((item) => item.id === saved.id ? saved : item); return saved; }
       catch (error) { this.apiError = activityApiError(error); throw error; } finally { this.apiMutating = false; }
     },
-    async registerFromApi(gateway: any, activity: { slug: string }) {
+    async refreshRegistrationFormFromApi(gateway: any, activity: { slug: string }) {
+      this.apiLoading = true; this.apiError = null;
+      try { const form = await gateway.registrations.form(activity.slug); this.apiRegistrationFormsBySlug[activity.slug] = form as ActivityRegistrationForm; return this.apiRegistrationFormsBySlug[activity.slug]; }
+      catch (error) { this.apiError = activityApiError(error); return undefined; } finally { this.apiLoading = false; }
+    },
+    async registerFromApi(gateway: any, activity: { slug: string }, answers: ActivityRegistrationAnswers = {}, templateRevisionId?: string) {
       this.apiMutating = true; this.apiError = null;
-      try { const registration = registrationFromApi(await gateway.registrations.create(activity.slug, { expectedVersion: 0 })); this.registrations = [registration, ...this.registrations.filter((item) => item.id !== registration.id)]; this.apiRegistrationsBySlug[activity.slug] = registration; return registration; }
+      try { const registration = registrationFromApi(await gateway.registrations.create(activity.slug, { expectedVersion: 0, answers, ...(templateRevisionId ? { templateRevisionId } : {}) })); this.registrations = [registration, ...this.registrations.filter((item) => item.id !== registration.id)]; this.apiRegistrationsBySlug[activity.slug] = registration; return registration; }
       catch (error) { this.apiError = activityApiError(error); throw error; } finally { this.apiMutating = false; }
     },
     async cancelRegistrationFromApi(gateway: any, registrationId: string) {
@@ -344,9 +352,14 @@ export const useActivitiesStore = defineStore("activities", {
       try { const registration = registrationFromApi(await gateway.registrations.cancel(registrationId, { expectedVersion: (current as any).version ?? 0 })); this.registrations = this.registrations.map((item) => item.id === registration.id ? registration : item); for (const [slug, item] of Object.entries(this.apiRegistrationsBySlug)) if (item.id === registration.id) this.apiRegistrationsBySlug[slug] = registration; return registration; }
       catch (error) { this.apiError = activityApiError(error); throw error; } finally { this.apiMutating = false; }
     },
-    async refreshRegistrationsFromApi(gateway: any, activityId: string) {
+    async refreshRegistrationsFromApi(gateway: any, activityId: string, query: { search?: string; status?: string; page?: number; pageSize?: number } = {}) {
       this.apiLoading = true; this.apiError = null;
-      try { const response = await gateway.registrations.listAdmin(activityId); const received = response.items.map(registrationFromApi); this.registrations = [...this.registrations.filter((item) => item.activityId !== activityId), ...received]; }
+      try { const response = await gateway.registrations.listAdmin(activityId, query); const received = response.items.map(registrationFromApi); this.registrations = [...this.registrations.filter((item) => item.activityId !== activityId), ...received]; return response; }
+      catch (error) { this.apiError = activityApiError(error); } finally { this.apiLoading = false; }
+    },
+    async refreshAllRegistrationsFromApi(gateway: any, query: { activityId?: string; search?: string; status?: string; page?: number; pageSize?: number } = {}) {
+      this.apiLoading = true; this.apiError = null;
+      try { const response = await gateway.registrations.listAllAdmin(query); this.registrations = response.items.map(registrationFromApi); return response; }
       catch (error) { this.apiError = activityApiError(error); } finally { this.apiLoading = false; }
     },
     async refreshMyRegistrationFromApi(gateway: any, activity: { slug: string }) {
@@ -388,12 +401,12 @@ export const useActivitiesStore = defineStore("activities", {
     getPublicActivities(): PublishedActivity[] {
       return this.activities
         .filter((activity) => activity.publishedState === "published" && activity.publishedSnapshot)
-        .map((activity) => ({ ...clone(activity.publishedSnapshot!), registrationOpen: activity.registrationOpen } as PublishedActivity & { registrationOpen: boolean }));
+        .map((activity) => ({ ...clone(activity.publishedSnapshot!), registrationOpen: isActivityRegistrationOpen(activity) } as PublishedActivity & { registrationOpen: boolean }));
     },
     getPublicBySlug(slug: string) {
       const activity = this.activities.find((item) => item.slug === slug && item.publishedState === "published" && item.publishedSnapshot);
       return activity?.publishedSnapshot
-        ? ({ ...clone(activity.publishedSnapshot), registrationOpen: activity.registrationOpen } as PublishedActivity & { registrationOpen: boolean })
+        ? ({ ...clone(activity.publishedSnapshot), registrationOpen: isActivityRegistrationOpen(activity) } as PublishedActivity & { registrationOpen: boolean })
         : undefined;
     },
     createDraft(input: ActivityDraftInput, now: Date = new Date()): ManagedActivity {
@@ -509,7 +522,6 @@ export const useActivitiesStore = defineStore("activities", {
       activity.revision = snapshot.revision;
       activity.version += 1;
       activity.updatedAt = snapshot.publishedAt;
-      if (!activity.registrationOpen) activity.registrationOpen = true;
       try {
         this.persist();
       } catch (error) {
@@ -551,6 +563,7 @@ export const useActivitiesStore = defineStore("activities", {
       activity.publishedState = "unpublished";
       activity.status = "unpublished";
       activity.registrationOpen = false;
+      activity.registrationOverride = false;
       activity.version += 1;
       activity.updatedAt = now.toISOString();
       try {
@@ -563,14 +576,19 @@ export const useActivitiesStore = defineStore("activities", {
       void reason;
       return activity;
     },
-    setRegistrationOpen(activityId: string, isOpen: boolean, now: Date = new Date()): ManagedActivity {
+    setRegistrationOpen(activityId: string, isOpen: boolean, now: Date = new Date(), overrideDeadline = false): ManagedActivity {
       const activity = this.getById(activityId);
       if (!activity) throw new Error("ACTIVITY_NOT_FOUND");
       assertCanManageActivity(activity);
       if (activity.publishedState !== "published") throw new Error("ACTIVITY_NOT_PUBLISHED");
-      if (activity.registrationOpen === isOpen) return activity;
+      const currentlyOpen = isActivityRegistrationOpen(activity, now);
+      if (isOpen ? currentlyOpen : !activity.registrationOpen) return activity;
+      const deadline = activity.registrationEndAt ? new Date(activity.registrationEndAt) : undefined;
+      const expired = !deadline || Number.isNaN(deadline.getTime()) || deadline <= now;
+      if (isOpen && expired && !overrideDeadline) throw new Error("ACTIVITY_REGISTRATION_CLOSED");
       const previous = clone(activity);
       activity.registrationOpen = isOpen;
+      activity.registrationOverride = isOpen && expired;
       activity.version += 1;
       activity.updatedAt = now.toISOString();
       try {
@@ -583,8 +601,8 @@ export const useActivitiesStore = defineStore("activities", {
       else usePortalContentStore().invalidateSource("activity", activity.id, now);
       return activity;
     },
-    openRegistration(activityId: string, now: Date = new Date()) {
-      return this.setRegistrationOpen(activityId, true, now);
+    openRegistration(activityId: string, now: Date = new Date(), overrideDeadline = false) {
+      return this.setRegistrationOpen(activityId, true, now, overrideDeadline);
     },
     closeRegistration(activityId: string, now: Date = new Date()) {
       return this.setRegistrationOpen(activityId, false, now);
@@ -624,9 +642,15 @@ export const useActivitiesStore = defineStore("activities", {
       const session = requireAuthenticatedActor();
       const activity = this.getById(activityId);
       if (!activity || activity.publishedState !== "published" || !activity.publishedSnapshot) throw new Error("ACTIVITY_NOT_PUBLIC");
-      if (!activity.registrationOpen) throw new Error("ACTIVITY_REGISTRATION_CLOSED");
-      const existing = this.registrations.find((item) => item.activityId === activityId && item.memberId === session.currentMemberId && item.status !== "cancelled");
-      if (existing) throw new Error("ACTIVITY_REGISTRATION_DUPLICATE");
+      if (!isActivityRegistrationOpen(activity, now)) throw new Error("ACTIVITY_REGISTRATION_CLOSED");
+      const existing = this.registrations.find((item) => item.activityId === activityId && item.memberId === session.currentMemberId);
+      if (existing && existing.status !== "cancelled") throw new Error("ACTIVITY_REGISTRATION_DUPLICATE");
+      if (existing) {
+        existing.status = "registered";
+        existing.updatedAt = now.toISOString();
+        this.persist();
+        return existing;
+      }
       const registration: ActivityRegistration = {
         id: `activity-registration-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         activityId,
@@ -693,10 +717,10 @@ export const useActivitiesStore = defineStore("activities", {
 });
 
 function activityApiError(error: unknown) { const api = error as { status?: unknown; code?: unknown; requestId?: unknown }; return error instanceof Error ? { status: typeof api.status === "number" ? api.status : undefined, code: typeof api.code === "string" ? api.code : "ACTIVITY_API_REQUEST_FAILED", message: error.message, requestId: typeof api.requestId === "string" ? api.requestId : undefined } : { code: "ACTIVITY_API_REQUEST_FAILED", message: "Activity API request failed" }; }
-function activityCreatePayload(input: ActivityDraftInput) { return { expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title, type: input.type, date: input.date, time: input.time, location: input.location, summary: input.summary, content: input.content, agenda: input.agenda, registrationEndAt: input.registrationEndAt, ...(input.cover ? { coverAttachmentId: input.cover.id } : {}), ...(input.details.length ? { detailAttachmentIds: input.details.map((item) => item.id) } : {}) }; }
-function registrationFromApi(item: any): ActivityRegistration { return { id: String(item.id), activityId: String(item.activityId), memberId: "", memberName: typeof item.memberName === "string" ? item.memberName : "", status: item.status as ActivityRegistrationStatus, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt), ...(item.decidedAt ? { decidedAt: String(item.decidedAt) } : {}), ...(item.decisionReason ? { decisionReason: String(item.decisionReason) } : {}), version: Number(item.version) } as ActivityRegistration; }
-function activityFromPublicApi(item: Record<string, unknown>): ManagedActivity { const slug = String(item.slug); const cover = publicActivityAttachment(item.cover, `activity-cover-${slug}`, "cover", 0); const details = Array.isArray(item.details) ? item.details.flatMap((detail, index) => { const mapped = publicActivityAttachment(detail, `activity-detail-${slug}-${index}`, "detail", index); return mapped ? [mapped] : []; }) : []; const base = { id: slug, slug, title: String(item.title), type: String(item.type), date: String(item.date), time: String(item.time), location: String(item.location), summary: String(item.summary), content: String(item.content), agenda: Array.isArray(item.agenda) ? item.agenda.map(String) : [], cover, details, ownerCenterId: "", registrationEndAt: String(item.registrationEndAt), registrationMode: "unlimited" as const, publishedAt: "", revision: 1 }; return { ...base, status: "published", registrationOpen: item.registrationOpen === true, version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedState: "published", publishedSnapshot: base }; }
-function activityFromAdminApi(item: Record<string, unknown>): ManagedActivity { const base = activityFromPublicApi({ ...item, cover: null, details: [] }); const cover = item.cover && typeof item.cover === "object" ? adminActivityAttachment(item.cover, "cover", 0) : typeof item.coverAttachmentId === "string" ? adminActivityAttachment(item.coverAttachmentId, "cover", 0) : null; const details = Array.isArray(item.details) ? item.details.flatMap((value, index) => value ? [adminActivityAttachment(value, "detail", index)] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => adminActivityAttachment(id, "detail", index)) : []; return { ...base, cover, details, id: String(item.id), ownerCenterId: String(item.centerId), status: item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft", publishedState: item.status === "published" ? "published" : "unpublished", registrationOpen: item.registrationOpen === true, version: Number(item.version), publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), publishedSnapshot: undefined }; }
+function activityCreatePayload(input: ActivityDraftInput) { return { expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title, type: input.type, date: input.date, time: input.time, location: input.location, summary: input.summary, content: input.content, agenda: input.agenda, ...(input.registrationEndAt ? { registrationEndAt: input.registrationEndAt } : {}), ...(input.cover ? { coverAttachmentId: input.cover.id } : {}), ...(input.details.length ? { detailAttachmentIds: input.details.map((item) => item.id) } : {}) }; }
+function registrationFromApi(item: any): ActivityRegistration { const studentId = typeof item.studentId === "string" ? item.studentId : ""; return { id: String(item.id), activityId: String(item.activityId), memberId: studentId, memberName: typeof item.memberName === "string" ? item.memberName : "", status: item.status as ActivityRegistrationStatus, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt), ...(item.decidedAt ? { decidedAt: String(item.decidedAt) } : {}), ...(item.decisionReason ? { decisionReason: String(item.decisionReason) } : {}), ...(typeof item.templateRevisionId === "string" ? { templateRevisionId: item.templateRevisionId } : {}), ...(item.answers && typeof item.answers === "object" ? { answers: item.answers } : {}), ...(studentId ? { studentId } : {}), version: Number(item.version) } as ActivityRegistration; }
+function activityFromPublicApi(item: Record<string, unknown>): ManagedActivity { const slug = String(item.slug); const cover = publicActivityAttachment(item.cover, `activity-cover-${slug}`, "cover", 0); const details = Array.isArray(item.details) ? item.details.flatMap((detail, index) => { const mapped = publicActivityAttachment(detail, `activity-detail-${slug}-${index}`, "detail", index); return mapped ? [mapped] : []; }) : []; const registrationEndAt = typeof item.registrationEndAt === "string" ? item.registrationEndAt : ""; const registrationOverride = item.registrationOpen === true && Boolean(registrationEndAt) && new Date(registrationEndAt) <= new Date(); const base = { id: slug, slug, title: String(item.title), type: String(item.type), date: String(item.date), time: String(item.time), location: String(item.location), summary: String(item.summary), content: String(item.content), agenda: Array.isArray(item.agenda) ? item.agenda.map(String) : [], cover, details, ownerCenterId: "", registrationEndAt, registrationMode: "unlimited" as const, publishedAt: "", revision: 1 }; return { ...base, status: "published", registrationOpen: item.registrationOpen === true, registrationOverride, version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedState: "published", publishedSnapshot: base }; }
+function activityFromAdminApi(item: Record<string, unknown>): ManagedActivity { const base = activityFromPublicApi({ ...item, cover: null, details: [] }); const cover = item.cover && typeof item.cover === "object" ? adminActivityAttachment(item.cover, "cover", 0) : typeof item.coverAttachmentId === "string" ? adminActivityAttachment(item.coverAttachmentId, "cover", 0) : null; const details = Array.isArray(item.details) ? item.details.flatMap((value, index) => value ? [adminActivityAttachment(value, "detail", index)] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => adminActivityAttachment(id, "detail", index)) : []; return { ...base, cover, details, id: String(item.id), ownerCenterId: String(item.centerId), status: item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft", publishedState: item.status === "published" ? "published" : "unpublished", registrationOpen: item.registrationOpen === true, registrationOverride: item.registrationOverride === true, version: Number(item.version), publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), publishedSnapshot: undefined }; }
 
 function adminActivityAttachment(value: unknown, role: "cover" | "detail", sortOrder: number): ContentMediaAttachment { if (typeof value === "object" && value !== null && !Array.isArray(value)) { const media = value as Record<string, unknown>; return { id: typeof media.id === "string" ? media.id : `activity-${role}-${sortOrder}`, serverOwned: true, role: media.role === "detail" ? "detail" : role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: media.status === "failed" ? "failed" : "ready", ...(typeof media.version === "number" ? { version: media.version } : {}) }; } const id = String(value); return { id, serverOwned: true, role, kind: "image", title: "", caption: "", alt: "", aspect: "landscape", sortOrder, status: "processing" }; }
 

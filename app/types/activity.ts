@@ -1,6 +1,7 @@
 export const ACTIVITY_REGISTRATION_STATUSES = ["registered", "accepted", "rejected", "cancelled"] as const;
 export type ActivityRegistrationStatus = (typeof ACTIVITY_REGISTRATION_STATUSES)[number];
 import type { ContentMediaAttachment } from "./content-media";
+import type { ActivityRegistrationAnswers } from "./activity-registration";
 
 export interface ActivityDraftInput {
   slug?: string;
@@ -29,6 +30,7 @@ export interface PublishedActivity extends ActivityDraftInput {
 export interface ManagedActivity extends PublishedActivity {
   status: "draft" | "published" | "unpublished";
   registrationOpen: boolean;
+  registrationOverride?: boolean;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +50,9 @@ export interface ActivityRegistration {
   decidedAt?: string;
   decidedBy?: string;
   decisionReason?: string;
+  templateRevisionId?: string;
+  answers?: ActivityRegistrationAnswers;
+  studentId?: string;
 }
 
 export interface ActivityAuditRecord {

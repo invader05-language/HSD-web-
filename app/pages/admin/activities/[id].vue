@@ -2,6 +2,7 @@
 import { useActivitiesStore } from "~/stores/activities";
 import { useContentGateway } from "~/composables/useContentGateway";
 import ActivityEditor from "~/components/admin/ActivityEditor.vue";
+import { localizeActivityError } from "~/utils/activity-errors";
 
 definePageMeta({ layout: "admin" });
 
@@ -41,10 +42,10 @@ function onCancelled() {
 
 <template>
   <div class="admin-recruitment-page admin-section-page">
-    <p v-if="activitiesStore.apiError" role="alert">{{ activitiesStore.apiError.message }}（{{ activitiesStore.apiError.code }}）</p>
+    <p v-if="activitiesStore.apiError" role="alert">{{ localizeActivityError(activitiesStore.apiError) }}</p>
     <p v-if="activitiesStore.apiLoading" role="status">正在加载活动…</p>
     <AdminPageHeading
-      eyebrow="Activities"
+      eyebrow="活动管理"
       :title="activity?.title || (sourceActivity ? '编辑活动' : '活动不存在')"
       :description="activity ? '编辑工作版本不会提前覆盖当前公开版本。' : '该活动不存在，或当前管理员无权访问。'"
     >

@@ -546,6 +546,11 @@ a {
   outline-offset: 2px;
 }
 
+.content-media-uploader__dropzone[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
 .content-media-uploader__dropzone strong {
   color: #272c31;
   font-size: 14px;
@@ -2509,6 +2514,74 @@ a {
   color: var(--brand-red);
   font-size: 12px;
   font-weight: 800;
+}
+
+.activity-registration-detail-drawer {
+  max-width: 560px;
+}
+
+.activity-registration-detail-fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.activity-registration-detail-fields div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.3fr);
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e8eb;
+}
+
+.activity-registration-detail-fields dt {
+  color: #66717d;
+  font-size: 13px;
+}
+
+.activity-registration-detail-fields dd {
+  margin: 0;
+  color: var(--near-black);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.activity-registration-section { border-top: 1px solid var(--line, #d9dfe5); }
+.activity-registration-form { display: grid; gap: 1rem; max-width: 42rem; }
+.activity-registration-form__identity { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; padding: .85rem 1rem; background: #f5f6f7; border: 1px solid #d9dfe5; }
+.activity-registration-form__identity div { display: grid; gap: .2rem; }
+.activity-registration-form__identity span { color: #66717d; font-size: .78rem; }
+.activity-registration-form fieldset { display: grid; gap: .45rem; border: 0; padding: 0; margin: 0; }
+.activity-registration-form legend { padding: 0; font-weight: 700; }
+.activity-registration-form legend span { color: #b1202b; margin-left: .2rem; }
+.activity-registration-form input:not([type="checkbox"]), .activity-registration-form textarea, .activity-registration-form select { width: 100%; }
+.activity-registration-form__options { display: grid; gap: .4rem; }
+.activity-registration-form__options label, .activity-registration-form__checkbox { display: flex; gap: .45rem; align-items: center; }
+.field-help { margin: 0; color: #66717d; font-size: .85rem; }
+.field-error { color: #b1202b; }
+.activity-registration-form fieldset.has-error input, .activity-registration-form fieldset.has-error textarea, .activity-registration-form fieldset.has-error select { border-color: #b1202b; }
+.admin-template-field { display: grid; gap: .8rem; padding: 1rem 0; border-bottom: 1px solid #d9dfe5; }
+.admin-template-field__head { display: flex; justify-content: space-between; align-items: center; }
+.admin-template-required { align-self: end; display: flex; align-items: center; gap: .4rem; }
+.admin-template-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+
+@media (max-width: 700px) {
+  .activity-registration-form__identity { grid-template-columns: 1fr 1fr; }
+}
+
+.organization-leadership-card__positions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .45rem;
+}
+
+.organization-leadership-card__positions span {
+  padding: .2rem .45rem;
+  border: 1px solid var(--line, #d9dee7);
+  border-radius: 999px;
+  color: var(--ink-muted, #5c6675);
+  font-size: .72rem;
 }
 
 .center-minister-card__meta {

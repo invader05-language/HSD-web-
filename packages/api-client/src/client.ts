@@ -36,6 +36,12 @@ import {
   type CreateRegistrationDto,
   type RegistrationCommandDto,
   type DecideRegistrationDto,
+  type RegistrationResponseDto,
+  type ActivityRegistrationFormResponseDto,
+  type RegistrationTemplateResponseDto,
+  type SaveRegistrationTemplateDto,
+  type PublishRegistrationTemplateDto,
+  type ListActivityRegistrationsDto,
   type LoginDto,
   type PreparatoryMemberImportDto,
   type PublishPortalConfigurationDto,
@@ -244,7 +250,7 @@ export interface HsdApiClient {
     listPublic(query?: { page?: number; pageSize?: number; kind?: "activity" | "article" | "notice" }): Promise<ApiResponseFor<"GET /api/v1/public/timeline">>;
   };
   registrations: {
-    create(slug: string, payload: CreateRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/activities/{slug}/registrations">>; mine(slug: string): Promise<ApiResponseFor<"GET /api/v1/activities/{slug}/registration">>; cancel(id: string, payload: RegistrationCommandDto): Promise<ApiResponseFor<"POST /api/v1/registrations/{id}/cancel">>; listAdmin(activityId: string): Promise<ApiResponseFor<"GET /api/v1/admin/activities/{activityId}/registrations">>; decide(id: string, payload: DecideRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/admin/registrations/{id}/decision">>;
+    create(slug: string, payload: CreateRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/activities/{slug}/registrations">>; mine(slug: string): Promise<ApiResponseFor<"GET /api/v1/activities/{slug}/registration">>; cancel(id: string, payload: RegistrationCommandDto): Promise<ApiResponseFor<"POST /api/v1/registrations/{id}/cancel">>; listAdmin(activityId: string, query?: ListActivityRegistrationsDto): Promise<ApiResponseFor<"GET /api/v1/admin/activities/{activityId}/registrations">>; listAllAdmin(query?: ListActivityRegistrationsDto): Promise<ApiResponseFor<"GET /api/v1/admin/registrations">>; detail(id: string): Promise<RegistrationResponseDto>; decide(id: string, payload: DecideRegistrationDto): Promise<ApiResponseFor<"POST /api/v1/admin/registrations/{id}/decision">>; form(slug: string): Promise<ActivityRegistrationFormResponseDto>; template(): Promise<RegistrationTemplateResponseDto>; saveTemplate(payload: SaveRegistrationTemplateDto): Promise<RegistrationTemplateResponseDto>; publishTemplate(payload: PublishRegistrationTemplateDto): Promise<RegistrationTemplateResponseDto>; activityForm(activityId: string): Promise<ActivityRegistrationFormResponseDto>;
   };
   galleries: {
     listAdmin(): Promise<ApiResponseFor<"GET /api/v1/admin/galleries">>;
@@ -442,7 +448,29 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       },
     },
     registrations: {
-      create: (slug, payload) => requestGenerated(transport, "POST /api/v1/activities/{slug}/registrations", payload, `/api/v1/activities/${encodeURIComponent(slug)}/registrations`), mine: (slug) => requestGenerated(transport, "GET /api/v1/activities/{slug}/registration", undefined, `/api/v1/activities/${encodeURIComponent(slug)}/registration`), cancel: (id, payload) => requestGenerated(transport, "POST /api/v1/registrations/{id}/cancel", payload, `/api/v1/registrations/${encodeURIComponent(id)}/cancel`), listAdmin: (activityId) => requestGenerated(transport, "GET /api/v1/admin/activities/{activityId}/registrations", undefined, `/api/v1/admin/activities/${encodeURIComponent(activityId)}/registrations`), decide: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/registrations/{id}/decision", payload, `/api/v1/admin/registrations/${encodeURIComponent(id)}/decision`),
+      create: (slug, payload) => requestGenerated(transport, "POST /api/v1/activities/{slug}/registrations", payload, `/api/v1/activities/${encodeURIComponent(slug)}/registrations`), mine: (slug) => requestGenerated(transport, "GET /api/v1/activities/{slug}/registration", undefined, `/api/v1/activities/${encodeURIComponent(slug)}/registration`), cancel: (id, payload) => requestGenerated(transport, "POST /api/v1/registrations/{id}/cancel", payload, `/api/v1/registrations/${encodeURIComponent(id)}/cancel`), listAdmin: (activityId, query = {}) => {
+        const params = new URLSearchParams();
+        if (query.search) params.set("search", query.search);
+        if (query.status) params.set("status", query.status);
+        if (query.page !== undefined) params.set("page", String(query.page));
+        if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+        const suffix = params.toString() ? `?${params.toString()}` : "";
+        return requestGenerated(transport, "GET /api/v1/admin/activities/{activityId}/registrations", undefined, `/api/v1/admin/activities/${encodeURIComponent(activityId)}/registrations${suffix}`);
+      }, listAllAdmin: (query = {}) => {
+        const params = new URLSearchParams();
+        if (query.activityId) params.set("activityId", query.activityId);
+        if (query.search) params.set("search", query.search);
+        if (query.status) params.set("status", query.status);
+        if (query.page !== undefined) params.set("page", String(query.page));
+        if (query.pageSize !== undefined) params.set("pageSize", String(query.pageSize));
+        const suffix = params.toString() ? `?${params.toString()}` : "";
+        return requestGenerated(transport, "GET /api/v1/admin/registrations", undefined, `/api/v1/admin/registrations${suffix}`);
+      }, detail: (id) => requestGenerated(transport, "GET /api/v1/admin/registrations/{id}", undefined, `/api/v1/admin/registrations/${encodeURIComponent(id)}`), decide: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/registrations/{id}/decision", payload, `/api/v1/admin/registrations/${encodeURIComponent(id)}/decision`),
+      form: (slug) => requestGenerated(transport, "GET /api/v1/activities/{slug}/registration-form", undefined, `/api/v1/activities/${encodeURIComponent(slug)}/registration-form`),
+      template: () => requestGenerated(transport, "GET /api/v1/admin/registration-template"),
+      saveTemplate: (payload) => requestGenerated(transport, "POST /api/v1/admin/registration-template/draft", payload),
+      publishTemplate: (payload) => requestGenerated(transport, "POST /api/v1/admin/registration-template/publish", payload),
+      activityForm: (activityId) => requestGenerated(transport, "GET /api/v1/admin/activities/{activityId}/registration-form", undefined, `/api/v1/admin/activities/${encodeURIComponent(activityId)}/registration-form`),
     },
     galleries: {
       listAdmin: () => requestGenerated(transport, "GET /api/v1/admin/galleries"),

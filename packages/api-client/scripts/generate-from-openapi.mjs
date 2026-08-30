@@ -114,9 +114,16 @@ const browserOperations = {
   publicActivity: "GET /api/v1/public/activities/{slug}",
   publicTimeline: "GET /api/v1/public/timeline",
   activityRegistrationCreate: "POST /api/v1/activities/{slug}/registrations",
+  activityRegistrationForm: "GET /api/v1/activities/{slug}/registration-form",
   activityRegistrationMine: "GET /api/v1/activities/{slug}/registration",
   activityRegistrationCancel: { operation: "POST /api/v1/registrations/{id}/cancel", successStatus: "200" },
+  adminRegistrationTemplate: "GET /api/v1/admin/registration-template",
+  adminRegistrationTemplateDraft: { operation: "POST /api/v1/admin/registration-template/draft", successStatus: "200" },
+  adminRegistrationTemplatePublish: { operation: "POST /api/v1/admin/registration-template/publish", successStatus: "200" },
+  adminActivityRegistrationForm: "GET /api/v1/admin/activities/{activityId}/registration-form",
   adminActivityRegistrations: "GET /api/v1/admin/activities/{activityId}/registrations",
+  adminRegistrations: "GET /api/v1/admin/registrations",
+  adminRegistrationDetail: "GET /api/v1/admin/registrations/{id}",
   adminActivityRegistrationDecision: { operation: "POST /api/v1/admin/registrations/{id}/decision", successStatus: "200" },
   adminGalleries: "GET /api/v1/admin/galleries",
   adminGalleryCreate: "POST /api/v1/admin/galleries",
@@ -141,6 +148,10 @@ const browserOperations = {
   adminHelpPublish: "POST /api/v1/admin/help/{id}/publish",
   publicHelp: "GET /api/v1/public/help",
   publicHelpDetail: "GET /api/v1/public/help/{slug}",
+};
+
+const queryTypes = {
+  ListActivityRegistrationsDto: "GET /api/v1/admin/activities/{activityId}/registrations",
 };
 
 const document = JSON.parse(await readFile(snapshotPath, "utf8"));
@@ -188,6 +199,19 @@ const declarations = Object.entries(schemas)
   .map(([name, schema]) => `export type ${name} = ${tsType(schema)};`)
   .join("\n\n");
 
+const queryDeclarations = Object.entries(queryTypes)
+  .map(([name, operation]) => {
+    const [method, path] = operation.split(" ");
+    const parameters = paths[path]?.[method.toLowerCase()]?.parameters ?? [];
+    const queryParameters = parameters.filter((parameter) => parameter.in === "query");
+    if (!queryParameters.length) throw new Error(`Missing query parameters for ${operation}`);
+    const properties = queryParameters
+      .map((parameter) => `  ${JSON.stringify(parameter.name)}${parameter.required ? "" : "?"}: ${tsType(parameter.schema)};`)
+      .join("\n");
+    return `export type ${name} = {\n${properties}\n};`;
+  })
+  .join("\n\n");
+
 const operations = Object.entries(browserOperations).map(([name, configuredOperation]) => {
   const operation = typeof configuredOperation === "string" ? configuredOperation : configuredOperation.operation;
   const [method, path] = operation.split(" ");
@@ -207,5 +231,6 @@ const responseSchemas = Object.fromEntries(operations.map(({ operation, schema }
 
 const output = `/**\n * AUTO-GENERATED from packages/api-client/openapi.snapshot.json.\n * Refresh with: pnpm --filter @hsd/api export:browser-openapi && pnpm --filter @hsd/api-client generate\n * Do not edit manually.\n */\n\n${declarations}\n\nexport const API_V1_PATHS = {\n${pathMap}\n} as const;\n\nexport const API_OPERATIONS = {\n${operationMap}\n} as const;\n\nexport type ApiOperation = keyof typeof API_OPERATIONS;\nexport type ApiV1Path = (typeof API_V1_PATHS)[keyof typeof API_V1_PATHS];\n\nexport interface ApiResponseByOperation {\n${responseMap}\n}\n\nexport type ApiResponseFor<TOperation extends ApiOperation> = ApiResponseByOperation[TOperation];\n\nconst API_RESPONSE_SCHEMAS = ${JSON.stringify(responseSchemas, null, 2)} as const;\n\ntype JsonSchema = {\n  $ref?: string; type?: string; nullable?: boolean; enum?: unknown[]; properties?: Record<string, JsonSchema>; required?: string[]; items?: JsonSchema; oneOf?: JsonSchema[]; anyOf?: JsonSchema[]; allOf?: JsonSchema[]; additionalProperties?: boolean | JsonSchema;\n};\n\nconst API_COMPONENT_SCHEMAS = ${JSON.stringify(schemas, null, 2)} as const;\n\nfunction resolveSchema(schema: JsonSchema): JsonSchema {\n  if (!schema.$ref) return schema;\n  const name = schema.$ref.split("/").at(-1);\n  const referenced = (API_COMPONENT_SCHEMAS as Record<string, JsonSchema>)[name];\n  if (!referenced) return schema;\n  const { $ref: _reference, ...overrides } = schema;\n  return { ...referenced, ...overrides };\n}\n\nfunction conforms(schema: JsonSchema, value: unknown, strictObject = true): boolean {\n  const resolved = resolveSchema(schema);\n  if (value === null) return resolved.nullable === true || resolved.type === "null" || (resolved.oneOf ?? resolved.anyOf ?? []).some((item) => conforms(item, value, strictObject));\n  if (resolved.oneOf || resolved.anyOf) return (resolved.oneOf ?? resolved.anyOf ?? []).some((item) => conforms(item, value, strictObject));\n  if (resolved.allOf && !resolved.allOf.every((item) => conforms(item, value, false))) return false;\n  if (resolved.enum && !resolved.enum.includes(value)) return false;\n  if (resolved.type === "array") return Array.isArray(value) && value.every((item) => conforms(resolved.items ?? {}, item, strictObject));\n  if (resolved.type === "object" || resolved.properties) {\n    if (!value || typeof value !== "object" || Array.isArray(value)) return false;\n    const record = value as Record<string, unknown>;\n    const properties = resolved.properties ?? {};\n    if (!(resolved.required ?? []).every((key) => key in record)) return false;\n    if (!Object.entries(properties).every(([key, property]) => !(key in record) || conforms(property, record[key], strictObject))) return false;\n    if (!strictObject || Object.keys(properties).length === 0) return true;\n    return Object.keys(record).every((key) => {\n      if (key in properties) return true;\n      if (resolved.additionalProperties === true) return true;\n      if (resolved.additionalProperties && typeof resolved.additionalProperties === "object") return conforms(resolved.additionalProperties, record[key], strictObject);\n      return false;\n    });\n  }\n  if (resolved.type === "integer") return typeof value === "number" && Number.isInteger(value);\n  if (resolved.type === "number") return typeof value === "number";\n  if (resolved.type === "boolean") return typeof value === "boolean";\n  if (resolved.type === "string") return typeof value === "string";\n  return true;\n}\n\nexport function isApiResponse<TOperation extends ApiOperation>(operation: TOperation, value: unknown): value is ApiResponseFor<TOperation> {\n  return conforms(API_RESPONSE_SCHEMAS[operation], value);\n}\n`;
 
-await writeFile(outputPath, `// @ts-nocheck\n${output}`, "utf8");
+const outputWithQueries = output.replace(`${declarations}\n\n`, `${declarations}\n\n${queryDeclarations}\n\n`);
+await writeFile(outputPath, `// @ts-nocheck\n${outputWithQueries}`, "utf8");
 console.info(`Generated ${operations.length} browser operation declarations from ${snapshotPath}`);

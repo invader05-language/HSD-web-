@@ -232,6 +232,27 @@ describe("generated browser API client", () => {
     ]);
   });
 
+  it("dispatches server-side activity registration filters and pagination", async () => {
+    const requests: Array<{ path: string; method: string }> = [];
+    const client = createHsdApiClient(async (request) => {
+      requests.push({ path: request.path, method: request.method });
+      return { page: 2, pageSize: 50, total: 51, totalPages: 2, items: [] };
+    });
+
+    await client.registrations.listAllAdmin({
+      activityId: "11111111-1111-4111-8111-111111111111",
+      search: "张三",
+      status: "registered",
+      page: 2,
+      pageSize: 50,
+    });
+
+    expect(requests).toEqual([{
+      method: "GET",
+      path: "/api/v1/admin/registrations?activityId=11111111-1111-4111-8111-111111111111&search=%E5%BC%A0%E4%B8%89&status=registered&page=2&pageSize=50",
+    }]);
+  });
+
   it("addresses every browser domain through the versioned API prefix", async () => {
     const requests: Array<{ path: string; method: string }> = [];
     const transport: ApiTransport = async (request) => {

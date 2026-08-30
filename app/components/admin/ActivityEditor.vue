@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACTIVITY_TIME_OPTIONS, ACTIVITY_TYPE_OPTIONS } from "~/data/activities";
+import { ACTIVITY_TYPE_OPTIONS } from "~/data/activities";
 import { useActivitiesStore } from "~/stores/activities";
 import { useContentGateway } from "~/composables/useContentGateway";
 import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
@@ -10,6 +10,8 @@ import type { ContentMediaAttachment } from "~/types/content-media";
 import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { useAdminToast } from "~/composables/useAdminToast";
+import { composeActivityTime, isValidActivityTime, splitActivityTime } from "~/utils/activity-time";
+import { localizeActivityError } from "~/utils/activity-errors";
 
 const props = defineProps<{
   activity?: ManagedActivity;
@@ -85,13 +87,21 @@ const detailItems = computed<ContentMediaAttachment[]>({
   set: (value) => { form.details = value; },
 });
 const mediaOwner = computed(() => props.activity ? { centerId: props.activity.ownerCenterId, ownerType: "activity" as const, ownerId: props.activity.id } : undefined);
+const timeStart = computed({
+  get: () => splitActivityTime(form.time)[0],
+  set: (value: string) => { const [, end] = splitActivityTime(form.time); form.time = composeActivityTime(value, end); },
+});
+const timeEnd = computed({
+  get: () => splitActivityTime(form.time)[1],
+  set: (value: string) => { const [start] = splitActivityTime(form.time); form.time = composeActivityTime(start, value); },
+});
 
 const missingFields = computed(() => {
   const missing: string[] = [];
   if (!form.title.trim()) missing.push("标题");
   if (!form.type.trim()) missing.push("分类");
   if (!form.date.trim()) missing.push("日期");
-  if (!form.time.trim()) missing.push("时间");
+  if (!isValidActivityTime(form.time)) missing.push("时间");
   if (!form.location.trim()) missing.push("地点");
   if (!form.registrationEndAt.trim()) missing.push("报名截止");
   if (!form.ownerCenterId.trim()) missing.push("归属中心");
@@ -116,7 +126,7 @@ onMounted(async () => {
     const assignedCenterId = session.currentAccount?.adminCenterId;
     if (assignedCenterId) form.ownerCenterId = assignedCenterId;
     else if (props.mode === "create" && !centerOptions.value.some((center) => center.id === form.ownerCenterId)) form.ownerCenterId = centerOptions.value[0]?.id ?? "";
-  } catch (caught) { formError.value = caught instanceof Error ? `中心加载失败：${caught.message}` : "中心加载失败。"; }
+  } catch (caught) { formError.value = `中心加载失败：${localizeActivityError(caught)}`; }
 });
 
 function loadActivity(activity?: ManagedActivity) {
@@ -190,7 +200,7 @@ async function saveDraft() {
     emit("saved", saved.id);
   } catch (caught) {
     notice.value = "";
-    formError.value = caught instanceof Error ? `保存失败：${caught.message}` : "保存失败。";
+    formError.value = `保存失败：${localizeActivityError(caught)}`;
   } finally {
     isSaving.value = false;
   }
@@ -209,7 +219,7 @@ async function publishActivity() {
     adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
+    formError.value = `发布失败：${localizeActivityError(caught)}`;
   } finally {
     isPublishing.value = false;
   }
@@ -224,7 +234,7 @@ async function offlineActivity() {
     notice.value = "活动已下线，报名已关闭。";
     adminToast.success(notice.value);
     emit("offline", props.activity.id);
-  } catch (caught) { formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。"; }
+  } catch (caught) { formError.value = `下线失败：${localizeActivityError(caught)}`; }
   finally { isOfflining.value = false; }
 }
 </script>
@@ -240,7 +250,8 @@ async function offlineActivity() {
         <label>标题<input v-model="form.title" type="text" autocomplete="off"></label>
         <label>分类<select v-model="form.type"><option v-for="option in ACTIVITY_TYPE_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
         <label>日期<input v-model="form.date" type="date"></label>
-        <label>时间<select v-model="form.time"><option value="">请选择时间段</option><option v-for="option in ACTIVITY_TIME_OPTIONS" :key="option" :value="option">{{ option }}</option></select></label>
+        <label>开始时间<input v-model="timeStart" type="time"></label>
+        <label>结束时间<input v-model="timeEnd" type="time"></label>
         <label>地点<input v-model="form.location" type="text"></label>
         <label>报名截止<input v-model="form.registrationEndAt" type="datetime-local"></label>
         <label>归属中心<select v-model="form.ownerCenterId" :disabled="session.adminLevel !== 'owner'"><option value="">请选择归属中心</option><option v-for="center in ownerOptions" :key="center.id" :value="center.id">{{ center.label }}</option></select></label>
@@ -252,13 +263,15 @@ async function offlineActivity() {
         v-model="coverItems"
         mode="cover"
         :owner="mediaOwner"
+        :disabled="mode === 'create' && !activity"
         title="活动封面"
-        description="封面会出现在活动列表、活动详情页和公开导航中。"
+        :description="mode === 'create' && !activity ? '请先保存草稿，再上传活动封面。' : '封面会出现在活动列表、活动详情页和公开导航中。'"
       />
       <ContentMediaUploader
         v-model="detailItems"
         mode="collection"
         :owner="mediaOwner"
+        :disabled="mode === 'create' && !activity"
         title="活动详情素材"
         description="可选。用于活动详情中的现场照片、视频或补充记录。"
       />
