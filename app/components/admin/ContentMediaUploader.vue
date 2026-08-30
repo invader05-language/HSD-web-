@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { useContentMediaUpload } from "~/composables/useContentMediaUpload";
 import type { ContentMediaUploadOwner } from "~/services/content-media/api-content-media.gateway";
+import { localizeActivityError } from "~/utils/activity-errors";
 
 const props = withDefaults(defineProps<{
   modelValue: ContentMediaAttachment[];
@@ -11,9 +12,11 @@ const props = withDefaults(defineProps<{
   title?: string;
   description?: string;
   owner?: Omit<ContentMediaUploadOwner, "role" | "sortOrder">;
+  disabled?: boolean;
 }>(), {
   title: "上传素材",
   description: "支持图片或视频，上传后可在此预览和编辑素材信息。",
+  disabled: false,
 });
 
 const emit = defineEmits<{ "update:modelValue": [value: ContentMediaAttachment[]] }>();
@@ -21,7 +24,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const items = ref<ContentMediaAttachment[]>([...props.modelValue]);
 const uploadError = ref("");
 const isUploading = ref(false);
-const { upload, updateDetails } = useContentMediaUpload();
+const { upload, updateDetails, updateMetadata } = useContentMediaUpload();
 
 const accept = computed(() => props.mode === "cover" ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,video/mp4,video/webm");
 const hasUploading = computed(() => items.value.some((item) => ["uploading", "processing"].includes(item.status)));
@@ -40,6 +43,10 @@ async function addFiles(files: FileList | File[]) {
   uploadError.value = "";
   const selected = Array.from(files);
   if (!selected.length) return;
+  if (props.disabled) {
+    uploadError.value = "请先保存草稿，再上传素材。";
+    return;
+  }
   isUploading.value = true;
   try {
     const remaining = props.maxItems === undefined ? selected.length : Math.max(0, props.maxItems - items.value.length);
@@ -50,7 +57,7 @@ async function addFiles(files: FileList | File[]) {
       try {
         uploaded.push(await upload(file, props.mode, items.value.length + uploaded.length, props.owner));
       } catch (error) {
-        uploadError.value = error instanceof Error ? error.message : "素材上传失败";
+        uploadError.value = localizeActivityError(error);
       }
     }
     items.value = props.mode === "cover" ? uploaded : [...items.value, ...uploaded];
@@ -62,12 +69,14 @@ async function addFiles(files: FileList | File[]) {
 }
 
 function onFileChange(event: Event) {
+  if (props.disabled) return;
   const input = event.target as HTMLInputElement;
   if (input.files) void addFiles(input.files);
 }
 
 function onDrop(event: DragEvent) {
   event.preventDefault();
+  if (props.disabled) return;
   if (event.dataTransfer?.files) void addFiles(event.dataTransfer.files);
 }
 
@@ -76,6 +85,22 @@ function updateItem(index: number, patch: Partial<ContentMediaAttachment>) {
   if (!current) return;
   items.value[index] = { ...current, ...patch };
   publishItems();
+}
+
+async function persistMetadata(index: number) {
+  const current = items.value[index];
+  if (!current?.serverOwned || !current.version) return;
+  try {
+    const updated = await updateMetadata(current);
+    items.value[index] = updated;
+    publishItems();
+  } catch (error) {
+    uploadError.value = `素材信息保存失败：${localizeActivityError(error)}`;
+  }
+}
+
+function statusLabel(status: ContentMediaAttachment["status"]) {
+  return status === "ready" ? "可发布" : status === "processing" ? "处理中" : status === "uploading" ? "上传中" : "处理失败";
 }
 
 function inputValue(event: Event) {
@@ -123,15 +148,16 @@ function moveItem(index: number, direction: -1 | 1) {
     <div
       class="content-media-uploader__dropzone"
       role="button"
-      tabindex="0"
-      @click="fileInput?.click()"
-      @keydown.enter.prevent="fileInput?.click()"
-      @keydown.space.prevent="fileInput?.click()"
+      :tabindex="disabled ? -1 : 0"
+      :aria-disabled="disabled ? 'true' : undefined"
+      @click="!disabled && fileInput?.click()"
+      @keydown.enter.prevent="!disabled && fileInput?.click()"
+      @keydown.space.prevent="!disabled && fileInput?.click()"
       @dragover.prevent
       @drop="onDrop"
     >
-      <strong>{{ mode === "cover" && items.length ? "替换封面" : "添加图片或视频" }}</strong>
-      <span>拖拽文件到这里，或点击选择；上传后可立即审阅</span>
+      <strong>{{ disabled ? "请先保存草稿" : mode === "cover" && items.length ? "替换封面" : "添加图片或视频" }}</strong>
+      <span>{{ disabled ? "保存后即可上传并编辑素材信息" : "拖拽文件到这里，或点击选择；上传后可立即审阅" }}</span>
       <input ref="fileInput" type="file" :accept="accept" :multiple="mode === 'collection'" hidden @change="onFileChange">
     </div>
 
@@ -142,18 +168,18 @@ function moveItem(index: number, direction: -1 | 1) {
         <ContentMediaView :item="item" preview="thumbnail" :controls="false" />
         <div class="content-media-uploader__item-body">
           <div class="content-media-uploader__item-heading">
-            <strong>{{ item.kind === "video" ? "视频" : "图片" }} · {{ item.status === "ready" ? "可发布" : item.status }}</strong>
+            <strong>{{ item.kind === "video" ? "视频" : "图片" }} · {{ statusLabel(item.status) }}</strong>
             <button type="button" class="button button--text" @click="removeItem(index)">移除</button>
           </div>
-          <label v-if="item.role === 'detail'">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })"></label>
-          <label v-if="item.role === 'detail'">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })"></textarea></label>
-          <label>替代文本<input :value="item.alt" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })"></label>
-          <label v-if="item.role === 'detail'">比例<select :value="item.aspect" @change="updateItem(index, { aspect: aspectValue($event) })"><option value="landscape">横向</option><option value="portrait">纵向</option><option value="wide">宽幅</option></select></label>
+          <label v-if="item.role === 'detail'">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })" @blur="persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail'">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })" @blur="persistMetadata(index)"></textarea></label>
+          <label>替代文本<input :value="item.alt" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })" @blur="persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail'">比例<select :value="item.aspect" @change="updateItem(index, { aspect: aspectValue($event) }); persistMetadata(index)"><option value="landscape">横向</option><option value="portrait">纵向</option><option value="wide">宽幅</option></select></label>
           <div v-if="mode === 'collection'" class="content-media-uploader__sort-actions">
             <button type="button" class="button button--text" :disabled="index === 0" @click="moveItem(index, -1)">上移</button>
             <button type="button" class="button button--text" :disabled="index === items.length - 1" @click="moveItem(index, 1)">下移</button>
           </div>
-          <small v-if="item.errorMessage" class="content-media-uploader__error">{{ item.errorMessage }}</small>
+          <small v-if="item.errorMessage" class="content-media-uploader__error">{{ localizeActivityError({ message: item.errorMessage }) }}</small>
         </div>
       </article>
     </div>

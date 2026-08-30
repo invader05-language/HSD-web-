@@ -2,9 +2,10 @@
 import { useActivitiesStore } from "~/stores/activities";
 import { useContentGateway } from "~/composables/useContentGateway";
 import { useSessionStore } from "~/stores/session";
-import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import { formatActivityRegistrationNotice } from "~/utils/activity-registration-notice";
 import { useAdminToast } from "~/composables/useAdminToast";
+import { localizeActivityError } from "~/utils/activity-errors";
+import { isActivityRegistrationOpen } from "~/utils/activity-registration";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "活动管理｜HSD 管理台" });
@@ -19,27 +20,21 @@ if (import.meta.client && !gateway) activitiesStore.hydrate();
 onMounted(() => { if (gateway) void activitiesStore.refreshFromApi(gateway); });
 
 const activityActionNotice = ref("");
-const scopedActivities = computed(() => {
-  if (session.adminLevel === "owner") return activitiesStore.activities;
-  const centerScope = getAdminCenterScope(session.currentAccount?.adminCenterRole);
-  return centerScope
-    ? activitiesStore.activities.filter((activity) => activity.ownerCenterId === getRecruitmentCenterId(centerScope))
-    : [];
-});
+const scopedActivities = computed(() => activitiesStore.activities);
 const registrationCount = computed(() => activitiesStore.registrations.length);
 const pendingCount = computed(() => activitiesStore.registrations.filter((item) => item.status === "registered").length);
-const openCount = computed(() => scopedActivities.value.filter((activity) => activity.registrationOpen && activity.publishedState === "published").length);
+const openCount = computed(() => scopedActivities.value.filter((activity) => isActivityRegistrationOpen(activity)).length);
 
 function toggleRegistration(activity: typeof activitiesStore.activities[number]) {
   const run = async () => {
     try {
     const saved = gateway
-      ? await activitiesStore.setRegistrationOpenFromApi(gateway, activity.id, !activity.registrationOpen)
-      : activitiesStore.setRegistrationOpen(activity.id, !activity.registrationOpen);
+      ? await activitiesStore.setRegistrationOpenFromApi(gateway, activity.id, !isActivityRegistrationOpen(activity))
+      : activitiesStore.setRegistrationOpen(activity.id, !isActivityRegistrationOpen(activity), new Date(), true);
     activityActionNotice.value = formatActivityRegistrationNotice(saved.registrationOpen);
     adminToast.success(activityActionNotice.value);
   } catch (caught) {
-    activityActionNotice.value = caught instanceof Error ? `操作失败：${caught.message}` : "操作失败。";
+    activityActionNotice.value = `操作失败：${localizeActivityError(caught)}`;
   }
   };
   void run();
@@ -80,13 +75,13 @@ function openRegistration(activityId: string) {
           <thead><tr><th>活动</th><th>发布状态</th><th>报名截止</th><th>报名</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="activity in scopedActivities" :key="activity.id">
-              <td><strong>{{ activity.title || "未命名活动" }}</strong><small>{{ activity.type || "未分类" }} · {{ activity.ownerCenterId }}</small></td>
+              <td><strong>{{ activity.title || "未命名活动" }}</strong><small>{{ activity.type || "未分类" }}</small></td>
               <td>{{ activity.publishedState === "published" ? "已发布" : activity.status === "unpublished" ? "已下架" : "草稿" }}</td>
               <td>{{ activity.registrationEndAt ? activity.registrationEndAt.slice(0, 10) : "未设置" }}</td>
-              <td>{{ activity.registrationOpen ? "开放" : "关闭" }}</td>
+              <td>{{ isActivityRegistrationOpen(activity) ? "开放" : "关闭" }}</td>
               <td>
                 <NuxtLink :to="`/admin/activities/${encodeURIComponent(activity.id)}`">编辑</NuxtLink>
-                <button type="button" :disabled="activity.publishedState !== 'published'" @click="toggleRegistration(activity)">{{ activity.registrationOpen ? "关闭报名" : "开放报名" }}</button>
+                <button type="button" :disabled="activity.publishedState !== 'published'" @click="toggleRegistration(activity)">{{ isActivityRegistrationOpen(activity) ? "关闭报名" : "开放报名" }}</button>
               </td>
             </tr>
             <tr v-if="!scopedActivities.length"><td colspan="5">当前权限范围内暂无活动。</td></tr>
