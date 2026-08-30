@@ -219,7 +219,7 @@ describe("activity publishing and registration workflow", () => {
     expect(JSON.parse(localStorage.getItem("baiyun-hsd.activities") ?? "{}").version).toBe(2);
   });
 
-  it("requires a reviewed cover and complete detail metadata before publishing", () => {
+  it("requires a reviewed cover and activity detail image description before publishing", () => {
     const store = useActivitiesStore();
     useSessionStore().signIn("admin-alliance", { requireAdmin: true });
     const draft = store.createDraft(activityInput({
@@ -235,7 +235,7 @@ describe("activity publishing and registration workflow", () => {
         id: "activity-detail",
         role: "detail" as const,
         kind: "video" as const,
-        title: "现场视频",
+        title: "",
         caption: "",
         alt: "活动现场视频",
         aspect: "wide" as const,
@@ -243,7 +243,7 @@ describe("activity publishing and registration workflow", () => {
         status: "ready" as const,
       }],
     }, NOW);
-    expect(() => store.publish(draft.id, NOW)).toThrow("ACTIVITY_INCOMPLETE");
+    expect(() => store.publish(draft.id, NOW)).not.toThrow();
   });
 
   it("keeps partially entered activity times while editing start and end inputs", () => {

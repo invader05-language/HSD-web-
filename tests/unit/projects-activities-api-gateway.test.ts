@@ -8,6 +8,7 @@ import { useProjectsStore } from "../../app/stores/projects";
 import { useActivitiesStore } from "../../app/stores/activities";
 import { useGalleryStore, GALLERY_STORAGE_KEY } from "../../app/stores/gallery";
 import { useSessionStore } from "../../app/stores/session";
+import { activityCreatePayload, activityUpdatePayload } from "../../app/utils/activity-api-payload";
 
 const projectRecord = { id: "project-api-1", centerId: "baize-development", slug: "api-project", status: "draft", version: 3, publishedAt: null, title: "API project", category: "AI", year: "2026", description: "Description", achievement: "Achievement", projectStage: "Draft", challenge: "Challenge", solution: "Solution", technologies: ["TypeScript"], memberCount: 1, coverAttachmentId: "project-cover-1", detailAttachmentIds: ["project-detail-1", "project-detail-2"], revisionNumber: 1 };
 const activityRecord = { id: "activity-api-1", centerId: "baize-development", slug: "api-activity", status: "published", version: 4, registrationOpen: false, publishedAt: "2026-08-10T00:00:00.000Z", title: "API activity", type: "Workshop", date: "2026-09-01", time: "09:00", location: "Room 1", summary: "Summary", content: "Content", agenda: ["Start"], registrationEndAt: "2026-08-31T00:00:00.000Z", coverAttachmentId: "activity-cover-1", detailAttachmentIds: ["activity-detail-1", "activity-detail-2"], revisionNumber: 1 };
@@ -64,6 +65,37 @@ describe("project, activity, and registration API gateway", () => {
       title: "智巡先锋（更新）",
     }));
     expect(api.projects.update.mock.calls[0]?.[1]).not.toHaveProperty("slug");
+  });
+
+  it("does not send an activity slug on update and creates an ASCII slug", () => {
+    const input = {
+      title: "2025年华为HSD联盟活动",
+      type: "Workshop",
+      date: "2026-09-01",
+      time: "09:00-10:00",
+      location: "Room 1",
+      summary: "Summary",
+      content: "Content",
+      agenda: ["Start"],
+      ownerCenterId: "11111111-1111-4111-8111-111111111111",
+      registrationEndAt: "2026-08-31T00:00:00.000Z",
+      cover: null,
+      details: [],
+    };
+    expect(activityCreatePayload(input, "fixed123").slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    expect(activityUpdatePayload({ ...input, slug: "历史中文标题" }, 4)).toEqual(expect.objectContaining({ expectedVersion: 4 }));
+    expect(activityUpdatePayload({ ...input, slug: "历史中文标题" }, 4)).not.toHaveProperty("slug");
+  });
+
+  it("preserves activity API field validation errors in the store", async () => {
+    const activities = useActivitiesStore();
+    const error = Object.assign(new Error("字段校验失败"), {
+      code: "VALIDATION_FAILED", status: 400, requestId: "activity-validation-1",
+      fieldErrors: { slug: "活动链接标识格式不正确" },
+    });
+    const api = { activities: { listAdmin: vi.fn().mockRejectedValue(error) } };
+    await activities.refreshFromApi(api);
+    expect(activities.apiError).toMatchObject({ code: "VALIDATION_FAILED", fieldErrors: { slug: "活动链接标识格式不正确" } });
   });
 
   it("generates an ASCII slug when creating a project with a Chinese title", async () => {

@@ -31,8 +31,8 @@ test("owner can publish an activity and review a member registration", async ({ 
     mimeType: "image/png",
     buffer: Buffer.from("activity-cover"),
   });
-  await expect(page.getByLabel("替代文本").first()).toBeVisible();
-  await page.getByLabel("替代文本").first().fill("端到端活动封面");
+  await expect(page.getByLabel("图片内容描述").first()).toBeVisible();
+  await page.getByLabel("图片内容描述").first().fill("端到端活动封面");
   await page.getByRole("button", { name: "直接发布" }).click();
   await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/activities");
   const activityRow = page.getByRole("row", { name: /端到端活动闭环验证/ });

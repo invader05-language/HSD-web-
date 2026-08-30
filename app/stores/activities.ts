@@ -4,7 +4,8 @@ import { PortalAutomationServiceMock } from "../services/portal-automation.mock"
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
 import { usePortalContentStore } from "./portal-content";
-import { isContentMediaAttachmentComplete } from "../utils/content-media";
+import { isActivityContentMediaAttachmentComplete, isContentMediaAttachmentComplete } from "../utils/content-media";
+import { activityCreatePayload, activityUpdatePayload } from "../utils/activity-api-payload";
 import { isActivityRegistrationOpen } from "../utils/activity-registration";
 import type { ContentMediaAttachment } from "../types/content-media";
 import type { ActivityRegistrationAnswers, ActivityRegistrationForm } from "../types/activity-registration";
@@ -290,7 +291,7 @@ export const useActivitiesStore = defineStore("activities", {
       apiModeActive: false,
       apiLoading: false,
       apiMutating: false,
-      apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
+      apiError: null as { status?: number; code: string; message: string; requestId?: string; fieldErrors?: Record<string, string> } | null,
       automationFailures: [] as Array<{ activityId: string; errorCode: string; automationKey: string }>,
       persistenceError: undefined as string | undefined,
     };
@@ -319,7 +320,7 @@ export const useActivitiesStore = defineStore("activities", {
     },
     async updateDraftFromApi(gateway: any, activityId: string, input: ActivityDraftInput) {
       const current = this.getById(activityId); if (!current) throw new Error("ACTIVITY_NOT_FOUND"); this.apiMutating = true; this.apiError = null;
-      try { const saved = activityFromAdminApi(await gateway.activities.update(activityId, { ...activityCreatePayload(input), expectedVersion: current.version })); this.activities = this.activities.map((item) => item.id === saved.id ? saved : item); return saved; }
+      try { const saved = activityFromAdminApi(await gateway.activities.update(activityId, activityUpdatePayload(input, current.version))); this.activities = this.activities.map((item) => item.id === saved.id ? saved : item); return saved; }
       catch (error) { this.apiError = activityApiError(error); throw error; } finally { this.apiMutating = false; }
     },
     async publishFromApi(gateway: any, activityId: string) {
@@ -551,7 +552,7 @@ export const useActivitiesStore = defineStore("activities", {
       if (!activity.cover || !isContentMediaAttachmentComplete(activity.cover) || activity.cover.role !== "cover" || activity.cover.kind !== "image") {
         throw new Error("ACTIVITY_INCOMPLETE");
       }
-      if (activity.details.some((detail) => detail.role !== "detail" || !isContentMediaAttachmentComplete(detail))) {
+      if (activity.details.some((detail) => detail.role !== "detail" || !isActivityContentMediaAttachmentComplete(detail))) {
         throw new Error("ACTIVITY_INCOMPLETE");
       }
     },
@@ -716,8 +717,21 @@ export const useActivitiesStore = defineStore("activities", {
   },
 });
 
-function activityApiError(error: unknown) { const api = error as { status?: unknown; code?: unknown; requestId?: unknown }; return error instanceof Error ? { status: typeof api.status === "number" ? api.status : undefined, code: typeof api.code === "string" ? api.code : "ACTIVITY_API_REQUEST_FAILED", message: error.message, requestId: typeof api.requestId === "string" ? api.requestId : undefined } : { code: "ACTIVITY_API_REQUEST_FAILED", message: "Activity API request failed" }; }
-function activityCreatePayload(input: ActivityDraftInput) { return { expectedVersion: 0, centerId: input.ownerCenterId, slug: slugify(input.slug?.trim() || input.title), title: input.title, type: input.type, date: input.date, time: input.time, location: input.location, summary: input.summary, content: input.content, agenda: input.agenda, ...(input.registrationEndAt ? { registrationEndAt: input.registrationEndAt } : {}), ...(input.cover ? { coverAttachmentId: input.cover.id } : {}), ...(input.details.length ? { detailAttachmentIds: input.details.map((item) => item.id) } : {}) }; }
+function activityApiError(error: unknown) {
+  const api = error as { status?: unknown; code?: unknown; requestId?: unknown; fieldErrors?: unknown };
+  const fieldErrors = api.fieldErrors && typeof api.fieldErrors === "object" && !Array.isArray(api.fieldErrors)
+    ? Object.fromEntries(Object.entries(api.fieldErrors).filter(([, value]) => typeof value === "string"))
+    : undefined;
+  return error instanceof Error
+    ? {
+        status: typeof api.status === "number" ? api.status : undefined,
+        code: typeof api.code === "string" ? api.code : "ACTIVITY_API_REQUEST_FAILED",
+        message: error.message,
+        requestId: typeof api.requestId === "string" ? api.requestId : undefined,
+        ...(fieldErrors && Object.keys(fieldErrors).length ? { fieldErrors } : {}),
+      }
+    : { code: "ACTIVITY_API_REQUEST_FAILED", message: "活动请求失败，请稍后重试。" };
+}
 function registrationFromApi(item: any): ActivityRegistration { const studentId = typeof item.studentId === "string" ? item.studentId : ""; return { id: String(item.id), activityId: String(item.activityId), memberId: studentId, memberName: typeof item.memberName === "string" ? item.memberName : "", status: item.status as ActivityRegistrationStatus, createdAt: String(item.createdAt), updatedAt: String(item.updatedAt), ...(item.decidedAt ? { decidedAt: String(item.decidedAt) } : {}), ...(item.decisionReason ? { decisionReason: String(item.decisionReason) } : {}), ...(typeof item.templateRevisionId === "string" ? { templateRevisionId: item.templateRevisionId } : {}), ...(item.answers && typeof item.answers === "object" ? { answers: item.answers } : {}), ...(studentId ? { studentId } : {}), version: Number(item.version) } as ActivityRegistration; }
 function activityFromPublicApi(item: Record<string, unknown>): ManagedActivity { const slug = String(item.slug); const cover = publicActivityAttachment(item.cover, `activity-cover-${slug}`, "cover", 0); const details = Array.isArray(item.details) ? item.details.flatMap((detail, index) => { const mapped = publicActivityAttachment(detail, `activity-detail-${slug}-${index}`, "detail", index); return mapped ? [mapped] : []; }) : []; const registrationEndAt = typeof item.registrationEndAt === "string" ? item.registrationEndAt : ""; const registrationOverride = item.registrationOpen === true && Boolean(registrationEndAt) && new Date(registrationEndAt) <= new Date(); const base = { id: slug, slug, title: String(item.title), type: String(item.type), date: String(item.date), time: String(item.time), location: String(item.location), summary: String(item.summary), content: String(item.content), agenda: Array.isArray(item.agenda) ? item.agenda.map(String) : [], cover, details, ownerCenterId: "", registrationEndAt, registrationMode: "unlimited" as const, publishedAt: "", revision: 1 }; return { ...base, status: "published", registrationOpen: item.registrationOpen === true, registrationOverride, version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedState: "published", publishedSnapshot: base }; }
 function activityFromAdminApi(item: Record<string, unknown>): ManagedActivity { const base = activityFromPublicApi({ ...item, cover: null, details: [] }); const cover = item.cover && typeof item.cover === "object" ? adminActivityAttachment(item.cover, "cover", 0) : typeof item.coverAttachmentId === "string" ? adminActivityAttachment(item.coverAttachmentId, "cover", 0) : null; const details = Array.isArray(item.details) ? item.details.flatMap((value, index) => value ? [adminActivityAttachment(value, "detail", index)] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => adminActivityAttachment(id, "detail", index)) : []; return { ...base, cover, details, id: String(item.id), ownerCenterId: String(item.centerId), status: item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft", publishedState: item.status === "published" ? "published" : "unpublished", registrationOpen: item.registrationOpen === true, registrationOverride: item.registrationOverride === true, version: Number(item.version), publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), publishedSnapshot: undefined }; }

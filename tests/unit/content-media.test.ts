@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   detectContentMediaAspect,
+  isActivityContentMediaAttachmentComplete,
   isContentMediaAttachmentComplete,
   validateContentMediaFile,
 } from "../../app/utils/content-media";
@@ -48,6 +49,12 @@ describe("content media contract", () => {
   it("allows a cover to omit detail-only fields while still requiring alt text", () => {
     expect(isContentMediaAttachmentComplete(attachment({ role: "cover", title: "", caption: "" }))).toBe(true);
     expect(isContentMediaAttachmentComplete(attachment({ role: "cover", title: "", caption: "", alt: "" }))).toBe(false);
+  });
+
+  it("uses the activity metadata profile for detail media", () => {
+    expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "" }))).toBe(true);
+    expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "", alt: "" }))).toBe(false);
+    expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "", role: "cover", kind: "video" }))).toBe(false);
   });
 
   it("uses direct-upload generated operations in production and never creates a localBlobId", async () => {
