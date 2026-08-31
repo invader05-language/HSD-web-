@@ -11,7 +11,7 @@ const gateway = useContentGateway();
 const albumId = computed(() => decodeURIComponent(String(route.params.id)));
 if (gateway) galleryStore.activateApiMode();
 if (import.meta.client && !gateway) galleryStore.hydrate();
-onMounted(() => { if (gateway) void galleryStore.refreshFromApi(gateway); });
+onMounted(() => { if (gateway) void galleryStore.refreshDetailFromApi(gateway, albumId.value); });
 
 const sourceAlbum = computed(() => galleryStore.getById(albumId.value));
 const canEdit = computed(() => Boolean(sourceAlbum.value && galleryStore.canManageAlbum(albumId.value)));
@@ -49,7 +49,7 @@ function onCancelled() {
       :description="album ? '编辑工作版本不会提前覆盖当前公开专题。' : '该专题不存在，或当前管理员无权访问。'"
     >
       <template #actions>
-        <NuxtLink v-if="album?.publishedSnapshot" class="button button--ghost" :to="`/gallery/${encodeURIComponent(album.slug)}`" target="_blank">预览用户端</NuxtLink>
+        <NuxtLink v-if="album?.publishedState === 'published'" class="button button--ghost" :to="`/gallery/${encodeURIComponent(album.slug)}`" target="_blank">预览用户端</NuxtLink>
         <NuxtLink class="button button--ghost" to="/admin/gallery">返回画廊专题</NuxtLink>
       </template>
     </AdminPageHeading>

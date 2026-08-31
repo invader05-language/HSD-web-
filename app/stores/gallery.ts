@@ -270,6 +270,20 @@ export const useGalleryStore = defineStore("gallery", {
         this.apiLoading = false;
       }
     },
+    async refreshDetailFromApi(gateway: { galleries: { detail(id: string): Promise<Record<string, unknown>> } }, albumId: string) {
+      this.activateApiMode(false);
+      this.apiLoading = true;
+      try {
+        const album = galleryFromAdminApi(await gateway.galleries.detail(albumId));
+        this.albums = [album, ...this.albums.filter((item) => item.id !== album.id)];
+        return album;
+      } catch (error) {
+        this.apiError = galleryApiError(error);
+        return undefined;
+      } finally {
+        this.apiLoading = false;
+      }
+    },
     async createDraftFromApi(gateway: any, input: GalleryDraftInput) {
       this.activateApiMode(); this.apiMutating = true; this.apiError = null;
       try {

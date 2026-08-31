@@ -11,6 +11,7 @@ import type { ContentMediaAttachment } from "~/types/content-media";
 import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { useAdminToast } from "~/composables/useAdminToast";
+import { localizeGalleryError } from "~/utils/gallery-errors";
 
 const props = defineProps<{
   album?: ManagedGalleryAlbum;
@@ -275,7 +276,7 @@ async function saveDraft() {
     adminToast.success(notice.value);
     emit("saved", saved.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `保存失败：${caught.message}` : "保存失败。";
+    formError.value = `保存失败：${localizeGalleryError(caught)}`;
   } finally {
     isSaving.value = false;
   }
@@ -293,7 +294,7 @@ async function publishGallery() {
     adminToast.success(notice.value);
     emit("published", saved.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `发布失败：${caught.message}` : "发布失败。";
+    formError.value = `发布失败：${localizeGalleryError(caught)}`;
   } finally {
     isPublishing.value = false;
   }
@@ -310,7 +311,7 @@ async function offlineGallery() {
     adminToast.success(notice.value);
     emit("offline", props.album.id);
   } catch (caught) {
-    formError.value = caught instanceof Error ? `下线失败：${caught.message}` : "下线失败。";
+    formError.value = `下线失败：${localizeGalleryError(caught)}`;
   } finally {
     isOfflining.value = false;
   }

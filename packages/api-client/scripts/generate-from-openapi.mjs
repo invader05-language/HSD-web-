@@ -126,6 +126,7 @@ const browserOperations = {
   adminRegistrationDetail: "GET /api/v1/admin/registrations/{id}",
   adminActivityRegistrationDecision: { operation: "POST /api/v1/admin/registrations/{id}/decision", successStatus: "200" },
   adminGalleries: "GET /api/v1/admin/galleries",
+  adminGallery: "GET /api/v1/admin/galleries/{id}",
   adminGalleryCreate: "POST /api/v1/admin/galleries",
   adminGalleryUpdate: "PATCH /api/v1/admin/galleries/{id}",
   adminGalleryPublish: "POST /api/v1/admin/galleries/{id}/publish",
