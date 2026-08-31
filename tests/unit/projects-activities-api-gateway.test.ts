@@ -383,6 +383,37 @@ describe("project, activity, and registration API gateway", () => {
     expect(store.getPublicBySlug("gallery-one")).toMatchObject({ title: "Gallery one detail" });
   });
 
+  it("preserves the server override flag when hydrating public activity lists", async () => {
+    const activities = useActivitiesStore();
+    const activity = {
+      slug: "reopened-list-activity", title: "Reopened list activity", type: "Workshop", date: "2026-09-01", time: "09:00",
+      location: "Room 1", summary: "Summary", content: "Content", agenda: ["Start"], registrationEndAt: "2026-09-01T00:00:00.000Z",
+      cover: null, details: [], available: true, registrationOpen: true, registrationOverride: true,
+    };
+
+    await activities.refreshPublicFromApi({ activities: { listPublic: vi.fn().mockResolvedValue({ items: [activity] }) } });
+
+    expect(activities.getPublicBySlug(activity.slug)).toMatchObject({ registrationOpen: true, registrationOverride: true });
+  });
+
+  it("does not let the public gallery detail page replace the list store", () => {
+    const source = readFileSync(resolve("app/pages/gallery/[slug].vue"), "utf8");
+    expect(source).toContain("galleryStore.publicDetails[slug]");
+    expect(source).not.toContain("galleryStore.albums = [detailData.value]");
+  });
+
+  it("preserves the cached public gallery list while navigating back", () => {
+    const source = readFileSync(resolve("app/pages/gallery/index.vue"), "utf8");
+    expect(source).toContain("galleryStore.activateApiMode(false)");
+    expect(source).toContain("galleryStore.apiTotal");
+  });
+
+  it("renders server-provided gallery covers in the admin cards", () => {
+    const source = readFileSync(resolve("app/pages/admin/gallery.vue"), "utf8");
+    expect(source).toContain("ContentMediaView");
+    expect(source).toContain("album.cover");
+  });
+
   it("uses the API session center UUID for management scope and create payloads", async () => {
     const centerId = "11111111-1111-4111-8111-111111111111";
     const session = useSessionStore();

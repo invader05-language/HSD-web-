@@ -56,15 +56,27 @@ async function addFiles(files: FileList | File[]) {
     const remaining = props.maxItems === undefined ? selected.length : Math.max(0, props.maxItems - items.value.length);
     const nextFiles = props.mode === "cover" ? selected.slice(0, 1) : selected.slice(0, remaining);
     if (props.mode === "collection" && nextFiles.length < selected.length) uploadError.value = `最多可上传 ${props.maxItems} 项详情素材`;
-    const uploaded = [];
-    for (const file of nextFiles) {
-      try {
-        uploaded.push(await upload(file, props.mode, items.value.length + uploaded.length, props.owner));
-      } catch (error) {
-        uploadError.value = localizeActivityError(error);
+    const uploaded: Array<ContentMediaAttachment | undefined> = new Array(nextFiles.length);
+    let nextIndex = 0;
+    const worker = async () => {
+      while (true) {
+        const index = nextIndex++;
+        const file = nextFiles[index];
+        if (!file) return;
+        try {
+          uploaded[index] = await upload(file, props.mode, items.value.length + index, props.owner);
+        } catch (error) {
+          uploadError.value = localizeActivityError(error);
+        }
       }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, nextFiles.length) }, () => worker()));
+    const completed = uploaded.filter((item): item is ContentMediaAttachment => Boolean(item));
+    if (props.mode === "cover") {
+      if (completed.length) items.value = completed;
+    } else {
+      items.value = [...items.value, ...completed];
     }
-    items.value = props.mode === "cover" ? uploaded : [...items.value, ...uploaded];
     publishItems();
   } finally {
     isUploading.value = false;

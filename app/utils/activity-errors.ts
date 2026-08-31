@@ -17,6 +17,7 @@ const ACTIVITY_ERROR_MESSAGES: Record<string, string> = {
   MEDIA_COVER_INCOMPLETE: "活动封面信息不完整，请补充图片内容描述。",
   MEDIA_DETAIL_INCOMPLETE: "活动详情素材信息不完整，请补充图片内容描述。",
   DIRECT_UPLOAD_FAILED: "文件上传失败，请检查网络后重试。",
+  DIRECT_UPLOAD_NETWORK_FAILED: "无法连接素材存储服务，请检查网络后重试。",
   UPLOAD_DESTINATION_MISSING: "暂时无法创建上传任务，请稍后重试。",
   CONTENT_MEDIA_API_REQUEST_FAILED: "素材服务暂时不可用，请稍后重试。",
   MEDIA_ATTACHMENT_VERSION_REQUIRED: "素材信息已更新，请刷新后重试。",

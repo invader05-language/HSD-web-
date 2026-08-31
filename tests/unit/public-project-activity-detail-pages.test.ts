@@ -1,5 +1,7 @@
 import { createPinia, setActivePinia } from "pinia";
 import { computed, defineComponent, nextTick, onMounted, ref } from "vue";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectDetailPage from "../../app/pages/projects/[slug].vue";
@@ -100,5 +102,13 @@ describe("production public project and activity detail pages", () => {
     const failed = mount(ActivityDetailPage, { global: { stubs: { PageBanner: true, ContentMediaView: true, EmptyState: { props: ["title"], template: "<div data-testid='empty'>{{ title }}</div>" }, NuxtLink: { template: "<a><slot /></a>" } } } });
     await flushPromises(); await nextTick();
     expect(failed.get("[role='alert']").text()).toContain("Activity service unavailable");
+  });
+
+  it("opens the API registration form only after a successful load and restores login continuation", () => {
+    const source = readFileSync(resolve("app/pages/activities/[slug].vue"), "utf8");
+    expect(source).toContain("async function openRegistration");
+    expect(source).toContain("registrationSection");
+    expect(source).toContain("route.query.signup");
+    expect(source).toContain("registrationFormError");
   });
 });

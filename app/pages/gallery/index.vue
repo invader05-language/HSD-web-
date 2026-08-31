@@ -11,7 +11,7 @@ useHead({ title: "媒体画廊｜白云 HSD 开发者部落" });
 const categories = ["全部", "活动纪实", "视觉创作", "视频作品", "人物风采"] as const;
 const galleryStore = useGalleryStore();
 const gateway = useContentGateway();
-if (gateway) galleryStore.activateApiMode();
+if (gateway) galleryStore.activateApiMode(false);
 if (import.meta.client && !gateway) galleryStore.hydrate();
 onMounted(() => { if (gateway) void loadPage(); });
 const active = ref("全部");
@@ -79,7 +79,7 @@ async function goToPage(page: number) {
       <div class="shell">
         <p v-if="galleryStore.apiError" role="alert">{{ galleryStore.apiError.message }}（{{ galleryStore.apiError.code }}）</p>
         <p v-if="galleryStore.apiLoading" role="status">正在加载公开画廊…</p>
-        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${filtered.length} 件作品`" />
+        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${gateway ? galleryStore.apiTotal : filtered.length} 件作品`" />
         <div v-if="visible.length" id="gallery-results" class="gallery-catalog">
           <NuxtLink
             v-for="(album, index) in visible"

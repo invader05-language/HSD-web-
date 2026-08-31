@@ -93,9 +93,14 @@ export function createApiContentMediaGateway(options: ApiContentMediaGatewayOpti
         mimeType, byteSize: file.size, checksumSha256: checksum, kind,
       });
       if (!intent.upload?.url) throw new ContentMediaApiError(503, "UPLOAD_DESTINATION_MISSING", "Upload destination is unavailable");
-      const storageResponse = await fetcher(intent.upload.url, {
-        method: "PUT", body: file, headers: intent.upload.headers,
-      });
+      let storageResponse: Response;
+      try {
+        storageResponse = await fetcher(intent.upload.url, {
+          method: "PUT", body: file, headers: intent.upload.headers,
+        });
+      } catch (error) {
+        throw new ContentMediaApiError(503, "DIRECT_UPLOAD_NETWORK_FAILED", error instanceof Error ? error.message : "Direct upload could not reach storage");
+      }
       if (!storageResponse.ok) throw new ContentMediaApiError(storageResponse.status, "DIRECT_UPLOAD_FAILED", "Direct upload failed");
       const completed = await client.uploads.complete(intent.id, {
         expectedVersion: intent.version,

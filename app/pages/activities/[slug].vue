@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { useActivitiesStore } from "~/stores/activities";
 import { useSessionStore } from "~/stores/session";
 import { resolveLoginAwareTarget } from "~/utils/login-continuation";
@@ -15,13 +15,21 @@ const gateway = useContentGateway();
 if (gateway) activitiesStore.activateApiMode();
 const slug = String(route.params.slug);
 if (import.meta.client && !gateway) activitiesStore.hydrate();
-onMounted(async () => { if (gateway) { await activitiesStore.refreshPublicDetailFromApi(gateway, slug); if (session.isAuthenticated && activity.value?.registrationOpen) await activitiesStore.refreshRegistrationFormFromApi(gateway, activity.value); if (session.isAuthenticated && activity.value) await activitiesStore.refreshMyRegistrationFromApi(gateway, activity.value); } });
+onMounted(async () => {
+  if (!gateway) return;
+  await activitiesStore.refreshPublicDetailFromApi(gateway, slug);
+  if (session.isAuthenticated && activity.value?.registrationOpen) await activitiesStore.refreshRegistrationFormFromApi(gateway, activity.value);
+  if (session.isAuthenticated && activity.value) await activitiesStore.refreshMyRegistrationFromApi(gateway, activity.value);
+  if (session.isAuthenticated && route.query.signup === "1" && registrationAvailable.value && !registration.value) await openRegistration();
+});
 const activity = computed(() => activitiesStore.getPublicBySlug(slug));
 const registration = computed(() => gateway ? activitiesStore.getMyRegistrationForSlug(slug) : (activity.value ? activitiesStore.getCurrentRegistration(activity.value.id) : undefined));
 const registrationForm = computed<ActivityRegistrationForm | undefined>(() => activitiesStore.apiRegistrationFormsBySlug[slug]);
 const answers = ref<ActivityRegistrationAnswers>({});
 const formErrors = ref<Record<string, string>>({});
 const formOpen = ref(false);
+const registrationFormError = ref("");
+const registrationSection = ref<HTMLElement | null>(null);
 const formSubmitting = ref(false);
 const actionNotice = ref("");
 const now = ref(new Date());
@@ -40,6 +48,25 @@ const registrationStatusLabel = computed(() => ({
   cancelled: "已取消",
 } as Record<string, string>)[registration.value?.status ?? ""] ?? (activity.value?.registrationOpen ? "报名开放" : "报名关闭"));
 
+async function openRegistration() {
+  if (!gateway || !activity.value) return;
+  registrationFormError.value = "";
+  const form = registrationForm.value ?? await activitiesStore.refreshRegistrationFormFromApi(gateway, activity.value);
+  if (!form) {
+    registrationFormError.value = localizeActivityError(activitiesStore.apiError);
+    return;
+  }
+  if (!form.fields.length) {
+    await activitiesStore.registerFromApi(gateway, activity.value, {}, form.revisionId);
+    actionNotice.value = "报名已提交，等待管理端审核。";
+    return;
+  }
+  formOpen.value = true;
+  await nextTick();
+  registrationSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  registrationSection.value?.querySelector<HTMLElement>("input, select, textarea, button")?.focus();
+}
+
 async function submitRegistration() {
   if (!activity.value) return;
   if (signupDisabled.value) {
@@ -57,8 +84,7 @@ async function submitRegistration() {
       actionNotice.value = "已取消本次活动报名。";
     } else {
       if (gateway) {
-        if (!registrationForm.value) await activitiesStore.refreshRegistrationFormFromApi(gateway, activity.value);
-        formOpen.value = true;
+        await openRegistration();
         return;
       }
       activitiesStore.registerCurrentUser(activity.value.id);
@@ -130,7 +156,8 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
         </aside>
       </div>
     </section>
-    <section v-if="formOpen && registrationForm" class="section section--cool activity-registration-section">
+    <p v-if="registrationFormError" class="registration-form-error" role="alert">{{ registrationFormError }}</p>
+    <section v-if="formOpen && registrationForm" ref="registrationSection" class="section section--cool activity-registration-section" tabindex="-1">
       <div class="shell">
         <div class="detail-main">
           <p class="eyebrow">活动报名</p>
