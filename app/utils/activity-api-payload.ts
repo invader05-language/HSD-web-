@@ -1,4 +1,5 @@
 import type { ActivityDraftInput } from "~/types/activity";
+import { dateTimeLocalToIso } from "~/utils/activity-datetime";
 
 const ASCII_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -34,7 +35,7 @@ function mutableActivityPayload(input: ActivityDraftInput) {
     summary: input.summary,
     content: input.content,
     agenda: input.agenda,
-    ...(input.registrationEndAt ? { registrationEndAt: input.registrationEndAt } : {}),
+    registrationEndAt: dateTimeLocalToIso(input.registrationEndAt),
     ...(input.cover ? { coverAttachmentId: input.cover.id } : {}),
     detailAttachmentIds: input.details.map((item) => item.id),
   };

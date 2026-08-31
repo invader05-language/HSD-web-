@@ -2560,10 +2560,51 @@ a {
 .field-help { margin: 0; color: #66717d; font-size: .85rem; }
 .field-error { color: #b1202b; }
 .activity-registration-form fieldset.has-error input, .activity-registration-form fieldset.has-error textarea, .activity-registration-form fieldset.has-error select { border-color: #b1202b; }
-.admin-template-field { display: grid; gap: .8rem; padding: 1rem 0; border-bottom: 1px solid #d9dfe5; }
+.admin-registration-template > header p { text-align: right; }
+.admin-template-status { min-height: 0; padding: 0 24px; }
+.admin-template-status p { margin: 14px 0 0; color: #66717d; }
+.admin-template-status p[role="alert"] { color: #b1202b; }
+.admin-template-tabs { display: flex; gap: 22px; margin-top: 18px; padding: 0 24px; border-bottom: 1px solid #d9dfe5; }
+.admin-template-tabs button { min-height: 48px; padding: 0 2px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #66717d; cursor: pointer; font-weight: 700; }
+.admin-template-tabs button[aria-selected="true"] { border-bottom-color: #b1202b; color: #b1202b; }
+.admin-template-tabs small { margin-left: 6px; font-size: 11px; font-weight: 400; }
+.admin-template-current, .admin-template-editor { padding-top: 20px; }
+.admin-template-current { padding: 20px 24px 24px; }
+.admin-template-panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding: 0 24px 16px; }
+.admin-template-current .admin-template-panel-heading { padding-inline: 0; }
+.admin-template-panel-heading > div { display: grid; gap: 2px; }
+.admin-template-panel-heading span { color: #8f949b; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.admin-template-panel-heading h3 { margin: 0; color: #282c31; font-size: 18px; }
+.admin-template-panel-heading > span:last-child { color: #66717d; font-size: 12px; letter-spacing: 0; text-transform: none; }
+.admin-template-current > p, .admin-template-editor > p { margin: 0; padding: 0 24px 24px; color: #66717d; }
+.admin-template-readonly-list { display: grid; gap: 12px; }
+.admin-template-readonly-list article { padding: 16px 18px; border: 1px solid #d9dfe5; background: #fafbfb; }
+.admin-template-readonly-list article > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-template-readonly-list article > header span { color: #66717d; font-size: 12px; }
+.admin-template-readonly-list article > header b { margin-left: 8px; color: #b1202b; font-size: 11px; }
+.admin-template-readonly-list article p { margin: 8px 0 0; color: #66717d; font-size: 13px; }
+.admin-template-readonly-list article ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.admin-template-readonly-list article li { padding: 3px 8px; border: 1px solid #d9dfe5; background: #fff; color: #34383e; font-size: 12px; }
+.admin-template-field { display: grid; gap: .8rem; padding: 20px 24px; border-bottom: 1px solid #d9dfe5; }
 .admin-template-field__head { display: flex; justify-content: space-between; align-items: center; }
 .admin-template-required { align-self: end; display: flex; align-items: center; gap: .4rem; }
-.admin-template-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.admin-template-field > label { display: grid; gap: 6px; padding: 0 24px; color: #767c84; font-size: 10px; font-weight: 700; }
+.admin-template-field > label input, .admin-template-field > label textarea { width: 100%; min-height: 38px; border: 1px solid #d9dde1; border-radius: 4px; padding: 8px 11px; outline: 0; background: #fff; color: #34383e; font-size: 12px; }
+.admin-template-field > label textarea { resize: vertical; }
+.admin-template-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; padding: 16px 24px 20px; border-top: 1px solid #d9dfe5; }
+
+@media (max-width: 700px) {
+  .admin-registration-template > header { align-items: flex-start; flex-direction: column; padding-block: 16px; }
+  .admin-registration-template > header p { text-align: left; }
+  .admin-template-tabs { gap: 16px; padding-inline: 16px; }
+  .admin-template-current { padding: 16px; }
+  .admin-template-editor { padding-top: 16px; }
+  .admin-template-panel-heading { padding-inline: 16px; }
+  .admin-template-current .admin-template-panel-heading { padding-inline: 0; }
+  .admin-template-field { padding: 16px; }
+  .admin-template-field > label, .admin-template-current > p, .admin-template-editor > p { padding-inline: 0; }
+  .admin-template-actions { padding: 16px; }
+}
 
 @media (max-width: 700px) {
   .activity-registration-form__identity { grid-template-columns: 1fr 1fr; }

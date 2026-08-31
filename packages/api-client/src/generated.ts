@@ -1387,6 +1387,7 @@ export type PublicActivityResponseDto = {
   "details": Array<Record<string, unknown>>;
   "available": boolean;
   "registrationOpen": boolean;
+  "registrationOverride"?: boolean;
 };
 
 export type PublicCenterDetailResponseDto = {
@@ -2262,6 +2263,7 @@ export const API_V1_PATHS = {
   adminRegistrationDetail: "/api/v1/admin/registrations/{id}",
   adminActivityRegistrationDecision: "/api/v1/admin/registrations/{id}/decision",
   adminGalleries: "/api/v1/admin/galleries",
+  adminGallery: "/api/v1/admin/galleries/{id}",
   adminGalleryCreate: "/api/v1/admin/galleries",
   adminGalleryUpdate: "/api/v1/admin/galleries/{id}",
   adminGalleryPublish: "/api/v1/admin/galleries/{id}/publish",
@@ -2408,6 +2410,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/registrations/{id}": { method: "GET", path: "/api/v1/admin/registrations/{id}" },
   "POST /api/v1/admin/registrations/{id}/decision": { method: "POST", path: "/api/v1/admin/registrations/{id}/decision" },
   "GET /api/v1/admin/galleries": { method: "GET", path: "/api/v1/admin/galleries" },
+  "GET /api/v1/admin/galleries/{id}": { method: "GET", path: "/api/v1/admin/galleries/{id}" },
   "POST /api/v1/admin/galleries": { method: "POST", path: "/api/v1/admin/galleries" },
   "PATCH /api/v1/admin/galleries/{id}": { method: "PATCH", path: "/api/v1/admin/galleries/{id}" },
   "POST /api/v1/admin/galleries/{id}/publish": { method: "POST", path: "/api/v1/admin/galleries/{id}/publish" },
@@ -2560,6 +2563,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/registrations/{id}": RegistrationResponseDto;
   "POST /api/v1/admin/registrations/{id}/decision": RegistrationResponseDto;
   "GET /api/v1/admin/galleries": AdminGalleryListResponseDto;
+  "GET /api/v1/admin/galleries/{id}": AdminGalleryResponseDto;
   "POST /api/v1/admin/galleries": AdminGalleryResponseDto;
   "PATCH /api/v1/admin/galleries/{id}": AdminGalleryResponseDto;
   "POST /api/v1/admin/galleries/{id}/publish": AdminGalleryResponseDto;
@@ -2961,6 +2965,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/admin/galleries": {
     "$ref": "#/components/schemas/AdminGalleryListResponseDto"
+  },
+  "GET /api/v1/admin/galleries/{id}": {
+    "$ref": "#/components/schemas/AdminGalleryResponseDto"
   },
   "POST /api/v1/admin/galleries": {
     "$ref": "#/components/schemas/AdminGalleryResponseDto"
@@ -8947,6 +8954,9 @@ const API_COMPONENT_SCHEMAS = {
         "type": "boolean"
       },
       "registrationOpen": {
+        "type": "boolean"
+      },
+      "registrationOverride": {
         "type": "boolean"
       }
     },

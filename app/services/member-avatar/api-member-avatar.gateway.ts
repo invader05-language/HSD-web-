@@ -1,3 +1,5 @@
+import { sha256File } from "../../utils/sha256";
+
 export interface MemberAvatarUploadIntent {
   id: string;
   version: number;
@@ -35,10 +37,7 @@ const readBrowserCookie = (name: string) => {
 };
 
 const requestId = () => globalThis.crypto?.randomUUID?.() ?? `member-avatar-${Date.now()}`;
-const defaultChecksum = async (file: File) => {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-};
+const defaultChecksum = sha256File;
 
 function isError(value: unknown): value is { code: string; message: string; requestId?: string } {
   return Boolean(value && typeof value === "object" && typeof (value as { code?: unknown }).code === "string" && typeof (value as { message?: unknown }).message === "string");
@@ -76,13 +75,19 @@ export function createApiMemberAvatarGateway(options: ApiMemberAvatarGatewayOpti
 
   return {
     async upload(file: File, centerId?: string): Promise<MemberAvatarUploadResult> {
+      let checksum: string;
+      try {
+        checksum = await checksumSha256(file);
+      } catch (error) {
+        throw new MemberAvatarApiError(422, "MEMBER_AVATAR_CHECKSUM_FAILED", error instanceof Error ? error.message : "Unable to calculate file checksum");
+      }
       const intent = await request<MemberAvatarUploadIntent>("/api/v1/members/me/avatar/uploads/intents", "POST", {
         expectedVersion: 0,
         ...(centerId ? { centerId } : {}),
         fileName: file.name,
         mimeType: file.type,
         byteSize: file.size,
-        checksumSha256: await checksumSha256(file),
+        checksumSha256: checksum,
         kind: "image",
       });
       if (!intent.upload?.url) throw new MemberAvatarApiError(503, "UPLOAD_DESTINATION_MISSING", "头像上传地址暂不可用");

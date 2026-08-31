@@ -8,6 +8,8 @@ const ACTIVITY_ERROR_MESSAGES: Record<string, string> = {
   CONTENT_MEDIA_OWNER_REQUIRED: "请先保存活动草稿，再上传素材。",
   CONTENT_MEDIA_CSRF_TOKEN_MISSING: "当前登录校验已失效，请刷新页面后重试。",
   CONTENT_MEDIA_TYPE_UNSUPPORTED: "文件格式不受支持。",
+  CONTENT_MEDIA_CHECKSUM_FAILED: "文件摘要计算失败，请重试或使用 HTTPS 访问管理台。",
+  MEMBER_AVATAR_CHECKSUM_FAILED: "头像摘要计算失败，请重试或使用 HTTPS 访问管理台。",
   CONTENT_MEDIA_COVER_IMAGE_REQUIRED: "活动封面必须是图片。",
   CONTENT_MEDIA_SIZE_EXCEEDED: "文件大小超过限制。",
   MEDIA_NOT_READY: "素材仍在处理中，请稍后再试。",

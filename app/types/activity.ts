@@ -25,6 +25,8 @@ export interface PublishedActivity extends ActivityDraftInput {
   registrationMode: "unlimited";
   publishedAt: string;
   revision: number;
+  /** True when the administrator explicitly reopened registration after its deadline. */
+  registrationOverride?: boolean;
 }
 
 export interface ManagedActivity extends PublishedActivity {

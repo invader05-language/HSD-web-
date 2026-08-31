@@ -1,5 +1,6 @@
 import { createHsdApiClient, type ApiRequest, type ApiTransport, type ErrorResponse } from "../../../packages/api-client/src";
 import type { ContentMediaAttachment, ContentMediaAspect, ContentMediaRole } from "../../types/content-media";
+import { sha256File } from "../../utils/sha256";
 
 export interface ContentMediaUploadOwner {
   centerId: string;
@@ -45,10 +46,7 @@ const isError = (value: unknown): value is ErrorResponse => Boolean(
   value && typeof value === "object" && typeof (value as ErrorResponse).code === "string"
   && typeof (value as ErrorResponse).message === "string",
 );
-const defaultChecksum = async (file: File) => {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-};
+const defaultChecksum = sha256File;
 const title = (name: string) => name.replace(/\.[^/.]+$/, "").trim();
 
 export function createApiContentMediaGateway(options: ApiContentMediaGatewayOptions): ContentMediaGateway {
@@ -82,7 +80,12 @@ export function createApiContentMediaGateway(options: ApiContentMediaGatewayOpti
 
   return {
     async upload(file, owner) {
-      const checksum = await checksumSha256(file);
+      let checksum: string;
+      try {
+        checksum = await checksumSha256(file);
+      } catch (error) {
+        throw new ContentMediaApiError(422, "CONTENT_MEDIA_CHECKSUM_FAILED", error instanceof Error ? error.message : "Unable to calculate file checksum");
+      }
       const kind = file.type.startsWith("image/") ? "image" as const : "video" as const;
       const mimeType = file.type as "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/webm";
       const intent = await client.uploads.createIntent({

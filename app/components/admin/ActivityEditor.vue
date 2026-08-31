@@ -13,6 +13,7 @@ import { useAdminToast } from "~/composables/useAdminToast";
 import { composeActivityTime, isValidActivityTime, splitActivityTime } from "~/utils/activity-time";
 import { localizeActivityError } from "~/utils/activity-errors";
 import { activityDraftFingerprint } from "~/utils/activity-api-payload";
+import { dateTimeLocalToIso, isoToDateTimeLocal } from "~/utils/activity-datetime";
 
 const props = defineProps<{
   activity?: ManagedActivity;
@@ -156,7 +157,7 @@ function loadActivity(activity?: ManagedActivity) {
     cover: activity.cover ? JSON.parse(JSON.stringify(activity.cover)) as ContentMediaAttachment : null,
     details: activity.details.map((item) => JSON.parse(JSON.stringify(item)) as ContentMediaAttachment),
     ownerCenterId: activity.ownerCenterId,
-    registrationEndAt: activity.registrationEndAt,
+    registrationEndAt: isoToDateTimeLocal(activity.registrationEndAt),
   } : emptyForm();
   Object.assign(form, source);
   initialFingerprint.value = props.mode === "edit" && activity ? activityDraftFingerprint(toPayload()) : "";
@@ -181,7 +182,7 @@ function toPayload(): ActivityDraftInput {
     cover: form.cover ? JSON.parse(JSON.stringify(form.cover)) as ContentMediaAttachment : null,
     details: form.details.map((item) => JSON.parse(JSON.stringify(item)) as ContentMediaAttachment),
     ownerCenterId: form.ownerCenterId,
-    registrationEndAt: form.registrationEndAt,
+    registrationEndAt: dateTimeLocalToIso(form.registrationEndAt) ?? "",
   };
 }
 

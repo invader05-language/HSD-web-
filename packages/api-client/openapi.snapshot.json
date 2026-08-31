@@ -18775,6 +18775,9 @@
           },
           "registrationOpen": {
             "type": "boolean"
+          },
+          "registrationOverride": {
+            "type": "boolean"
           }
         },
         "required": [

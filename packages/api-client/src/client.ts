@@ -254,6 +254,7 @@ export interface HsdApiClient {
   };
   galleries: {
     listAdmin(): Promise<ApiResponseFor<"GET /api/v1/admin/galleries">>;
+    detail(id: string): Promise<ApiResponseFor<"GET /api/v1/admin/galleries/{id}">>;
     create(payload: CreateGalleryDto): Promise<ApiResponseFor<"POST /api/v1/admin/galleries">>;
     update(id: string, payload: UpdateGalleryDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/galleries/{id}">>;
     publish(id: string, payload: GalleryCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/galleries/{id}/publish">>;
@@ -474,6 +475,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     },
     galleries: {
       listAdmin: () => requestGenerated(transport, "GET /api/v1/admin/galleries"),
+      detail: (id) => requestGenerated(transport, "GET /api/v1/admin/galleries/{id}", undefined, `/api/v1/admin/galleries/${encodeURIComponent(id)}`),
       create: (payload) => requestGenerated(transport, "POST /api/v1/admin/galleries", payload),
       update: (id, payload) => requestGenerated(transport, "PATCH /api/v1/admin/galleries/{id}", payload, `/api/v1/admin/galleries/${encodeURIComponent(id)}`),
       publish: (id, payload) => requestGenerated(transport, "POST /api/v1/admin/galleries/{id}/publish", payload, `/api/v1/admin/galleries/${encodeURIComponent(id)}/publish`),
