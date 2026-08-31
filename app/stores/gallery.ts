@@ -21,6 +21,13 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+const PUBLIC_LIST_CACHE_TTL_MS = 15_000;
+const publicListInflight = new Map<string, Promise<void>>();
+
+function publicListQueryKey(query?: { page?: number; pageSize?: number; category?: string }) {
+  return JSON.stringify({ page: query?.page ?? 1, pageSize: query?.pageSize ?? 12, category: query?.category ?? "" });
+}
+
 function getStorage(): Storage | undefined {
   try {
     return typeof localStorage === "undefined" ? undefined : localStorage;
@@ -219,6 +226,8 @@ export const useGalleryStore = defineStore("gallery", {
       apiMutating: false,
       apiError: null as { status?: number; code: string; message: string; requestId?: string } | null,
       apiTotal: 0,
+      publicListQueryKey: null as string | null,
+      publicListFetchedAt: 0,
       persistenceError: undefined as string | undefined,
     };
   },
@@ -230,18 +239,27 @@ export const useGalleryStore = defineStore("gallery", {
       this.apiError = null;
     },
     async refreshPublicFromApi(gateway: { galleries: { listPublic(query?: { page?: number; pageSize?: number; category?: string }): Promise<{ items: Array<Record<string, unknown>>; total?: number }> } }, query?: { page?: number; pageSize?: number; category?: string }) {
-      this.activateApiMode();
-      this.apiLoading = true;
-      try {
-        const response = await gateway.galleries.listPublic(query);
-        this.albums = response.items.map(galleryFromPublicApi);
-        this.apiTotal = response.total ?? this.albums.length;
-        this.publicDetails = {};
-      } catch (error) {
-        this.apiError = galleryApiError(error);
-      } finally {
-        this.apiLoading = false;
-      }
+      const key = publicListQueryKey(query);
+      if (this.apiModeActive && this.publicListQueryKey === key && Date.now() - this.publicListFetchedAt < PUBLIC_LIST_CACHE_TTL_MS) return;
+      const existing = publicListInflight.get(key);
+      if (existing) return existing;
+      const request = (async () => {
+        this.activateApiMode(this.apiModeActive ? false : true);
+        this.apiLoading = true;
+        try {
+          const response = await gateway.galleries.listPublic(query);
+          this.albums = response.items.map(galleryFromPublicApi);
+          this.apiTotal = response.total ?? this.albums.length;
+          this.publicListQueryKey = key;
+          this.publicListFetchedAt = Date.now();
+        } catch (error) {
+          this.apiError = galleryApiError(error);
+        } finally {
+          this.apiLoading = false;
+        }
+      })();
+      publicListInflight.set(key, request);
+      try { await request; } finally { if (publicListInflight.get(key) === request) publicListInflight.delete(key); }
     },
     async refreshPublicDetailFromApi(gateway: { gallery(slug: string): Promise<Record<string, unknown>> }, slug: string) {
       this.activateApiMode(false);
@@ -264,6 +282,8 @@ export const useGalleryStore = defineStore("gallery", {
         const response = await gateway.galleries.listAdmin();
         this.albums = response.items.map(galleryFromAdminApi);
         this.publicDetails = {};
+        this.publicListQueryKey = null;
+        this.publicListFetchedAt = 0;
       } catch (error) {
         this.apiError = galleryApiError(error);
       } finally {

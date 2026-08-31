@@ -128,6 +128,29 @@ describe("content media contract", () => {
     ]);
   });
 
+  it("maps direct-upload network rejections to a retryable media error", async () => {
+    const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
+      status, headers: { "content-type": "application/json" },
+    });
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(json({
+        id: "11111111-1111-4111-8111-111111111111", centerId: "22222222-2222-4222-8222-222222222222",
+        createdBy: { id: "55555555-5555-4555-8555-555555555555", username: "owner", displayName: "Owner" },
+        fileName: "photo.png", mimeType: "image/png", byteSize: 3, kind: "image", status: "uploading", version: 1,
+        expiresAt: "2030-01-01T00:00:00.000Z", failureCode: null, completedAt: null,
+        createdAt: "2029-12-31T00:00:00.000Z", updatedAt: "2029-12-31T00:00:00.000Z",
+        upload: { url: "https://storage.test/direct", headers: {} },
+      }, 201))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const gateway = createApiContentMediaGateway({
+      apiBase: "https://api.test", readCookie: () => "csrf-proof", checksumSha256: async () => "a".repeat(64), fetcher,
+    });
+
+    await expect(gateway.upload(new File(["png"], "photo.png", { type: "image/png" }), {
+      centerId: "22222222-2222-4222-8222-222222222222", ownerType: "gallery", ownerId: "gallery-1", role: "cover", sortOrder: 0,
+    })).rejects.toMatchObject({ code: "DIRECT_UPLOAD_NETWORK_FAILED", status: 503 });
+  });
+
   it("resolves backend-relative public media URLs against the configured API origin", () => {
     expect(resolveApiMediaUrl("/api/v1/public/media/token", "http://127.0.0.1:3001")).toBe("http://127.0.0.1:3001/api/v1/public/media/token");
     expect(resolveApiMediaUrl("https://cdn.example/media.jpg", "http://127.0.0.1:3001")).toBe("https://cdn.example/media.jpg");

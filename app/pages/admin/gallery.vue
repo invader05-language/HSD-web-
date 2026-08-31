@@ -2,6 +2,7 @@
 import { useGalleryStore } from "~/stores/gallery";
 import { useContentGateway } from "~/composables/useContentGateway";
 import { useSessionStore } from "~/stores/session";
+import type { ContentMediaAttachment } from "~/types/content-media";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "画廊专题｜HSD 管理台" });
@@ -23,6 +24,26 @@ function albumStatus(album: typeof galleryStore.albums[number]) {
   if (album.status === "unpublished") return "已下架";
   return "草稿";
 }
+
+function coverMedia(album: typeof galleryStore.albums[number]): ContentMediaAttachment | undefined {
+  const cover = album.cover;
+  if (!cover) return undefined;
+  return {
+    id: cover.id,
+    role: "cover",
+    kind: cover.kind === "video" ? "video" : "image",
+    title: cover.title ?? "",
+    caption: cover.caption ?? "",
+    alt: cover.alt ?? album.title,
+    aspect: cover.aspect ?? "landscape",
+    sortOrder: 0,
+    status: cover.status ?? "ready",
+    serverOwned: cover.serverOwned,
+    version: cover.version,
+    ...(cover.imageUrl ? { url: cover.imageUrl } : {}),
+    ...(cover.thumbnailUrl ? { thumbnailUrl: cover.thumbnailUrl } : {}),
+  };
+}
 </script>
 
 <template>
@@ -37,6 +58,7 @@ function albumStatus(album: typeof galleryStore.albums[number]) {
     <section class="admin-gallery-admin-grid" aria-label="画廊专题列表">
       <article v-for="album in scopedAlbums" :key="album.id">
         <div :style="{ '--gallery-cover': '#3f4e58' }">
+          <ContentMediaView v-if="coverMedia(album)" class="admin-gallery-admin-grid__cover" :item="coverMedia(album)!" preview="thumbnail" :controls="false" />
           <span>&lt; HSD GALLERY &gt;</span>
           <AdminStatusPill :status="albumStatus(album)" />
           <h2>{{ album.title }}</h2>

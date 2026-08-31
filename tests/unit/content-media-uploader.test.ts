@@ -2,11 +2,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContentMediaAttachment } from "../../app/types/content-media";
 
-const { updateMetadata } = vi.hoisted(() => ({ updateMetadata: vi.fn() }));
+const { updateMetadata, upload } = vi.hoisted(() => ({ updateMetadata: vi.fn(), upload: vi.fn() }));
 
 vi.mock("../../app/composables/useContentMediaUpload", () => ({
   useContentMediaUpload: () => ({
-    upload: vi.fn(),
+    upload,
     resolvePreviewUrl: vi.fn().mockResolvedValue({ url: undefined, owned: false }),
     updateDetails: (items: ContentMediaAttachment[]) => items.map((item, index) => ({ ...item, sortOrder: index })),
     updateMetadata,
@@ -40,6 +40,7 @@ function mountUploader(metadataProfile: "full" | "activity" = "activity") {
 describe("content media metadata persistence", () => {
   beforeEach(() => {
     updateMetadata.mockReset();
+    upload.mockReset();
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "", useMockApi: true } }));
   });
 
@@ -91,5 +92,22 @@ describe("content media metadata persistence", () => {
     expect(full.text()).toContain("说明");
     expect(full.text()).toContain("替代文本");
     full.unmount();
+  });
+
+  it("keeps the existing cover when a replacement upload fails", async () => {
+    upload.mockRejectedValueOnce(Object.assign(new Error("Failed to fetch"), { code: "DIRECT_UPLOAD_NETWORK_FAILED" }));
+    const wrapper = mount(ContentMediaUploader, {
+      props: { modelValue: [{ ...attachment, role: "cover" }], mode: "cover" },
+      global: { stubs: { ContentMediaView: true } },
+    });
+
+    await wrapper.get('[role="button"]').trigger("drop", {
+      dataTransfer: { files: [new File(["image"], "replacement.png", { type: "image/png" })] },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll(".content-media-uploader__item")).toHaveLength(1);
+    expect(wrapper.get('[role="alert"]').text()).toContain("无法连接素材存储服务");
+    wrapper.unmount();
   });
 });

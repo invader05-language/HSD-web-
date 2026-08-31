@@ -15,7 +15,7 @@ if (gateway) {
   galleryStore.activateApiMode(false);
   const { data: detailData } = await useAsyncData<ManagedGalleryAlbum | undefined>(`public-gallery-${slug}`, () => galleryStore.refreshPublicDetailFromApi(gateway, slug));
   // Pinia is reset during client hydration; restore the cached SSR async-data result.
-  if (detailData.value) galleryStore.albums = [detailData.value];
+  if (detailData.value?.publishedSnapshot) galleryStore.publicDetails[slug] = detailData.value.publishedSnapshot;
 } else if (import.meta.client) galleryStore.hydrate();
 const album = computed(() => galleryStore.getPublicBySlug(slug));
 if (gateway && import.meta.server && galleryStore.apiError?.status === 404) {
