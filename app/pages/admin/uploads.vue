@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onUnmounted, ref, watch } from "vue";
 import { ADMIN_UPLOAD_TASKS, type AdminAssetCenterId, filterAdminUploadTasksByOwnerCenter } from "~/data/admin-assets";
 import { useUploadGateway } from "~/composables/useUploadGateway";
 import { createAdminUploadListController, type AdminUploadKind, type AdminUploadStatus } from "~/services/uploads/admin-upload-list";
@@ -21,7 +22,20 @@ const query = ref(""); const status = ref<AdminUploadStatus | "">(""); const kin
 const page = computed({ get: () => realList?.query.value.page ?? 1, set: (value: number) => { if (realList) { realList.setPage(value); void realList.load(); } } });
 const isOwner = computed(() => session.adminLevel === "owner");
 const rows = computed(() => realList?.records.value ?? []); const total = computed(() => realList?.total.value ?? 0); const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (realList?.query.value.pageSize ?? 20)))); const listStatus = computed(() => realList?.status.value ?? "error"); const listError = computed(() => realList?.error.value || "上传任务读取服务不可用。");
-watch([query, status, kind, centerId], () => { if (!realList) return; realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(isOwner.value && centerId.value ? { centerId: centerId.value } : {}) }); void realList.load(); }, { immediate: true });
+let filterTimer: ReturnType<typeof setTimeout> | undefined;
+let filterWatchInitialized = false;
+watch([query, status, kind, centerId], () => {
+  if (!realList) return;
+  realList.setFilters({ q: query.value, ...(status.value ? { status: status.value } : {}), ...(kind.value ? { kind: kind.value } : {}), ...(isOwner.value && centerId.value ? { centerId: centerId.value } : {}) });
+  if (!filterWatchInitialized) {
+    filterWatchInitialized = true;
+    void realList.load();
+    return;
+  }
+  if (filterTimer) clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => { void realList.load(); }, 300);
+}, { immediate: true });
+onUnmounted(() => { if (filterTimer) clearTimeout(filterTimer); });
 </script>
 
 <template>

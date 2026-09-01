@@ -1621,6 +1621,61 @@
         ]
       }
     },
+    "/api/v1/admin/uploads/{uploadId}/thumbnail": {
+      "get": {
+        "operationId": "UploadsController_thumbnail",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Direct uploads"
+        ]
+      }
+    },
     "/api/v1/admin/media/attachments": {
       "post": {
         "operationId": "MediaController_bind",
@@ -13827,7 +13882,6 @@
           "kind",
           "title",
           "caption",
-          "alt",
           "aspect",
           "sortOrder"
         ]
@@ -13880,7 +13934,9 @@
             "type": "string"
           },
           "alt": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
           },
           "aspect": {
             "type": "string",
@@ -13925,7 +13981,6 @@
           "kind",
           "title",
           "caption",
-          "alt",
           "aspect",
           "sortOrder",
           "status",

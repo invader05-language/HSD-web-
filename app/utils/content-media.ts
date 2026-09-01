@@ -67,13 +67,19 @@ export function createLegacyContentMediaAttachment(assetId: string, alt: string,
 }
 
 export function isContentMediaAttachmentComplete(attachment: ContentMediaAttachment) {
-  if (attachment.status !== "ready" || !attachment.alt.trim()) return false;
+  if (attachment.status !== "ready" || !attachment.alt?.trim()) return false;
   if (attachment.role === "cover") return attachment.kind === "image";
   return Boolean(attachment.title.trim() && attachment.caption.trim() && attachment.aspect);
 }
 
 export function isActivityContentMediaAttachmentComplete(attachment: ContentMediaAttachment) {
-  if (attachment.status !== "ready" || !attachment.alt.trim()) return false;
+  if (attachment.status !== "ready") return false;
+  if (attachment.role === "cover") return attachment.kind === "image";
+  return attachment.role === "detail" && Boolean(attachment.aspect);
+}
+
+export function isGalleryContentMediaAttachmentComplete(attachment: ContentMediaAttachment) {
+  if (attachment.status !== "ready") return false;
   if (attachment.role === "cover") return attachment.kind === "image";
   return attachment.role === "detail" && Boolean(attachment.aspect);
 }

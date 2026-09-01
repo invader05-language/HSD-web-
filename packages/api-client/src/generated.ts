@@ -756,7 +756,7 @@ export type CreateMediaAttachmentDto = {
   "kind": "image" | "video";
   "title": string;
   "caption": string;
-  "alt": string;
+  "alt"?: string;
   "aspect": "landscape" | "portrait" | "wide";
   "sortOrder": number;
 };
@@ -1106,7 +1106,7 @@ export type MediaAttachmentResponseDto = {
   "kind": "image" | "video";
   "title": string;
   "caption": string;
-  "alt": string;
+  "alt"?: (string) | null;
   "aspect": "landscape" | "portrait" | "wide";
   "sortOrder": number;
   "status": "ready" | "failed";
@@ -4007,7 +4007,6 @@ const API_COMPONENT_SCHEMAS = {
       "kind",
       "title",
       "caption",
-      "alt",
       "aspect",
       "sortOrder"
     ]
@@ -4060,7 +4059,9 @@ const API_COMPONENT_SCHEMAS = {
         "type": "string"
       },
       "alt": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 300,
+        "nullable": true
       },
       "aspect": {
         "type": "string",
@@ -4105,7 +4106,6 @@ const API_COMPONENT_SCHEMAS = {
       "kind",
       "title",
       "caption",
-      "alt",
       "aspect",
       "sortOrder",
       "status",

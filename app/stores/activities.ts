@@ -4,7 +4,7 @@ import { PortalAutomationServiceMock } from "../services/portal-automation.mock"
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
 import { usePortalContentStore } from "./portal-content";
-import { isActivityContentMediaAttachmentComplete, isContentMediaAttachmentComplete } from "../utils/content-media";
+import { isActivityContentMediaAttachmentComplete } from "../utils/content-media";
 import { activityCreatePayload, activityUpdatePayload } from "../utils/activity-api-payload";
 import { isActivityRegistrationOpen } from "../utils/activity-registration";
 import type { ContentMediaAttachment } from "../types/content-media";
@@ -77,7 +77,6 @@ function createSeedActivity(activity: (typeof ACTIVITY_DETAILS)[number], index: 
     kind: "image",
     title: "",
     caption: "",
-    alt: `${activity.title}活动封面`,
     aspect: "wide",
     sortOrder: 0,
     status: "ready",
@@ -176,15 +175,21 @@ function migrateActivityRecord(record: Record<string, unknown>): Record<string, 
 function normalizeActivityMedia(record: ManagedActivity): ManagedActivity {
   const normalized = { ...record } as ManagedActivity;
   normalized.cover = normalized.cover ?? null;
-  normalized.details = Array.isArray(normalized.details) ? normalized.details : [];
+  normalized.cover = normalized.cover ? stripActivityAlt(normalized.cover) : null;
+  normalized.details = Array.isArray(normalized.details) ? normalized.details.map(stripActivityAlt) : [];
   if (normalized.publishedSnapshot) {
     normalized.publishedSnapshot = {
       ...normalized.publishedSnapshot,
-      cover: normalized.publishedSnapshot.cover ?? null,
-      details: Array.isArray(normalized.publishedSnapshot.details) ? normalized.publishedSnapshot.details : [],
+      cover: normalized.publishedSnapshot.cover ? stripActivityAlt(normalized.publishedSnapshot.cover) : null,
+      details: Array.isArray(normalized.publishedSnapshot.details) ? normalized.publishedSnapshot.details.map(stripActivityAlt) : [],
     };
   }
   return normalized;
+}
+
+function stripActivityAlt(attachment: ContentMediaAttachment): ContentMediaAttachment {
+  const { alt: _legacyAlt, ...withoutAlt } = attachment;
+  return withoutAlt;
 }
 
 function migratePersistedState(value: unknown): PersistedActivityState | undefined {
@@ -218,12 +223,16 @@ function readPersistedState(): PersistedActivityState | undefined {
     }
     const migrated = migratePersistedState(parsed);
     if (!migrated) return undefined;
+    const normalized = {
+      ...migrated,
+      activities: migrated.activities.map(normalizeActivityMedia),
+    };
     try {
-      storage?.setItem(ACTIVITIES_STORAGE_KEY, JSON.stringify(migrated));
+      storage?.setItem(ACTIVITIES_STORAGE_KEY, JSON.stringify(normalized));
     } catch {
       // Keep the migrated state in memory even if browser storage is temporarily unavailable.
     }
-    return clone(migrated);
+    return clone(normalized);
   } catch {
     return undefined;
   }
@@ -552,7 +561,7 @@ export const useActivitiesStore = defineStore("activities", {
         if (typeof value !== "string" || !value.trim()) throw new Error("ACTIVITY_INCOMPLETE");
       }
       if (!activity.agenda.some((item) => item.trim())) throw new Error("ACTIVITY_INCOMPLETE");
-      if (!activity.cover || !isContentMediaAttachmentComplete(activity.cover) || activity.cover.role !== "cover" || activity.cover.kind !== "image") {
+      if (!activity.cover || !isActivityContentMediaAttachmentComplete(activity.cover) || activity.cover.role !== "cover" || activity.cover.kind !== "image") {
         throw new Error("ACTIVITY_INCOMPLETE");
       }
       if (activity.details.some((detail) => detail.role !== "detail" || !isActivityContentMediaAttachmentComplete(detail))) {
@@ -739,6 +748,6 @@ function registrationFromApi(item: any): ActivityRegistration { const studentId 
 function activityFromPublicApi(item: Record<string, unknown>): ManagedActivity { const slug = String(item.slug); const cover = publicActivityAttachment(item.cover, `activity-cover-${slug}`, "cover", 0); const details = Array.isArray(item.details) ? item.details.flatMap((detail, index) => { const mapped = publicActivityAttachment(detail, `activity-detail-${slug}-${index}`, "detail", index); return mapped ? [mapped] : []; }) : []; const registrationEndAt = typeof item.registrationEndAt === "string" ? item.registrationEndAt : ""; const registrationOpen = item.registrationOpen === true; const deadline = registrationEndAt ? new Date(registrationEndAt) : undefined; const hasServerOverride = typeof item.registrationOverride === "boolean"; const registrationOverride = hasServerOverride ? item.registrationOverride as boolean : registrationOpen && deadline instanceof Date && !Number.isNaN(deadline.getTime()) && deadline <= new Date(); const base = { id: slug, slug, title: String(item.title), type: String(item.type), date: String(item.date), time: String(item.time), location: String(item.location), summary: String(item.summary), content: String(item.content), agenda: Array.isArray(item.agenda) ? item.agenda.map(String) : [], cover, details, ownerCenterId: "", registrationEndAt, registrationMode: "unlimited" as const, publishedAt: "", revision: 1 }; return { ...base, status: "published", registrationOpen, registrationOverride, version: 0, createdAt: "", updatedAt: "", createdBy: "", publishedState: "published", publishedSnapshot: base }; }
 function activityFromAdminApi(item: Record<string, unknown>): ManagedActivity { const base = activityFromPublicApi({ ...item, cover: null, details: [] }); const cover = item.cover && typeof item.cover === "object" ? adminActivityAttachment(item.cover, "cover", 0) : typeof item.coverAttachmentId === "string" ? adminActivityAttachment(item.coverAttachmentId, "cover", 0) : null; const details = Array.isArray(item.details) ? item.details.flatMap((value, index) => value ? [adminActivityAttachment(value, "detail", index)] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => adminActivityAttachment(id, "detail", index)) : []; return { ...base, cover, details, id: String(item.id), ownerCenterId: String(item.centerId), status: item.status === "published" ? "published" : item.status === "offline" ? "unpublished" : "draft", publishedState: item.status === "published" ? "published" : "unpublished", registrationOpen: item.registrationOpen === true, registrationOverride: item.registrationOverride === true, version: Number(item.version), publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), publishedSnapshot: undefined }; }
 
-function adminActivityAttachment(value: unknown, role: "cover" | "detail", sortOrder: number): ContentMediaAttachment { if (typeof value === "object" && value !== null && !Array.isArray(value)) { const media = value as Record<string, unknown>; return { id: typeof media.id === "string" ? media.id : `activity-${role}-${sortOrder}`, serverOwned: true, role: media.role === "detail" ? "detail" : role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: media.status === "failed" ? "failed" : "ready", ...(typeof media.version === "number" ? { version: media.version } : {}) }; } const id = String(value); return { id, serverOwned: true, role, kind: "image", title: "", caption: "", alt: "", aspect: "landscape", sortOrder, status: "processing" }; }
+function adminActivityAttachment(value: unknown, role: "cover" | "detail", sortOrder: number): ContentMediaAttachment { if (typeof value === "object" && value !== null && !Array.isArray(value)) { const media = value as Record<string, unknown>; return { id: typeof media.id === "string" ? media.id : `activity-${role}-${sortOrder}`, serverOwned: true, role: media.role === "detail" ? "detail" : role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: media.status === "failed" ? "failed" : "ready", ...(typeof media.version === "number" ? { version: media.version } : {}) }; } const id = String(value); return { id, serverOwned: true, role, kind: "image", title: "", caption: "", aspect: "landscape", sortOrder, status: "processing" }; }
 
-function publicActivityAttachment(value: unknown, id: string, fallbackRole: "cover" | "detail", fallbackOrder: number): ContentMediaAttachment | null { if (!value || typeof value !== "object" || Array.isArray(value)) return null; const media = value as Record<string, unknown>; return { id, role: media.role === "detail" ? "detail" : fallbackRole, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : fallbackOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: "ready" }; }
+function publicActivityAttachment(value: unknown, id: string, fallbackRole: "cover" | "detail", fallbackOrder: number): ContentMediaAttachment | null { if (!value || typeof value !== "object" || Array.isArray(value)) return null; const media = value as Record<string, unknown>; return { id, role: media.role === "detail" ? "detail" : fallbackRole, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", aspect: media.aspect === "portrait" || media.aspect === "wide" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : fallbackOrder, ...(typeof media.url === "string" ? { url: media.url } : {}), ...(typeof media.thumbnailUrl === "string" ? { thumbnailUrl: media.thumbnailUrl } : {}), status: "ready" }; }

@@ -35,7 +35,6 @@ const activeMediaItem = computed<ContentMediaAttachment | undefined>(() => {
     kind: activeItem.value.kind ?? "image",
     title: activeItem.value.title,
     caption: activeItem.value.caption,
-    alt: activeItem.value.alt,
     aspect: activeItem.value.aspect,
     sortOrder: activeItem.value.sortOrder ?? props.activeIndex,
     url: activeItem.value.imageUrl,

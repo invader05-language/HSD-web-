@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ADMIN_ASSETS, canSelectAsset } from "../data/admin-assets";
 import { GALLERY_ALBUMS, type GalleryAsset, type GalleryAlbum } from "../data/gallery";
-import { isContentMediaAttachmentComplete } from "../utils/content-media";
+import { isGalleryContentMediaAttachmentComplete } from "../utils/content-media";
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
 import { normalizeGalleryCategory, type GalleryCategory, type GalleryDraftInput, type ManagedGalleryAlbum, type PublishedGalleryAlbum } from "../types/gallery";
@@ -81,13 +81,16 @@ function isGalleryCategory(value: unknown): value is GalleryCategory {
 }
 
 function normalizeAssets(assets: readonly GalleryAsset[]): GalleryAsset[] {
-  return assets.map((asset, index): GalleryAsset => ({
-    ...asset,
-    role: asset.role ?? "detail",
-    kind: asset.kind ?? "image",
-    status: asset.status ?? "ready",
-    sortOrder: asset.sortOrder ?? index,
-  }));
+  return assets.map((asset, index): GalleryAsset => {
+    const { alt: _legacyAlt, ...withoutAlt } = asset as GalleryAsset & { alt?: string };
+    return {
+      ...withoutAlt,
+      role: asset.role ?? "detail",
+      kind: asset.kind ?? "image",
+      status: asset.status ?? "ready",
+      sortOrder: asset.sortOrder ?? index,
+    };
+  });
 }
 
 function asCover(asset: GalleryAsset | undefined): GalleryAsset | null {
@@ -194,15 +197,14 @@ function assertCompleteGallery(album: ManagedGalleryAlbum) {
   }
   validateAssets(album.assets, true);
   if (!album.cover) throw new Error("GALLERY_COVER_REQUIRED");
-  if (!isContentMediaAttachmentComplete({ ...album.cover, role: "cover", kind: album.cover.kind ?? "image", status: album.cover.status ?? "ready", sortOrder: album.cover.sortOrder ?? 0, url: album.cover.imageUrl })) throw new Error("GALLERY_COVER_METADATA_REQUIRED");
+  if (!isGalleryContentMediaAttachmentComplete({ ...album.cover, role: "cover", kind: album.cover.kind ?? "image", status: album.cover.status ?? "ready", sortOrder: album.cover.sortOrder ?? 0, url: album.cover.imageUrl })) throw new Error("GALLERY_COVER_METADATA_REQUIRED");
   for (const asset of album.assets) {
-    const complete = isContentMediaAttachmentComplete({
+    const complete = isGalleryContentMediaAttachmentComplete({
       id: asset.id,
       role: asset.role ?? "detail",
       kind: asset.kind ?? "image",
       title: asset.title,
       caption: asset.caption,
-      alt: asset.alt,
       aspect: asset.aspect,
       sortOrder: asset.sortOrder ?? 0,
       url: asset.imageUrl,
@@ -543,7 +545,7 @@ function galleryFromAdminApi(item: Record<string, unknown>): ManagedGalleryAlbum
   return {
     id: String(item.id), slug: String(item.slug), title: String(item.title), category: normalizeGalleryCategory(item.category), year: typeof item.year === "string" ? item.year : "",
     summary: typeof item.description === "string" ? item.description : "", team: typeof item.team === "string" ? item.team : "",
-    ownerCenterId: String(item.centerId), cover: adminGalleryAsset(item.cover, "cover", 0), assets: Array.isArray(item.details) ? item.details.flatMap((value, index) => adminGalleryAsset(value, "detail", index) ? [adminGalleryAsset(value, "detail", index)!] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => ({ id, role: "detail" as const, kind: "image" as const, title: "", caption: "", alt: "", aspect: "landscape" as const, sortOrder: index, status: "processing" as const, serverOwned: true })) : [],
+    ownerCenterId: String(item.centerId), cover: adminGalleryAsset(item.cover, "cover", 0), assets: Array.isArray(item.details) ? item.details.flatMap((value, index) => adminGalleryAsset(value, "detail", index) ? [adminGalleryAsset(value, "detail", index)!] : []) : Array.isArray(item.detailAttachmentIds) ? item.detailAttachmentIds.filter((id): id is string => typeof id === "string").map((id, index) => ({ id, role: "detail" as const, kind: "image" as const, title: "", caption: "", aspect: "landscape" as const, sortOrder: index, status: "processing" as const, serverOwned: true })) : [],
     to: `/gallery/${String(item.slug)}`, publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : "", revision: Number(item.revisionNumber), status, publishedState: status === "published" ? "published" : "unpublished", version: Number(item.version), createdAt: "", updatedAt: "", createdBy: "",
   };
 }
@@ -563,7 +565,6 @@ function publicGalleryAsset(value: unknown, id: string, sortOrder: number): Gall
     id,
     title: typeof media.title === "string" ? media.title : "",
     caption: typeof media.caption === "string" ? media.caption : "",
-    alt: typeof media.alt === "string" ? media.alt : "",
     aspect: media.aspect === "wide" || media.aspect === "portrait" ? media.aspect : "landscape",
     role: media.role === "cover" ? "cover" : "detail",
     kind: media.kind === "video" ? "video" : "image",
@@ -579,6 +580,6 @@ function adminGalleryAsset(value: unknown, role: "cover" | "detail", sortOrder: 
   const media = value as Record<string, unknown>;
   if (typeof media.id !== "string") return null;
   return {
-    id: media.id, role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", alt: typeof media.alt === "string" ? media.alt : "", aspect: media.aspect === "wide" || media.aspect === "portrait" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, status: media.status === "ready" ? "ready" : "processing", serverOwned: true, version: typeof media.version === "number" ? media.version : undefined, imageUrl: typeof media.url === "string" ? media.url : undefined, thumbnailUrl: typeof media.thumbnailUrl === "string" ? media.thumbnailUrl : undefined,
+    id: media.id, role, kind: media.kind === "video" ? "video" : "image", title: typeof media.title === "string" ? media.title : "", caption: typeof media.caption === "string" ? media.caption : "", aspect: media.aspect === "wide" || media.aspect === "portrait" ? media.aspect : "landscape", sortOrder: typeof media.sortOrder === "number" ? media.sortOrder : sortOrder, status: media.status === "ready" ? "ready" : "processing", serverOwned: true, version: typeof media.version === "number" ? media.version : undefined, imageUrl: typeof media.url === "string" ? media.url : undefined, thumbnailUrl: typeof media.thumbnailUrl === "string" ? media.thumbnailUrl : undefined,
   };
 }

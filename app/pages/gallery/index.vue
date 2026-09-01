@@ -35,7 +35,6 @@ function toMediaItem(asset: GalleryAsset): ContentMediaAttachment {
     kind: asset.kind ?? "image",
     title: asset.title,
     caption: asset.caption,
-    alt: asset.alt,
     aspect: asset.aspect,
     sortOrder: asset.sortOrder ?? 0,
     url: asset.imageUrl,

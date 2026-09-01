@@ -8,7 +8,7 @@ import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-cente
 import type { GalleryAsset } from "~/data/gallery";
 import { GALLERY_CATEGORY_CODES, galleryCategoryLabel, normalizeGalleryCategory, type GalleryCategory, type GalleryDraftInput, type ManagedGalleryAlbum } from "~/types/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
+import { isGalleryContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { useAdminToast } from "~/composables/useAdminToast";
 import { localizeGalleryError } from "~/utils/gallery-errors";
@@ -59,10 +59,10 @@ const form = reactive<GalleryDraftInput>({
   assets: [],
 });
 const coverItems = computed<ContentMediaAttachment[]>({
-  get: () => form.cover ? [{ id: form.cover.id, localBlobId: form.cover.localBlobId, role: "cover" as const, kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, alt: form.cover.alt, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready", errorMessage: form.cover.errorMessage, serverOwned: form.cover.serverOwned, version: form.cover.version }] : [],
+  get: () => form.cover ? [{ id: form.cover.id, localBlobId: form.cover.localBlobId, role: "cover" as const, kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready", errorMessage: form.cover.errorMessage, serverOwned: form.cover.serverOwned, version: form.cover.version }] : [],
   set: (items: ContentMediaAttachment[]) => {
     const item = items[0];
-    form.cover = item ? { id: item.id, title: item.title, caption: item.caption, alt: item.alt, aspect: item.aspect, imageUrl: item.url, localBlobId: item.localBlobId, thumbnailUrl: item.thumbnailUrl, role: "cover", kind: item.kind, status: item.status, sortOrder: 0, errorMessage: item.errorMessage, serverOwned: item.serverOwned, version: item.version } : null;
+    form.cover = item ? { id: item.id, title: item.title, caption: item.caption, aspect: item.aspect, imageUrl: item.url, localBlobId: item.localBlobId, thumbnailUrl: item.thumbnailUrl, role: "cover", kind: item.kind, status: item.status, sortOrder: 0, errorMessage: item.errorMessage, serverOwned: item.serverOwned, version: item.version } : null;
   },
 });
 const centerOptions = ref<Array<{ id: string; label: string }>>([...CENTER_OPTIONS]);
@@ -84,7 +84,6 @@ const mediaItems = computed<ContentMediaAttachment[]>({
     kind: asset.kind ?? "image",
     title: asset.title,
     caption: asset.caption,
-    alt: asset.alt,
     aspect: asset.aspect,
     sortOrder: asset.sortOrder ?? index,
     url: asset.imageUrl,
@@ -99,7 +98,6 @@ const mediaItems = computed<ContentMediaAttachment[]>({
       id: item.id,
       title: item.title,
       caption: item.caption,
-      alt: item.alt,
       aspect: item.aspect,
       imageUrl: item.url,
       localBlobId: item.localBlobId,
@@ -131,7 +129,6 @@ const missingFields = computed(() => {
     kind: asset.kind ?? "image",
     title: asset.title,
     caption: asset.caption,
-    alt: asset.alt,
     aspect: asset.aspect,
     sortOrder: asset.sortOrder ?? 0,
     url: asset.imageUrl,
@@ -139,13 +136,12 @@ const missingFields = computed(() => {
     thumbnailUrl: asset.thumbnailUrl,
     status: asset.status ?? "ready",
     serverOwned: asset.serverOwned,
-  }) && !isContentMediaAttachmentComplete({
+  }) && !isGalleryContentMediaAttachmentComplete({
     id: asset.id,
     role: "detail",
     kind: asset.kind ?? "image",
     title: asset.title,
     caption: asset.caption,
-    alt: asset.alt,
     aspect: asset.aspect,
     sortOrder: asset.sortOrder ?? 0,
     url: asset.imageUrl,
@@ -153,7 +149,7 @@ const missingFields = computed(() => {
     thumbnailUrl: asset.thumbnailUrl,
     status: asset.status ?? "ready",
   }))) missing.push("专题素材信息");
-  if (form.cover && !isContentMediaAttachmentComplete({ id: form.cover.id, role: "cover", kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, alt: form.cover.alt, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, localBlobId: form.cover.localBlobId, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready" })) missing.push("封面信息");
+  if (form.cover && !isGalleryContentMediaAttachmentComplete({ id: form.cover.id, role: "cover", kind: form.cover.kind ?? "image", title: form.cover.title, caption: form.cover.caption, aspect: form.cover.aspect, sortOrder: 0, url: form.cover.imageUrl, localBlobId: form.cover.localBlobId, thumbnailUrl: form.cover.thumbnailUrl, status: form.cover.status ?? "ready" })) missing.push("封面信息");
   return missing;
 });
 const isComplete = computed(() => missingFields.value.length === 0);
@@ -229,7 +225,6 @@ async function persistMediaMetadata() {
       expectedVersion: item.version!,
       title: item.title,
       caption: item.caption,
-      alt: item.alt,
       aspect: item.aspect,
       sortOrder: item.sortOrder,
     });
@@ -238,7 +233,6 @@ async function persistMediaMetadata() {
       version: updated.version,
       title: updated.title,
       caption: updated.caption,
-      alt: updated.alt,
       aspect: updated.aspect as ContentMediaAttachment["aspect"],
       sortOrder: updated.sortOrder,
       status: updated.status as ContentMediaAttachment["status"],
@@ -333,8 +327,8 @@ async function offlineGallery() {
         <label class="is-wide">摘要<textarea v-model="form.summary" rows="3"></textarea></label>
         <label class="is-wide">制作团队<input v-model="form.team" type="text"></label>
       </div>
-      <ContentMediaUploader v-model="coverItems" mode="cover" :owner="mediaOwner" title="画廊独立封面" description="封面单独上传，不占用详情素材 20 张上限。" />
-      <ContentMediaUploader v-model="mediaItems" mode="collection" :max-items="20" :owner="mediaOwner" title="画廊详情素材" description="上传 1–20 张详情照片；详情素材与封面独立保存。" />
+      <ContentMediaUploader v-model="coverItems" mode="cover" :owner="mediaOwner" metadata-profile="gallery" title="画廊独立封面" description="封面单独上传，不占用详情素材 20 张上限。" />
+      <ContentMediaUploader v-model="mediaItems" mode="collection" :max-items="20" :owner="mediaOwner" metadata-profile="gallery" title="画廊详情素材" description="上传 1–20 张详情照片；标题和说明可选。" />
     </div>
     <footer class="admin-drawer__footer">
       <span>{{ isComplete ? "必填信息和素材已完整，可直接发布。" : "草稿可暂存，直接发布前需补齐全部信息和素材。" }}</span>

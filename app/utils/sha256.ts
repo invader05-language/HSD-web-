@@ -91,7 +91,9 @@ function appendBytes(left: Uint8Array, right: Uint8Array): Uint8Array<ArrayBuffe
 
 export async function sha256File(file: Blob): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
-  if (subtle) {
+  // Avoid materialising large videos in one ArrayBuffer. The incremental path
+  // keeps peak memory bounded to the 1 MiB chunk size below.
+  if (subtle && file.size <= 32 * 1024 * 1024) {
     try {
       const buffer = await file.arrayBuffer();
       const digest = await subtle.digest("SHA-256", buffer);
