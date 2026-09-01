@@ -414,6 +414,20 @@ describe("project, activity, and registration API gateway", () => {
     expect(source).toContain("album.cover");
   });
 
+  it("keeps admin gallery status pills out of the card grid flow", () => {
+    const styles = readFileSync(resolve("app/assets/css/main.css"), "utf8");
+    expect(styles).not.toContain(".admin-gallery-admin-grid > article > div > :not(.admin-gallery-admin-grid__cover)");
+    expect(styles).toContain(".admin-gallery-admin-grid > article > div > h2");
+    expect(styles).toContain(".admin-gallery-admin-grid .admin-result-pill");
+    expect(styles).toContain("width: max-content;");
+  });
+
+  it("renders an explicit placeholder for an admin gallery without a cover", () => {
+    const source = readFileSync(resolve("app/pages/admin/gallery.vue"), "utf8");
+    expect(source).toContain('admin-gallery-admin-grid__cover--empty');
+    expect(source).toContain("暂无封面");
+  });
+
   it("uses the API session center UUID for management scope and create payloads", async () => {
     const centerId = "11111111-1111-4111-8111-111111111111";
     const session = useSessionStore();

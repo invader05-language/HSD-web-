@@ -58,6 +58,7 @@ function coverMedia(album: typeof galleryStore.albums[number]): ContentMediaAtta
       <article v-for="album in scopedAlbums" :key="album.id">
         <div :style="{ '--gallery-cover': '#3f4e58' }">
           <ContentMediaView v-if="coverMedia(album)" class="admin-gallery-admin-grid__cover" :item="coverMedia(album)!" preview="thumbnail" :controls="false" />
+          <span v-else class="admin-gallery-admin-grid__cover admin-gallery-admin-grid__cover--empty">暂无封面</span>
           <span class="admin-gallery-admin-grid__eyebrow">&lt; HSD GALLERY &gt;</span>
           <AdminStatusPill :status="albumStatus(album)" />
           <h2>{{ album.title }}</h2>
