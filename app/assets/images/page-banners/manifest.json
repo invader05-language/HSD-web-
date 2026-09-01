@@ -1,0 +1,261 @@
+{
+  "version": 2,
+  "generatedAt": "2026-09-01T13:42:38.836774+00:00",
+  "widths": [
+    828,
+    1440,
+    1920
+  ],
+  "assets": [
+    {
+      "assetId": "asset-home-poster",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/home-poster.webp",
+        "sha256": "4c5e335ac26be05c603a42a19cc8cd96c186e6e9f9c67d9fa4f609747378c8f0",
+        "width": 1280,
+        "height": 1817
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-home-poster-v2-828w.webp",
+          "width": 828,
+          "height": 1175,
+          "bytes": 84586,
+          "sha256": "d772b6eb784c9bdf80cfddb6605a2dfb857ad8a52b88ebebdf6762e5aab0ce2d"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-about-team",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/about-team.webp",
+        "sha256": "e417810c7b13a28009da35f54ea874c8c3e2bf39c8f4e115ce21d595b439e5f0",
+        "width": 1920,
+        "height": 1280
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-about-team-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 68924,
+          "sha256": "d2ae7e2b4818c85828d4d6fe157cde80676c6fd8761d99c35cf8ec1f717d4cc7"
+        },
+        {
+          "path": "asset-about-team-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 141250,
+          "sha256": "4ae80f4541a224c9a87d1a4d7c83047f7cf712355310ceae982e3e37a93e5e27"
+        },
+        {
+          "path": "asset-about-team-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 182188,
+          "sha256": "1d0dcdbd4b18ed02df0f0d8bbf4c90a4f91e4a270d7e36228fe9217ee831f337"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-centers-baize",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/centers-baize.webp",
+        "sha256": "97f11efb58a9919245eaa355eeb177182497b0c0a20cfad6b76e804716f6ba7c",
+        "width": 2200,
+        "height": 1467
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-centers-baize-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 61830,
+          "sha256": "ebf87a44a0cac00a3102fbfe9543c5aadc78adebbdd50039525fdc617e2c025d"
+        },
+        {
+          "path": "asset-centers-baize-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 125810,
+          "sha256": "b2dec93b05429f483d5dd89972b77dbdbe8d7cc347a9e2ad430063b73edf6077"
+        },
+        {
+          "path": "asset-centers-baize-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 181424,
+          "sha256": "89c95384478c5743b2d43cfc79be6091024abe533e86504563fbaf36c4f10dc3"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-projects-baize",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD-media-source/page-banners/2026-09-01/projects-hero-source.jpg",
+        "sha256": "2c9c4481aace02100e089928967277436c01f290bf016a0d4e5196a1c7ff8bfc",
+        "width": 4096,
+        "height": 2730
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-projects-baize-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 74140,
+          "sha256": "c006d71e6aebaf2a8eab7640431c6cf87cbf71a8c6544e56895618fa85c2eedf"
+        },
+        {
+          "path": "asset-projects-baize-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 155660,
+          "sha256": "ccb1ccff6d7bcd98a6d7e277474a658251e58722978af7a9093c80ed98c5f7bc"
+        },
+        {
+          "path": "asset-projects-baize-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 235952,
+          "sha256": "dd6542d291b7687bc54b996ef218518c435300113d0d11728717385206321aed"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-activities-programmer-day",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/activities-programmer-day.webp",
+        "sha256": "8530f43720cb44327a1d303e2e5a1ad83f82d88f72df23974aaa5abe7b1b9894",
+        "width": 2200,
+        "height": 1467
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-activities-programmer-day-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 80996,
+          "sha256": "aa825dd7bae4e01f941d5a095c835788ff579b13471ca3f77508737378cd52be"
+        },
+        {
+          "path": "asset-activities-programmer-day-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 172472,
+          "sha256": "f6df88db5ab1db17de478dde7dc65acc7c97d5b68968733339f5ea7249b5ac15"
+        },
+        {
+          "path": "asset-activities-programmer-day-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 248220,
+          "sha256": "35f8ce46bbb816fecd4411dfb19614839e00e080644d3d2d213c1f7796431cdd"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-gallery-transition",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/gallery-transition.webp",
+        "sha256": "510ea71e36683541f012315f358a589b2ddcf606a825d6dd709988a48f89c858",
+        "width": 2200,
+        "height": 1467
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-gallery-transition-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 30960,
+          "sha256": "6e2ca3f384cc13581fac524996c88d1307cf6d897301ec6e137bf7389465c555"
+        },
+        {
+          "path": "asset-gallery-transition-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 58960,
+          "sha256": "07216a1d50b33f420fb348d08158eb2651020ea9b6eb8826042e5acfebd55f28"
+        },
+        {
+          "path": "asset-gallery-transition-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 83634,
+          "sha256": "c3291e6be6a627b8a516381ba65a76ba135eb45b03730a5e4d3759d25f5ececd"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-resources-programmer-day",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD/app/assets/images/page-banners/resources-programmer-day.webp",
+        "sha256": "e8e978ff065179ff399393ab5773c66ef2345a6e110838cb842b7dfc0178ce6b",
+        "width": 2200,
+        "height": 1467
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-resources-programmer-day-v2-828w.webp",
+          "width": 828,
+          "height": 552,
+          "bytes": 33146,
+          "sha256": "6f164728338e919a0e6f1641587a990c5afe4d83f7f9b5155d9023cd853bbaea"
+        },
+        {
+          "path": "asset-resources-programmer-day-v2-1440w.webp",
+          "width": 1440,
+          "height": 960,
+          "bytes": 69900,
+          "sha256": "c9db50b39cc885630d1dbc55dc349044d811dc94530cb5767db1bc8811734b9f"
+        },
+        {
+          "path": "asset-resources-programmer-day-v2-1920w.webp",
+          "width": 1920,
+          "height": 1280,
+          "bytes": 99450,
+          "sha256": "cd4a123c587bdeb7da2d6900079617024be5f042834a6a6c899676bd28e8e67d"
+        }
+      ]
+    },
+    {
+      "assetId": "asset-join-orientation",
+      "source": {
+        "path": "E:/文档/ChatGPT/HSD-media-source/page-banners/2026-09-01/join-hero-source.jpg",
+        "sha256": "ca89521b37b8eb9c3ebfeab50d309557e320da396200fc22cdf2eb90bc47561e",
+        "width": 3472,
+        "height": 1769
+      },
+      "quality": 88,
+      "variants": [
+        {
+          "path": "asset-join-orientation-v2-828w.webp",
+          "width": 828,
+          "height": 422,
+          "bytes": 95788,
+          "sha256": "0c4e2e2c8d625bbaa304c7842d4d4d2007993800d0accd8e422fc30f96135376"
+        },
+        {
+          "path": "asset-join-orientation-v2-1440w.webp",
+          "width": 1440,
+          "height": 734,
+          "bytes": 248426,
+          "sha256": "75b24693e4ee5286b57a152471ba73b502642fe68f3a9f00475caa621a4db521"
+        },
+        {
+          "path": "asset-join-orientation-v2-1920w.webp",
+          "width": 1920,
+          "height": 978,
+          "bytes": 387526,
+          "sha256": "688249f84dd3a1cc1252c0389b99b681aabc1c364915095967815ac7294cdbde"
+        }
+      ]
+    }
+  ]
+}

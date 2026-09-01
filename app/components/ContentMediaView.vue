@@ -10,10 +10,12 @@ const props = withDefaults(defineProps<{
   preview?: "full" | "thumbnail";
   fit?: "cover" | "contain";
   controls?: boolean;
+  role?: "hero" | "card" | "detail";
 }>(), {
   preview: "full",
   fit: "cover",
   controls: true,
+  role: undefined,
 });
 
 const runtimeConfig = useRuntimeConfig() as { public?: { apiBase?: string } };
@@ -21,6 +23,10 @@ const apiBase = runtimeConfig.public?.apiBase;
 const source = ref<string | undefined>(resolveApiMediaUrl(props.preview === "thumbnail" && props.item.kind === "image" ? (props.item.thumbnailUrl ?? props.item.url) : props.item.url, apiBase));
 const poster = computed(() => props.item.kind === "video" ? resolveApiMediaUrl(props.item.thumbnailUrl, apiBase) : undefined);
 const hasError = ref(false);
+const mediaRole = computed(() => props.role ?? (props.preview === "full" ? "detail" : "card"));
+const imageLoading = computed(() => mediaRole.value === "hero" ? "eager" : "lazy");
+const imageFetchPriority = computed(() => mediaRole.value === "hero" ? "high" : "auto");
+const imageSizes = computed(() => mediaRole.value === "hero" ? "(max-width: 900px) 100vw, 48vw" : "(max-width: 900px) 100vw, 33vw");
 let ownsSource = false;
 const { resolvePreviewUrl } = useContentMediaUpload();
 
@@ -67,7 +73,7 @@ onBeforeUnmount(releaseSource);
     `content-media-view--${fit}`,
     `content-media-view--aspect-${item.aspect}`,
   ]" data-testid="content-media-view">
-    <img v-if="item.kind === 'image' && source && !hasError" :src="source" :alt="item.alt ?? ''" loading="lazy" @error="handleMediaError">
+    <img v-if="item.kind === 'image' && source && !hasError" :src="source" :alt="item.alt ?? ''" :loading="imageLoading" :fetchpriority="imageFetchPriority" :sizes="imageSizes" decoding="async" @error="handleMediaError">
     <video v-else-if="item.kind === 'video' && source && !hasError" :src="source" :poster="poster" :controls="controls" :muted="preview === 'thumbnail'" preload="metadata" :aria-label="item.alt ?? item.title" @error="handleMediaError"></video>
     <span v-else class="content-media-view__fallback" aria-hidden="true">&lt; HSD &gt;</span>
   </span>

@@ -10,7 +10,7 @@ import { selectHomepageMembers, type HomepageMemberCard } from "~/utils/homepage
 import { usePretextLayout } from "~/composables/usePretextLayout";
 import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
-import { resolvePortalAssetSource } from "~/data/portal-assets";
+import { resolvePortalAssetMetadata, resolvePortalAssetSource } from "~/data/portal-assets";
 import { resolvePageVisual } from "~/data/page-visuals";
 import ContentMediaView from "~/components/ContentMediaView.vue";
 import { useActivitiesStore } from "~/stores/activities";
@@ -96,12 +96,27 @@ const homeVisualSource = computed(() => resolvePortalAssetSource(config.value.vi
 const homeVisual = computed(() => resolvePageVisual(config.value.visuals.home, "home"));
 const homeVisualLabel = computed(() => homeVisual.value.alt || "官网主视觉素材位");
 const homeVisualDetail = computed(() => homeVisual.value.supportingText || (homeVisual.value.media ? "已发布门户主视觉" : "后续使用单独设计或授权照片"));
-const homeVisualSource = computed(() => homeVisual.value.media?.url ?? resolvePortalAssetSource(homeVisual.value.assetId));
+const homeVisualMetadata = computed(() => resolvePortalAssetMetadata(homeVisual.value.assetId));
+const homeVisualSource = computed(() => homeVisual.value.media?.url ?? homeVisualMetadata.value?.src ?? resolvePortalAssetSource(homeVisual.value.assetId));
 const homePosterStyle = computed(() => (
   homeVisualSource.value
     ? { "--home-poster-image": `url("${homeVisualSource.value}")` }
     : undefined
 ));
+useHead(() => {
+  const metadata = homeVisualMetadata.value;
+  if (!metadata || homeVisual.value.media) return {};
+  return {
+    link: [{
+      rel: "preload",
+      as: "image",
+      href: metadata.src,
+      imagesrcset: metadata.srcSet,
+      imagesizes: metadata.sizes,
+      fetchpriority: "high",
+    }],
+  };
+});
 const liveStats = computed(() => {
   const stats = publicStatsData.data.value;
   if (!contentGateway || !stats) return STATS;
@@ -191,6 +206,7 @@ watch(
             :item="homeVisual.media"
             preview="thumbnail"
             :controls="false"
+            role="hero"
             class="home-hero__media home-hero__media--poster"
           />
           <MediaPlaceholder
@@ -198,6 +214,13 @@ watch(
             :label="homeVisualLabel"
             :detail="homeVisualDetail"
             :src="homeVisualSource"
+            :src-set="homeVisualMetadata?.srcSet"
+            :sizes="homeVisualMetadata?.sizes"
+            :width="homeVisualMetadata?.width"
+            :height="homeVisualMetadata?.height"
+            :loading="homeVisualMetadata ? 'eager' : 'lazy'"
+            :fetch-priority="homeVisualMetadata ? 'high' : 'auto'"
+            :fallback-src="homeVisualMetadata?.fallbackSrc"
             :alt="homeVisual.alt"
             :data-asset-id="homeVisual.assetId"
             class="home-hero__media home-hero__media--poster"
