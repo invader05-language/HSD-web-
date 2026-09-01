@@ -26,6 +26,37 @@ describe("published portal visuals", () => {
     expect(wrapper.text()).toContain("首页主视觉");
   });
 
+  it("renders responsive banner attributes and falls back to the legacy asset once", async () => {
+    const wrapper = mount(MediaPlaceholder, {
+      props: {
+        src: "/_nuxt/projects-v2-1440.webp",
+        srcSet: "/_nuxt/projects-v2-828.webp 828w, /_nuxt/projects-v2-1440.webp 1440w",
+        sizes: "(max-width: 900px) 100vw, 48vw",
+        width: 4096,
+        height: 2730,
+        loading: "eager",
+        fetchPriority: "high",
+        fallbackSrc: "/_nuxt/projects-legacy.webp",
+        alt: "项目成果大屏",
+      },
+    });
+
+    const image = wrapper.get("img");
+    expect(image.attributes("srcset")).toContain("1440w");
+    expect(image.attributes("sizes")).toBe("(max-width: 900px) 100vw, 48vw");
+    expect(image.attributes("width")).toBe("4096");
+    expect(image.attributes("height")).toBe("2730");
+    expect(image.attributes("loading")).toBe("eager");
+    expect(image.attributes("fetchpriority")).toBe("high");
+
+    await image.trigger("error");
+    expect(wrapper.get("img").attributes("src")).toBe("/_nuxt/projects-legacy.webp");
+    expect(wrapper.get("img").attributes("srcset")).toBeUndefined();
+
+    await wrapper.get("img").trigger("error");
+    expect(wrapper.find("img").exists()).toBe(false);
+  });
+
   it("uses the placeholder when no published asset is selected", () => {
     const wrapper = mount(MediaPlaceholder, {
       props: { label: "首页主视觉", detail: "等待正式授权素材" },
@@ -50,6 +81,8 @@ describe("published portal visuals", () => {
     expect(joinSource).toContain('resolvePageVisual(config.visuals.join, "join")');
     expect(joinSource).toContain(':visual="joinVisual"');
     expect(bannerSource).toContain("resolvePortalAssetSource(props.visual?.assetId)");
+    expect(bannerSource).toContain("resolvePortalAssetMetadata(props.visual?.assetId)");
+    expect(bannerSource).toContain(":src-set=\"visualMetadata?.srcSet\"");
   });
 
   it("renders uploaded portal visuals through the shared media viewer", () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PAGE_VISUALS, resolvePageVisual } from "../../app/data/page-visuals";
-import { resolvePortalAssetSource } from "../../app/data/portal-assets";
+import { resolvePortalAssetMetadata, resolvePortalAssetSource } from "../../app/data/portal-assets";
 
 describe("approved page visuals", () => {
   it("defines a resolvable WebP and non-empty alt text for every landing page", () => {
@@ -39,5 +39,21 @@ describe("approved page visuals", () => {
       expect(source).toContain('import { PAGE_VISUALS } from "~/data/page-visuals"');
       expect(source).toContain(`:visual="PAGE_VISUALS.${visual}"`);
     }
+  });
+
+  it("uses versioned responsive derivatives for every static page banner", () => {
+    for (const visual of Object.values(PAGE_VISUALS)) {
+      const metadata = resolvePortalAssetMetadata(visual.assetId);
+      expect(metadata).toBeDefined();
+      expect(metadata?.src).toMatch(/\/v2\/asset-[^/]+-v2-\d+w\.webp(?:\?|$)/);
+      expect(metadata?.srcSet.split(", ")).toHaveLength(metadata?.srcSet.includes("1920w") ? 3 : 1);
+      expect(metadata?.sizes).toContain("48vw");
+      expect(metadata?.width).toBeGreaterThan(0);
+      expect(metadata?.height).toBeGreaterThan(0);
+      expect(metadata?.fallbackSrc).toMatch(/\.webp(?:\?|$)/);
+    }
+
+    expect(resolvePortalAssetMetadata("asset-projects-baize")?.srcSet).toContain("asset-projects-baize-v2");
+    expect(resolvePortalAssetMetadata("asset-join-orientation")?.srcSet).toContain("asset-join-orientation-v2");
   });
 });

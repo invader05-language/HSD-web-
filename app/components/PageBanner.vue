@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { resolvePortalAssetSource } from "~/data/portal-assets";
+import { resolvePortalAssetMetadata, resolvePortalAssetSource } from "~/data/portal-assets";
 import type { PortalVisualConfig } from "~/types/portal-config";
 import type { ContentMediaAttachment } from "~/types/content-media";
 
@@ -23,7 +23,23 @@ const props = withDefaults(defineProps<{
 
 const visualLabel = computed(() => props.visual?.alt || props.mediaLabel);
 const visualDetail = computed(() => props.visual?.supportingText || (props.visual?.assetId ? "已发布门户主视觉" : "等待正式授权素材"));
-const visualSource = computed(() => resolvePortalAssetSource(props.visual?.assetId));
+const visualMetadata = computed(() => resolvePortalAssetMetadata(props.visual?.assetId));
+const visualSource = computed(() => visualMetadata.value?.src || resolvePortalAssetSource(props.visual?.assetId));
+
+useHead(() => {
+  const metadata = visualMetadata.value;
+  if (!metadata || props.media || props.visual?.media) return {};
+  return {
+    link: [{
+      rel: "preload",
+      as: "image",
+      href: metadata.src,
+      imagesrcset: metadata.srcSet,
+      imagesizes: metadata.sizes,
+      fetchpriority: "high",
+    }],
+  };
+});
 </script>
 
 <template>
@@ -37,9 +53,25 @@ const visualSource = computed(() => resolvePortalAssetSource(props.visual?.asset
           <slot name="actions" />
         </div>
       </div>
-      <ContentMediaView v-if="media" :item="media" :preview="mediaPreview" :fit="mediaFit" :controls="false" class="page-banner__media" />
-      <ContentMediaView v-else-if="visual?.media" :item="visual.media" :preview="mediaPreview" :fit="mediaFit" :controls="false" class="page-banner__media" />
-      <MediaPlaceholder v-else :label="visualLabel" :detail="visualDetail" :src="visualSource" :alt="visual?.alt" :data-asset-id="visual?.assetId" :dark="tone === 'dark' || tone === 'red'" />
+      <ContentMediaView v-if="media" :item="media" :preview="mediaPreview" :fit="mediaFit" :controls="false" role="hero" class="page-banner__media" />
+      <ContentMediaView v-else-if="visual?.media" :item="visual.media" :preview="mediaPreview" :fit="mediaFit" :controls="false" role="hero" class="page-banner__media" />
+      <MediaPlaceholder
+        v-else
+        :label="visualLabel"
+        :detail="visualDetail"
+        :src="visualSource"
+        :src-set="visualMetadata?.srcSet"
+        :sizes="visualMetadata?.sizes"
+        :width="visualMetadata?.width"
+        :height="visualMetadata?.height"
+        :loading="visualMetadata ? 'eager' : 'lazy'"
+        :fetch-priority="visualMetadata ? 'high' : 'auto'"
+        :object-position="visual?.objectPosition"
+        :fallback-src="visualMetadata?.fallbackSrc"
+        :alt="visual?.alt"
+        :data-asset-id="visual?.assetId"
+        :dark="tone === 'dark' || tone === 'red'"
+      />
     </div>
   </section>
 </template>
