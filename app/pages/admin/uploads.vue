@@ -34,7 +34,7 @@ watch([query, status, kind, centerId], () => {
   }
   if (filterTimer) clearTimeout(filterTimer);
   filterTimer = setTimeout(() => { void realList.load(); }, 300);
-});
+}, { immediate: true });
 onUnmounted(() => { if (filterTimer) clearTimeout(filterTimer); });
 </script>
 
