@@ -3,11 +3,11 @@ import { expect, test } from "@playwright/test";
 const pageBanners = [
   ["/about", "白云 HSD 开发者部落成员集体合影"],
   ["/centers", "白泽开发中心成员合影"],
-  ["/projects", "白泽开发中心项目团队合影"],
+  ["/projects", "项目团队展示无人机与硬件成果的现场照片"],
   ["/activities", "1024 程序员节活动现场"],
   ["/gallery", "HSD 换届大会现场合影"],
   ["/resources", "1024 程序员节分享活动现场"],
-  ["/join", "白云 HSD 迎新活动现场"],
+  ["/join", "广东白云学院新学期迎新活动现场"],
 ] as const;
 
 test("approved landing visuals load and retain the intended crop mode", async ({ page }) => {
