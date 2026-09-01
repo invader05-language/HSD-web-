@@ -4,7 +4,7 @@ import { PortalAutomationServiceMock } from "../services/portal-automation.mock"
 import { getAdminCenterScope, getRecruitmentCenterId } from "../utils/admin-center-scope";
 import { useSessionStore } from "./session";
 import { usePortalContentStore } from "./portal-content";
-import { isActivityContentMediaAttachmentComplete, isContentMediaAttachmentComplete } from "../utils/content-media";
+import { isActivityContentMediaAttachmentComplete } from "../utils/content-media";
 import { activityCreatePayload, activityUpdatePayload } from "../utils/activity-api-payload";
 import { isActivityRegistrationOpen } from "../utils/activity-registration";
 import type { ContentMediaAttachment } from "../types/content-media";
@@ -561,7 +561,7 @@ export const useActivitiesStore = defineStore("activities", {
         if (typeof value !== "string" || !value.trim()) throw new Error("ACTIVITY_INCOMPLETE");
       }
       if (!activity.agenda.some((item) => item.trim())) throw new Error("ACTIVITY_INCOMPLETE");
-      if (!activity.cover || !isContentMediaAttachmentComplete(activity.cover) || activity.cover.role !== "cover" || activity.cover.kind !== "image") {
+      if (!activity.cover || !isActivityContentMediaAttachmentComplete(activity.cover) || activity.cover.role !== "cover" || activity.cover.kind !== "image") {
         throw new Error("ACTIVITY_INCOMPLETE");
       }
       if (activity.details.some((detail) => detail.role !== "detail" || !isActivityContentMediaAttachmentComplete(detail))) {

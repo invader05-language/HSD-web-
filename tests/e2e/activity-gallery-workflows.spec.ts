@@ -31,8 +31,6 @@ test("owner can publish an activity and review a member registration", async ({ 
     mimeType: "image/png",
     buffer: Buffer.from("activity-cover"),
   });
-  await expect(page.getByLabel("图片内容描述").first()).toBeVisible();
-  await page.getByLabel("图片内容描述").first().fill("端到端活动封面");
   await page.getByRole("button", { name: "直接发布" }).click();
   await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/activities");
   const activityRow = page.getByRole("row", { name: /端到端活动闭环验证/ });
@@ -75,7 +73,6 @@ test("owner can publish a gallery and the public detail renders its snapshot", a
   });
   await page.getByLabel("标题").nth(1).fill("验收现场");
   await page.getByLabel("说明").fill("画廊发布后的现场记录。");
-  await page.getByLabel("替代文本").fill("画廊验收现场");
   await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page.getByRole("status")).toContainText("画廊草稿已保存");
   await page.getByRole("button", { name: "直接发布" }).click();
