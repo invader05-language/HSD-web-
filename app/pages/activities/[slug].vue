@@ -130,10 +130,10 @@ useHead(() => ({ title: `${activity.value?.title}｜活动中心` }));
           <p class="eyebrow">活动简介</p>
           <h2>活动介绍</h2>
           <h3>活动内容</h3>
-          <p>{{ activity.content }}</p>
+          <p class="activity-detail-copy">{{ activity.content }}</p>
           <h3>活动流程</h3>
           <ol class="agenda-list">
-            <li v-for="(item, index) in activity.agenda" :key="item"><span>0{{ index + 1 }}</span>{{ item }}</li>
+            <li v-for="(item, index) in activity.agenda" :key="item"><span>0{{ index + 1 }}</span><strong class="agenda-list__text">{{ item }}</strong></li>
           </ol>
           <div v-if="activity.details.length" class="activity-detail-media" aria-label="活动详情素材">
             <ContentMediaView v-for="item in activity.details" :key="item.id" :item="item" fit="contain" preview="full" controls />

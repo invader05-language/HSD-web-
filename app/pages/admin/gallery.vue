@@ -34,7 +34,6 @@ function coverMedia(album: typeof galleryStore.albums[number]): ContentMediaAtta
     kind: cover.kind === "video" ? "video" : "image",
     title: cover.title ?? "",
     caption: cover.caption ?? "",
-    alt: cover.alt ?? album.title,
     aspect: cover.aspect ?? "landscape",
     sortOrder: 0,
     status: cover.status ?? "ready",
@@ -59,7 +58,7 @@ function coverMedia(album: typeof galleryStore.albums[number]): ContentMediaAtta
       <article v-for="album in scopedAlbums" :key="album.id">
         <div :style="{ '--gallery-cover': '#3f4e58' }">
           <ContentMediaView v-if="coverMedia(album)" class="admin-gallery-admin-grid__cover" :item="coverMedia(album)!" preview="thumbnail" :controls="false" />
-          <span>&lt; HSD GALLERY &gt;</span>
+          <span class="admin-gallery-admin-grid__eyebrow">&lt; HSD GALLERY &gt;</span>
           <AdminStatusPill :status="albumStatus(album)" />
           <h2>{{ album.title }}</h2>
           <p>{{ album.assets.length }} 项专题素材</p>

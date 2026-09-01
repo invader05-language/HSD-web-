@@ -87,7 +87,6 @@ export function usePortalCatalog(runtime?: { useMockApi: boolean }): PortalCatal
         kind: asset.kind ?? "image",
         title: asset.title,
         caption: asset.caption,
-        alt: asset.alt,
         aspect: asset.aspect,
         sortOrder: asset.sortOrder ?? 0,
         url: asset.imageUrl,

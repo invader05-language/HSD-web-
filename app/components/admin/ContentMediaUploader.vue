@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   description?: string;
   owner?: Omit<ContentMediaUploadOwner, "role" | "sortOrder">;
   disabled?: boolean;
-  metadataProfile?: "full" | "activity";
+  metadataProfile?: "full" | "activity" | "gallery";
 }>(), {
   title: "上传素材",
   description: "支持图片或视频，上传后可在此预览和编辑素材信息。",
@@ -230,9 +230,9 @@ function moveItem(index: number, direction: -1 | 1) {
             <strong>{{ item.kind === "video" ? "视频" : "图片" }} · {{ statusLabel(item.status) }}</strong>
             <button type="button" class="button button--text" @click="removeItem(index)">移除</button>
           </div>
-          <label v-if="item.role === 'detail' && metadataProfile === 'full'">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })" @blur="void persistMetadata(index)"></label>
-          <label v-if="item.role === 'detail' && metadataProfile === 'full'">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })" @blur="void persistMetadata(index)"></textarea></label>
-          <label>{{ metadataProfile === 'activity' ? '图片内容描述' : '替代文本' }}<input :value="item.alt" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })" @blur="void persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail' && (metadataProfile === 'full' || metadataProfile === 'gallery')">标题<input :value="item.title" @input="updateItem(index, { title: inputValue($event) })" @blur="void persistMetadata(index)"></label>
+          <label v-if="item.role === 'detail' && (metadataProfile === 'full' || metadataProfile === 'gallery')">说明<textarea :value="item.caption" rows="2" @input="updateItem(index, { caption: textareaValue($event) })" @blur="void persistMetadata(index)"></textarea></label>
+          <label v-if="metadataProfile === 'full'">替代文本<input :value="item.alt ?? ''" placeholder="描述用户看不到的画面内容" @input="updateItem(index, { alt: inputValue($event) })" @blur="void persistMetadata(index)"></label>
           <label v-if="item.role === 'detail'">比例<select :value="item.aspect" @change="updateItem(index, { aspect: aspectValue($event) }); void persistMetadata(index)"><option value="landscape">横向</option><option value="portrait">纵向</option><option value="wide">宽幅</option></select></label>
           <div v-if="mode === 'collection'" class="content-media-uploader__sort-actions">
             <button type="button" class="button button--text" :disabled="index === 0" @click="moveItem(index, -1)">上移</button>

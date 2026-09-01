@@ -67,8 +67,8 @@ onBeforeUnmount(releaseSource);
     `content-media-view--${fit}`,
     `content-media-view--aspect-${item.aspect}`,
   ]" data-testid="content-media-view">
-    <img v-if="item.kind === 'image' && source && !hasError" :src="source" :alt="item.alt" loading="lazy" @error="handleMediaError">
-    <video v-else-if="item.kind === 'video' && source && !hasError" :src="source" :poster="poster" :controls="controls" :muted="preview === 'thumbnail'" preload="metadata" :aria-label="item.alt" @error="handleMediaError"></video>
+    <img v-if="item.kind === 'image' && source && !hasError" :src="source" :alt="item.alt ?? ''" loading="lazy" @error="handleMediaError">
+    <video v-else-if="item.kind === 'video' && source && !hasError" :src="source" :poster="poster" :controls="controls" :muted="preview === 'thumbnail'" preload="metadata" :aria-label="item.alt ?? item.title" @error="handleMediaError"></video>
     <span v-else class="content-media-view__fallback" aria-hidden="true">&lt; HSD &gt;</span>
   </span>
 </template>

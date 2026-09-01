@@ -7,7 +7,7 @@ import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope, getRecruitmentCenterId } from "~/utils/admin-center-scope";
 import type { ActivityDraftInput, ManagedActivity } from "~/types/activity";
 import type { ContentMediaAttachment } from "~/types/content-media";
-import { isActivityContentMediaAttachmentComplete, isContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
+import { isActivityContentMediaAttachmentComplete, isRetainedServerContentMediaAttachment } from "~/utils/content-media";
 import ContentMediaUploader from "./ContentMediaUploader.vue";
 import { useAdminToast } from "~/composables/useAdminToast";
 import { composeActivityTime, isValidActivityTime, splitActivityTime } from "~/utils/activity-time";
@@ -114,7 +114,7 @@ const missingFields = computed(() => {
   if (!form.summary.trim()) missing.push("摘要");
   if (!form.content.trim()) missing.push("活动内容");
   if (!form.agenda.split(/\r?\n/).some((item) => item.trim())) missing.push("活动流程");
-  if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && (form.cover.kind !== "image" || !isContentMediaAttachmentComplete(form.cover)))) missing.push("活动封面");
+  if (!form.cover || form.cover.role !== "cover" || (!isRetainedServerContentMediaAttachment(form.cover) && !isActivityContentMediaAttachmentComplete(form.cover))) missing.push("活动封面");
   if (form.details.some((item) => item.role !== "detail" || (!isRetainedServerContentMediaAttachment(item) && !isActivityContentMediaAttachmentComplete(item)))) missing.push("详情素材信息");
   return missing;
 });

@@ -23,7 +23,8 @@ export interface ContentMediaAttachment {
   kind: ContentMediaKind;
   title: string;
   caption: string;
-  alt: string;
+  /** Accessibility metadata used by content, portal, project, and resource media. Activity/gallery media omit it. */
+  alt?: string;
   aspect: ContentMediaAspect;
   sortOrder: number;
   url?: string;

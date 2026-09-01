@@ -133,7 +133,7 @@ function normalizeContentBlocks(value: unknown): ContentBlock[] | undefined {
       normalized.push({
         type: "image",
         media: block.media,
-        alt: typeof block.alt === "string" ? block.alt : block.media.alt,
+        alt: typeof block.alt === "string" ? block.alt : block.media.alt ?? "",
         ...(typeof block.caption === "string" ? { caption: block.caption } : {}),
       });
       continue;

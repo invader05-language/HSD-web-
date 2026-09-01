@@ -300,7 +300,7 @@ describe("project, activity, and registration API gateway", () => {
       expect.objectContaining({ kind: "video", url: "/api/v1/public/media/project-detail", alt: "Project demo", caption: "Safe caption", status: "ready" }),
     ]);
     expect(activities.getPublicBySlug(activity.slug)?.details).toEqual([
-      expect.objectContaining({ kind: "image", url: "/api/v1/public/media/activity-detail", alt: "Activity photo", caption: "Safe caption", status: "ready" }),
+      expect.objectContaining({ kind: "image", url: "/api/v1/public/media/activity-detail", caption: "Safe caption", status: "ready" }),
     ]);
     expect(JSON.stringify(projects.getPublicBySlug(project.slug))).not.toMatch(/attachmentId|objectKey/);
     expect(JSON.stringify(activities.getPublicBySlug(activity.slug))).not.toMatch(/attachmentId|objectKey/);

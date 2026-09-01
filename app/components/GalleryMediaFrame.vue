@@ -14,7 +14,6 @@ const mediaItem = computed<ContentMediaAttachment>(() => ({
   kind: props.item.kind ?? "image",
   title: props.item.title,
   caption: props.item.caption,
-  alt: props.item.alt,
   aspect: props.item.aspect,
   sortOrder: props.item.sortOrder ?? 0,
   url: props.item.imageUrl,

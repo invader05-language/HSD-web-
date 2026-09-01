@@ -85,10 +85,11 @@ describe("gallery publishing workflow", () => {
     expect(useGalleryStore().getPublicBySlug("rehydrated-gallery")).toMatchObject({ title: "新媒体作品集" });
   });
 
-  it("rejects publishing when a direct-upload detail attachment is not fully reviewed", () => {
+  it("rejects publishing when a direct-upload detail attachment is not ready", () => {
     useSessionStore().signIn("media-admin", { requireAdmin: true });
     const store = useGalleryStore();
     const created = store.createDraft(galleryInput({
+      cover: { id: "cover-ready", title: "", caption: "", aspect: "wide" as const, role: "cover" as const, kind: "image" as const, sortOrder: 0, status: "ready" as const },
       slug: "unreviewed-gallery",
       assets: [{
         id: "uploaded-1",
@@ -96,7 +97,7 @@ describe("gallery publishing workflow", () => {
         caption: "",
         alt: "现场照片",
         aspect: "landscape" as const,
-        status: "ready",
+        status: "failed",
         role: "detail" as const,
         kind: "image" as const,
         sortOrder: 0,

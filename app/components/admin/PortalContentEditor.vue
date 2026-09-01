@@ -134,7 +134,7 @@ function updateImageBlock(index: number, items: ContentMediaAttachment[]) {
   const media = items[0];
   blocks.value[index] = {
     type: "image",
-    ...(media ? { media, alt: media.alt, ...(media.caption ? { caption: media.caption } : {}) } : { alt: "" }),
+    ...(media ? { media, alt: media.alt ?? "", ...(media.caption ? { caption: media.caption } : {}) } : { alt: "" }),
   };
 }
 

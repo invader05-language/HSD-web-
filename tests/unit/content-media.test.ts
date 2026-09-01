@@ -3,6 +3,7 @@ import {
   detectContentMediaAspect,
   isActivityContentMediaAttachmentComplete,
   isContentMediaAttachmentComplete,
+  isGalleryContentMediaAttachmentComplete,
   validateContentMediaFile,
 } from "../../app/utils/content-media";
 import type { ContentMediaAttachment } from "../../app/types/content-media";
@@ -53,8 +54,14 @@ describe("content media contract", () => {
 
   it("uses the activity metadata profile for detail media", () => {
     expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "" }))).toBe(true);
-    expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "", alt: "" }))).toBe(false);
+    expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "", alt: "" }))).toBe(true);
     expect(isActivityContentMediaAttachmentComplete(attachment({ title: "", caption: "", role: "cover", kind: "video" }))).toBe(false);
+  });
+
+  it("allows gallery media to publish without title, caption, or alt metadata", () => {
+    expect(isGalleryContentMediaAttachmentComplete(attachment({ title: "", caption: "", alt: "" }))).toBe(true);
+    expect(isGalleryContentMediaAttachmentComplete(attachment({ role: "cover", title: "", caption: "", alt: "" }))).toBe(true);
+    expect(isGalleryContentMediaAttachmentComplete(attachment({ role: "cover", kind: "video", title: "", caption: "", alt: "" }))).toBe(false);
   });
 
   it("uses direct-upload generated operations in production and never creates a localBlobId", async () => {

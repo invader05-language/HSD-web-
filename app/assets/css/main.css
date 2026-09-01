@@ -2850,6 +2850,14 @@ a {
   font-size: 24px;
 }
 
+.activity-detail-copy,
+.agenda-list__text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .detail-main .media-placeholder {
   min-height: 390px;
   margin-top: 32px;
@@ -2950,6 +2958,11 @@ a {
   align-items: center;
   gap: 22px;
   border-bottom: 1px solid var(--border);
+}
+
+.agenda-list__text {
+  color: inherit;
+  font-weight: 400;
 }
 
 .agenda-list span {
@@ -10573,9 +10586,8 @@ body.is-admin-drawer-open {
   min-height: 260px;
   align-content: end;
   padding: 24px;
-  background:
-    linear-gradient(180deg, transparent 15%, rgb(17 19 22 / 92%)),
-    var(--gallery-cover);
+  overflow: hidden;
+  background: var(--gallery-cover);
   color: #fff;
 }
 
@@ -10606,7 +10618,7 @@ body.is-admin-drawer-open {
   z-index: 1;
 }
 
-.admin-gallery-admin-grid > article > div > span:first-child {
+.admin-gallery-admin-grid__eyebrow {
   position: absolute;
   top: 20px;
   left: 22px;

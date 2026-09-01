@@ -30,7 +30,7 @@ const attachment: ContentMediaAttachment = {
   status: "ready",
 };
 
-function mountUploader(metadataProfile: "full" | "activity" = "activity") {
+function mountUploader(metadataProfile: "full" | "activity" | "gallery" = "full") {
   return mount(ContentMediaUploader, {
     props: { modelValue: [attachment], mode: "collection", metadataProfile },
     global: { stubs: { ContentMediaView: true } },
@@ -80,12 +80,18 @@ describe("content media metadata persistence", () => {
     wrapper.unmount();
   });
 
-  it("only shows the activity metadata field for the activity profile", () => {
+  it("does not show removed activity metadata and keeps gallery title/caption optional", () => {
     const activity = mountUploader("activity");
-    expect(activity.text()).toContain("图片内容描述");
+    expect(activity.text()).not.toContain("图片内容描述");
     expect(activity.text()).not.toContain("替代文本");
     expect(activity.text()).not.toContain("旧标题");
     activity.unmount();
+
+    const gallery = mountUploader("gallery");
+    expect(gallery.text()).toContain("标题");
+    expect(gallery.text()).toContain("说明");
+    expect(gallery.text()).not.toContain("替代文本");
+    gallery.unmount();
 
     const full = mountUploader("full");
     expect(full.text()).toContain("标题");

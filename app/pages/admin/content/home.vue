@@ -201,7 +201,7 @@ function saveVisualDraft() {
 function updateVisualMedia(slot: "home" | "join", items: ContentMediaAttachment[]) {
   visualDraft[slot].media = items[0];
   if (items[0]) {
-    visualDraft[slot].alt = items[0].alt;
+    visualDraft[slot].alt = items[0].alt ?? "";
     visualDraft[slot].assetId = undefined;
   }
 }
