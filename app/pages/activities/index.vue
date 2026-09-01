@@ -90,7 +90,12 @@ watch(activeView, () => {
   currentPage.value = 1;
   void loadTimeline();
 });
-onMounted(() => { void loadTimeline(); });
+if (gateway) {
+  await useAsyncData("public-timeline-page-1", async () => {
+    await loadTimeline();
+    return { items: timelineItems.value, total: timelineTotal.value };
+  });
+}
 
 async function goToPage(page: number) {
   currentPage.value = Math.min(Math.max(page, 1), pageCount.value);

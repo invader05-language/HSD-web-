@@ -2,6 +2,7 @@
 import { useGalleryStore } from "~/stores/gallery";
 import { useContentGateway } from "~/composables/useContentGateway";
 import type { GalleryAsset } from "~/data/gallery";
+import type { PublishedGalleryAlbum } from "~/types/gallery";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { galleryCategoryLabel, normalizeGalleryCategory } from "~/types/gallery";
 import { PAGE_VISUALS } from "~/data/page-visuals";
@@ -13,14 +14,15 @@ const galleryStore = useGalleryStore();
 const gateway = useContentGateway();
 if (gateway) galleryStore.activateApiMode(false);
 if (import.meta.client && !gateway) galleryStore.hydrate();
-onMounted(() => { if (gateway) void loadPage(); });
 const active = ref("全部");
 const pageSize = 6;
 const currentPage = ref(1);
+const apiItems = ref<PublishedGalleryAlbum[]>([]);
+const apiTotal = ref(0);
 const filtered = computed(() => !gateway && active.value === "全部"
   ? galleryStore.getPublicAlbums()
-  : !gateway ? galleryStore.getPublicAlbums().filter((album) => galleryCategoryLabel(album.category) === active.value) : galleryStore.getPublicAlbums());
-const pageCount = computed(() => Math.max(1, Math.ceil((gateway ? galleryStore.apiTotal : filtered.value.length) / pageSize)));
+  : !gateway ? galleryStore.getPublicAlbums().filter((album) => galleryCategoryLabel(album.category) === active.value) : apiItems.value);
+const pageCount = computed(() => Math.max(1, Math.ceil((gateway ? apiTotal.value : filtered.value.length) / pageSize)));
 const visible = computed(() => {
   if (gateway) return filtered.value;
   const start = (currentPage.value - 1) * pageSize;
@@ -50,6 +52,16 @@ function serverCategory() {
 async function loadPage() {
   if (!gateway) return;
   await galleryStore.refreshPublicFromApi(gateway, { page: currentPage.value, pageSize, ...(serverCategory() ? { category: serverCategory() } : {}) });
+  apiItems.value = galleryStore.getPublicAlbums();
+  apiTotal.value = galleryStore.apiTotal;
+}
+if (gateway) {
+  const { data } = await useAsyncData("public-gallery-page-1", async () => {
+    await loadPage();
+    return { items: apiItems.value, total: apiTotal.value };
+  });
+  apiItems.value = data.value?.items ?? [];
+  apiTotal.value = data.value?.total ?? 0;
 }
 watch(active, () => {
   currentPage.value = 1;
@@ -78,7 +90,7 @@ async function goToPage(page: number) {
       <div class="shell">
         <p v-if="galleryStore.apiError" role="alert">{{ galleryStore.apiError.message }}（{{ galleryStore.apiError.code }}）</p>
         <p v-if="galleryStore.apiLoading" role="status">正在加载公开画廊…</p>
-        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${gateway ? galleryStore.apiTotal : filtered.length} 件作品`" />
+        <FilterToolbar v-model="active" :filters="categories" :result-label="`共 ${gateway ? apiTotal : filtered.length} 件作品`" />
         <div v-if="visible.length" id="gallery-results" class="gallery-catalog">
           <NuxtLink
             v-for="(album, index) in visible"

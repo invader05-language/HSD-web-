@@ -15,6 +15,7 @@ export interface PortalVisualConfig {
   media?: ContentMediaAttachment;
   alt: string;
   supportingText?: string;
+  objectPosition?: string;
 }
 
 export type PortalSlots = Record<PortalSlotId, PortalReference[]>;
