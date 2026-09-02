@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 async function signInToAdmin(
   page: import("@playwright/test").Page,
-  target = "/admin/recruitment",
+  target = "/admin/recruitment/batches",
   account = "admin-alliance"
 ) {
   await page.goto(target);
