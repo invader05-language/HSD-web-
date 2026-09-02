@@ -71,6 +71,9 @@ function errorFrom(error: unknown) {
 }
 
 function apiEntryToReference(entry: PortalResolvedEntryResponseDto): { slot: typeof PORTAL_SLOT_IDS[number]; reference: PortalReference } | undefined {
+  if (entry.reference && PORTAL_SLOT_IDS.includes(entry.slot)) {
+    return { slot: entry.slot, reference: { entityType: entry.reference.entityType, sourceId: entry.reference.sourceId } };
+  }
   if (!entry.content) return undefined;
   const content = entry.content as Record<string, unknown>;
   const sourceId = typeof content.slug === "string" ? content.slug : undefined;
@@ -104,9 +107,8 @@ function savePayload(config: PortalConfig) {
   const entries = PORTAL_SLOT_IDS.flatMap((slot) => config.slots[slot].map((reference, index) => ({
     slot,
     position: index + 1,
-    ...(reference.entityType === "flash" || reference.entityType === "article" || reference.entityType === "notice"
-      ? { contentSlug: reference.sourceId }
-      : { entityType: reference.entityType, sourceId: reference.sourceId }),
+    entityType: reference.entityType,
+    sourceId: reference.sourceId,
   })));
   const visual = (value: PortalVisualConfig) => ({
     ...(value.attachmentId || value.media?.id ? { attachmentId: value.attachmentId ?? value.media?.id } : {}),

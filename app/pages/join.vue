@@ -7,6 +7,9 @@ import { usePublishedPortal } from "~/composables/usePublishedPortal";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
 import { resolvePageVisual } from "~/data/page-visuals";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
+import { useContentGateway } from "~/composables/useContentGateway";
+import { projectPublicPortal, resolvePublicPortalVisual } from "~/utils/public-homepage-portal";
+import type { PortalVisualConfig } from "~/types/portal-config";
 import { mapPublicRecruitmentBatch, type PublicRecruitmentBatchView } from "~/services/recruitment/recruitment-view-models";
 import type { PublicRecruitmentBatchDto } from "../../packages/api-client/src";
 
@@ -16,6 +19,7 @@ const runtimeConfig = useRuntimeConfig() as { public: { apiBase: string; useMock
 const isMockApi = runtimeConfig.public.useMockApi;
 const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
 const recruitmentGateway = useRecruitmentGateway();
+const contentGateway = useContentGateway();
 const now = useRecruitmentNow();
 const route = useRoute();
 const isJoinLanding = computed(() => route.path === "/join");
@@ -51,7 +55,12 @@ const canApply = computed(() => currentBatch.value?.effectiveStatus === "open");
 const applyTarget = computed(() => resolveLoginAwareTarget("/join/apply", session.isAuthenticated));
 const applyLabel = computed(() => session.isAuthenticated ? "开始填写报名表" : "登录后填写报名表");
 const { config } = usePublishedPortal();
-const joinVisual = computed(() => resolvePageVisual(config.visuals.join, "join"));
+const publicPortal = ref<ReturnType<typeof projectPublicPortal> | null>(null);
+const joinVisual = computed(() => {
+  if (isMockApi) return resolvePageVisual(config.visuals.join, "join");
+  const visual = resolvePublicPortalVisual("join", publicPortal.value?.visuals.join);
+  return resolvePageVisual({ ...visual } as PortalVisualConfig, "join");
+});
 
 async function loadProductionDiscovery() {
   if (isMockApi || !recruitmentGateway) return;
@@ -73,7 +82,16 @@ async function loadProductionDiscovery() {
   }
 }
 
-onMounted(loadProductionDiscovery);
+async function loadProductionPortal() {
+  if (isMockApi || !contentGateway) return;
+  try {
+    publicPortal.value = projectPublicPortal(await contentGateway.portal.publicConfiguration());
+  } catch {
+    publicPortal.value = null;
+  }
+}
+
+onMounted(() => { void Promise.all([loadProductionDiscovery(), loadProductionPortal()]); });
 </script>
 
 <template>

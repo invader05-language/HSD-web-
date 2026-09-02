@@ -9821,13 +9821,6 @@ body.is-admin-drawer-open {
   padding: 21px 22px 17px;
 }
 
-.admin-home-slots header span:not(.admin-result-pill) {
-  color: #b1202b;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-}
-
 .admin-home-slots h2 {
   margin: 4px 0 2px;
   color: #2d3237;
@@ -9840,6 +9833,24 @@ body.is-admin-drawer-open {
   margin: 0;
   color: #92979d;
   font-size: 9px;
+}
+
+.admin-slot-capacity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-slot-capacity strong {
+  color: #a21d28;
+  font-size: 13px;
+}
+
+.admin-slot-capacity span {
+  color: #737b84;
+  font-size: 11px;
 }
 
 .admin-home-slots ol {
@@ -10030,11 +10041,6 @@ body.is-admin-drawer-open {
 .admin-slot-actions button:disabled {
   color: #b9bdc1;
   cursor: not-allowed;
-}
-
-.admin-home-slots > article > footer > span {
-  color: #7e858c;
-  font-size: 9px;
 }
 
 .admin-portal-visuals {
