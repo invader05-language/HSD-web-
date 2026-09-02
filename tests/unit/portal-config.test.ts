@@ -442,8 +442,8 @@ describe("portal configuration surfaces", () => {
     expect(source).toContain("removeReference");
     expect(source).toContain("页面主视觉");
     expect(source).toContain("确认整份发布");
+    expect(source).toContain('session.hasCapability("portal.configure")');
     expect(source).toContain('session.hasCapability("portal.publish")');
-    expect(source).not.toContain('session.adminLevel === "owner"');
     expect(legacySource).toContain('query: { view: "visuals" }');
     expect(legacySource).not.toContain("const banners");
   });

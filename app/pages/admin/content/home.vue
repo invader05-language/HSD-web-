@@ -87,7 +87,7 @@ async function initializePortal() {
   catalogLoading.value = true;
   catalogError.value = "";
   try {
-    const centersPromise = organizationGateway && session.adminLevel === "owner"
+    const centersPromise = organizationGateway && session.hasCapability("portal.configure")
       ? organizationGateway.listCenters()
       : Promise.resolve(undefined);
     const [, centers] = await Promise.all([

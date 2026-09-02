@@ -38,8 +38,8 @@ describe("administration content workflow", () => {
 
   it("keeps homepage modules fixed with explicit capacity", () => {
     expect(HOMEPAGE_SLOTS.map((slot) => [slot.label, slot.capacity])).toEqual([
-      ["HSD 快讯", 1],
-      ["推荐新闻", 3],
+      ["首页快讯", 1],
+      ["首页新闻", 3],
       ["精选项目", 4],
       ["近期活动", 3],
       ["媒体专题", 3],
@@ -116,8 +116,8 @@ describe("administration content workflow", () => {
     const slotData = readFileSync("app/data/admin-content.ts", "utf8");
 
     expect(source).toContain("slot.sourceHint");
-    expect(slotData).toContain("来自已发布官网内容");
-    expect(slotData).toContain("当前为系统预置资源");
+    expect(slotData).toContain("来源于官网内容中的已发布快讯");
+    expect(slotData).toContain("来源于资源管理中可公开访问的资料");
     expect(source).not.toContain("公开配置需要重新确认");
     expect(source).not.toContain("固定模块，不允许删除");
   });
