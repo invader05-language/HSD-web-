@@ -181,23 +181,23 @@ test("real content list navigates to API new, edit, and preview routes without a
   await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
 });
 
-test("real content blocks multi-paragraph body edits while preserving blocks for title-only saves", async ({ page }) => {
+test("real content edits a structured paragraph while preserving sibling blocks", async ({ page }) => {
   const blocks = [{ type: "paragraph", text: "First" }, { type: "image", attachmentId: "image-1", alt: "Image" }, { type: "paragraph", text: "Last" }];
   const detail = { id: "multi-paragraph", publicId: "multi-paragraph-public", centerId: "center-1", slug: "multi-paragraph", kind: "article", status: "draft", version: 2, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "多段正文", summary: "多段摘要", tag: null, internalTarget: null, expiresAt: null, blocks, internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
   let patchCount = 0; let patchBody: Record<string, unknown> | undefined;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
   await page.route("**/api/v1/admin/content/**", async (route) => {
-    if (route.request().method() === "PATCH") { patchCount += 1; patchBody = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...detail, version: 3 }) }); }
+    if (route.request().method() === "PATCH") { patchCount += 1; patchBody = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...detail, version: 3, workingRevision: { ...detail.workingRevision, title: patchBody.title as string, blocks: patchBody.blocks as typeof blocks } }) }); }
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(detail) });
   });
   await page.goto("/admin/content/multi-paragraph");
   await page.getByLabel("正文段落").first().fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
-  await expect(page.getByRole("alert")).toContainText("当前编辑器不支持修改多段正文");
-  expect(patchCount).toBe(0);
-  await page.getByLabel("正文段落").first().fill("First\n\nLast"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
-  await expect.poll(() => patchBody).toMatchObject({ title: "仅改标题", blocks });
+  await expect.poll(() => patchBody).toMatchObject({ blocks: [{ type: "paragraph", text: "Changed body" }, blocks[1], blocks[2]] });
   expect(patchCount).toBe(1);
+  await page.getByLabel("正文段落").first().fill("Changed again"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect.poll(() => patchBody).toMatchObject({ title: "仅改标题", blocks: [{ type: "paragraph", text: "Changed again" }, blocks[1], blocks[2]] });
+  expect(patchCount).toBe(2);
 });
 
 test("real content retains its edit draft on 409 and reports a 403 workflow denial without local success", async ({ page }) => {
