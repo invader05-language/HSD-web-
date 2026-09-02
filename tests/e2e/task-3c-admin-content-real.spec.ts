@@ -154,7 +154,7 @@ test("real content list navigates to API new, edit, and preview routes without a
   let createBody: Record<string, unknown> | undefined; let patchBody: Record<string, unknown> | undefined; let currentDetail = detail;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
-  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "center-1", slug: "center-1", name: "测试中心", active: true, positions: [] }] }) }));
+  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ currentPermission: { accountId: "owner-api", personId: "person-owner", adminLevel: "OWNER", adminCenterId: null, version: 1 }, items: [{ id: "center-1", slug: "center-1", name: "测试中心", active: true, positions: [] }] }) }));
   await page.route("**/api/v1/admin/content**", async (route) => {
     const request = route.request(); const pathname = new URL(request.url()).pathname;
     if (request.method() === "POST" && pathname === "/api/v1/admin/content") { createBody = request.postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(detail) }); }

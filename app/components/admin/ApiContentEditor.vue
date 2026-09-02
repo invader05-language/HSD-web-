@@ -82,7 +82,7 @@ function syncFromRecord(record: AdminContentDetail | undefined) {
 watch(() => props.record, syncFromRecord, { immediate: true });
 
 onMounted(async () => {
-  if (!organizationGateway || !isOwner.value) return;
+  if (!organizationGateway || !isOwner.value || !isNew.value) return;
   try {
     const response = await organizationGateway.listCenters();
     centerOptions.value = response.items.filter((item) => item.active).map((item) => ({ id: item.id, name: item.name }));
