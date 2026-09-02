@@ -751,7 +751,7 @@ export type CreateMediaAttachmentDto = {
   "expectedUploadVersion": number;
   "ownerType": "content" | "portal_home" | "portal_join" | "project" | "activity" | "gallery" | "resource";
   "ownerId": string;
-  "centerId": string;
+  "centerId"?: string;
   "role": "cover" | "detail" | "visual";
   "kind": "image" | "video";
   "title": string;
@@ -1309,10 +1309,17 @@ export type PortalDashboardSummaryDto = {
   "isDirty": boolean;
 };
 
+export type PortalReferenceResponseDto = {
+  "entityType": "flash" | "article" | "notice" | "project" | "activity" | "gallery" | "resource";
+  "sourceId": string;
+};
+
 export type PortalResolvedEntryResponseDto = {
   "slot": "flash" | "news" | "projects" | "activities" | "gallery" | "resources";
   "position": number;
   "content": (PublicContentResponseDto | PortalCatalogSnapshotResponseDto) | null;
+  "reference"?: PortalReferenceResponseDto;
+  "invalidReason"?: string;
 };
 
 export type PortalVisualDto = {
@@ -3955,7 +3962,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "centerId": {
         "type": "string",
-        "format": "uuid"
+        "format": "uuid",
+        "description": "Ignored for portal_home and portal_join; the server assigns the portal system center"
       },
       "role": {
         "type": "string",
@@ -4002,7 +4010,6 @@ const API_COMPONENT_SCHEMAS = {
       "expectedUploadVersion",
       "ownerType",
       "ownerId",
-      "centerId",
       "role",
       "kind",
       "title",
@@ -7388,6 +7395,31 @@ const API_COMPONENT_SCHEMAS = {
       "csv"
     ]
   },
+  "PortalReferenceResponseDto": {
+    "type": "object",
+    "properties": {
+      "entityType": {
+        "type": "string",
+        "enum": [
+          "flash",
+          "article",
+          "notice",
+          "project",
+          "activity",
+          "gallery",
+          "resource"
+        ]
+      },
+      "sourceId": {
+        "type": "string",
+        "description": "The persisted source identifier for the configured entry"
+      }
+    },
+    "required": [
+      "entityType",
+      "sourceId"
+    ]
+  },
   "PortalResolvedEntryResponseDto": {
     "type": "object",
     "properties": {
@@ -7417,6 +7449,18 @@ const API_COMPONENT_SCHEMAS = {
             "$ref": "#/components/schemas/PortalCatalogSnapshotResponseDto"
           }
         ]
+      },
+      "reference": {
+        "description": "Original reference when the configured source is unavailable",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortalReferenceResponseDto"
+          }
+        ]
+      },
+      "invalidReason": {
+        "type": "string",
+        "description": "Machine-readable reason why the configured source could not be resolved"
       }
     },
     "required": [

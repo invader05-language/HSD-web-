@@ -4,7 +4,7 @@ import type { AdminContentCanonicalStatus, AdminContentKind } from "./admin-cont
 
 export type AdminContentDetailStatus = "idle" | "loading" | "success" | "missingRevision" | "unauthorized" | "forbidden" | "notFound" | "error";
 export type AdminContentDetailBlock = ContentAttachmentImageBlockResponseDto | ContentHeadingBlockResponseDto | ContentParagraphBlockResponseDto;
-export interface AdminContentDetail { id: string; kind: AdminContentKind; status: string; canonicalStatus: AdminContentCanonicalStatus; version: number; workingRevisionNumber: number; title: string; summary: string; internalTarget: string | null; expiresAt: string | null; blocks: AdminContentDetailBlock[]; createdBy: string; updatedAt: string; rejectionReason: string | null; }
+export interface AdminContentDetail { id: string; centerId: string | null; slug: string; kind: AdminContentKind; status: string; canonicalStatus: AdminContentCanonicalStatus; version: number; workingRevisionNumber: number; title: string; summary: string; tag: string | null; internalTarget: string | null; expiresAt: string | null; blocks: AdminContentDetailBlock[]; createdBy: string; updatedAt: string; rejectionReason: string | null; }
 export interface AdminContentDetailGateway { detail(contentId: string): Promise<AdminContentResponseDto>; }
 
 const STATUS_LABELS: Record<AdminContentCanonicalStatus, string> = { draft: "草稿", review: "待审核", pending_publication: "待发布", published: "已发布", offline: "已下架" };
@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<AdminContentCanonicalStatus, string> = { draft: "草
 export function mapAdminContentDetail(item: AdminContentResponseDto): AdminContentDetail | undefined {
   const revision = item.workingRevision;
   if (!revision) return undefined;
-  return { id: item.id, kind: item.kind, status: STATUS_LABELS[item.status], canonicalStatus: item.status, version: item.version, workingRevisionNumber: revision.revisionNumber, title: revision.title, summary: revision.summary ?? "", internalTarget: revision.internalTarget, expiresAt: revision.expiresAt, blocks: revision.blocks, createdBy: item.createdBy.displayName, updatedAt: item.updatedAt, rejectionReason: item.rejectionReason };
+  return { id: item.id, centerId: item.centerId, slug: item.slug, kind: item.kind, status: STATUS_LABELS[item.status], canonicalStatus: item.status, version: item.version, workingRevisionNumber: revision.revisionNumber, title: revision.title, summary: revision.summary ?? "", tag: revision.tag, internalTarget: revision.internalTarget, expiresAt: revision.expiresAt, blocks: revision.blocks, createdBy: item.createdBy.displayName, updatedAt: item.updatedAt, rejectionReason: item.rejectionReason };
 }
 
 export function replaceFirstContentParagraph(blocks: AdminContentDetailBlock[], text: string): AdminContentDetailBlock[] {

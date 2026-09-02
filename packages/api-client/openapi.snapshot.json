@@ -13830,7 +13830,8 @@
           },
           "centerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Ignored for portal_home and portal_join; the server assigns the portal system center"
           },
           "role": {
             "type": "string",
@@ -13877,7 +13878,6 @@
           "expectedUploadVersion",
           "ownerType",
           "ownerId",
-          "centerId",
           "role",
           "kind",
           "title",
@@ -17263,6 +17263,31 @@
           "csv"
         ]
       },
+      "PortalReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "flash",
+              "article",
+              "notice",
+              "project",
+              "activity",
+              "gallery",
+              "resource"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "The persisted source identifier for the configured entry"
+          }
+        },
+        "required": [
+          "entityType",
+          "sourceId"
+        ]
+      },
       "PortalResolvedEntryResponseDto": {
         "type": "object",
         "properties": {
@@ -17292,6 +17317,18 @@
                 "$ref": "#/components/schemas/PortalCatalogSnapshotResponseDto"
               }
             ]
+          },
+          "reference": {
+            "description": "Original reference when the configured source is unavailable",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortalReferenceResponseDto"
+              }
+            ]
+          },
+          "invalidReason": {
+            "type": "string",
+            "description": "Machine-readable reason why the configured source could not be resolved"
           }
         },
         "required": [

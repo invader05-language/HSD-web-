@@ -10,6 +10,7 @@ import { usePortalConfigStore } from "~/stores/portal-config";
 import { useProjectsStore } from "~/stores/projects";
 import { useResourcesStore } from "~/stores/resources";
 import { useSessionStore } from "~/stores/session";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
 import type { ContentMediaAttachment } from "~/types/content-media";
@@ -28,12 +29,17 @@ const configStore = usePortalConfigStore();
 const session = useSessionStore();
 const adminToast = useAdminToast();
 const contentGateway = useContentGateway();
+const organizationGateway = useOrganizationGateway();
 const runtimeConfig = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const projectsStore = useProjectsStore();
 const activitiesStore = useActivitiesStore();
 const galleryStore = useGalleryStore();
 const resourcesStore = useResourcesStore();
-const catalog = computed(() => usePortalCatalog(runtimeConfig.public));
+const publicContentCatalog = ref<PortalCatalogItem[]>([]);
+const catalogLoading = ref(false);
+const catalogError = ref("");
+const portalUploadCenterId = ref(session.currentAccount?.adminCenterId ?? "");
+const catalog = computed(() => [...usePortalCatalog(runtimeConfig.public), ...publicContentCatalog.value]);
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
 const showPublishConfirmation = ref(false);
@@ -61,16 +67,53 @@ watch(() => configStore.draftConfig.visuals, (visuals) => {
   }
 }, { deep: true });
 
-onMounted(() => {
+async function refreshPublicContentCatalog() {
   if (!contentGateway) return;
-  void Promise.all([
-    configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
-    projectsStore.refreshPublicFromApi(contentGateway),
-    activitiesStore.refreshPublicFromApi(contentGateway),
-    galleryStore.refreshPublicFromApi(contentGateway),
-    resourcesStore.refreshPublicFromApi(contentGateway),
-  ]);
-});
+  const response = await contentGateway.content.list("status=published&page=1&pageSize=100");
+  publicContentCatalog.value = response.items.map((item): PortalCatalogItem => ({
+    entityType: item.kind,
+    sourceId: item.id,
+    title: item.title,
+    summary: item.summary ?? "",
+    to: item.kind === "flash" ? "/activities" : `/updates/${encodeURIComponent(item.slug)}`,
+    publishedAt: item.publishedAt ?? new Date(0).toISOString(),
+    eligibleSlots: item.kind === "flash" ? ["flash"] : ["news"],
+    available: true,
+  }));
+}
+
+async function initializePortal() {
+  if (!contentGateway) return;
+  catalogLoading.value = true;
+  catalogError.value = "";
+  try {
+    const centersPromise = organizationGateway && session.hasCapability("portal.configure")
+      ? organizationGateway.listCenters()
+      : Promise.resolve(undefined);
+    const [, centers] = await Promise.all([
+      Promise.all([
+        configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
+        projectsStore.refreshPublicFromApi(contentGateway),
+        activitiesStore.refreshPublicFromApi(contentGateway),
+        galleryStore.refreshPublicFromApi(contentGateway),
+        resourcesStore.refreshPublicFromApi(contentGateway),
+        refreshPublicContentCatalog(),
+      ]),
+      centersPromise,
+    ]);
+    if (!portalUploadCenterId.value && centers) {
+      portalUploadCenterId.value = centers.items.find((center) => center.active && center.slug === "baize-development")?.id
+        ?? centers.items.find((center) => center.active)?.id
+        ?? "";
+    }
+  } catch {
+    catalogError.value = "门户候选内容读取失败，请点击重试。";
+  } finally {
+    catalogLoading.value = false;
+  }
+}
+
+onMounted(() => { void initializePortal(); });
 
 function setView(view: PortalConfigView, focus = false) {
   void router.replace({ query: view === "visuals" ? { ...route.query, view } : { ...route.query, view: undefined } }).then(() => {
@@ -210,6 +253,11 @@ function visualMedia(slot: "home" | "join") {
   return visualDraft[slot].media ? [visualDraft[slot].media] : [];
 }
 
+function visualOwner(slot: "home" | "join") {
+  if (!portalUploadCenterId.value) return undefined;
+  return { centerId: portalUploadCenterId.value, ownerType: `portal_${slot}` as const, ownerId: "global" };
+}
+
 async function publishConfiguration() {
   try {
     if (runtimeConfig.public.useMockApi) configStore.publish(catalog.value, true);
@@ -285,7 +333,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-recruitment-page admin-section-page admin-portal-config">
-    <AdminPageHeading eyebrow="Portal Publishing" title="门户配置" description="维护首页推荐位和预定义页面主视觉。所有更改先进入草稿，联盟总负责人确认后整份发布。">
+    <AdminPageHeading eyebrow="首页展示管理" title="门户配置" description="管理首页推荐内容和顶部横幅图片。所有更改先保存为草稿，确认后一次发布。">
       <template #actions>
         <button v-if="canConfigure" type="button" class="button button--ghost" @click="openDialog('preview', $event)">预览门户草稿</button>
         <button v-if="canPublish" type="button" class="button" @click="openDialog('publish', $event)">发布门户配置</button>
@@ -298,35 +346,37 @@ onBeforeUnmount(() => {
       <button id="portal-tab-visuals" ref="visualsTab" type="button" role="tab" aria-controls="portal-panel-visuals" :aria-selected="activeView === 'visuals'" :tabindex="activeView === 'visuals' ? 0 : -1" @keydown="handleTabKeydown" @click="setView('visuals')">页面主视觉</button>
     </div>
 
+    <p v-if="catalogLoading" class="admin-portal-message" role="status">正在读取可推荐内容和门户草稿…</p>
+    <p v-if="catalogError" class="admin-portal-message is-error" role="alert">{{ catalogError }} <button type="button" class="button button--text" @click="initializePortal">重试</button></p>
     <p v-if="statusMessage" class="admin-portal-message" role="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="admin-portal-message is-error" role="alert">{{ errorMessage }}</p>
     <div v-if="canConfigure && !canPublish" class="admin-fixed-notice"><strong>发布权限</strong><p>你可以保存和预览门户草稿；整份发布仅限联盟总负责人。</p></div>
 
     <section v-if="activeView === 'recommendations'" id="portal-panel-recommendations" role="tabpanel" aria-labelledby="portal-tab-recommendations" tabindex="0">
       <section class="admin-home-slots" aria-label="首页固定模块">
-        <article v-for="(slot, slotIndex) in HOMEPAGE_SLOTS" :key="slot.id">
-          <header><div><span>{{ String(slotIndex + 1).padStart(2, "0") }} / FIXED SLOT</span><h2>{{ slot.label }}</h2><p>{{ slot.description }}</p></div><AdminStatusPill :status="`${configStore.draftConfig.slots[slot.id].length} / ${slot.capacity}`" /></header>
+        <article v-for="slot in HOMEPAGE_SLOTS" :key="slot.id">
+          <header><div><h2>{{ slot.label }}</h2><p>{{ slot.description }}</p><div class="admin-slot-capacity"><strong>已配置 {{ configStore.draftConfig.slots[slot.id].length }} 条</strong><span>容量上限：{{ slot.capacity }} 条</span></div></div></header>
           <ol>
             <li v-for="(reference, itemIndex) in configStore.draftConfig.slots[slot.id]" :key="referenceKey(reference)">
               <span>{{ itemIndex + 1 }}</span>
-              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="catalogLoading" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
               <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" @click="removeReference(slot.id, itemIndex)">移除</button></div>
             </li>
             <li v-if="configStore.draftConfig.slots[slot.id].length < slot.capacity" class="is-empty">
               <span>{{ configStore.draftConfig.slots[slot.id].length + 1 }}</span>
-              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>选择已发布内容</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="catalogLoading" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
-          <footer><small>容量上限 {{ slot.capacity }} 条</small><span>{{ slot.allowedTypes.join(" / ") }}</span><em>{{ slot.sourceHint }}</em></footer>
+          <footer><em>{{ slot.sourceHint }}</em></footer>
         </article>
       </section>
     </section>
 
     <section v-else id="portal-panel-visuals" class="admin-portal-visuals" role="tabpanel" aria-labelledby="portal-tab-visuals" tabindex="0">
-      <article v-for="visual in [{ id: 'home' as const, label: '官网首页', note: '首页首屏主视觉' }, { id: 'join' as const, label: '加入我们', note: '招新页面主视觉' }]" :key="visual.id">
-          <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
-        <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
-        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
+      <article v-for="visual in [{ id: 'home' as const, label: '官网首页横幅', note: '显示在官网首页顶部大图区域' }, { id: 'join' as const, label: '加入我们横幅', note: '显示在加入我们页面顶部大图区域' }]" :key="visual.id">
+          <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill :status="visualDraft[visual.id].media || visualDraft[visual.id].assetId ? '已配置' : '未配置'" /></header>
+        <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].attachmentId || visualDraft[visual.id].assetId ? "已配置主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "请填写图片说明，便于无障碍访问" }}</small></div>
+        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" :owner="visualOwner(visual.id)" :disabled="!visualOwner(visual.id)" title="上传横幅图片" description="上传完成后会用于对应页面顶部大图；替换前请先确认图片已准备好。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
         <label v-if="runtimeConfig.public.useMockApi">辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>
@@ -338,10 +388,10 @@ onBeforeUnmount(() => {
       <div v-if="showPreview" class="admin-drawer-backdrop" @click.self="closeDialog('preview')" @keydown="handleDialogKeydown($event, 'preview')">
         <aside ref="previewDialog" class="admin-candidate-drawer admin-portal-preview" role="dialog" aria-modal="true" aria-labelledby="portal-preview-title" aria-describedby="portal-preview-description">
           <header class="admin-drawer__header"><div><h2 id="portal-preview-title">门户草稿预览</h2></div><button ref="previewCloseButton" type="button" aria-label="关闭预览" @click="closeDialog('preview')">×</button></header>
-          <div class="admin-drawer__body"><section v-for="slot in HOMEPAGE_SLOTS" :key="slot.id"><header><span>{{ slot.capacity }}</span><h3>{{ slot.label }}</h3></header><ol :aria-label="`${slot.label}预览`"><li v-for="item in previewProjection.slots[slot.id]" :key="item.sourceId"><strong>{{ item.title }}</strong><small v-if="item.fallbackFor">自动补位：替代 {{ item.fallbackFor }}</small></li><li v-if="!previewProjection.slots[slot.id].length">暂无可用内容</li></ol></section></div>
+          <div class="admin-drawer__body"><section v-for="slot in HOMEPAGE_SLOTS" :key="slot.id"><header><span>容量上限：{{ slot.capacity }} 条</span><h3>{{ slot.label }}</h3></header><ol :aria-label="`${slot.label}预览`"><li v-for="item in previewProjection.slots[slot.id]" :key="item.sourceId"><strong>{{ item.title }}</strong><small v-if="item.fallbackFor">自动补位：替代 {{ item.fallbackFor }}</small></li><li v-if="!previewProjection.slots[slot.id].length">暂无可用内容</li></ol></section></div>
         </aside>
       </div>
-      <div v-if="showPublishConfirmation" class="admin-confirm-backdrop" @keydown="handleDialogKeydown($event, 'publish')"><section ref="publishDialog" role="dialog" aria-modal="true" aria-labelledby="portal-publish-title" aria-describedby="portal-publish-description"><span>ATOMIC PORTAL PUBLICATION</span><h2 id="portal-publish-title">确认整份发布门户配置？</h2><p id="portal-publish-description">发布前会校验全部容量、重复引用和候选有效性。任一校验失败时，当前公开版本保持不变。</p><div><button ref="publishCancelButton" type="button" class="button button--ghost" @click="closeDialog('publish')">返回检查</button><button type="button" class="button" @click="publishConfiguration">确认整份发布</button></div></section></div>
+      <div v-if="showPublishConfirmation" class="admin-confirm-backdrop" @keydown="handleDialogKeydown($event, 'publish')"><section ref="publishDialog" role="dialog" aria-modal="true" aria-labelledby="portal-publish-title" aria-describedby="portal-publish-description"><h2 id="portal-publish-title">确认整份发布门户配置？</h2><p id="portal-publish-description">发布前会校验全部容量、重复引用和候选有效性。任一校验失败时，当前公开版本保持不变。</p><div><button ref="publishCancelButton" type="button" class="button button--ghost" @click="closeDialog('publish')">返回检查</button><button type="button" class="button" @click="publishConfiguration">确认整份发布</button></div></section></div>
     </Teleport>
   </div>
 </template>

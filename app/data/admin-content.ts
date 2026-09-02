@@ -222,19 +222,19 @@ export const ADMIN_ACTIVITY_RECORDS: AdminActivityRecord[] = [
 export const HOMEPAGE_SLOTS: HomepageSlot[] = [
   {
     id: "flash",
-    label: "HSD 快讯",
+    label: "首页快讯",
     capacity: 1,
-    description: "首页 Banner 下方的即时信息入口",
+    description: "展示首页顶部的重要动态和即时通知",
     allowedTypes: ["flash"],
-    sourceHint: "来自已发布官网内容，可在官网内容中创建。"
+    sourceHint: "来源于官网内容中的已发布快讯。"
   },
   {
     id: "news",
-    label: "推荐新闻",
+    label: "首页新闻",
     capacity: 3,
-    description: "近期新闻与联盟动态",
+    description: "展示官网已发布的新闻和公告",
     allowedTypes: ["article", "notice"],
-    sourceHint: "来自已发布新闻或公告，可在官网内容中创建。"
+    sourceHint: "来源于官网内容中的已发布新闻或公告。"
   },
   {
     id: "projects",
@@ -256,7 +256,7 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
     id: "gallery",
     label: "媒体专题",
     capacity: 3,
-    description: "使用一张主视觉承载专题入口，并展示两个次级专题",
+    description: "展示已发布且有封面的画廊专题",
     allowedTypes: ["gallery"],
     sourceHint: "来自画廊专题中已发布且有封面的专题。"
   },
@@ -266,7 +266,7 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
     capacity: 3,
     description: "公开或成员可访问的学习资料",
     allowedTypes: ["resource"],
-    sourceHint: "当前为系统预置资源，后续接入资源管理。"
+    sourceHint: "来源于资源管理中可公开访问的资料。"
   }
 ];
 

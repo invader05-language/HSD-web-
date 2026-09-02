@@ -16,8 +16,9 @@ const gateway = useContentGateway();
 const mockContent = useMockApi ? usePortalContentStore() : undefined;
 const realContent = !useMockApi && gateway ? createAdminContentListController({ list: gateway.content.list }) : undefined;
 const session = useSessionStore();
-const canCreateContent = computed(() => useMockApi || session.hasCapability("content.create"));
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
+const canCreateContent = computed(() => useMockApi || session.hasCapability("content.create"));
+const canConfigure = computed(() => useMockApi ? !centerScope.value : session.hasCapability("portal.configure"));
 const isOwner = computed(() => useMockApi ? !centerScope.value : session.adminLevel === "owner");
 const canonicalStatuses: Array<{ value: AdminContentCanonicalStatus; label: string }> = [
   { value: "draft", label: "草稿" }, { value: "review", label: "待审核" }, { value: "pending_publication", label: "待发布" }, { value: "published", label: "已发布" }, { value: "offline", label: "已下架" },
@@ -79,15 +80,14 @@ function retryAutomationDraft(automationKey: string) {
   <div class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Content & Portal" title="官网内容" description="维护 HSD 快讯、新闻和公开公告。草稿、审核、待发布与官网公开版本分开保存。">
       <template #actions>
-        <NuxtLink v-if="useMockApi && !centerScope" class="button button--ghost" to="/admin/content/home">门户配置</NuxtLink>
-        <span v-else-if="!useMockApi" class="admin-page-heading__hint">门户配置尚未接入真实 API</span>
+        <NuxtLink v-if="canConfigure" class="button button--ghost" to="/admin/content/home">门户配置</NuxtLink>
         <NuxtLink v-if="canCreateContent" class="button" to="/admin/content/new">新建内容</NuxtLink>
       </template>
     </AdminPageHeading>
     <section class="admin-summary-strip" aria-label="官网内容概览">
       <div><span>全部内容</span><strong>{{ total }}</strong><small>{{ useMockApi ? "官网内容记录" : "服务端匹配记录" }}</small></div>
       <template v-if="useMockApi"><div><span>待审核</span><strong>{{ mockOverview.inReview }}</strong><small>等待负责人审核</small></div><div><span>待发布</span><strong>{{ mockOverview.pendingPublication }}</strong><small>审核通过，未公开</small></div><div><span>已发布</span><strong>{{ mockOverview.published }}</strong><small>当前官网可见</small></div></template>
-      <template v-else><div><span>当前页</span><strong>{{ rows.length }}</strong><small>本页服务端项目</small></div><div><span>页码</span><strong>{{ page }}</strong><small>共 {{ pageCount }} 页</small></div><div><span>读取模式</span><strong>API</strong><small>不使用本地内容缓存</small></div></template>
+      <template v-else><div><span>当前页</span><strong>{{ rows.length }}</strong><small>当前筛选结果</small></div><div><span>页码</span><strong>{{ page }}</strong><small>共 {{ pageCount }} 页</small></div><div><span>内容状态</span><strong>{{ realStatus === "success" ? "正常" : "读取中" }}</strong><small>服务端数据</small></div></template>
     </section>
     <section v-if="unresolvedAutomationFailures.length" class="admin-list-card" aria-labelledby="portal-automation-failures-title">
       <header><div><span>Automation Retry</span><h2 id="portal-automation-failures-title">快讯草稿生成失败</h2></div><p>业务操作已成功，按原事件语义键重试即可，不会重复创建草稿。</p></header>
