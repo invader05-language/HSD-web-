@@ -266,8 +266,8 @@ test("portal visuals are merged and the legacy banner route redirects to them", 
   await expect.poll(() => new URL(page.url()).searchParams.get("view")).toBe("visuals");
   await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "页面主视觉" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByLabel("官网首页主视觉素材")).toBeVisible();
-  await expect(page.getByLabel("加入我们主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("官网首页横幅主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("加入我们横幅主视觉素材")).toBeVisible();
   await expect(page.getByText("招新按钮是否可用仍由招新批次控制")).toBeVisible();
 });
 
