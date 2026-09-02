@@ -214,7 +214,7 @@ async function command(action: "submit" | "return" | "approve" | "publish" | "of
         <section>
           <header><h2>基础信息</h2><AdminStatusPill :status="record?.status ?? '草稿'" /></header>
           <div class="admin-editor-grid">
-            <label v-if="isNew">归属中心<select v-model="centerId" :disabled="!isOwner"><option value="" disabled>选择归属中心</option><option v-for="option in centerOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select></label>
+            <label v-if="isNew">归属中心<select v-model="centerId" :disabled="!isOwner"><option value="" disabled>选择归属中心</option><option v-if="!isOwner && centerId" :value="centerId">当前管理中心</option><option v-for="option in centerOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select></label>
             <label v-if="isNew && isOwner">Slug（可选）<input v-model="slug" placeholder="留空则自动生成英文标识"></label>
             <label v-if="isNew">内容类型<select v-model="kind"><option value="article">新闻动态</option><option value="notice">通知公告</option><option value="flash">HSD 快讯</option></select></label>
             <label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label>
