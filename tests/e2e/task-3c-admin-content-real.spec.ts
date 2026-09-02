@@ -154,6 +154,7 @@ test("real content list navigates to API new, edit, and preview routes without a
   let createBody: Record<string, unknown> | undefined; let patchBody: Record<string, unknown> | undefined; let currentDetail = detail;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
+  await page.route("**/api/v1/admin/organization/centers", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "center-1", slug: "center-1", name: "测试中心", active: true, positions: [] }] }) }));
   await page.route("**/api/v1/admin/content**", async (route) => {
     const request = route.request(); const pathname = new URL(request.url()).pathname;
     if (request.method() === "POST" && pathname === "/api/v1/admin/content") { createBody = request.postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(detail) }); }
@@ -164,7 +165,7 @@ test("real content list navigates to API new, edit, and preview routes without a
   await page.goto("/admin/content");
   await page.getByRole("link", { name: "新建内容" }).click();
   await expect(page).toHaveURL(/\/admin\/content\/new$/);
-  await page.getByLabel("中心 ID").fill("center-1"); await page.getByLabel("Slug").fill("qa-new"); await page.getByLabel("标题").fill("qa-新建接口内容"); await page.getByLabel("摘要").fill("新建摘要"); await page.getByLabel("正文段落").fill("新建正文"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await page.getByLabel("归属中心").selectOption("center-1"); await page.getByLabel("Slug（可选）").fill("qa-new"); await page.getByLabel("标题").fill("qa-新建接口内容"); await page.getByLabel("摘要").fill("新建摘要"); await page.getByRole("button", { name: "添加正文段落" }).click(); await page.getByLabel("正文段落").fill("新建正文"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page).toHaveURL(/\/admin\/content\/content-edit$/);
   await expect.poll(() => createBody).toMatchObject({ blocks: [{ type: "paragraph", text: "新建正文" }] });
   await page.goto("/admin/content");
@@ -191,23 +192,23 @@ test("real content blocks multi-paragraph body edits while preserving blocks for
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(detail) });
   });
   await page.goto("/admin/content/multi-paragraph");
-  await page.getByLabel("正文段落").fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await page.getByLabel("正文段落").first().fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect(page.getByRole("alert")).toContainText("当前编辑器不支持修改多段正文");
   expect(patchCount).toBe(0);
-  await page.getByLabel("正文段落").fill("First\n\nLast"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await page.getByLabel("正文段落").first().fill("First\n\nLast"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect.poll(() => patchBody).toMatchObject({ title: "仅改标题", blocks });
   expect(patchCount).toBe(1);
 });
 
 test("real content retains its edit draft on 409 and reports a 403 workflow denial without local success", async ({ page }) => {
-  const detail = { id: "conflict-content", publicId: "conflict-public", centerId: "center-1", slug: "conflict-content", kind: "article", status: "review", version: 4, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "冲突内容", summary: "冲突摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "旧正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
+  const detail = { id: "conflict-content", publicId: "conflict-public", centerId: "center-1", slug: "conflict-content", kind: "article", status: "draft", version: 4, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "冲突内容", summary: "冲突摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "旧正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
   let patchCount = 0; let lastExpectedVersion: number | undefined;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
   await page.route("**/api/v1/admin/content/**", async (route) => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     if (request.method() === "PATCH") { patchCount += 1; lastExpectedVersion = (request.postDataJSON() as { expectedVersion: number }).expectedVersion; return route.fulfill(patchCount === 1 ? { status: 409, contentType: "application/json", body: JSON.stringify({ code: "VERSION_CONFLICT", message: "Reload required", requestId: "conflict" }) } : { status: 200, contentType: "application/json", body: JSON.stringify({ ...detail, version: 5 }) }); }
-    if (path.endsWith("/approve-publication")) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "CONTENT_FORBIDDEN", message: "Owner denied", requestId: "forbidden" }) });
+    if (path.endsWith("/submit-review")) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "CONTENT_FORBIDDEN", message: "Owner denied", requestId: "forbidden" }) });
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(patchCount ? { ...detail, version: 5, workingRevision: { ...detail.workingRevision, blocks: [{ type: "paragraph", text: "服务端新正文" }] } } : detail) });
   });
   await page.goto("/admin/content/conflict-content");
@@ -218,7 +219,7 @@ test("real content retains its edit draft on 409 and reports a 403 workflow deni
   await expect(page.getByLabel("正文段落")).toHaveValue("服务端新正文");
   await page.getByLabel("正文段落").fill("重读后再次保存"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect.poll(() => lastExpectedVersion).toBe(5);
-  await page.getByRole("button", { name: "审核通过" }).click();
+  await page.getByRole("button", { name: "提交审核" }).click();
   await expect(page.getByRole("alert")).toContainText("Owner denied");
   await expect(page.getByText("服务端已更新内容状态。", { exact: true })).toHaveCount(0);
 });
