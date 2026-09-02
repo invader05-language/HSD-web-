@@ -185,11 +185,25 @@ test("real content edits a structured paragraph while preserving sibling blocks"
   const blocks = [{ type: "paragraph", text: "First" }, { type: "image", attachmentId: "image-1", alt: "Image" }, { type: "paragraph", text: "Last" }];
   const detail = { id: "multi-paragraph", publicId: "multi-paragraph-public", centerId: "center-1", slug: "multi-paragraph", kind: "article", status: "draft", version: 2, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "多段正文", summary: "多段摘要", tag: null, internalTarget: null, expiresAt: null, blocks, internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
   let patchCount = 0; let patchBody: Record<string, unknown> | undefined;
+  let currentDetail = detail;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }));
   await page.route("**/api/v1/admin/content/**", async (route) => {
-    if (route.request().method() === "PATCH") { patchCount += 1; patchBody = route.request().postDataJSON() as Record<string, unknown>; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...detail, version: 3, workingRevision: { ...detail.workingRevision, title: patchBody.title as string, blocks: patchBody.blocks as typeof blocks } }) }); }
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(detail) });
+    if (route.request().method() === "PATCH") {
+      patchCount += 1;
+      patchBody = route.request().postDataJSON() as Record<string, unknown>;
+      currentDetail = {
+        ...currentDetail,
+        version: currentDetail.version + 1,
+        workingRevision: {
+          ...currentDetail.workingRevision,
+          ...(typeof patchBody.title === "string" ? { title: patchBody.title } : {}),
+          blocks: patchBody.blocks as typeof blocks,
+        },
+      };
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
+    }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
   });
   await page.goto("/admin/content/multi-paragraph");
   await page.getByLabel("正文段落").first().fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
