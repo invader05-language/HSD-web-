@@ -5890,6 +5890,87 @@
         ]
       }
     },
+    "/api/v1/admin/content/{contentId}/publish-direct": {
+      "post": {
+        "operationId": "ContentAdminController_publishDirect",
+        "parameters": [
+          {
+            "name": "contentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishContentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminContentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "让联盟总负责人直接发布自己创建的草稿，跳过自审流程",
+        "tags": [
+          "Content administration"
+        ]
+      }
+    },
     "/api/v1/admin/content/{contentId}/offline": {
       "post": {
         "operationId": "ContentAdminController_offline",
@@ -6072,7 +6153,7 @@
             "$ref": "#/components/responses/ErrorResponse"
           }
         },
-        "summary": "Read the selected published revision for an article or notice",
+        "summary": "Read the selected published revision for a flash, article, or notice",
         "tags": [
           "Public content"
         ]
@@ -16024,7 +16105,8 @@
           },
           "slug": {
             "type": "string",
-            "example": "community-update"
+            "example": "community-update",
+            "description": "可选；留空时由服务端根据标题生成唯一地址"
           },
           "title": {
             "type": "string",
@@ -16061,7 +16143,6 @@
         "required": [
           "centerId",
           "kind",
-          "slug",
           "title"
         ]
       },
@@ -18862,6 +18943,10 @@
               "type": "object"
             }
           },
+          "detailCount": {
+            "type": "number",
+            "description": "仅列表响应返回的详情素材数量"
+          },
           "available": {
             "type": "boolean"
           },
@@ -18884,7 +18969,6 @@
           "agenda",
           "registrationEndAt",
           "cover",
-          "details",
           "available",
           "registrationOpen"
         ]
@@ -19811,6 +19895,10 @@
               "$ref": "#/components/schemas/PublicGalleryMediaResponseDto"
             }
           },
+          "detailCount": {
+            "type": "number",
+            "description": "仅列表响应返回的详情素材数量"
+          },
           "available": {
             "type": "boolean"
           }
@@ -19822,7 +19910,6 @@
           "year",
           "description",
           "cover",
-          "details",
           "available"
         ]
       },
@@ -22491,6 +22578,14 @@
           },
           "caption": {
             "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "管理端工作版本预览地址，仅对已绑定素材返回"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "description": "管理端工作版本缩略图地址，仅对已绑定素材返回"
           }
         },
         "required": [

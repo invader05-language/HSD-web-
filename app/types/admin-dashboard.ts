@@ -6,6 +6,7 @@ export const DASHBOARD_CAPABILITIES = [
   "recruitment.assessment.edit",
   "recruitment.result.publish",
   "content.create",
+  "content.submit_review",
   "content.review",
   "content.publish",
   "portal.configure",
