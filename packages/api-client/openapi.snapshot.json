@@ -22489,6 +22489,10 @@
           },
           "caption": {
             "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "description": "公开内容图片的缩略图地址"
           }
         },
         "required": [

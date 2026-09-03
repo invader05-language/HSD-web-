@@ -7,6 +7,7 @@ import { useSessionStore } from "./session";
 import type { AdminPortalConfigurationResponseDto, HsdApiClient, PortalResolvedEntryResponseDto } from "../../packages/api-client/src";
 
 export interface PortalConfigRuntimeConfig { useMockApi: boolean; }
+export type PortalDraftStatus = "idle" | "loading" | "ready" | "error";
 type PortalConfigGateway = Pick<HsdApiClient, "portal">;
 
 export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
@@ -19,6 +20,16 @@ function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; 
 
 function emptySlots(): PortalSlots {
   return { flash: [], news: [], projects: [], activities: [], gallery: [], resources: [] };
+}
+
+function emptyConfig(): PortalConfig {
+  return {
+    revision: 0,
+    slots: emptySlots(),
+    visuals: { home: { alt: "" }, join: { alt: "" } },
+    updatedAt: "",
+    updatedBy: "",
+  };
 }
 
 function defaultSlots(): PortalSlots {
@@ -252,13 +263,15 @@ function validate(config: PortalConfig, catalog: readonly PortalCatalogItem[]) {
 export const usePortalConfigStore = defineStore("portal-config", {
   state: () => {
     const persisted = runtimeUsesMockApi() ? restorePersistedConfigs() : undefined;
+    const useMockApi = runtimeUsesMockApi();
     return {
-      draftConfig: persisted?.draftConfig ?? initialConfig(),
-      publishedConfig: persisted?.publishedConfig ?? initialConfig(),
+      draftConfig: persisted?.draftConfig ?? (useMockApi ? initialConfig() : emptyConfig()),
+      publishedConfig: persisted?.publishedConfig ?? (useMockApi ? initialConfig() : emptyConfig()),
       auditRecords: persisted?.auditRecords ?? [] as PortalConfigAuditRecord[],
       persistenceError: undefined as string | undefined,
       requestError: null as ReturnType<typeof errorFrom> | null,
       loading: false,
+      draftStatus: (useMockApi ? "ready" : "idle") as PortalDraftStatus,
       apiModeActive: !runtimeUsesMockApi(),
     };
   },
@@ -266,10 +279,12 @@ export const usePortalConfigStore = defineStore("portal-config", {
     async initializeForRuntime(config: PortalConfigRuntimeConfig, gateway: PortalConfigGateway | undefined) {
       this.apiModeActive = !config.useMockApi;
       this.requestError = null;
+      this.draftStatus = config.useMockApi ? "ready" : "loading";
       if (config.useMockApi) return this.preview();
       if (!gateway) {
         const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE");
         this.requestError = errorFrom(error);
+        this.draftStatus = "error";
         throw error;
       }
       capabilityActorId("portal.configure");
@@ -279,9 +294,11 @@ export const usePortalConfigStore = defineStore("portal-config", {
         this.draftConfig = draft;
         this.publishedConfig = clone(draft);
         this.persistenceError = undefined;
+        this.draftStatus = "ready";
         return clone(draft);
       } catch (error) {
         this.requestError = errorFrom(error);
+        this.draftStatus = "error";
         throw error;
       } finally { this.loading = false; }
     },
@@ -298,6 +315,11 @@ export const usePortalConfigStore = defineStore("portal-config", {
       if (config.useMockApi) return this.saveDraft(patch);
       if (!gateway) { const error = new Error("PORTAL_CONFIG_API_UNAVAILABLE"); this.requestError = errorFrom(error); throw error; }
       capabilityActorId("portal.configure");
+      if (this.draftStatus !== "ready") {
+        const error = new Error("PORTAL_CONFIG_NOT_READY");
+        this.requestError = errorFrom(error);
+        throw error;
+      }
       const next = clone(this.draftConfig);
       if (patch.slots) for (const slot of PORTAL_SLOT_IDS) if (patch.slots[slot]) next.slots[slot] = clone(patch.slots[slot]!);
       if (patch.visuals) next.visuals = { ...next.visuals, ...clone(patch.visuals) };

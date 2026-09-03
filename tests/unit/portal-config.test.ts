@@ -499,4 +499,18 @@ describe("portal configuration surfaces", () => {
     expect(source).toContain("PORTAL_CONFIG_INVALID_VISUAL");
     expect(source).toContain("当前公开版本保持不变");
   });
+
+  it("blocks portal editing until the authoritative draft is ready and identifies failed modules", () => {
+    const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
+
+    expect(source).toContain("configStore.draftStatus");
+    expect(source).toContain("failedSlots");
+    expect(source).toContain("projectsStore.apiError");
+    expect(source).toContain("activitiesStore.apiError");
+    expect(source).toContain("galleryStore.apiError");
+    expect(source).toContain("resourcesStore.apiError");
+    expect(source).toContain("PORTAL_CONFIG_NOT_READY");
+    expect(source).toContain("其余模块仍可配置");
+    expect(source).not.toContain("部分候选内容读取失败，已保留可用内容；请点击重试补齐。");
+  });
 });
