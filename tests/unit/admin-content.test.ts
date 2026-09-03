@@ -38,7 +38,7 @@ describe("administration content workflow", () => {
 
   it("keeps homepage modules fixed with explicit capacity", () => {
     expect(HOMEPAGE_SLOTS.map((slot) => [slot.label, slot.capacity])).toEqual([
-      ["首页快讯", 1],
+      ["首页快讯", 3],
       ["首页新闻", 3],
       ["精选项目", 4],
       ["近期活动", 3],

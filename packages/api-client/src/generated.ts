@@ -2201,7 +2201,6 @@ export const API_V1_PATHS = {
   adminContentDetail: "/api/v1/admin/content/{contentId}",
   adminContentCreate: "/api/v1/admin/content",
   adminContentUpdate: "/api/v1/admin/content/{contentId}",
-  adminContentPreview: "/api/v1/admin/content/{contentId}/preview",
   adminContentSubmitReview: "/api/v1/admin/content/{contentId}/submit-review",
   adminContentReturnDraft: "/api/v1/admin/content/{contentId}/return-draft",
   adminContentApprovePublication: "/api/v1/admin/content/{contentId}/approve-publication",
@@ -2349,7 +2348,6 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
   "POST /api/v1/admin/content": { method: "POST", path: "/api/v1/admin/content" },
   "PATCH /api/v1/admin/content/{contentId}": { method: "PATCH", path: "/api/v1/admin/content/{contentId}" },
-  "GET /api/v1/admin/content/{contentId}/preview": { method: "GET", path: "/api/v1/admin/content/{contentId}/preview" },
   "POST /api/v1/admin/content/{contentId}/submit-review": { method: "POST", path: "/api/v1/admin/content/{contentId}/submit-review" },
   "POST /api/v1/admin/content/{contentId}/return-draft": { method: "POST", path: "/api/v1/admin/content/{contentId}/return-draft" },
   "POST /api/v1/admin/content/{contentId}/approve-publication": { method: "POST", path: "/api/v1/admin/content/{contentId}/approve-publication" },
@@ -2503,7 +2501,6 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
   "POST /api/v1/admin/content": AdminContentResponseDto;
   "PATCH /api/v1/admin/content/{contentId}": AdminContentResponseDto;
-  "GET /api/v1/admin/content/{contentId}/preview": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/submit-review": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/return-draft": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/approve-publication": AdminContentResponseDto;
@@ -2759,9 +2756,6 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "PATCH /api/v1/admin/content/{contentId}": {
-    "$ref": "#/components/schemas/AdminContentResponseDto"
-  },
-  "GET /api/v1/admin/content/{contentId}/preview": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "POST /api/v1/admin/content/{contentId}/submit-review": {

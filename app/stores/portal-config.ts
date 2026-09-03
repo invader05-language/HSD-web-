@@ -13,7 +13,7 @@ export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
 export const PORTAL_CONFIG_STORAGE_VERSION = 4;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
-export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 3, resources: 3 } as const;
+export const PORTAL_SLOT_CAPACITY = { flash: 3, news: 3, projects: 4, activities: 3, gallery: 3, resources: 3 } as const;
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 

@@ -53,7 +53,6 @@ const browserOperations = {
   adminContentDetail: "GET /api/v1/admin/content/{contentId}",
   adminContentCreate: "POST /api/v1/admin/content",
   adminContentUpdate: { operation: "PATCH /api/v1/admin/content/{contentId}", successStatus: "200" },
-  adminContentPreview: "GET /api/v1/admin/content/{contentId}/preview",
   adminContentSubmitReview: { operation: "POST /api/v1/admin/content/{contentId}/submit-review", successStatus: "200" },
   adminContentReturnDraft: { operation: "POST /api/v1/admin/content/{contentId}/return-draft", successStatus: "200" },
   adminContentApprovePublication: { operation: "POST /api/v1/admin/content/{contentId}/approve-publication", successStatus: "200" },
