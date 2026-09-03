@@ -222,6 +222,7 @@ export interface HsdApiClient {
     returnDraft(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/return-draft">>;
     approvePublication(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/approve-publication">>;
     publish(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish">>;
+    publishDirect(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish-direct">>;
     offline(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/offline">>;
   };
   uploads: {
@@ -412,6 +413,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       returnDraft: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/return-draft", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/return-draft`),
       approvePublication: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/approve-publication", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/approve-publication`),
       publish: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish`),
+      publishDirect: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish-direct", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish-direct`),
       offline: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/offline", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/offline`),
     },
     uploads: {

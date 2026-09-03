@@ -58,6 +58,7 @@ const browserOperations = {
   adminContentReturnDraft: { operation: "POST /api/v1/admin/content/{contentId}/return-draft", successStatus: "200" },
   adminContentApprovePublication: { operation: "POST /api/v1/admin/content/{contentId}/approve-publication", successStatus: "200" },
   adminContentPublish: "POST /api/v1/admin/content/{contentId}/publish",
+  adminContentPublishDirect: "POST /api/v1/admin/content/{contentId}/publish-direct",
   adminContentOffline: { operation: "POST /api/v1/admin/content/{contentId}/offline", successStatus: "200" },
   adminUploads: "GET /api/v1/admin/uploads",
   adminUploadIntent: "POST /api/v1/admin/uploads/intents",

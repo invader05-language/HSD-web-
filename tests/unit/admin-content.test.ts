@@ -111,6 +111,15 @@ describe("administration content workflow", () => {
     expect(editPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');
   });
 
+  it("keeps slug server-managed and lets a center administrator submit a draft", () => {
+    const editor = readFileSync("app/components/admin/ApiContentEditor.vue", "utf8");
+    const session = readFileSync("app/stores/session.ts", "utf8");
+    expect(editor).not.toContain("Slug（可选）");
+    expect(editor).not.toContain("createSlug");
+    expect(editor).toContain("content.submit_review");
+    expect(session).toContain("content.submit_review");
+  });
+
   it("keeps portal configuration helper copy visible without the removed warning panels", () => {
     const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
     const slotData = readFileSync("app/data/admin-content.ts", "utf8");

@@ -112,6 +112,7 @@ function mockCapabilities(account: MockAccount): string[] {
       "recruitment.assessment.edit",
       "recruitment.result.publish",
       "content.create",
+      "content.submit_review",
       "content.review",
       "content.publish",
       "portal.configure",
@@ -120,7 +121,7 @@ function mockCapabilities(account: MockAccount): string[] {
     ];
   }
   if (account.adminLevel === "admin" && account.adminAccessEnabled) {
-    return ["recruitment.assessment.edit", "content.create"];
+    return ["recruitment.assessment.edit", "content.create", "content.submit_review"];
   }
   return [];
 }

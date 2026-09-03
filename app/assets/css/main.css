@@ -9591,6 +9591,29 @@ body.is-admin-drawer-open {
   font-size: 21px;
 }
 
+.admin-content-preview__body {
+  margin-top: 28px;
+}
+
+.admin-content-preview__body > p {
+  margin: 16px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-content-preview__image {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  background: #eef0f1;
+}
+
+.admin-content-preview__empty {
+  color: var(--muted);
+}
+
 .admin-content-preview figure {
   margin: 24px 0;
   padding: 34px;
@@ -9602,6 +9625,15 @@ body.is-admin-drawer-open {
   margin-top: 12px;
   color: #666d75;
   font-size: 12px;
+}
+
+.admin-content-editor__inline-image {
+  display: block;
+  width: min(100%, 280px);
+  max-height: 160px;
+  margin-bottom: 10px;
+  object-fit: contain;
+  background: #eef0f1;
 }
 
 .admin-inline-preview p {

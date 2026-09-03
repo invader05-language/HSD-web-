@@ -590,6 +590,8 @@ export type ContentAttachmentImageBlockResponseDto = {
   "attachmentId": string;
   "alt": string;
   "caption"?: string;
+  "url"?: string;
+  "thumbnailUrl"?: string;
 };
 
 export type ContentCommandDto = {
@@ -678,7 +680,7 @@ export type CreateAdjustmentProposalDto = {
 export type CreateContentDto = {
   "centerId": string;
   "kind": "flash" | "article" | "notice";
-  "slug": string;
+  "slug"?: string;
   "title": string;
   "summary"?: string;
   "tag"?: string;
@@ -1391,7 +1393,8 @@ export type PublicActivityResponseDto = {
   "agenda": Array<string>;
   "registrationEndAt": string;
   "cover": Record<string, unknown>;
-  "details": Array<Record<string, unknown>>;
+  "details"?: Array<Record<string, unknown>>;
+  "detailCount"?: number;
   "available": boolean;
   "registrationOpen": boolean;
   "registrationOverride"?: boolean;
@@ -1470,7 +1473,8 @@ export type PublicGalleryResponseDto = {
   "year": string;
   "description": string;
   "cover": PublicGalleryMediaResponseDto;
-  "details": Array<PublicGalleryMediaResponseDto>;
+  "details"?: Array<PublicGalleryMediaResponseDto>;
+  "detailCount"?: number;
   "available": boolean;
 };
 
@@ -2202,6 +2206,7 @@ export const API_V1_PATHS = {
   adminContentReturnDraft: "/api/v1/admin/content/{contentId}/return-draft",
   adminContentApprovePublication: "/api/v1/admin/content/{contentId}/approve-publication",
   adminContentPublish: "/api/v1/admin/content/{contentId}/publish",
+  adminContentPublishDirect: "/api/v1/admin/content/{contentId}/publish-direct",
   adminContentOffline: "/api/v1/admin/content/{contentId}/offline",
   adminUploads: "/api/v1/admin/uploads",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
@@ -2349,6 +2354,7 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/content/{contentId}/return-draft": { method: "POST", path: "/api/v1/admin/content/{contentId}/return-draft" },
   "POST /api/v1/admin/content/{contentId}/approve-publication": { method: "POST", path: "/api/v1/admin/content/{contentId}/approve-publication" },
   "POST /api/v1/admin/content/{contentId}/publish": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish" },
+  "POST /api/v1/admin/content/{contentId}/publish-direct": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish-direct" },
   "POST /api/v1/admin/content/{contentId}/offline": { method: "POST", path: "/api/v1/admin/content/{contentId}/offline" },
   "GET /api/v1/admin/uploads": { method: "GET", path: "/api/v1/admin/uploads" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
@@ -2502,6 +2508,7 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/content/{contentId}/return-draft": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/approve-publication": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/publish": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/publish-direct": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/offline": AdminContentResponseDto;
   "GET /api/v1/admin/uploads": UploadListResponseDto;
   "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
@@ -2767,6 +2774,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "POST /api/v1/admin/content/{contentId}/publish": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/publish-direct": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "POST /api/v1/admin/content/{contentId}/offline": {
@@ -6156,7 +6166,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "slug": {
         "type": "string",
-        "example": "community-update"
+        "example": "community-update",
+        "description": "可选；留空时由服务端根据标题生成唯一地址"
       },
       "title": {
         "type": "string",
@@ -6193,7 +6204,6 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "centerId",
       "kind",
-      "slug",
       "title"
     ]
   },
@@ -8994,6 +9004,10 @@ const API_COMPONENT_SCHEMAS = {
           "type": "object"
         }
       },
+      "detailCount": {
+        "type": "number",
+        "description": "仅列表响应返回的详情素材数量"
+      },
       "available": {
         "type": "boolean"
       },
@@ -9016,7 +9030,6 @@ const API_COMPONENT_SCHEMAS = {
       "agenda",
       "registrationEndAt",
       "cover",
-      "details",
       "available",
       "registrationOpen"
     ]
@@ -9943,6 +9956,10 @@ const API_COMPONENT_SCHEMAS = {
           "$ref": "#/components/schemas/PublicGalleryMediaResponseDto"
         }
       },
+      "detailCount": {
+        "type": "number",
+        "description": "仅列表响应返回的详情素材数量"
+      },
       "available": {
         "type": "boolean"
       }
@@ -9954,7 +9971,6 @@ const API_COMPONENT_SCHEMAS = {
       "year",
       "description",
       "cover",
-      "details",
       "available"
     ]
   },
@@ -12623,6 +12639,14 @@ const API_COMPONENT_SCHEMAS = {
       },
       "caption": {
         "type": "string"
+      },
+      "url": {
+        "type": "string",
+        "description": "管理端工作版本预览地址，仅对已绑定素材返回"
+      },
+      "thumbnailUrl": {
+        "type": "string",
+        "description": "管理端工作版本缩略图地址，仅对已绑定素材返回"
       }
     },
     "required": [

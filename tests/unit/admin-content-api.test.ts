@@ -14,17 +14,20 @@ describe("admin content production mutations", () => {
     await client.content.returnDraft("content-1", { expectedVersion: 3, reason: "Needs revision" });
     await client.content.approvePublication("content-1", { expectedVersion: 4 });
     await client.content.publish("content-1", { expectedVersion: 5, confirmed: true });
-    await client.content.offline("content-1", { expectedVersion: 6, reason: "Expired" });
+    await client.content.publishDirect("content-1", { expectedVersion: 6, confirmed: true });
+    await client.content.offline("content-1", { expectedVersion: 7, reason: "Expired" });
     expect(requests.map(({ path, method }) => ({ path, method }))).toEqual([
       { path: "/api/v1/admin/content/content-1/preview", method: "GET" },
       { path: "/api/v1/admin/content/content-1/submit-review", method: "POST" },
       { path: "/api/v1/admin/content/content-1/return-draft", method: "POST" },
       { path: "/api/v1/admin/content/content-1/approve-publication", method: "POST" },
       { path: "/api/v1/admin/content/content-1/publish", method: "POST" },
+      { path: "/api/v1/admin/content/content-1/publish-direct", method: "POST" },
       { path: "/api/v1/admin/content/content-1/offline", method: "POST" },
     ]);
     expect(requests[2]?.body).toEqual({ expectedVersion: 3, reason: "Needs revision" });
     expect(requests[4]?.body).toEqual({ expectedVersion: 5, confirmed: true });
+    expect(requests[5]?.body).toEqual({ expectedVersion: 6, confirmed: true });
   });
 
   it("maps canonical working revisions and clears stale detail after a missing response", async () => {
