@@ -223,8 +223,8 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
   {
     id: "flash",
     label: "首页快讯",
-    capacity: 1,
-    description: "展示首页顶部的重要动态和即时通知",
+    capacity: 3,
+    description: "展示官网首页顶部的 HSD 快讯，最多配置 3 条",
     allowedTypes: ["flash"],
     sourceHint: "来源于官网内容中的已发布快讯。"
   },
@@ -232,7 +232,7 @@ export const HOMEPAGE_SLOTS: HomepageSlot[] = [
     id: "news",
     label: "首页新闻",
     capacity: 3,
-    description: "展示官网已发布的新闻和公告",
+    description: "展示官网首页“新闻与公告”区域中的已发布新闻和公告",
     allowedTypes: ["article", "notice"],
     sourceHint: "来源于官网内容中的已发布新闻或公告。"
   },

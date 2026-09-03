@@ -9373,7 +9373,7 @@ body.is-admin-drawer-open {
 
 .admin-content-editor__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(245px, 0.32fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -10041,12 +10041,20 @@ body.is-admin-drawer-open {
 
 .admin-home-slots li {
   grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.admin-home-slots li > span:first-child {
+  align-self: center;
+  justify-self: center;
+  line-height: 1;
 }
 
 .admin-home-slots li > label,
 .admin-home-slots li select {
   width: 100%;
   min-width: 0;
+  align-self: center;
 }
 
 .admin-home-slots li select {
@@ -10063,6 +10071,7 @@ body.is-admin-drawer-open {
   display: flex;
   align-items: center;
   gap: 12px;
+  align-self: center;
 }
 
 .admin-slot-actions button {

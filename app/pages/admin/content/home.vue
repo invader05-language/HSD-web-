@@ -37,6 +37,8 @@ const galleryStore = useGalleryStore();
 const resourcesStore = useResourcesStore();
 const publicContentCatalog = ref<PortalCatalogItem[]>([]);
 const catalogLoading = ref(false);
+const catalogReady = ref(false);
+const draftActionBusy = ref(false);
 const catalogError = ref("");
 const portalUploadCenterId = ref(session.currentAccount?.adminCenterId ?? "");
 const catalog = computed(() => [...usePortalCatalog(runtimeConfig.public), ...publicContentCatalog.value]);
@@ -52,6 +54,7 @@ const visualDraft = reactive<{ home: PortalVisualConfig; join: PortalVisualConfi
 const previewProjection = computed(() => resolveHomepageProjection(configStore.draftConfig.slots, catalog.value));
 const canConfigure = computed(() => session.hasCapability("portal.configure"));
 const canPublish = computed(() => session.hasCapability("portal.publish"));
+const mutationBusy = computed(() => catalogLoading.value || configStore.loading || draftActionBusy.value);
 const recommendationsTab = ref<HTMLButtonElement | null>(null);
 const visualsTab = ref<HTMLButtonElement | null>(null);
 const previewDialog = ref<HTMLElement | null>(null);
@@ -85,32 +88,29 @@ async function refreshPublicContentCatalog() {
 async function initializePortal() {
   if (!contentGateway) return;
   catalogLoading.value = true;
+  catalogReady.value = false;
   catalogError.value = "";
-  try {
-    const centersPromise = organizationGateway && session.hasCapability("portal.configure")
+  const tasks = await Promise.allSettled([
+    configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
+    projectsStore.refreshPublicFromApi(contentGateway),
+    activitiesStore.refreshPublicFromApi(contentGateway),
+    galleryStore.refreshPublicFromApi(contentGateway),
+    resourcesStore.refreshPublicFromApi(contentGateway),
+    refreshPublicContentCatalog(),
+    organizationGateway && session.hasCapability("portal.configure")
       ? organizationGateway.listCenters()
-      : Promise.resolve(undefined);
-    const [, centers] = await Promise.all([
-      Promise.all([
-        configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
-        projectsStore.refreshPublicFromApi(contentGateway),
-        activitiesStore.refreshPublicFromApi(contentGateway),
-        galleryStore.refreshPublicFromApi(contentGateway),
-        resourcesStore.refreshPublicFromApi(contentGateway),
-        refreshPublicContentCatalog(),
-      ]),
-      centersPromise,
-    ]);
-    if (!portalUploadCenterId.value && centers) {
-      portalUploadCenterId.value = centers.items.find((center) => center.active && center.slug === "baize-development")?.id
-        ?? centers.items.find((center) => center.active)?.id
-        ?? "";
-    }
-  } catch {
-    catalogError.value = "门户候选内容读取失败，请点击重试。";
-  } finally {
-    catalogLoading.value = false;
+      : Promise.resolve(undefined),
+  ]);
+  const centersResult = tasks.at(-1);
+  if (centersResult?.status === "fulfilled" && centersResult.value && "items" in centersResult.value && !portalUploadCenterId.value) {
+    portalUploadCenterId.value = centersResult.value.items.find((center) => center.active && center.slug === "baize-development")?.id
+      ?? centersResult.value.items.find((center) => center.active)?.id
+      ?? "";
   }
+  const failures = tasks.filter((task) => task.status === "rejected");
+  if (failures.length) catalogError.value = "部分候选内容读取失败，已保留可用内容；请点击重试补齐。";
+  catalogReady.value = true;
+  catalogLoading.value = false;
 }
 
 onMounted(() => { void initializePortal(); });
@@ -141,6 +141,7 @@ function referenceLabel(reference: PortalReference) {
 }
 
 function currentReferenceIssue(slot: PortalSlotId, index: number, reference: PortalReference) {
+  if (!catalogReady.value) return undefined;
   const candidate = findReference(reference);
   if (!candidate) return `无效当前项（引用不存在）：${reference.entityType} / ${reference.sourceId}`;
   if (!candidate.available) return `无效当前项（内容不可用）：${candidate.title}`;
@@ -152,6 +153,7 @@ function currentReferenceIssue(slot: PortalSlotId, index: number, reference: Por
 }
 
 function candidatesFor(slot: PortalSlotId, currentIndex: number) {
+  if (!catalogReady.value) return [];
   const used = new Set(
     HOMEPAGE_SLOTS.flatMap((definition) => configStore.draftConfig.slots[definition.id]
       .filter((_, index) => definition.id !== slot || index !== currentIndex)
@@ -181,6 +183,7 @@ function portalErrorMessage(error: unknown) {
   }
   if (code === "PORTAL_CONFIG_INVALID_VISUAL") return "主视觉发布校验失败。请确认素材已审核通过并填写替代文本。";
   if (code === "PORTAL_CONFIG_INVALID_REFERENCE") return "推荐位引用校验失败。请处理失效、重复或超出容量的引用后重试。";
+  if (code === "PORTAL_CONTENT_VERSION_CONFLICT") return "门户草稿已被其他管理员更新，请先重新读取最新版本再操作。";
   if (configStore.persistenceError) {
     return "浏览器存储不可用，配置未持久化；当前公开版本保持不变，请释放存储空间后重试。";
   }
@@ -188,6 +191,8 @@ function portalErrorMessage(error: unknown) {
 }
 
 async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]) {
+  if (mutationBusy.value) return;
+  draftActionBusy.value = true;
   try {
     if (runtimeConfig.public.useMockApi) configStore.saveDraft(patch);
     else await configStore.saveDraftForRuntime(runtimeConfig.public, contentGateway, patch);
@@ -202,6 +207,8 @@ async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]
   } catch (error) {
     errorMessage.value = portalErrorMessage(error);
     statusMessage.value = "";
+  } finally {
+    draftActionBusy.value = false;
   }
 }
 
@@ -359,12 +366,12 @@ onBeforeUnmount(() => {
           <ol>
             <li v-for="(reference, itemIndex) in configStore.draftConfig.slots[slot.id]" :key="referenceKey(reference)">
               <span>{{ itemIndex + 1 }}</span>
-              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="catalogLoading" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="mutationBusy" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
               <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" @click="removeReference(slot.id, itemIndex)">移除</button></div>
             </li>
             <li v-if="configStore.draftConfig.slots[slot.id].length < slot.capacity" class="is-empty">
               <span>{{ configStore.draftConfig.slots[slot.id].length + 1 }}</span>
-              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="catalogLoading" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="mutationBusy" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
           <footer><em>{{ slot.sourceHint }}</em></footer>
@@ -380,7 +387,7 @@ onBeforeUnmount(() => {
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
         <label v-if="runtimeConfig.public.useMockApi">辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>
-      <footer><p>招新按钮是否可用仍由招新批次控制，门户配置不能覆盖批次开放状态。</p><button type="button" class="button" @click="saveVisualDraft">保存主视觉草稿</button></footer>
+      <footer><p>招新按钮是否可用仍由招新批次控制，门户配置不能覆盖批次开放状态。</p><button type="button" class="button" :disabled="mutationBusy" @click="saveVisualDraft">保存主视觉草稿</button></footer>
     </section>
     </template>
 

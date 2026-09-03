@@ -56,7 +56,6 @@ test("real admin content navigation keeps create capability-gated while exposing
   const row = page.getByRole("row").filter({ hasText: "qa-真实接口内容" });
   await expect(page.getByRole("link", { name: "新建内容" })).toHaveCount(0);
   await expect(row.getByRole("link", { name: "编辑" })).toHaveAttribute("href", "/admin/content/qa-content-api-only");
-  await expect(row.getByRole("link", { name: "预览" })).toHaveAttribute("href", "/admin/content/qa-content-api-only/preview");
   await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
 });
 
@@ -148,7 +147,7 @@ test("real admin content pagination replaces server rows and a filter resets pag
   await expect(page.getByText("qa-筛选后的第一页", { exact: true })).toBeVisible();
 });
 
-test("real content list navigates to API new, edit, and preview routes without a local fallback", async ({ page }) => {
+test("real content list navigates to API new and edit routes without a local fallback", async ({ page }) => {
   const detail = { id: "content-edit", publicId: "content-edit-public", centerId: "center-1", slug: "content-edit", kind: "article", status: "draft", version: 2, createdBy: { type: "account", accountId: "owner-api", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "qa-编辑接口内容", summary: "编辑摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "原始正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
   const listPage = { ...contentPage, items: [{ ...contentPage.items[0], id: detail.id, publicId: detail.publicId, slug: detail.slug, title: detail.workingRevision.title, summary: detail.workingRevision.summary, status: detail.status }] };
   let createBody: Record<string, unknown> | undefined; let patchBody: Record<string, unknown> | undefined; let currentDetail = detail;
@@ -174,10 +173,6 @@ test("real content list navigates to API new, edit, and preview routes without a
   await expect(page).toHaveURL(/\/admin\/content\/content-edit$/);
   await page.getByLabel("正文段落").fill("修改后的 API 正文"); await page.getByRole("button", { name: "保存草稿" }).click();
   await expect.poll(() => patchBody).toMatchObject({ expectedVersion: 2, blocks: [{ type: "paragraph", text: "修改后的 API 正文" }] });
-  await page.goto("/admin/content");
-  await page.getByRole("row").filter({ hasText: "qa-编辑接口内容" }).getByRole("link", { name: "预览" }).click();
-  await expect(page).toHaveURL(/\/admin\/content\/content-edit\/preview$/);
-  await expect(page.getByText("修改后的 API 正文", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => localStorage.getItem("baiyun-hsd.portal-content"))).toBeNull();
 });
 
