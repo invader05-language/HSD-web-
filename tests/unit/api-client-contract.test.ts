@@ -514,6 +514,30 @@ describe("generated browser API client", () => {
     expect(isApiResponse("GET /api/v1/public/portal", portal)).toBe(true);
   });
 
+  it("accepts public portal content image blocks with their runtime thumbnail URL", () => {
+    const portal = {
+      publishedAt: "2026-08-11T00:00:00.000Z",
+      entries: [{
+        slot: "flash",
+        position: 1,
+        content: {
+          slug: "flash-with-image",
+          kind: "flash",
+          title: "Flash with image",
+          summary: null,
+          tag: "new",
+          expiresAt: null,
+          blocks: [{ type: "image", url: "/flash-image", thumbnailUrl: "/flash-image-thumb", alt: "Flash image" }],
+          publishedAt: "2026-08-11T00:00:00.000Z",
+        },
+      }],
+    };
+
+    const adminPortal = { version: 1, entries: portal.entries, visuals: {} };
+    expect(isApiResponse("GET /api/v1/admin/portal/configuration/draft", adminPortal), "admin portal draft").toBe(true);
+    expect(isApiResponse("GET /api/v1/public/portal", portal), "public portal").toBe(true);
+  });
+
   it("models membership retirement as a true boolean and omits deprecated core-member retirement", () => {
     expect(API_V1_PATHS).toMatchObject({
       organizationMembershipRetire: "/api/v1/admin/organization/memberships/{personId}/retire",

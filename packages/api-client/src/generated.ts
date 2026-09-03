@@ -607,6 +607,7 @@ export type ContentImageBlockResponseDto = {
   "url": string;
   "alt": string;
   "caption"?: string;
+  "thumbnailUrl"?: string;
 };
 
 export type ContentParagraphBlockResponseDto = {
@@ -12553,6 +12554,10 @@ const API_COMPONENT_SCHEMAS = {
       },
       "caption": {
         "type": "string"
+      },
+      "thumbnailUrl": {
+        "type": "string",
+        "description": "公开内容图片的缩略图地址"
       }
     },
     "required": [

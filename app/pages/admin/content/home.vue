@@ -10,6 +10,7 @@ import { usePortalConfigStore } from "~/stores/portal-config";
 import { useProjectsStore } from "~/stores/projects";
 import { useResourcesStore } from "~/stores/resources";
 import { useSessionStore } from "~/stores/session";
+import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import type { PortalCatalogItem, PortalSlotId } from "~/types/portal-content";
 import type { PortalReference, PortalVisualConfig } from "~/types/portal-config";
 import type { ContentMediaAttachment } from "~/types/content-media";
@@ -28,12 +29,21 @@ const configStore = usePortalConfigStore();
 const session = useSessionStore();
 const adminToast = useAdminToast();
 const contentGateway = useContentGateway();
+const organizationGateway = useOrganizationGateway();
 const runtimeConfig = useRuntimeConfig() as { public: { useMockApi: boolean } };
 const projectsStore = useProjectsStore();
 const activitiesStore = useActivitiesStore();
 const galleryStore = useGalleryStore();
 const resourcesStore = useResourcesStore();
-const catalog = computed(() => usePortalCatalog(runtimeConfig.public));
+const publicContentCatalog = ref<PortalCatalogItem[]>([]);
+const catalogLoading = ref(false);
+const catalogReady = ref(false);
+const draftActionBusy = ref(false);
+const catalogError = ref("");
+const failedSlots = ref<Set<PortalSlotId>>(new Set());
+const failedCatalogLabels = ref<string[]>([]);
+const portalUploadCenterId = ref(session.currentAccount?.adminCenterId ?? "");
+const catalog = computed(() => [...usePortalCatalog(runtimeConfig.public), ...publicContentCatalog.value]);
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
 const showPreview = ref(false);
 const showPublishConfirmation = ref(false);
@@ -46,6 +56,8 @@ const visualDraft = reactive<{ home: PortalVisualConfig; join: PortalVisualConfi
 const previewProjection = computed(() => resolveHomepageProjection(configStore.draftConfig.slots, catalog.value));
 const canConfigure = computed(() => session.hasCapability("portal.configure"));
 const canPublish = computed(() => session.hasCapability("portal.publish"));
+const draftReady = computed(() => configStore.draftStatus === "ready");
+const mutationBusy = computed(() => catalogLoading.value || configStore.loading || draftActionBusy.value || !draftReady.value);
 const recommendationsTab = ref<HTMLButtonElement | null>(null);
 const visualsTab = ref<HTMLButtonElement | null>(null);
 const previewDialog = ref<HTMLElement | null>(null);
@@ -53,6 +65,7 @@ const previewCloseButton = ref<HTMLButtonElement | null>(null);
 const publishDialog = ref<HTMLElement | null>(null);
 const publishCancelButton = ref<HTMLButtonElement | null>(null);
 let dialogTrigger: HTMLElement | null = null;
+let initializeRequestId = 0;
 
 watch(() => configStore.draftConfig.visuals, (visuals) => {
   for (const slot of ["home", "join"] as const) {
@@ -61,16 +74,66 @@ watch(() => configStore.draftConfig.visuals, (visuals) => {
   }
 }, { deep: true });
 
-onMounted(() => {
+async function refreshPublicContentCatalog() {
   if (!contentGateway) return;
-  void Promise.all([
-    configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
-    projectsStore.refreshPublicFromApi(contentGateway),
-    activitiesStore.refreshPublicFromApi(contentGateway),
-    galleryStore.refreshPublicFromApi(contentGateway),
-    resourcesStore.refreshPublicFromApi(contentGateway),
-  ]);
-});
+  const response = await contentGateway.content.list("status=published&page=1&pageSize=100");
+  publicContentCatalog.value = response.items.map((item): PortalCatalogItem => ({
+    entityType: item.kind,
+    sourceId: item.id,
+    title: item.title,
+    summary: item.summary ?? "",
+    to: item.kind === "flash" ? "/activities" : `/updates/${encodeURIComponent(item.slug)}`,
+    publishedAt: item.publishedAt ?? new Date(0).toISOString(),
+    eligibleSlots: item.kind === "flash" ? ["flash"] : ["news"],
+    available: true,
+  }));
+}
+
+async function initializePortal() {
+  if (!contentGateway) return;
+  if (catalogLoading.value) return;
+  const requestId = ++initializeRequestId;
+  catalogLoading.value = true;
+  catalogReady.value = false;
+  catalogError.value = "";
+  failedSlots.value = new Set();
+  failedCatalogLabels.value = [];
+  const taskDefinitions: Array<{ label: string; slots: PortalSlotId[]; run: () => Promise<unknown>; failed?: () => boolean }> = [
+    { label: "门户草稿", slots: ["flash", "news", "projects", "activities", "gallery", "resources"], run: () => configStore.initializeForRuntime(runtimeConfig.public, contentGateway), failed: () => configStore.draftStatus === "error" },
+    { label: "精选项目", slots: ["projects"], run: () => projectsStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(projectsStore.apiError) },
+    { label: "近期活动", slots: ["activities"], run: () => activitiesStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(activitiesStore.apiError) },
+    { label: "媒体专题", slots: ["gallery"], run: () => galleryStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(galleryStore.apiError) },
+    { label: "推荐资源", slots: ["resources"], run: () => resourcesStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(resourcesStore.apiError) },
+    { label: "首页快讯与新闻", slots: ["flash", "news"], run: refreshPublicContentCatalog },
+    { label: "中心目录", slots: [], run: () => organizationGateway && session.hasCapability("portal.configure") ? organizationGateway.listCenters() : Promise.resolve(undefined) },
+  ];
+  const tasks = await Promise.allSettled(taskDefinitions.map((task) => task.run()));
+  if (requestId !== initializeRequestId) return;
+  const centersResult = tasks.at(-1);
+  const centers = centersResult?.status === "fulfilled" && centersResult.value && typeof centersResult.value === "object"
+    ? centersResult.value as { items?: Array<{ id: string; active: boolean; slug: string }> }
+    : undefined;
+  if (centers?.items && !portalUploadCenterId.value) {
+    portalUploadCenterId.value = centers.items.find((center) => center.active && center.slug === "baize-development")?.id
+      ?? centers.items.find((center) => center.active)?.id
+      ?? "";
+  }
+  const failures = tasks.flatMap((task, index) => task.status === "rejected" || taskDefinitions[index]?.failed?.() ? [taskDefinitions[index]!] : []);
+  failedCatalogLabels.value = failures.map((task) => task.label);
+  failedSlots.value = new Set(failures.flatMap((task) => task.slots));
+  if (!draftReady.value) {
+    catalogError.value = "门户草稿读取失败，配置编辑已暂停；请点击重试。";
+    catalogReady.value = false;
+  } else {
+    catalogError.value = failures.length
+      ? `以下候选模块读取失败：${failedCatalogLabels.value.join("、")}。其余模块仍可配置。`
+      : "";
+    catalogReady.value = true;
+  }
+  catalogLoading.value = false;
+}
+
+onMounted(() => { void initializePortal(); });
 
 function setView(view: PortalConfigView, focus = false) {
   void router.replace({ query: view === "visuals" ? { ...route.query, view } : { ...route.query, view: undefined } }).then(() => {
@@ -98,6 +161,7 @@ function referenceLabel(reference: PortalReference) {
 }
 
 function currentReferenceIssue(slot: PortalSlotId, index: number, reference: PortalReference) {
+  if (!catalogReady.value) return undefined;
   const candidate = findReference(reference);
   if (!candidate) return `无效当前项（引用不存在）：${reference.entityType} / ${reference.sourceId}`;
   if (!candidate.available) return `无效当前项（内容不可用）：${candidate.title}`;
@@ -109,6 +173,7 @@ function currentReferenceIssue(slot: PortalSlotId, index: number, reference: Por
 }
 
 function candidatesFor(slot: PortalSlotId, currentIndex: number) {
+  if (!catalogReady.value || failedSlots.value.has(slot)) return [];
   const used = new Set(
     HOMEPAGE_SLOTS.flatMap((definition) => configStore.draftConfig.slots[definition.id]
       .filter((_, index) => definition.id !== slot || index !== currentIndex)
@@ -132,12 +197,16 @@ function selectReference(slot: PortalSlotId, index: number, event: Event) {
 }
 
 function portalErrorMessage(error: unknown) {
-  const code = error instanceof Error ? error.message : "";
+  const code = typeof (error as { code?: unknown })?.code === "string"
+    ? (error as { code: string }).code
+    : error instanceof Error ? error.message : "";
   if (code === "PORTAL_CONFIG_PERSISTENCE_FAILED") {
     return "浏览器存储不可用，配置未持久化；当前公开版本保持不变，请释放存储空间后重试。";
   }
   if (code === "PORTAL_CONFIG_INVALID_VISUAL") return "主视觉发布校验失败。请确认素材已审核通过并填写替代文本。";
   if (code === "PORTAL_CONFIG_INVALID_REFERENCE") return "推荐位引用校验失败。请处理失效、重复或超出容量的引用后重试。";
+  if (code === "PORTAL_CONTENT_VERSION_CONFLICT") return "门户草稿已被其他管理员更新，请先重新读取最新版本再操作。";
+  if (code === "PORTAL_CONFIG_NOT_READY") return "门户草稿尚未成功读取，当前不能保存配置；请点击重试。";
   if (configStore.persistenceError) {
     return "浏览器存储不可用，配置未持久化；当前公开版本保持不变，请释放存储空间后重试。";
   }
@@ -145,6 +214,8 @@ function portalErrorMessage(error: unknown) {
 }
 
 async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]) {
+  if (mutationBusy.value) return;
+  draftActionBusy.value = true;
   try {
     if (runtimeConfig.public.useMockApi) configStore.saveDraft(patch);
     else await configStore.saveDraftForRuntime(runtimeConfig.public, contentGateway, patch);
@@ -159,7 +230,13 @@ async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]
   } catch (error) {
     errorMessage.value = portalErrorMessage(error);
     statusMessage.value = "";
+  } finally {
+    draftActionBusy.value = false;
   }
+}
+
+function slotLoadFailed(slot: PortalSlotId) {
+  return !draftReady.value || failedSlots.value.has(slot);
 }
 
 function moveReference(slot: PortalSlotId, index: number, direction: "up" | "down") {
@@ -208,6 +285,11 @@ function updateVisualMedia(slot: "home" | "join", items: ContentMediaAttachment[
 
 function visualMedia(slot: "home" | "join") {
   return visualDraft[slot].media ? [visualDraft[slot].media] : [];
+}
+
+function visualOwner(slot: "home" | "join") {
+  if (!portalUploadCenterId.value) return undefined;
+  return { centerId: portalUploadCenterId.value, ownerType: `portal_${slot}` as const, ownerId: "global" };
 }
 
 async function publishConfiguration() {
@@ -287,8 +369,8 @@ onBeforeUnmount(() => {
   <div class="admin-recruitment-page admin-section-page admin-portal-config">
     <AdminPageHeading eyebrow="Portal Publishing" title="门户配置" description="维护首页推荐位和预定义页面主视觉。所有更改先进入草稿，联盟总负责人确认后整份发布。">
       <template #actions>
-        <button v-if="canConfigure" type="button" class="button button--ghost" @click="openDialog('preview', $event)">预览门户草稿</button>
-        <button v-if="canPublish" type="button" class="button" @click="openDialog('publish', $event)">发布门户配置</button>
+        <button v-if="canConfigure" type="button" class="button button--ghost" :disabled="mutationBusy" @click="openDialog('preview', $event)">预览门户草稿</button>
+        <button v-if="canPublish" type="button" class="button" :disabled="mutationBusy" @click="openDialog('publish', $event)">发布门户配置</button>
       </template>
     </AdminPageHeading>
 
@@ -298,23 +380,25 @@ onBeforeUnmount(() => {
       <button id="portal-tab-visuals" ref="visualsTab" type="button" role="tab" aria-controls="portal-panel-visuals" :aria-selected="activeView === 'visuals'" :tabindex="activeView === 'visuals' ? 0 : -1" @keydown="handleTabKeydown" @click="setView('visuals')">页面主视觉</button>
     </div>
 
+    <p v-if="catalogLoading" class="admin-portal-message" role="status">正在读取可推荐内容和门户草稿…</p>
+    <p v-if="catalogError" class="admin-portal-message is-error" role="alert">{{ catalogError }} <button type="button" class="button button--text" @click="initializePortal">重试</button></p>
     <p v-if="statusMessage" class="admin-portal-message" role="status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="admin-portal-message is-error" role="alert">{{ errorMessage }}</p>
     <div v-if="canConfigure && !canPublish" class="admin-fixed-notice"><strong>发布权限</strong><p>你可以保存和预览门户草稿；整份发布仅限联盟总负责人。</p></div>
 
     <section v-if="activeView === 'recommendations'" id="portal-panel-recommendations" role="tabpanel" aria-labelledby="portal-tab-recommendations" tabindex="0">
       <section class="admin-home-slots" aria-label="首页固定模块">
-        <article v-for="(slot, slotIndex) in HOMEPAGE_SLOTS" :key="slot.id">
-          <header><div><span>{{ String(slotIndex + 1).padStart(2, "0") }} / FIXED SLOT</span><h2>{{ slot.label }}</h2><p>{{ slot.description }}</p></div><AdminStatusPill :status="`${configStore.draftConfig.slots[slot.id].length} / ${slot.capacity}`" /></header>
+        <article v-for="slot in HOMEPAGE_SLOTS" :key="slot.id">
+          <header><div><h2>{{ slot.label }}</h2><p>{{ slot.description }}</p><div class="admin-slot-capacity"><strong>已配置 {{ configStore.draftConfig.slots[slot.id].length }} 条</strong><span>容量上限：{{ slot.capacity }} 条</span></div></div></header>
           <ol>
             <li v-for="(reference, itemIndex) in configStore.draftConfig.slots[slot.id]" :key="referenceKey(reference)">
               <span>{{ itemIndex + 1 }}</span>
-              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
-              <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" @click="removeReference(slot.id, itemIndex)">移除</button></div>
+              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="mutationBusy || slotLoadFailed(slot.id)" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="mutationBusy || itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="mutationBusy || itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" :disabled="mutationBusy" @click="removeReference(slot.id, itemIndex)">移除</button></div>
             </li>
             <li v-if="configStore.draftConfig.slots[slot.id].length < slot.capacity" class="is-empty">
               <span>{{ configStore.draftConfig.slots[slot.id].length + 1 }}</span>
-              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>选择已发布内容</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="mutationBusy || slotLoadFailed(slot.id)" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : failedSlots.has(slot.id) ? "该模块读取失败，请重试" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
           <footer><small>容量上限 {{ slot.capacity }} 条</small><span>{{ slot.allowedTypes.join(" / ") }}</span><em>{{ slot.sourceHint }}</em></footer>
@@ -326,11 +410,11 @@ onBeforeUnmount(() => {
       <article v-for="visual in [{ id: 'home' as const, label: '官网首页', note: '首页首屏主视觉' }, { id: 'join' as const, label: '加入我们', note: '招新页面主视觉' }]" :key="visual.id">
           <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
         <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
-        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
+        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" :owner="visualOwner(visual.id)" :disabled="Boolean(organizationGateway && !visualOwner(visual.id))" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
         <label v-if="runtimeConfig.public.useMockApi">辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>
-      <footer><p>招新按钮是否可用仍由招新批次控制，门户配置不能覆盖批次开放状态。</p><button type="button" class="button" @click="saveVisualDraft">保存主视觉草稿</button></footer>
+      <footer><p>招新按钮是否可用仍由招新批次控制，门户配置不能覆盖批次开放状态。</p><button type="button" class="button" :disabled="mutationBusy" @click="saveVisualDraft">保存主视觉草稿</button></footer>
     </section>
     </template>
 
