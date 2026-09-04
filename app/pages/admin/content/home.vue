@@ -40,6 +40,8 @@ const catalogLoading = ref(false);
 const catalogReady = ref(false);
 const draftActionBusy = ref(false);
 const catalogError = ref("");
+const failedSlots = ref<Set<PortalSlotId>>(new Set());
+const failedCatalogLabels = ref<string[]>([]);
 const portalUploadCenterId = ref(session.currentAccount?.adminCenterId ?? "");
 const catalog = computed(() => [...usePortalCatalog(runtimeConfig.public), ...publicContentCatalog.value]);
 const activeView = computed<PortalConfigView>(() => route.query.view === "visuals" ? "visuals" : "recommendations");
@@ -54,7 +56,8 @@ const visualDraft = reactive<{ home: PortalVisualConfig; join: PortalVisualConfi
 const previewProjection = computed(() => resolveHomepageProjection(configStore.draftConfig.slots, catalog.value));
 const canConfigure = computed(() => session.hasCapability("portal.configure"));
 const canPublish = computed(() => session.hasCapability("portal.publish"));
-const mutationBusy = computed(() => catalogLoading.value || configStore.loading || draftActionBusy.value);
+const draftReady = computed(() => configStore.draftStatus === "ready");
+const mutationBusy = computed(() => catalogLoading.value || configStore.loading || draftActionBusy.value || !draftReady.value);
 const recommendationsTab = ref<HTMLButtonElement | null>(null);
 const visualsTab = ref<HTMLButtonElement | null>(null);
 const previewDialog = ref<HTMLElement | null>(null);
@@ -62,6 +65,7 @@ const previewCloseButton = ref<HTMLButtonElement | null>(null);
 const publishDialog = ref<HTMLElement | null>(null);
 const publishCancelButton = ref<HTMLButtonElement | null>(null);
 let dialogTrigger: HTMLElement | null = null;
+let initializeRequestId = 0;
 
 watch(() => configStore.draftConfig.visuals, (visuals) => {
   for (const slot of ["home", "join"] as const) {
@@ -87,29 +91,45 @@ async function refreshPublicContentCatalog() {
 
 async function initializePortal() {
   if (!contentGateway) return;
+  if (catalogLoading.value) return;
+  const requestId = ++initializeRequestId;
   catalogLoading.value = true;
   catalogReady.value = false;
   catalogError.value = "";
-  const tasks = await Promise.allSettled([
-    configStore.initializeForRuntime(runtimeConfig.public, contentGateway),
-    projectsStore.refreshPublicFromApi(contentGateway),
-    activitiesStore.refreshPublicFromApi(contentGateway),
-    galleryStore.refreshPublicFromApi(contentGateway),
-    resourcesStore.refreshPublicFromApi(contentGateway),
-    refreshPublicContentCatalog(),
-    organizationGateway && session.hasCapability("portal.configure")
-      ? organizationGateway.listCenters()
-      : Promise.resolve(undefined),
-  ]);
+  failedSlots.value = new Set();
+  failedCatalogLabels.value = [];
+  const taskDefinitions: Array<{ label: string; slots: PortalSlotId[]; run: () => Promise<unknown>; failed?: () => boolean }> = [
+    { label: "门户草稿", slots: ["flash", "news", "projects", "activities", "gallery", "resources"], run: () => configStore.initializeForRuntime(runtimeConfig.public, contentGateway), failed: () => configStore.draftStatus === "error" },
+    { label: "精选项目", slots: ["projects"], run: () => projectsStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(projectsStore.apiError) },
+    { label: "近期活动", slots: ["activities"], run: () => activitiesStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(activitiesStore.apiError) },
+    { label: "媒体专题", slots: ["gallery"], run: () => galleryStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(galleryStore.apiError) },
+    { label: "推荐资源", slots: ["resources"], run: () => resourcesStore.refreshPublicFromApi(contentGateway), failed: () => Boolean(resourcesStore.apiError) },
+    { label: "首页快讯与新闻", slots: ["flash", "news"], run: refreshPublicContentCatalog },
+    { label: "中心目录", slots: [], run: () => organizationGateway && session.hasCapability("portal.configure") ? organizationGateway.listCenters() : Promise.resolve(undefined) },
+  ];
+  const tasks = await Promise.allSettled(taskDefinitions.map((task) => task.run()));
+  if (requestId !== initializeRequestId) return;
   const centersResult = tasks.at(-1);
-  if (centersResult?.status === "fulfilled" && centersResult.value && "items" in centersResult.value && !portalUploadCenterId.value) {
-    portalUploadCenterId.value = centersResult.value.items.find((center) => center.active && center.slug === "baize-development")?.id
-      ?? centersResult.value.items.find((center) => center.active)?.id
+  const centers = centersResult?.status === "fulfilled" && centersResult.value && typeof centersResult.value === "object"
+    ? centersResult.value as { items?: Array<{ id: string; active: boolean; slug: string }> }
+    : undefined;
+  if (centers?.items && !portalUploadCenterId.value) {
+    portalUploadCenterId.value = centers.items.find((center) => center.active && center.slug === "baize-development")?.id
+      ?? centers.items.find((center) => center.active)?.id
       ?? "";
   }
-  const failures = tasks.filter((task) => task.status === "rejected");
-  if (failures.length) catalogError.value = "部分候选内容读取失败，已保留可用内容；请点击重试补齐。";
+  const failures = tasks.flatMap((task, index) => task.status === "rejected" || taskDefinitions[index]?.failed?.() ? [taskDefinitions[index]!] : []);
+  failedCatalogLabels.value = failures.map((task) => task.label);
+  failedSlots.value = new Set(failures.flatMap((task) => task.slots));
+  if (!draftReady.value) {
+    catalogError.value = "门户草稿读取失败，配置编辑已暂停；请点击重试。";
+    catalogReady.value = false;
+  } else {
+    catalogError.value = failures.length
+      ? `以下候选模块读取失败：${failedCatalogLabels.value.join("、")}。其余模块仍可配置。`
+      : "";
   catalogReady.value = true;
+  }
   catalogLoading.value = false;
 }
 
@@ -153,7 +173,7 @@ function currentReferenceIssue(slot: PortalSlotId, index: number, reference: Por
 }
 
 function candidatesFor(slot: PortalSlotId, currentIndex: number) {
-  if (!catalogReady.value) return [];
+  if (!catalogReady.value || failedSlots.value.has(slot)) return [];
   const used = new Set(
     HOMEPAGE_SLOTS.flatMap((definition) => configStore.draftConfig.slots[definition.id]
       .filter((_, index) => definition.id !== slot || index !== currentIndex)
@@ -177,13 +197,16 @@ function selectReference(slot: PortalSlotId, index: number, event: Event) {
 }
 
 function portalErrorMessage(error: unknown) {
-  const code = error instanceof Error ? error.message : "";
+  const code = typeof (error as { code?: unknown })?.code === "string"
+    ? (error as { code: string }).code
+    : error instanceof Error ? error.message : "";
   if (code === "PORTAL_CONFIG_PERSISTENCE_FAILED") {
     return "浏览器存储不可用，配置未持久化；当前公开版本保持不变，请释放存储空间后重试。";
   }
   if (code === "PORTAL_CONFIG_INVALID_VISUAL") return "主视觉发布校验失败。请确认素材已审核通过并填写替代文本。";
   if (code === "PORTAL_CONFIG_INVALID_REFERENCE") return "推荐位引用校验失败。请处理失效、重复或超出容量的引用后重试。";
   if (code === "PORTAL_CONTENT_VERSION_CONFLICT") return "门户草稿已被其他管理员更新，请先重新读取最新版本再操作。";
+  if (code === "PORTAL_CONFIG_NOT_READY") return "门户草稿尚未成功读取，当前不能保存配置；请点击重试。";
   if (configStore.persistenceError) {
     return "浏览器存储不可用，配置未持久化；当前公开版本保持不变，请释放存储空间后重试。";
   }
@@ -210,6 +233,10 @@ async function runDraftAction(patch: Parameters<typeof configStore.saveDraft>[0]
   } finally {
     draftActionBusy.value = false;
   }
+}
+
+function slotLoadFailed(slot: PortalSlotId) {
+  return !draftReady.value || failedSlots.value.has(slot);
 }
 
 function moveReference(slot: PortalSlotId, index: number, direction: "up" | "down") {
@@ -342,8 +369,8 @@ onBeforeUnmount(() => {
   <div class="admin-recruitment-page admin-section-page admin-portal-config">
     <AdminPageHeading eyebrow="首页展示管理" title="门户配置" description="管理首页推荐内容和顶部横幅图片。所有更改先保存为草稿，确认后一次发布。">
       <template #actions>
-        <button v-if="canConfigure" type="button" class="button button--ghost" @click="openDialog('preview', $event)">预览门户草稿</button>
-        <button v-if="canPublish" type="button" class="button" @click="openDialog('publish', $event)">发布门户配置</button>
+        <button v-if="canConfigure" type="button" class="button button--ghost" :disabled="mutationBusy" @click="openDialog('preview', $event)">预览门户草稿</button>
+        <button v-if="canPublish" type="button" class="button" :disabled="mutationBusy" @click="openDialog('publish', $event)">发布门户配置</button>
       </template>
     </AdminPageHeading>
 
@@ -366,12 +393,12 @@ onBeforeUnmount(() => {
           <ol>
             <li v-for="(reference, itemIndex) in configStore.draftConfig.slots[slot.id]" :key="referenceKey(reference)">
               <span>{{ itemIndex + 1 }}</span>
-              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="mutationBusy" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
-              <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" @click="removeReference(slot.id, itemIndex)">移除</button></div>
+              <label><span class="sr-only">替换{{ slot.label }}第 {{ itemIndex + 1 }} 项</span><select :value="referenceKey(reference)" :disabled="mutationBusy || slotLoadFailed(slot.id)" @change="selectReference(slot.id, itemIndex, $event)"><option v-if="currentReferenceIssue(slot.id, itemIndex, reference)" :value="referenceKey(reference)" disabled>{{ currentReferenceIssue(slot.id, itemIndex, reference) }}</option><option v-for="candidate in candidatesFor(slot.id, itemIndex)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <div class="admin-slot-actions"><button type="button" :aria-label="`上移 ${referenceLabel(reference)}`" :disabled="mutationBusy || itemIndex === 0" @click="moveReference(slot.id, itemIndex, 'up')">上移</button><button type="button" :aria-label="`下移 ${referenceLabel(reference)}`" :disabled="mutationBusy || itemIndex === configStore.draftConfig.slots[slot.id].length - 1" @click="moveReference(slot.id, itemIndex, 'down')">下移</button><button type="button" :aria-label="`移除 ${referenceLabel(reference)}`" :disabled="mutationBusy" @click="removeReference(slot.id, itemIndex)">移除</button></div>
             </li>
             <li v-if="configStore.draftConfig.slots[slot.id].length < slot.capacity" class="is-empty">
               <span>{{ configStore.draftConfig.slots[slot.id].length + 1 }}</span>
-              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="mutationBusy" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
+              <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="mutationBusy || slotLoadFailed(slot.id)" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : failedSlots.has(slot.id) ? "该模块读取失败，请重试" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
           <footer><em>{{ slot.sourceHint }}</em></footer>

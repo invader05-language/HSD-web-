@@ -74,6 +74,44 @@ describe("portal configuration production API mode", () => {
     expect(store.draftConfig.slots.news).toEqual([]);
     expect(store.requestError).toMatchObject({ code: "PORTAL_DOWN", status: 503 });
     expect(store.apiModeActive).toBe(true);
+    expect(store.draftStatus).toBe("error");
+    expect(store.draftConfig.revision).toBe(0);
+    expect(store.draftConfig.slots.projects).toEqual([]);
+    expect(store.draftConfig.slots.activities).toEqual([]);
+    expect(store.draftConfig.slots.gallery).toEqual([]);
+    expect(store.draftConfig.slots.resources).toEqual([]);
+  });
+
+  it("does not allow production mutations before the authoritative draft has loaded", async () => {
+    const store = usePortalConfigStore();
+    signInWithPortalCapabilities();
+    const gateway = { portal: { saveDraft: vi.fn() } };
+
+    await expect(store.saveDraftForRuntime({ useMockApi: false }, gateway as never, { slots: { flash: [] } }))
+      .rejects.toThrow("PORTAL_CONFIG_NOT_READY");
+    expect(gateway.portal.saveDraft).not.toHaveBeenCalled();
+    expect(store.requestError).toMatchObject({ code: "PORTAL_CONFIG_NOT_READY" });
+  });
+
+  it("preserves the authoritative revision when the API reports a version conflict", async () => {
+    const store = usePortalConfigStore();
+    signInWithPortalCapabilities();
+    const gateway = {
+      portal: {
+        draft: vi.fn().mockResolvedValue(apiDraft),
+        saveDraft: vi.fn().mockRejectedValue(Object.assign(new Error("Portal changed"), {
+          code: "PORTAL_CONTENT_VERSION_CONFLICT",
+          status: 409,
+          requestId: "portal-conflict-1",
+        })),
+      },
+    };
+
+    await store.initializeForRuntime({ useMockApi: false }, gateway as never);
+    await expect(store.saveDraftForRuntime({ useMockApi: false }, gateway as never, { slots: { news: [] } }))
+      .rejects.toThrow("Portal changed");
+    expect(store.draftConfig.revision).toBe(apiDraft.version);
+    expect(store.requestError).toMatchObject({ code: "PORTAL_CONTENT_VERSION_CONFLICT", status: 409, requestId: "portal-conflict-1" });
   });
 
   it("requires portal.configure for draft and preview API commands and portal.publish for publication", async () => {
