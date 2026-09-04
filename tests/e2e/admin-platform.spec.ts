@@ -37,6 +37,35 @@ test("administration navigation stays isolated from the public site header", asy
   await expect(page.getByRole("link", { name: "返回官网" })).toBeVisible();
 });
 
+test("portal configuration loads its client route without failed Nuxt chunks", async ({ page }) => {
+  const failedChunkRequests: string[] = [];
+  const failedChunkResponses: Array<{ url: string; status: number }> = [];
+  const chunkConsoleErrors: string[] = [];
+
+  page.on("requestfailed", (request) => {
+    if (request.resourceType() === "script" && request.url().includes("/_nuxt/")) {
+      failedChunkRequests.push(`${request.url()} (${request.failure()?.errorText ?? "unknown"})`);
+    }
+  });
+  page.on("response", (response) => {
+    if (response.request().resourceType() === "script" && response.url().includes("/_nuxt/") && !response.ok()) {
+      failedChunkResponses.push({ url: response.url(), status: response.status() });
+    }
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error" && /dynamically imported|CORS|1\.1\.1\.3/i.test(message.text())) {
+      chunkConsoleErrors.push(message.text());
+    }
+  });
+
+  await signInToAdmin(page, "/admin/content/home");
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
+
+  expect(failedChunkRequests).toEqual([]);
+  expect(failedChunkResponses).toEqual([]);
+  expect(chunkConsoleErrors).toEqual([]);
+});
+
 test("administrator denial identifies the owner-only destination", async ({ page }) => {
   await page.goto("/admin/accounts");
   await page.getByLabel("学号或成员账号").fill("media-admin");
