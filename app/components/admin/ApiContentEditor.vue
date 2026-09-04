@@ -9,6 +9,7 @@ import { useAdminToast } from "~/composables/useAdminToast";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import ContentMediaUploader from "~/components/admin/ContentMediaUploader.vue";
 import { resolveApiMediaUrl } from "~/utils/media-url";
+import { initialContentEditorBlocks, missingContentPublicationFields } from "~/utils/content-editor-rules";
 
 type ContentKind = "flash" | "article" | "notice";
 type EditableBlock =
@@ -24,6 +25,8 @@ const session = useSessionStore();
 const adminToast = useAdminToast();
 const apiBase = (useRuntimeConfig() as { public: { apiBase: string } }).public.apiBase;
 
+const isNew = computed(() => !props.record);
+
 const kind = ref<ContentKind>(props.record?.kind ?? "article");
 const centerId = ref(props.record?.centerId ?? session.currentAccount?.adminCenterId ?? "");
 const centerOptions = ref<Array<{ id: string; name: string }>>([]);
@@ -32,7 +35,7 @@ const summary = ref(props.record?.summary ?? "");
 const tag = ref(props.record?.tag ?? "");
 const internalTarget = ref(props.record?.internalTarget ?? "/activities");
 const expiresAt = ref(props.record?.expiresAt?.slice(0, 16) ?? "");
-const blocks = ref<EditableBlock[]>([]);
+const blocks = ref<EditableBlock[]>(initialContentEditorBlocks(isNew.value));
 const mediaItems = ref<ContentMediaAttachment[]>([]);
 const reason = ref("");
 const error = ref("");
@@ -40,7 +43,6 @@ const notice = ref("");
 const pending = ref(false);
 const reloadRequired = ref(false);
 
-const isNew = computed(() => !props.record);
 const isOwner = computed(() => session.adminLevel === "owner");
 const isReadOnly = computed(() => Boolean(props.record && ["review", "pending_publication"].includes(props.record.canonicalStatus)));
 const isOwnerCreated = computed(() => Boolean(props.record && isOwner.value && props.record.createdByAccountId === session.currentAccount?.account));
@@ -86,19 +88,14 @@ onMounted(async () => {
   }
 });
 
-const missingFields = computed(() => {
-  const missing: string[] = [];
-  if (!title.value.trim()) missing.push("标题");
-  if (!centerId.value.trim()) missing.push("归属中心");
-  if (kind.value === "flash") {
-    if (!tag.value.trim()) missing.push("标签");
-    if (!internalTarget.value.trim()) missing.push("站内目标");
-  } else {
-    if (!summary.value.trim()) missing.push("摘要");
-    if (!blocks.value.some((block) => block.type !== "image" && block.text.trim())) missing.push("正文");
-  }
-  return missing;
-});
+const missingFields = computed(() => missingContentPublicationFields(kind.value, {
+  title: title.value,
+  centerId: centerId.value,
+  summary: summary.value,
+  tag: tag.value,
+  internalTarget: internalTarget.value,
+  blocks: blocks.value,
+}));
 
 function blocksPayload(): Array<Record<string, unknown>> {
   return blocks.value.filter((block) => block.type === "image" || block.text.trim()).map((block) => {
@@ -108,10 +105,13 @@ function blocksPayload(): Array<Record<string, unknown>> {
   });
 }
 
-function validate() {
+function validate(forPublication = false) {
   if (!gateway) { error.value = "官网内容服务不可用，请稍后重试。"; return false; }
-  if (missingFields.value.length) { error.value = `请补充：${missingFields.value.join("、")}。`; return false; }
-  if (kind.value !== "flash" && !blocksPayload().length) { error.value = "新闻和公告至少需要一段正文。"; return false; }
+  const missing = forPublication ? missingFields.value : [
+    ...(!title.value.trim() ? ["标题"] : []),
+    ...(!centerId.value.trim() ? ["归属中心"] : []),
+  ];
+  if (missing.length) { error.value = `请补充：${missing.join("、")}。`; return false; }
   return true;
 }
 
@@ -141,7 +141,7 @@ function fail(cause: unknown) {
 }
 
 async function save() {
-  if (!validate()) return;
+  if (!validate(false)) return;
   pending.value = true;
   error.value = "";
   notice.value = "";
@@ -174,6 +174,7 @@ function appendUploadedImages() {
 
 async function command(action: "submit" | "return" | "approve" | "publish" | "publishDirect" | "offline") {
   if (!gateway || !props.record) return;
+  if (["submit", "approve", "publish", "publishDirect"].includes(action) && !validate(true)) return;
   if (action === "submit" && !canSubmit.value) { error.value = "当前账号没有提交审核权限。"; return; }
   if (["return", "approve"].includes(action) && !canReview.value) { error.value = "当前账号没有审核权限。"; return; }
   if (["publish", "publishDirect", "offline"].includes(action) && !canPublish.value) { error.value = "当前账号没有发布权限。"; return; }
@@ -223,7 +224,7 @@ async function command(action: "submit" | "return" | "approve" | "publish" | "pu
           </div>
         </section>
         <section>
-          <header><h2>正文内容</h2><p>可选；按顺序添加小标题、正文段落或图片。</p></header>
+          <header><h2>正文内容</h2><p>发布前至少填写一段正文；可按顺序添加小标题、正文段落或图片。</p></header>
           <div class="admin-content-blocks">
             <article v-for="(block, index) in blocks" :key="index">
               <label v-if="block.type === 'heading'">小标题<textarea v-model="block.text" :disabled="isReadOnly" rows="2"></textarea></label>
@@ -234,9 +235,7 @@ async function command(action: "submit" | "return" | "approve" | "publish" | "pu
           </div>
           <ContentMediaUploader v-if="!isReadOnly && mediaOwner" v-model="mediaItems" mode="collection" :max-items="10" :owner="mediaOwner" metadata-profile="full" title="上传正文图片" description="上传完成后点击“添加到正文”，素材会写入当前内容草稿。" />
           <p v-else-if="!isReadOnly" class="admin-inline-note">保存草稿后才能上传正文图片。</p>
-          <button v-if="!isReadOnly" type="button" class="button button--ghost" @click="addBlock('heading')">添加小标题</button>
-          <button v-if="!isReadOnly" type="button" class="button button--ghost" @click="addBlock('paragraph')">添加正文段落</button>
-          <button v-if="!isReadOnly" type="button" class="button button--ghost" :disabled="!mediaItems.length" @click="appendUploadedImages">添加已上传图片</button>
+          <div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" class="button button--ghost" @click="addBlock('heading')">添加小标题</button><button type="button" class="button button--ghost" @click="addBlock('paragraph')">添加正文段落</button><button type="button" class="button button--ghost" :disabled="!mediaItems.length" @click="appendUploadedImages">添加已上传图片</button></div>
         </section>
         <section v-if="record">
           <header><h2>审核与发布</h2></header>
@@ -244,14 +243,13 @@ async function command(action: "submit" | "return" | "approve" | "publish" | "pu
             <label v-if="record.canonicalStatus === 'review' || record.canonicalStatus === 'published'">处理原因<input v-model="reason" placeholder="退回或下架时必填"></label>
             <button v-if="record.canonicalStatus === 'draft' && isOwnerCreated" type="button" :disabled="pending || reloadRequired || !canPublish" @click="command('publishDirect')">直接发布</button>
             <button v-else-if="record.canonicalStatus === 'draft'" type="button" :disabled="pending || reloadRequired || !canSubmit" @click="command('submit')">提交审核</button>
-            <button v-if="record.canonicalStatus === 'review'" type="button" :disabled="pending || !canReview" @click="command('return')">退回草稿</button>
-            <button v-if="record.canonicalStatus === 'review'" type="button" :disabled="pending || !canReview" @click="command('approve')">审核通过</button>
-            <button v-if="record.canonicalStatus === 'pending_publication'" type="button" class="button" :disabled="pending || !canPublish" @click="command('publish')">发布内容</button>
-            <button v-if="record.canonicalStatus === 'published'" type="button" :disabled="pending || !canPublish" @click="command('offline')">确认下架</button>
+            <button v-if="record.canonicalStatus === 'review' && canReview" type="button" :disabled="pending" @click="command('return')">退回草稿</button>
+            <button v-if="record.canonicalStatus === 'review' && canReview" type="button" :disabled="pending" @click="command('approve')">审核通过</button>
+            <button v-if="record.canonicalStatus === 'pending_publication' && canPublish" type="button" class="button" :disabled="pending" @click="command('publish')">发布内容</button>
+            <button v-if="record.canonicalStatus === 'published' && canPublish" type="button" :disabled="pending" @click="command('offline')">确认下架</button>
           </div>
         </section>
       </div>
-      <aside class="admin-content-editor__sidebar"><span>官网展示预览</span><h2>{{ title || "未命名内容" }}</h2><p>{{ summary || (kind === 'flash' ? "快讯将以标题和标签展示。" : "摘要将在这里显示。") }}</p><small>{{ kind === 'flash' ? 'HSD 快讯' : kind === 'notice' ? '通知公告' : '新闻动态' }} · {{ record?.status ?? '草稿' }}</small></aside>
     </div>
     <footer class="admin-content-editor__footer"><NuxtLink class="button button--ghost" to="/admin/content">返回列表</NuxtLink><button type="button" class="button" :disabled="pending || isReadOnly || reloadRequired" @click="save">保存草稿</button><button v-if="reloadRequired" type="button" @click="emit('reload')">重新读取</button></footer>
   </section>

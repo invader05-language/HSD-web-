@@ -5503,69 +5503,6 @@
         ]
       }
     },
-    "/api/v1/admin/content/{contentId}/preview": {
-      "get": {
-        "operationId": "ContentAdminController_preview",
-        "parameters": [
-          {
-            "name": "contentId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminContentResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "401": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "403": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "404": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "409": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "422": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "423": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "500": {
-            "$ref": "#/components/responses/ErrorResponse"
-          },
-          "503": {
-            "$ref": "#/components/responses/ErrorResponse"
-          }
-        },
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "summary": "Preview the current working revision",
-        "tags": [
-          "Content administration"
-        ]
-      }
-    },
     "/api/v1/admin/content/{contentId}/submit-review": {
       "post": {
         "operationId": "ContentAdminController_submit",
