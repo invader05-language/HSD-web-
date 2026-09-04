@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "verify:build-assets": "node scripts/verify-client-build-assets.mjs",
+    "build:verify": "pnpm build && pnpm verify:build-assets",
     "vercel:materialize": "node scripts/materialize-vercel-functions.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",

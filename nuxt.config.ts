@@ -42,6 +42,13 @@ export default defineNuxtConfig({
     "/admin/**": { ssr: false }
   },
   vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          hashCharacters: "hex"
+        }
+      }
+    },
     define: {
       __VUE_PROD_DEVTOOLS__: false
     },
