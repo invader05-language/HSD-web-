@@ -29,6 +29,11 @@ import type {
   UpdateMyProfileDto,
   UpdateRecruitmentBatchDto,
   WithdrawApplicationDto,
+  ChangeInterviewSlotDto,
+  ReconcileInterviewSlotsDto,
+  MemberNotificationListDto,
+  NotificationActionResponseDto,
+  NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
 
 export interface RecruitmentGateway {
@@ -44,6 +49,11 @@ export interface RecruitmentGateway {
   getAdminBatch(batchId: string): Promise<AdminRecruitmentBatchDto>;
   createAdminBatch(payload: CreateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
   updateAdminBatch(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
+  reconcileAdminInterviewSlots(batchId: string, payload: ReconcileInterviewSlotsDto): Promise<AdminRecruitmentBatchDto>;
+  listNotifications(page?: number, pageSize?: number): Promise<MemberNotificationListDto>;
+  unreadNotificationCount(): Promise<NotificationUnreadCountDto>;
+  markNotificationRead(notificationId: string): Promise<NotificationActionResponseDto>;
+  markAllNotificationsRead(): Promise<NotificationActionResponseDto>;
   listAdminBatchLifecycleEvents(batchId: string, page?: number, pageSize?: number): Promise<RecruitmentBatchLifecycleEventListDto>;
   runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
   archiveAdminBatch(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
@@ -76,4 +86,6 @@ export interface RecruitmentGateway {
   ): Promise<AssessmentPublicationResponseDto>;
   getMyResults(): Promise<MyRecruitmentResultListDto>;
   getMyResponsibleContact(resultId: string, personId: string): Promise<{ personId: string; contact: string }>;
+  /** Optional until the backend publishes dedicated interview-slot operations. */
+  changeInterviewSlot?(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
 }

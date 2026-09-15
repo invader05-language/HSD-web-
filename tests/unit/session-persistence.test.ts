@@ -115,7 +115,7 @@ describe("session persistence", () => {
       status: "invalid_input",
       errors: { password: "新密码不能与初始密码相同。" }
     });
-    expect(session.completePasswordChange("new-pass-2026", "new-pass-2026"))
+    expect(session.completePasswordChange("new-password-2026", "new-password-2026"))
       .toEqual({ status: "success" });
     expect(session.mustChangePassword).toBe(false);
     expect(window.localStorage.getItem("baiyun-hsd-admin-access"))

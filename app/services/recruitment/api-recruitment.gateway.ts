@@ -25,6 +25,11 @@ import {
   type UpdateMyProfileDto,
   type UpdateRecruitmentBatchDto,
   type WithdrawApplicationDto,
+  type ChangeInterviewSlotDto,
+  type ReconcileInterviewSlotsDto,
+  type MemberNotificationListDto,
+  type NotificationActionResponseDto,
+  type NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
 import type { RecruitmentGateway } from "./recruitment-gateway";
 
@@ -115,7 +120,7 @@ export function createApiRecruitmentGateway(
     operation: TOperation,
     path: string,
     body: unknown,
-    method: "POST" | "PATCH" = "POST",
+    method: "POST" | "PATCH" | "PUT" = "POST",
   ): Promise<ApiResponseFor<TOperation>> {
     const csrfToken = readCookie("hsd_csrf");
     if (!csrfToken) throw new Error("RECRUITMENT_CSRF_TOKEN_MISSING");
@@ -130,6 +135,31 @@ export function createApiRecruitmentGateway(
       body: JSON.stringify(body),
     });
     return parseResponse(operation, response);
+  }
+
+  async function rawMutate<T>(path: string, body: unknown, method: "POST" | "PUT" | "PATCH" = "POST"): Promise<T> {
+    const csrfToken = readCookie("hsd_csrf");
+    if (!csrfToken) throw new Error("RECRUITMENT_CSRF_TOKEN_MISSING");
+    const response = await fetcher(`${apiBase}${path}`, {
+      method,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": decodeURIComponent(csrfToken),
+        "X-Request-ID": createRequestId(),
+      },
+      body: JSON.stringify(body),
+    });
+    const payload: unknown = await response.json();
+    if (!response.ok) {
+      throw new RecruitmentApiError({
+        status: response.status,
+        code: isErrorResponse(payload) ? payload.code : "RECRUITMENT_API_REQUEST_FAILED",
+        message: isErrorResponse(payload) ? payload.message : "Recruitment API request failed",
+        ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
+      });
+    }
+    return payload as T;
   }
 
   return {
@@ -259,5 +289,34 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/recruitment/results/me/{resultId}/responsible-contacts/{contactPersonId}",
       `/api/v1/recruitment/results/me/${encodeURIComponent(resultId)}/responsible-contacts/${encodeURIComponent(personId)}`,
     ),
+    changeInterviewSlot: (batchId: string, applicationId: string, payload: ChangeInterviewSlotDto) => rawMutate<MyRecruitmentApplicationResponseDto>(
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/interview-slot`,
+      payload,
+      "PATCH",
+    ),
+    reconcileAdminInterviewSlots: (batchId, payload: ReconcileInterviewSlotsDto) => mutate(
+      "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots",
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/interview-slots`,
+      payload,
+      "PUT",
+    ) as Promise<AdminRecruitmentBatchDto>,
+    listNotifications: (page = 1, pageSize = 20) => read(
+      "GET /api/v1/notifications",
+      `/api/v1/notifications?page=${page}&pageSize=${pageSize}`,
+    ) as Promise<MemberNotificationListDto>,
+    unreadNotificationCount: () => read(
+      "GET /api/v1/notifications/unread-count",
+      "/api/v1/notifications/unread-count",
+    ) as Promise<NotificationUnreadCountDto>,
+    markNotificationRead: (notificationId: string) => mutate(
+      "POST /api/v1/notifications/{notificationId}/read",
+      `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+      {},
+    ) as Promise<NotificationActionResponseDto>,
+    markAllNotificationsRead: () => mutate(
+      "POST /api/v1/notifications/read-all",
+      "/api/v1/notifications/read-all",
+      {},
+    ) as Promise<NotificationActionResponseDto>,
   };
 }

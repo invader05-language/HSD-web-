@@ -262,6 +262,7 @@ export type AdminRecruitmentApplicationDto = {
   "submittedAt": string;
   "withdrawnAt": (string) | null;
   "preferences": Array<AdminRecruitmentApplicationPreferenceDto>;
+  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
 };
 
 export type AdminRecruitmentApplicationListDto = {
@@ -296,6 +297,7 @@ export type AdminRecruitmentBatchDto = {
   "applicationCount": number;
   "openCenters": Array<AdminRecruitmentCenterDto>;
   "responsibleAccounts": Array<AdminRecruitmentResponsibleAccountDto>;
+  "interviewSlots"?: Array<AdminRecruitmentInterviewSlotDto>;
 };
 
 export type AdminRecruitmentBatchListDto = {
@@ -315,6 +317,16 @@ export type AdminRecruitmentCenterDto = {
   "slug": string;
   "name": string;
   "active": boolean;
+};
+
+export type AdminRecruitmentInterviewSlotDto = {
+  "id": string;
+  "startAt": string;
+  "endAt": string;
+  "capacity": (number) | null;
+  "status": "ACTIVE" | "RETIRED";
+  "version": number;
+  "confirmedCount": number;
 };
 
 export type AdminRecruitmentResponsibleAccountDto = {
@@ -574,6 +586,11 @@ export type ChangeAdminQualificationDto = {
 export type ChangeCenterLeadershipDto = {
   "confirmed"?: boolean;
   "expectedAccountVersion": number;
+};
+
+export type ChangeInterviewSlotDto = {
+  "expectedApplicationVersion": number;
+  "interviewSlotId": string;
 };
 
 export type ChangePasswordDto = {
@@ -1051,6 +1068,14 @@ export type HonorCommandDto = {
   "expectedVersion": number;
 };
 
+export type InterviewSlotInputDto = {
+  "publicToken"?: string;
+  "startAt": string;
+  "endAt": string;
+  "capacity"?: (Record<string, unknown>) | null;
+  "status"?: "ACTIVE" | "RETIRED";
+};
+
 export type LoginDto = {
   "account": string;
   "password": string;
@@ -1178,6 +1203,24 @@ export type MemberAvatarUploadResponseDto = {
   "assetId": string;
 };
 
+export type MemberNotificationDto = {
+  "id": string;
+  "type": string;
+  "title": string;
+  "body": string;
+  "actionPath"?: (string) | null;
+  "metadata"?: Record<string, unknown>;
+  "readAt"?: (string) | null;
+  "createdAt": string;
+};
+
+export type MemberNotificationListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<MemberNotificationDto>;
+};
+
 export type MemberProfileResponseDto = {
   "id": string;
   "name": string;
@@ -1217,6 +1260,7 @@ export type MyRecruitmentApplicationResponseDto = {
   "withdrawnAt": (string) | null;
   "locked": boolean;
   "preferences": Array<RecruitmentApplicationPreferenceDto>;
+  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
 };
 
 export type MyRecruitmentResultDto = {
@@ -1233,6 +1277,14 @@ export type MyRecruitmentResultDto = {
 
 export type MyRecruitmentResultListDto = {
   "items": Array<MyRecruitmentResultDto>;
+};
+
+export type NotificationActionResponseDto = {
+  "ok": boolean;
+};
+
+export type NotificationUnreadCountDto = {
+  "unreadCount": number;
 };
 
 export type Object = Record<string, unknown>;
@@ -1308,6 +1360,11 @@ export type PortalDashboardSummaryDto = {
   "draftRevision": number;
   "publishedRevision": number;
   "isDirty": boolean;
+};
+
+export type PortalReferenceResponseDto = {
+  "entityType": "flash" | "article" | "notice" | "project" | "activity" | "gallery" | "resource";
+  "sourceId": string;
 };
 
 export type PortalResolvedEntryResponseDto = {
@@ -1560,6 +1617,7 @@ export type PublicRecruitmentBatchDto = {
   "endAt": string;
   "timezone": "Asia/Shanghai";
   "openCenters": Array<PublicRecruitmentCenterDto>;
+  "interviewSlots"?: Array<PublicRecruitmentInterviewSlotDto>;
 };
 
 export type PublicRecruitmentBatchEnvelopeDto = {
@@ -1569,6 +1627,15 @@ export type PublicRecruitmentBatchEnvelopeDto = {
 export type PublicRecruitmentCenterDto = {
   "slug": string;
   "name": string;
+};
+
+export type PublicRecruitmentInterviewSlotDto = {
+  "id": string;
+  "startAt": string;
+  "endAt": string;
+  "timezone": "Asia/Shanghai";
+  "capacity": (number) | null;
+  "remainingCapacity": (number) | null;
 };
 
 export type PublicResourceListResponseDto = {
@@ -1653,6 +1720,12 @@ export type ReasonedContentCommandDto = {
   "reason": string;
 };
 
+export type ReconcileInterviewSlotsDto = {
+  "expectedBatchVersion": number;
+  "slots": Array<InterviewSlotInputDto>;
+  "confirmed"?: boolean;
+};
+
 export type RecordRoundResultDto = {
   "expectedVersion": number;
   "round": number;
@@ -1730,6 +1803,14 @@ export type RecruitmentCenterResponseDto = {
   "slug": string;
   "name": string;
   "active": boolean;
+};
+
+export type RecruitmentInterviewSelectionDto = {
+  "id": string;
+  "status": "CONFIRMED" | "RESELECTION_REQUIRED" | "RELEASED";
+  "startAt": string;
+  "endAt": string;
+  "timezone": "Asia/Shanghai";
 };
 
 export type RecruitmentPreferenceInputDto = {
@@ -2212,6 +2293,11 @@ export const API_V1_PATHS = {
   adminRecruitmentBatches: "/api/v1/admin/recruitment/batches",
   adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
   adminRecruitmentBatch: "/api/v1/admin/recruitment/batches/{batchId}",
+  adminRecruitmentInterviewSlots: "/api/v1/admin/recruitment/batches/{batchId}/interview-slots",
+  memberNotifications: "/api/v1/notifications",
+  memberNotificationUnreadCount: "/api/v1/notifications/unread-count",
+  memberNotificationRead: "/api/v1/notifications/{notificationId}/read",
+  memberNotificationsReadAll: "/api/v1/notifications/read-all",
   adminRecruitmentBatchUpdate: "/api/v1/admin/recruitment/batches/{batchId}",
   adminRecruitmentBatchLifecycleEvents: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events",
   adminRecruitmentApplications: "/api/v1/admin/recruitment/batches/{batchId}/applications",
@@ -2359,6 +2445,11 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/recruitment/batches": { method: "GET", path: "/api/v1/admin/recruitment/batches" },
   "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
   "GET /api/v1/admin/recruitment/batches/{batchId}": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}" },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots": { method: "PUT", path: "/api/v1/admin/recruitment/batches/{batchId}/interview-slots" },
+  "GET /api/v1/notifications": { method: "GET", path: "/api/v1/notifications" },
+  "GET /api/v1/notifications/unread-count": { method: "GET", path: "/api/v1/notifications/unread-count" },
+  "POST /api/v1/notifications/{notificationId}/read": { method: "POST", path: "/api/v1/notifications/{notificationId}/read" },
+  "POST /api/v1/notifications/read-all": { method: "POST", path: "/api/v1/notifications/read-all" },
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": { method: "PATCH", path: "/api/v1/admin/recruitment/batches/{batchId}" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/lifecycle-events" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/applications" },
@@ -2512,6 +2603,11 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/recruitment/batches": AdminRecruitmentBatchListDto;
   "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots": AdminRecruitmentBatchDto;
+  "GET /api/v1/notifications": MemberNotificationListDto;
+  "GET /api/v1/notifications/unread-count": NotificationUnreadCountDto;
+  "POST /api/v1/notifications/{notificationId}/read": NotificationActionResponseDto;
+  "POST /api/v1/notifications/read-all": NotificationActionResponseDto;
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": AdminRecruitmentBatchDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/lifecycle-events": RecruitmentBatchLifecycleEventListDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/applications": AdminRecruitmentApplicationListDto;
@@ -2810,6 +2906,21 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/admin/recruitment/batches/{batchId}": {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots": {
+    "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "GET /api/v1/notifications": {
+    "$ref": "#/components/schemas/MemberNotificationListDto"
+  },
+  "GET /api/v1/notifications/unread-count": {
+    "$ref": "#/components/schemas/NotificationUnreadCountDto"
+  },
+  "POST /api/v1/notifications/{notificationId}/read": {
+    "$ref": "#/components/schemas/NotificationActionResponseDto"
+  },
+  "POST /api/v1/notifications/read-all": {
+    "$ref": "#/components/schemas/NotificationActionResponseDto"
   },
   "PATCH /api/v1/admin/recruitment/batches/{batchId}": {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
@@ -4551,6 +4662,12 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "$ref": "#/components/schemas/PublicRecruitmentCenterDto"
         }
+      },
+      "interviewSlots": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PublicRecruitmentInterviewSlotDto"
+        }
       }
     },
     "required": [
@@ -4677,6 +4794,14 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "$ref": "#/components/schemas/RecruitmentApplicationPreferenceDto"
         }
+      },
+      "interviewSelection": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentInterviewSelectionDto"
+          }
+        ]
       }
     },
     "required": [
@@ -5054,6 +5179,12 @@ const API_COMPONENT_SCHEMAS = {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/AdminRecruitmentResponsibleAccountDto"
+        }
+      },
+      "interviewSlots": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminRecruitmentInterviewSlotDto"
         }
       }
     },
@@ -5701,6 +5832,14 @@ const API_COMPONENT_SCHEMAS = {
         "items": {
           "$ref": "#/components/schemas/AdminRecruitmentApplicationPreferenceDto"
         }
+      },
+      "interviewSelection": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RecruitmentInterviewSelectionDto"
+          }
+        ]
       }
     },
     "required": [
@@ -12718,6 +12857,313 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "slug",
       "title"
+    ]
+  },
+  "PublicRecruitmentInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Opaque public slot token"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      },
+      "capacity": {
+        "type": "number",
+        "nullable": true
+      },
+      "remainingCapacity": {
+        "type": "number",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "startAt",
+      "endAt",
+      "timezone",
+      "capacity",
+      "remainingCapacity"
+    ]
+  },
+  "RecruitmentInterviewSelectionDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Opaque public slot token"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "RESELECTION_REQUIRED",
+          "RELEASED"
+        ]
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "status",
+      "startAt",
+      "endAt",
+      "timezone"
+    ]
+  },
+  "ChangeInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "expectedApplicationVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "interviewSlotId": {
+        "type": "string",
+        "description": "Opaque public interview slot token"
+      }
+    },
+    "required": [
+      "expectedApplicationVersion",
+      "interviewSlotId"
+    ]
+  },
+  "AdminRecruitmentInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "capacity": {
+        "type": "number",
+        "nullable": true
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "RETIRED"
+        ]
+      },
+      "version": {
+        "type": "number"
+      },
+      "confirmedCount": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "id",
+      "startAt",
+      "endAt",
+      "capacity",
+      "status",
+      "version",
+      "confirmedCount"
+    ]
+  },
+  "InterviewSlotInputDto": {
+    "type": "object",
+    "properties": {
+      "publicToken": {
+        "type": "string",
+        "description": "Existing opaque public token; omit to create a slot"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "capacity": {
+        "type": "object",
+        "minimum": 1,
+        "nullable": true,
+        "description": "Null means unlimited capacity"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "RETIRED"
+        ]
+      }
+    },
+    "required": [
+      "startAt",
+      "endAt"
+    ]
+  },
+  "ReconcileInterviewSlotsDto": {
+    "type": "object",
+    "properties": {
+      "expectedBatchVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "slots": {
+        "minItems": 1,
+        "maxItems": 100,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/InterviewSlotInputDto"
+        }
+      },
+      "confirmed": {
+        "type": "boolean",
+        "description": "Required for disruptive changes affecting confirmed applicants"
+      }
+    },
+    "required": [
+      "expectedBatchVersion",
+      "slots"
+    ]
+  },
+  "PortalReferenceResponseDto": {
+    "type": "object",
+    "properties": {
+      "entityType": {
+        "type": "string",
+        "enum": [
+          "flash",
+          "article",
+          "notice",
+          "project",
+          "activity",
+          "gallery",
+          "resource"
+        ]
+      },
+      "sourceId": {
+        "type": "string",
+        "description": "The persisted source identifier for the configured entry"
+      }
+    },
+    "required": [
+      "entityType",
+      "sourceId"
+    ]
+  },
+  "MemberNotificationDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "body": {
+        "type": "string"
+      },
+      "actionPath": {
+        "type": "string",
+        "nullable": true
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "readAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "type",
+      "title",
+      "body",
+      "createdAt"
+    ]
+  },
+  "MemberNotificationListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MemberNotificationDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
+  "NotificationUnreadCountDto": {
+    "type": "object",
+    "properties": {
+      "unreadCount": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "unreadCount"
+    ]
+  },
+  "NotificationActionResponseDto": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "ok"
     ]
   }
 } as const;

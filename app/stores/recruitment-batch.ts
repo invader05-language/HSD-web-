@@ -27,6 +27,7 @@ type RecruitmentBatchPatch = Partial<Pick<
   | "endAt"
   | "openCenterIds"
   | "responsibleAccountIds"
+  | "interviewSlots"
 >>;
 
 export const RECRUITMENT_BATCH_STORAGE_KEY = "baiyun-hsd-recruitment-batches";
@@ -60,6 +61,7 @@ function cloneBatch(batch: RecruitmentBatch): RecruitmentBatch {
     ...batch,
     openCenterIds: [...batch.openCenterIds],
     responsibleAccountIds: [...batch.responsibleAccountIds],
+    interviewSlots: batch.interviewSlots?.map((slot) => ({ ...slot })),
   };
 }
 
@@ -296,6 +298,7 @@ export const useRecruitmentBatchStore = defineStore("recruitment-batch", {
         timezone: "Asia/Shanghai",
         openCenterIds,
         responsibleAccountIds: [actor.id],
+        interviewSlots: input.interviewSlots?.map((slot) => ({ ...slot })) ?? [],
         lifecycleStatus: "draft",
         manualOverride: "none",
         version: 1,

@@ -5,6 +5,7 @@ import {
 } from "../../packages/api-client/src";
 import {
   mapMemberProfileResponse,
+  mapMemberProfileUpdatePayload,
   mapAdminRecruitmentBatch,
   mapPublicRecruitmentBatch,
   mapRecruitmentApplicationDraft,
@@ -65,6 +66,7 @@ describe("production recruitment integration", () => {
         withdrawnAt: null,
         locked: false,
         preferences: [],
+        interviewSelection: null,
       };
       return {
         id: "application-1",
@@ -78,6 +80,7 @@ describe("production recruitment integration", () => {
         withdrawnAt: "2026-08-23T01:00:00.000Z",
         locked: false,
         preferences: [],
+        interviewSelection: null,
       };
     });
 
@@ -217,6 +220,34 @@ describe("production recruitment integration", () => {
       firstChoice: "新媒体中心",
       secondChoice: undefined,
     });
+  });
+
+  it("keeps a public avatar token out of the internal update payload", () => {
+    const profile = mapMemberProfileResponse({
+      id: "person-with-avatar",
+      name: "有头像成员",
+      studentId: "20260002",
+      grade: "2026",
+      className: "软件工程 2 班",
+      contact: null,
+      bio: null,
+      biography: null,
+      status: "FORMAL_MEMBER",
+      baizeDirection: null,
+      avatar: { kind: "asset", publicToken: "opaque-public-token" },
+      publicProfileEnabled: true,
+      version: 4,
+      membership: null,
+    });
+
+    expect(profile.avatarUrl).toBe("/api/v1/public/media/opaque-public-token");
+    expect(profile).not.toHaveProperty("avatarAssetId");
+    expect(mapMemberProfileUpdatePayload(profile, {
+      name: profile.name,
+      grade: profile.grade,
+      className: profile.className,
+      bio: profile.bio,
+    })).not.toHaveProperty("avatarAssetId");
   });
 
   it("maps an empty production admin batch list without a fixture fallback", () => {

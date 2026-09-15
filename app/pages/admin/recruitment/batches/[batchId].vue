@@ -23,11 +23,14 @@ import type { RecruitmentBatch } from "~/types/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { useOrganizationGateway } from "~/composables/useOrganizationGateway";
 import { createProductionRecruitmentBatchController } from "~/composables/useProductionRecruitmentBatch";
-import type { UpdateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
+import type { ReconcileInterviewSlotsDto, UpdateRecruitmentBatchDto } from "../../../../../packages/api-client/src";
 import { copyTextToClipboard } from "~/utils/clipboard";
 import type { RecruitmentBatchLifecycleEventView } from "~/services/recruitment/recruitment-view-models";
 import { useAdminToast } from "~/composables/useAdminToast";
 import { lifecycleChangeSummary, lifecycleSnapshotValue } from "~/utils/recruitment-lifecycle-copy";
+import type { RecruitmentInterviewSlot, RecruitmentInterviewSlotDraft } from "~/types/recruitment-interview";
+import AdminInterviewSlotEditor from "~/components/admin/AdminInterviewSlotEditor.vue";
+import { hasPublishReadyInterviewSlots, validateInterviewSlotDrafts } from "~/utils/recruitment-interview-slots";
 
 definePageMeta({ layout: "admin" });
 
@@ -42,6 +45,7 @@ interface AdminBatchDetail extends AdminRecruitmentBatchLike {
   version?: number;
   actualOpenedAt?: string;
   owner?: string;
+  interviewSlots?: RecruitmentInterviewSlot[];
 }
 
 type LifecycleAction = "publish" | "openNow" | "pause" | "resume" | "close" | "reopen" | "archive";
@@ -138,6 +142,7 @@ const editForm = reactive({
   startAt: "",
   endAt: "",
   openCenterIds: [] as string[],
+  interviewSlots: [] as RecruitmentInterviewSlotDraft[],
 });
 
 const centerOptions = RECRUITMENT_CENTERS.map((label, index) => [
@@ -171,6 +176,10 @@ const applicantCount = computed(() => !isMockApi
 const publishReadiness = computed(() => batch.value && isDraft.value && isMockApi
   ? batchStore?.getPublishReadiness(batchId.value, now.value) ?? { ok: false }
   : { ok: false });
+const interviewPublishReady = computed(() => {
+  const slots = batch.value?.interviewSlots;
+  return slots === undefined || hasPublishReadyInterviewSlots(slots, batch.value?.endAt ?? "");
+});
 const openCenterNames = computed(() => !isMockApi
   ? productionBatch?.batch.value?.openCenters.map((center) => `${center.name}${center.active ? "" : "（已停用）"}`) ?? []
   : (batch.value?.openCenterIds ?? []).map((id) => centerOptions.find(([centerId]) => centerId === id)?.[1] ?? id));
@@ -316,6 +325,10 @@ function requestAction(action: LifecycleAction) {
     actionError.value = "只有联盟总负责人可以修改批次状态。";
     return;
   }
+  if (action === "publish" && !interviewPublishReady.value) {
+    actionError.value = "至少需要一个在报名截止后开始的有效面试时段。";
+    return;
+  }
   if (action === "publish" && !publishReadiness.value.ok) {
     actionError.value = getRecruitmentBatchCommandMessage(publishReadiness.value);
     return;
@@ -447,13 +460,30 @@ function toDateTime(value: string, endOfDay = false) {
   return value ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+08:00`).toISOString() : "";
 }
 
+function dateTimeInput(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
+}
+
 function openEditor() {
-  if (!batch.value || !canManage.value || !isDraft.value) return;
+  if (!batch.value || !canManage.value || isArchived.value) return;
   editError.value = "";
   editForm.name = batch.value.name;
   editForm.startAt = dateInput(batch.value.startAt);
   editForm.endAt = dateInput(batch.value.endAt);
   editForm.openCenterIds = [...(batch.value.openCenterIds ?? [])];
+  editForm.interviewSlots = (batch.value.interviewSlots ?? []).map((slot) => ({
+    id: slot.id,
+    startAt: dateTimeInput(slot.startAt),
+    endAt: dateTimeInput(slot.endAt),
+    capacity: slot.capacity === null ? "" : String(slot.capacity),
+  }));
   editOpen.value = true;
 }
 
@@ -468,11 +498,38 @@ async function saveEditor() {
     };
     if (!isMockApi) {
       if (!productionBatch) return;
-      const saved = await productionBatch.updateDraft({ ...payload, expectedVersion: batch.value.version ?? 1, reason: "更新招新批次草稿" } satisfies UpdateRecruitmentBatchDto);
-      if (!saved) throw new Error(productionBatch.commandError.value || "批次草稿保存失败");
+      if (isDraft.value) {
+        const saved = await productionBatch.updateDraft({ ...payload, expectedVersion: batch.value.version ?? 1, reason: "更新招新批次草稿" } satisfies UpdateRecruitmentBatchDto);
+        if (!saved) throw new Error(productionBatch.commandError.value || "批次草稿保存失败");
+      }
+      const expectedBatchVersion = productionBatch.batch.value?.version ?? batch.value.version ?? 1;
+      const slots: ReconcileInterviewSlotsDto["slots"] = editForm.interviewSlots.map((slot) => ({
+        ...(slot.id ? { publicToken: slot.id } : {}),
+        startAt: new Date(`${slot.startAt.replace(" ", "T")}:00+08:00`).toISOString(),
+        endAt: new Date(`${slot.endAt.replace(" ", "T")}:00+08:00`).toISOString(),
+        capacity: slot.capacity.trim() ? Number(slot.capacity) as unknown as ReconcileInterviewSlotsDto["slots"][number]["capacity"] : null,
+        status: "ACTIVE" as const,
+      }));
+      if (slots.length === 0) throw new Error("至少配置一个面试时段。");
+      const savedSlots = await productionBatch.updateInterviewSlots({ expectedBatchVersion, slots, confirmed: true });
+      if (!savedSlots) throw new Error(productionBatch.commandError.value || "面试时段保存失败");
     } else {
       if (!batchStore) return;
-      batchStore.updateBatch(batchId.value, payload, "更新招新批次草稿");
+      const slotErrors = validateInterviewSlotDrafts(editForm.interviewSlots, batch.value.endAt ?? "");
+      if (slotErrors.length) throw new Error(slotErrors.join(" "));
+      batchStore.updateBatch(batchId.value, {
+        ...payload,
+          interviewSlots: editForm.interviewSlots.map((slot, index) => ({
+          id: slot.id ?? `slot-${batchId.value}-${index + 1}`,
+          startAt: new Date(`${slot.startAt.replace(" ", "T")}:00+08:00`).toISOString(),
+          endAt: new Date(`${slot.endAt.replace(" ", "T")}:00+08:00`).toISOString(),
+          timezone: "Asia/Shanghai",
+          capacity: slot.capacity.trim() ? Number(slot.capacity) : null,
+          status: "ACTIVE" as const,
+          confirmedCount: batch.value?.interviewSlots?.find((existing) => existing.id === slot.id)?.confirmedCount ?? 0,
+          version: batch.value?.interviewSlots?.find((existing) => existing.id === slot.id)?.version ?? 1,
+          })),
+      }, "更新招新批次草稿与面试时段");
     }
     editOpen.value = false;
     editError.value = "";
@@ -595,8 +652,8 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div class="admin-batch-actions">
           <NuxtLink class="button button--ghost" to="/admin/recruitment/batches">返回批次列表</NuxtLink>
           <NuxtLink class="button button--ghost" to="/join">查看用户端页面</NuxtLink>
-          <button v-if="isDraft && canManage" type="button" class="button button--ghost" @click="openEditor">编辑批次</button>
-          <button v-if="isMockApi && statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok" @click="requestAction('publish')">发布批次</button>
+          <button v-if="!isArchived && canManage" type="button" class="button button--ghost" @click="openEditor">{{ isDraft ? "编辑批次" : "调整面试时段" }}</button>
+          <button v-if="isMockApi && statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok || !interviewPublishReady" @click="requestAction('publish')">发布批次</button>
           <button v-if="isMockApi && statusKey === 'upcoming'" type="button" class="button" :disabled="!canManage" @click="requestAction('openNow')">立即开放</button>
           <button v-if="isMockApi && statusKey === 'open'" type="button" class="button button--ghost" :disabled="!canManage" @click="requestAction('pause')">暂停报名</button>
           <button v-if="isMockApi && statusKey === 'paused'" type="button" class="button" :disabled="!canManage" @click="requestAction('resume')">恢复报名</button>
@@ -638,7 +695,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div :class="['admin-batch-readiness__status', publishReadiness.ok ? 'is-ready' : 'is-blocked']">
           <strong>{{ publishReadiness.ok ? "可以发布" : "暂不可发布" }}</strong>
           <span v-if="publishReadiness.ok">当前批次的报名时间和开放中心配置均可生效。</span>
-          <span v-else>{{ getRecruitmentBatchCommandMessage(publishReadiness) }}</span>
+          <span v-else>{{ interviewPublishReady ? getRecruitmentBatchCommandMessage(publishReadiness) : "至少需要一个在报名截止后开始的有效面试时段。" }}</span>
         </div>
         <div v-if="!publishReadiness.ok && publishReadiness.code === 'BATCH_SCHEDULE_OVERLAP'" class="admin-batch-readiness__actions">
           <button type="button" class="button button--ghost" @click="openEditor">修改批次时间</button>
@@ -718,13 +775,14 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
 
     <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="编辑招新批次">
-        <header class="admin-drawer__header"><div><span>编辑批次</span><h2>编辑招新批次</h2><p>仅草稿可以编辑，保存后需要重新完成发布准备检查。</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
+        <header class="admin-drawer__header"><div><span>{{ isDraft ? "编辑批次" : "调整面试时段" }}</span><h2>{{ isDraft ? "编辑招新批次" : "调整面试时段" }}</h2><p>{{ isDraft ? "保存后需要重新完成发布准备检查。" : "已被选择的时段发生调整时，受影响成员将收到站内通知并必须主动重新选择。" }}</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
         <div class="admin-drawer__body">
-          <div class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
-          <section class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
+          <div v-if="isDraft" class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
+          <section v-if="isDraft" class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
+          <AdminInterviewSlotEditor v-model="editForm.interviewSlots" :registration-end-at="batch.endAt ?? ''" :impact-message="applications.length ? `${applications.length} 位已报名成员` : ''" :disabled="false" @publish="saveEditor" />
           <p v-if="editError" class="admin-save-message admin-save-message--error" role="alert">{{ editError }}</p>
         </div>
-        <footer class="admin-drawer__footer"><span>联盟总负责人编辑 · 保存为草稿</span><button type="button" class="button button--ghost" @click="editOpen = false">取消</button><button type="button" class="button" @click="saveEditor">保存修改</button></footer>
+        <footer class="admin-drawer__footer"><span>{{ isDraft ? "联盟总负责人编辑 · 保存为草稿" : "联盟总负责人调整面试时段" }}</span><button type="button" class="button button--ghost" @click="editOpen = false">取消</button><button type="button" class="button" @click="saveEditor">保存修改</button></footer>
       </aside>
     </div>
   </div>

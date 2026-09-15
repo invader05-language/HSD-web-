@@ -77,6 +77,8 @@ export function createProductionMemberProfileController(input: {
   const status = ref<"idle" | "loading" | "saving" | "success" | "error" | "conflict">("idle");
   const error = ref("");
   const avatarSource = computed(() => resolveApiMediaUrl(profile.value?.avatarUrl, input.apiBase));
+  let stagedAvatarFile: File | undefined;
+  let stagedAvatarAssetId: string | undefined;
 
   async function load() {
     status.value = "loading";
@@ -85,6 +87,8 @@ export function createProductionMemberProfileController(input: {
       const loaded = mapMemberProfileResponse(await input.gateway.getCurrentProfile());
       profile.value = loaded;
       assignDraft(draft, loaded);
+      stagedAvatarFile = undefined;
+      stagedAvatarAssetId = undefined;
       status.value = "idle";
       return loaded;
     } catch (cause) {
@@ -109,7 +113,11 @@ export function createProductionMemberProfileController(input: {
       const avatarChanged = Boolean(options.avatarFile || options.removeAvatar);
       if (options.avatarFile) {
         if (!input.avatarGateway) throw new Error("头像上传服务暂不可用，请刷新后重试。");
-        avatarAssetId = (await input.avatarGateway.upload(options.avatarFile, options.avatarCenterId)).assetId;
+        avatarAssetId = stagedAvatarFile === options.avatarFile && stagedAvatarAssetId
+          ? stagedAvatarAssetId
+          : (await input.avatarGateway.upload(options.avatarFile, options.avatarCenterId)).assetId;
+        stagedAvatarFile = options.avatarFile;
+        stagedAvatarAssetId = avatarAssetId;
         draft.avatarAssetId = avatarAssetId;
       }
       if (options.removeAvatar) {
@@ -117,6 +125,8 @@ export function createProductionMemberProfileController(input: {
         await input.avatarGateway.remove();
         avatarAssetId = undefined;
         delete draft.avatarAssetId;
+        stagedAvatarFile = undefined;
+        stagedAvatarAssetId = undefined;
       }
       const { avatarAssetId: _currentAvatarAssetId, ...profileDraft } = draft;
       const payloadDraft = avatarChanged ? { ...profileDraft, avatarAssetId } : profileDraft;
@@ -124,6 +134,8 @@ export function createProductionMemberProfileController(input: {
       const reloaded = mapMemberProfileResponse(await input.gateway.getCurrentProfile());
       profile.value = reloaded;
       assignDraft(draft, reloaded);
+      stagedAvatarFile = undefined;
+      stagedAvatarAssetId = undefined;
       status.value = "success";
       return true;
     } catch (cause) {
@@ -163,6 +175,8 @@ export function createProductionMemberProfileController(input: {
 
   function resetDraft() {
     if (profile.value) assignDraft(draft, profile.value);
+    stagedAvatarFile = undefined;
+    stagedAvatarAssetId = undefined;
     error.value = "";
     status.value = "idle";
   }

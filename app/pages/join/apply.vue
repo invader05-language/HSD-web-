@@ -28,7 +28,13 @@ import {
   validateConfirmation,
   validateRegistrationStep,
 } from "~/utils/recruitment-application-form";
-import { isSupportedAvatar, normalizeMemberGrade } from "~/utils/member-profile-form";
+import { normalizeMemberGrade, validateAvatarFile } from "~/utils/member-profile-form";
+import {
+  formatInterviewSlotRange,
+  getInterviewSlotAvailability,
+  interviewSlotCapacityLabel,
+} from "~/utils/recruitment-interview-slots";
+import type { RecruitmentInterviewSlot } from "~/types/recruitment-interview";
 import type { MemberProfileResponseDto } from "../../../packages/api-client/src";
 
 type Step = 1 | 2 | 3;
@@ -87,6 +93,7 @@ const activeBatchStatus = computed(() => {
   return (activeBatch.value as PublicRecruitmentBatchView).effectiveStatus;
 });
 const hasOpenBatch = computed(() => activeBatchStatus.value === "open");
+const activeInterviewSlots = computed<RecruitmentInterviewSlot[]>(() => activeBatch.value?.interviewSlots ?? []);
 const upcomingBatch = computed(() => isMockApi ? batchStore?.upcomingBatchAt(now.value) : productionUpcomingBatch.value);
 const pausedBatch = computed(() => isMockApi
   ? batchStore?.currentPausedBatchAt(now.value)
@@ -166,7 +173,10 @@ async function focusFirstError() {
 
 async function validateStep(target: Step) {
   if (target === 1) setErrors(validateRegistrationStep(profileDraft, applicationDraft));
-  if (target === 2) setErrors(validateApplicationDraft(applicationDraft));
+  if (target === 2) setErrors(validateApplicationDraft(applicationDraft, {
+    interviewSlots: activeInterviewSlots.value,
+    now: now.value,
+  }));
   if (target === 3) setErrors(validateConfirmation(confirmation.value));
   if (Object.keys(errors).length) {
     await focusFirstError();
@@ -217,8 +227,9 @@ function chooseAvatar(event: Event) {
   if (!file) return;
 
   clearErrors("avatarUrl");
-  if (!isSupportedAvatar(file)) {
-    errors.avatarUrl = "请选择 JPG、PNG、WEBP 或 GIF 图片，且文件不超过 5MB。";
+  const validation = validateAvatarFile(file);
+  if (!validation.valid) {
+    errors.avatarUrl = validation.message;
     input.value = "";
     return;
   }
@@ -246,6 +257,7 @@ function loadApplicationDraft() {
     thirdChoice: undefined,
     baizeDirection: undefined,
     acceptsAdjustment: undefined,
+    interviewSlotId: undefined,
   }, {
     contact: application.contact,
     firstChoice: application.firstChoice,
@@ -253,6 +265,7 @@ function loadApplicationDraft() {
     thirdChoice: application.thirdChoice,
     baizeDirection: application.baizeDirection,
     acceptsAdjustment: application.acceptsAdjustment,
+    interviewSlotId: application.interviewSelection?.slotId,
   });
   confirmation.value = false;
   clearErrors(...Object.keys(errors));
@@ -320,7 +333,11 @@ async function submitApplication() {
         },
         { ...applicationDraft, contact: applicationDraft.contact.trim() },
         confirmation.value,
-        { batchId, allowExistingUpdate: editingApplication.value },
+        {
+          batchId,
+          allowExistingUpdate: editingApplication.value,
+          requireInterviewSlot: activeInterviewSlots.value.length > 0,
+        },
       );
     } else if (recruitmentGateway && productionProfile.value && productionBatch.value) {
       const updatedProfile = await recruitmentGateway.updateCurrentProfile(mapMemberProfileUpdatePayload(
@@ -444,6 +461,7 @@ onBeforeUnmount(() => {
             <div class="recruitment-summary-grid">
               <section><h3>成员资料</h3><p>姓名：{{ currentProfile.name }}</p><p v-if="currentProfile.bio">个人简介：{{ currentProfile.bio }}</p><p>联系方式：{{ submittedApplication.contact }}（仅招新联系）</p></section>
               <section><h3>报名志愿</h3><p>第一志愿：{{ submittedApplication.firstChoice }}</p><p>第二志愿：{{ submittedApplication.secondChoice || "未填写" }}</p><p>第三志愿：{{ submittedApplication.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ submittedApplication.baizeDirection || "不适用" }}</p></section>
+              <section v-if="submittedApplication.interviewSelection"><h3>面试安排</h3><p>{{ submittedApplication.interviewSelection.status === "CONFIRMED" ? "已确认" : submittedApplication.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回" }}</p><p>{{ formatInterviewSlotRange(submittedApplication.interviewSelection) }}</p><p v-if="submittedApplication.interviewSelection.invalidationReason" class="form-error">{{ submittedApplication.interviewSelection.invalidationReason }}</p></section>
             </div>
           </details>
           <div v-if="showWithdrawConfirmation" class="admin-modal-backdrop">
@@ -478,7 +496,7 @@ onBeforeUnmount(() => {
                 <header class="recruitment-section-heading"><span>01</span><div><h2 id="registration-profile-heading">完善个人资料</h2><p>这些资料会在最终提交后建立当前账号的初始成员档案。</p></div></header>
                 <div class="registration-avatar" data-field="avatarUrl">
                   <HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="lg" />
-                  <div><strong>头像（可选）</strong><p v-if="isMockApi">上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><p v-else>当前报名接口不接收头像文件；如需修改头像，请在正式媒体上传能力上线后通过成员资料页操作。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/gif" @change="chooseAvatar"><button v-if="isMockApi" class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="isMockApi && profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
+                  <div><strong>头像（可选）</strong><p v-if="isMockApi">上传后自动用于公开成员展示；未上传时使用白底 HSD 默认头像。当前仅本地预览，不会上传服务器。</p><p v-else>当前报名接口不接收头像文件；如需修改头像，请在正式媒体上传能力上线后通过成员资料页操作。</p><input ref="fileInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" @change="chooseAvatar"><button v-if="isMockApi" class="text-link" type="button" @click="fileInput?.click()">选择图片</button><button v-if="isMockApi && profileDraft.avatarUrl" class="text-link registration-avatar__remove" type="button" @click="removeAvatar">移除预览</button><small v-if="errors.avatarUrl" class="form-error" role="alert">{{ errors.avatarUrl }}</small></div>
                 </div>
                 <div class="registration-fields registration-fields--choices">
                   <label data-field="name"><span>姓名</span><input v-model="profileDraft.name" autocomplete="name" maxlength="20" :aria-invalid="Boolean(errors.name)" :aria-describedby="errors.name ? 'name-error' : undefined"><small id="name-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.name }" :aria-hidden="!errors.name" aria-live="polite">{{ errors.name || " " }}</small></label>
@@ -500,6 +518,7 @@ onBeforeUnmount(() => {
                   <label v-if="hasBaizePreference" data-field="baizeDirection" class="registration-fields__wide"><span>白泽意向方向</span><select v-model="applicationDraft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" :aria-describedby="errors.baizeDirection ? 'baize-direction-error' : undefined"><option value="">请选择方向</option><option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option></select><small id="baize-direction-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.baizeDirection }" :aria-hidden="!errors.baizeDirection" aria-live="polite">{{ errors.baizeDirection || " " }}</small></label>
                 </div>
                 <fieldset data-field="acceptsAdjustment" class="registration-adjustment" :aria-describedby="errors.acceptsAdjustment ? 'adjustment-error' : undefined"><legend>是否接受调剂</legend><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="true">接受调剂</label><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="false">不接受调剂</label><small id="adjustment-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.acceptsAdjustment }" :aria-hidden="!errors.acceptsAdjustment" aria-live="polite">{{ errors.acceptsAdjustment || " " }}</small></fieldset>
+                <fieldset data-field="interviewSlotId" class="registration-interview-slots" :aria-describedby="errors.interviewSlotId ? 'interview-slot-error' : undefined"><legend>选择面试时间 <small>中国标准时间（UTC+8）</small></legend><p v-if="!activeInterviewSlots.length" class="registration-field-help">当前批次尚未开放面试时段，请稍后再试。</p><div v-for="slot in activeInterviewSlots" :key="slot.id" class="registration-interview-slot"><label><input v-model="applicationDraft.interviewSlotId" type="radio" name="interview-slot" :value="slot.id" :disabled="!getInterviewSlotAvailability(slot, now).selectable"><span><strong>{{ formatInterviewSlotRange(slot) }}</strong><small>{{ interviewSlotCapacityLabel(slot) }}<template v-if="!getInterviewSlotAvailability(slot, now).selectable"> · 当前不可选</template></small></span></label></div><small id="interview-slot-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.interviewSlotId }" :aria-hidden="!errors.interviewSlotId" aria-live="polite">{{ errors.interviewSlotId || " " }}</small></fieldset>
               </section>
 
               <section v-show="step === 3" aria-labelledby="application-confirmation-heading">
@@ -507,7 +526,7 @@ onBeforeUnmount(() => {
                 <p class="recruitment-batch-context">当前批次：<strong>{{ activeBatch?.name }}</strong> · 系统将自动关联本批次，不支持手动切换。</p>
                 <div class="recruitment-confirmation-grid">
                   <section><header><h3>成员资料</h3><button type="button" class="text-link" @click="goToStep(1)">修改</button></header><div class="recruitment-confirmation-profile"><HsdAvatar :name="profileDraft.name || '成员'" :src="avatarSource" size="sm" /><div><p>姓名：{{ profileDraft.name }}</p><p>学号：{{ profileDraft.studentId }}</p><p>年级：{{ profileDraft.grade }}</p><p>班级：{{ profileDraft.className }}</p></div></div><p v-if="profileDraft.bio">个人简介：{{ profileDraft.bio }}</p><p>联系方式：{{ applicationDraft.contact }}（仅招新联系）</p></section>
-                  <section><header><h3>报名志愿</h3><button type="button" class="text-link" @click="goToStep(2)">修改</button></header><p>第一志愿：{{ applicationDraft.firstChoice }}</p><p>第二志愿：{{ applicationDraft.secondChoice || "未填写" }}</p><p>第三志愿：{{ applicationDraft.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ applicationDraft.baizeDirection || "不适用" }}</p><p>调剂意愿：{{ applicationDraft.acceptsAdjustment ? "接受调剂" : "不接受调剂" }}</p></section>
+                  <section><header><h3>报名志愿</h3><button type="button" class="text-link" @click="goToStep(2)">修改</button></header><p>第一志愿：{{ applicationDraft.firstChoice }}</p><p>第二志愿：{{ applicationDraft.secondChoice || "未填写" }}</p><p>第三志愿：{{ applicationDraft.thirdChoice || "未填写" }}</p><p>白泽意向方向：{{ applicationDraft.baizeDirection || "不适用" }}</p><p>调剂意愿：{{ applicationDraft.acceptsAdjustment ? "接受调剂" : "不接受调剂" }}</p><p v-if="applicationDraft.interviewSlotId">面试时间：{{ activeInterviewSlots.find((slot) => slot.id === applicationDraft.interviewSlotId) ? formatInterviewSlotRange(activeInterviewSlots.find((slot) => slot.id === applicationDraft.interviewSlotId)!) : "待确认" }}</p></section>
                 </div>
                 <label data-field="confirmation" class="registration-confirmation"><input v-model="confirmation" type="checkbox" :aria-invalid="Boolean(errors.confirmation)" :aria-describedby="errors.confirmation ? 'confirmation-error' : undefined">我确认以上资料真实，并同意仅将联系方式用于本次招新联系。</label><small id="confirmation-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.confirmation }" :aria-hidden="!errors.confirmation" aria-live="polite">{{ errors.confirmation || " " }}</small>
                 <p v-if="submitError" class="form-error" role="alert">{{ submitError }}</p>

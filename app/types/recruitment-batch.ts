@@ -40,6 +40,8 @@ export type RecruitmentBatchStatusReason =
   | "force-closed"
   | "archived";
 
+import type { RecruitmentInterviewSlot } from "./recruitment-interview";
+
 export type RecruitmentBatchCommandErrorCode =
   | "RECRUITMENT_BATCH_NOT_FOUND"
   | "BATCH_ALREADY_PUBLISHED"
@@ -108,6 +110,7 @@ export interface RecruitmentBatch {
   archivedAt?: string;
   createdAt: string;
   updatedAt: string;
+  interviewSlots?: RecruitmentInterviewSlot[];
 }
 
 export interface RecruitmentBatchDraftInput {
@@ -115,6 +118,7 @@ export interface RecruitmentBatchDraftInput {
   startAt: string;
   endAt: string;
   openCenterIds: readonly string[];
+  interviewSlots?: readonly RecruitmentInterviewSlot[];
 }
 
 export interface RecruitmentBatchStatusResult {

@@ -7,6 +7,7 @@ import type {
   AssessmentRoundNumber,
   RecruitmentAssessmentRecord,
 } from "../types/recruitment-assessment";
+import type { RecruitmentInterviewSelection } from "../types/recruitment-interview";
 
 export type RecruitmentCenter = ApplicationRecruitmentCenter;
 
@@ -48,6 +49,7 @@ export interface AdminCandidate {
   updatedAt: string;
   rounds?: AssessmentRound[];
   internalNote?: string;
+  interviewSelection?: RecruitmentInterviewSelection;
 }
 
 export type RecruitmentApplicationSort = "submittedAt.desc" | "submittedAt.asc";
@@ -131,6 +133,15 @@ export const ADMIN_CANDIDATES: AdminCandidate[] = [
     result: "待公布",
     submittedAt: "2026-07-30T14:28:00.000Z",
     updatedAt: "07-30 14:28",
+    interviewSelection: {
+      status: "CONFIRMED",
+      slotId: "slot-current-1",
+      startAt: "2026-09-20T01:00:00.000Z",
+      endAt: "2026-09-20T01:30:00.000Z",
+      timezone: "Asia/Shanghai",
+      canChange: true,
+      invalidationReason: null,
+    },
     rounds: [
       { label: "第一轮考核", result: "通过", editable: false },
       { label: "第二轮考核", result: "待公布", editable: true },
