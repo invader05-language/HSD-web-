@@ -15,6 +15,12 @@ export const MAX_BIO_LENGTH = 500;
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 export const SUPPORTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
+export type AvatarValidationErrorCode = "empty" | "type" | "size";
+
+export type AvatarValidationResult =
+  | { valid: true }
+  | { valid: false; code: AvatarValidationErrorCode; message: string };
+
 /** Keep the member-facing label stable while accepting the API's year-only value. */
 export function normalizeMemberGrade(value: string | null | undefined): string {
   const trimmed = value?.trim() ?? "";
@@ -57,7 +63,19 @@ export function validateMemberProfileDraft(
   return errors;
 }
 
+export function validateAvatarFile(file: Pick<File, "type" | "size">): AvatarValidationResult {
+  if (file.size <= 0) {
+    return { valid: false, code: "empty", message: "请选择不为空的图片文件。" };
+  }
+  if (!SUPPORTED_AVATAR_TYPES.includes(file.type as (typeof SUPPORTED_AVATAR_TYPES)[number])) {
+    return { valid: false, code: "type", message: "请选择 JPG、PNG 或 WEBP 图片。" };
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { valid: false, code: "size", message: "图片文件不能超过 5 MiB。" };
+  }
+  return { valid: true };
+}
+
 export function isSupportedAvatar(file: Pick<File, "type" | "size">): boolean {
-  return SUPPORTED_AVATAR_TYPES.includes(file.type as (typeof SUPPORTED_AVATAR_TYPES)[number])
-    && file.size <= MAX_AVATAR_BYTES;
+  return validateAvatarFile(file).valid;
 }

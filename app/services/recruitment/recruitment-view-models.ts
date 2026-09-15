@@ -19,6 +19,44 @@ import {
 } from "../../data/recruitment-application";
 import type { MemberProfile } from "../../data/member-profile";
 import { normalizeMemberGrade, serializeMemberGrade } from "../../utils/member-profile-form";
+import type { RecruitmentInterviewSelection, RecruitmentInterviewSlot } from "../../types/recruitment-interview";
+
+function normalizeInterviewCapacity(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function mapInterviewSlot(
+  slot: { id: string; startAt: string; endAt: string; capacity?: unknown; remainingCapacity?: unknown; status?: "ACTIVE" | "RETIRED"; version?: number; confirmedCount?: number },
+): RecruitmentInterviewSlot {
+  return {
+    id: slot.id,
+    startAt: slot.startAt,
+    endAt: slot.endAt,
+    timezone: "Asia/Shanghai",
+    capacity: normalizeInterviewCapacity(slot.capacity),
+    ...(typeof slot.remainingCapacity === "number" ? { remainingCapacity: slot.remainingCapacity } : {}),
+    status: slot.status ?? "ACTIVE",
+    version: slot.version ?? 1,
+    confirmedCount: slot.confirmedCount ?? 0,
+  };
+}
+
+function mapInterviewSelection(value: unknown): RecruitmentInterviewSelection | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const selection = value as { id?: unknown; slotId?: unknown; status?: unknown; startAt?: unknown; endAt?: unknown; timezone?: unknown; canChange?: unknown; invalidationReason?: unknown };
+  if (typeof selection.startAt !== "string" || typeof selection.endAt !== "string" || typeof selection.status !== "string") return undefined;
+  const slotId = typeof selection.slotId === "string" ? selection.slotId : selection.id;
+  if (typeof slotId !== "string" || !["CONFIRMED", "RESELECTION_REQUIRED", "RELEASED"].includes(selection.status)) return undefined;
+  return {
+    slotId,
+    status: selection.status as RecruitmentInterviewSelection["status"],
+    startAt: selection.startAt,
+    endAt: selection.endAt,
+    timezone: selection.timezone === "Asia/Shanghai" ? "Asia/Shanghai" : "Asia/Shanghai",
+    canChange: typeof selection.canChange === "boolean" ? selection.canChange : selection.status === "CONFIRMED",
+    invalidationReason: typeof selection.invalidationReason === "string" ? selection.invalidationReason : null,
+  };
+}
 
 const CENTER_ID_BY_NAME: Record<RecruitmentCenter, string> = {
   "白泽开发中心": "baize-development",
@@ -57,6 +95,7 @@ export interface PublicRecruitmentBatchView {
   effectiveStatusReason: PublicRecruitmentBatchDto["effectiveStatusReason"];
   openCenterIds: string[];
   openCenters: Array<{ id: string; name: string }>;
+  interviewSlots?: RecruitmentInterviewSlot[];
 }
 
 export function getRecruitmentCenterOptions(
@@ -88,6 +127,7 @@ export interface AdminRecruitmentBatchView {
   openCenters: AdminRecruitmentBatchDto["openCenters"];
   owner: string | undefined;
   responsibleAccounts: AdminRecruitmentBatchDto["responsibleAccounts"];
+  interviewSlots?: RecruitmentInterviewSlot[];
 }
 
 export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRecruitmentBatchView {
@@ -116,6 +156,9 @@ export function mapAdminRecruitmentBatch(dto: AdminRecruitmentBatchDto): AdminRe
     openCenters: dto.openCenters,
     owner,
     responsibleAccounts: dto.responsibleAccounts,
+    ...((Array.isArray(dto.interviewSlots) && dto.interviewSlots.length)
+      ? { interviewSlots: dto.interviewSlots.map((slot) => mapInterviewSlot(slot)) }
+      : {}),
   };
 }
 
@@ -192,6 +235,7 @@ export interface ProductionMemberProfile extends MemberProfile {
 }
 
 export function mapPublicRecruitmentBatch(dto: PublicRecruitmentBatchDto): PublicRecruitmentBatchView {
+  const interviewSlots = Array.isArray(dto.interviewSlots) ? dto.interviewSlots : [];
   return {
     id: dto.id,
     name: dto.name,
@@ -202,6 +246,7 @@ export function mapPublicRecruitmentBatch(dto: PublicRecruitmentBatchDto): Publi
     effectiveStatusReason: dto.effectiveStatusReason,
     openCenterIds: dto.openCenters.map((center) => center.slug),
     openCenters: dto.openCenters.map((center) => ({ id: center.slug, name: center.name })),
+    ...(interviewSlots.length ? { interviewSlots: interviewSlots.map((slot) => mapInterviewSlot(slot)) } : {}),
   };
 }
 
@@ -220,7 +265,10 @@ export function mapMemberProfileResponse(dto: MemberProfileResponseDto): Product
   const status = mapStatus(dto.status);
   const direction = mapDirection(dto.baizeDirection);
   const membershipCenter = dto.membership?.center;
-  const avatarAssetId = dto.avatar.kind === "asset" ? dto.avatar.publicToken : undefined;
+  // The authenticated profile response intentionally exposes only the public
+  // media token. Keep it as a display URL; never reuse that token as the
+  // internal asset UUID accepted by PATCH /members/me.
+  const avatarPublicToken = dto.avatar.kind === "asset" ? dto.avatar.publicToken : undefined;
   return {
     id: dto.id,
     name: dto.name,
@@ -234,14 +282,13 @@ export function mapMemberProfileResponse(dto: MemberProfileResponseDto): Product
     identity: status.identity,
     ...(direction ? { baizeDirection: direction } : {}),
     bio: dto.bio ?? dto.biography ?? "",
-    ...(avatarAssetId ? { avatarUrl: `/api/v1/public/media/${encodeURIComponent(avatarAssetId)}` } : {}),
+    ...(avatarPublicToken ? { avatarUrl: `/api/v1/public/media/${encodeURIComponent(avatarPublicToken)}` } : {}),
     publicDirectoryVisible: dto.publicProfileEnabled,
     version: dto.version,
     contact: dto.contact ?? "",
     biography: dto.biography ?? "",
     status: dto.status,
     publicProfileEnabled: dto.publicProfileEnabled,
-    ...(avatarAssetId ? { avatarAssetId } : {}),
   };
 }
 
@@ -277,6 +324,7 @@ export function mapRecruitmentApplicationDraft(
     })),
     ...(draft.baizeDirection ? { baizeDirection: API_BAIZE_DIRECTION_BY_NAME[draft.baizeDirection] } : {}),
     acceptsAdjustment: draft.acceptsAdjustment === true,
+    ...(draft.interviewSlotId ? { interviewSlotId: draft.interviewSlotId } : {}),
   };
 }
 
@@ -336,6 +384,7 @@ export function mapRecruitmentApplicationResponse(
     updatedAt: dto.withdrawnAt ?? dto.submittedAt,
     withdrawnAt: dto.withdrawnAt ?? undefined,
     lockedAt: dto.locked ? dto.submittedAt : undefined,
+    interviewSelection: mapInterviewSelection((dto as MyRecruitmentApplicationResponseDto & { interviewSelection?: unknown }).interviewSelection),
   };
 }
 

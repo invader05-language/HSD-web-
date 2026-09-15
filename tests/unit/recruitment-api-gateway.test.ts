@@ -91,6 +91,59 @@ describe("recruitment API gateway", () => {
     );
   });
 
+  it("routes interview reselection and admin slot reconciliation through CSRF-protected mutations", async () => {
+    const response = { id: "application-1", version: 4 };
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: "batch-1",
+        name: "秋季招新",
+        startAt: "2026-09-01T00:00:00.000Z",
+        endAt: "2026-09-20T00:00:00.000Z",
+        timezone: "Asia/Shanghai",
+        lifecycleStatus: "DRAFT",
+        manualOverride: "NONE",
+        effectiveStatus: "draft",
+        effectiveStatusReason: "draft",
+        version: 4,
+        publishedAt: null,
+        actualOpenedAt: null,
+        closedAt: null,
+        archivedAt: null,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+        applicationCount: 0,
+        openCenters: [],
+        responsibleAccounts: [],
+        interviewSlots: [],
+      }), { status: 200 }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      readCookie: () => "csrf-token",
+      createRequestId: () => "request-interview-1",
+    });
+
+    await gateway.changeInterviewSlot?.("batch-1", "application-1", {
+      expectedApplicationVersion: 3,
+      interviewSlotId: "slot-public-1",
+    });
+    await gateway.reconcileAdminInterviewSlots("batch-1", {
+      expectedBatchVersion: 4,
+      confirmed: true,
+      slots: [],
+    });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1,
+      "https://api.example.test/api/v1/recruitment/batches/batch-1/applications/application-1/interview-slot",
+      expect.objectContaining({ method: "PATCH", credentials: "include", headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token" }) }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(2,
+      "https://api.example.test/api/v1/admin/recruitment/batches/batch-1/interview-slots",
+      expect.objectContaining({ method: "PUT", credentials: "include", headers: expect.objectContaining({ "X-CSRF-Token": "csrf-token" }) }),
+    );
+  });
+
   it("submits a production application through the CSRF-protected API", async () => {
     const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       id: "application-1",
@@ -104,6 +157,7 @@ describe("recruitment API gateway", () => {
       withdrawnAt: null,
       locked: false,
       preferences: [],
+      interviewSelection: null,
     }), { status: 201, headers: { "Content-Type": "application/json" } }));
     const gateway = createApiRecruitmentGateway({
       apiBase: "https://api.example.test",
@@ -167,6 +221,7 @@ describe("recruitment API gateway", () => {
         withdrawnAt: null,
         locked: false,
         preferences: [],
+        interviewSelection: null,
       }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const gateway = createApiRecruitmentGateway({
       apiBase: "https://api.example.test",

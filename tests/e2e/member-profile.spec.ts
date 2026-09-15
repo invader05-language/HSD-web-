@@ -132,11 +132,11 @@ test("a newly created account must replace its initial password before entering 
   await expect.poll(() => new URL(page.url()).searchParams.get("redirect")).toBe("/member/profile");
   await page.reload();
   await expect(page).toHaveURL(/\/member\/change-password/);
-  await page.getByRole("textbox", { name: /^新密码/ }).fill("new-pass-2026");
-  await page.getByLabel("确认新密码", { exact: true }).fill("new-pass-2026");
+  await page.getByRole("textbox", { name: /^新密码/ }).fill("new-password-2026");
+  await page.getByLabel("确认新密码", { exact: true }).fill("new-password-2026");
   await page.getByRole("button", { name: "保存新密码并继续" }).click();
 
   await expect(page).toHaveURL(/\/member\/profile$/);
   await expect(page.evaluate(() => window.localStorage.getItem("baiyun-hsd-admin-access")))
-    .resolves.not.toContain("new-pass-2026");
+    .resolves.not.toContain("new-password-2026");
 });

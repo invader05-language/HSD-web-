@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useSessionStore } from "~/stores/session";
-import { normalizePasswordChangeContinuation } from "~/utils/password-change";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  normalizePasswordChangeContinuation,
+} from "~/utils/password-change";
 
 definePageMeta({ layout: false });
 useHead({ title: "首次修改密码｜白云 HSD 开发者部落" });
@@ -84,11 +88,13 @@ async function signOut() {
           <input
             v-model="newPassword"
             type="password"
+            :minlength="MIN_PASSWORD_LENGTH"
+            :maxlength="MAX_PASSWORD_LENGTH"
             autocomplete="new-password"
             :aria-invalid="Boolean(passwordError)"
             :aria-describedby="passwordError ? 'new-password-error' : 'new-password-help'"
           >
-          <small id="new-password-help">至少 8 位，且不能继续使用初始密码。</small>
+          <small id="new-password-help">至少 {{ MIN_PASSWORD_LENGTH }} 位，最多 {{ MAX_PASSWORD_LENGTH }} 位，且不能使用常见弱密码或初始密码。</small>
           <small v-if="passwordError" id="new-password-error" class="password-change-error">{{ passwordError }}</small>
         </label>
         <label>

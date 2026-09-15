@@ -4,8 +4,8 @@ import { useSessionStore } from "~/stores/session";
 import { useSessionGateway } from "~/composables/useSessionGateway";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import {
-  isSupportedAvatar,
   normalizeMemberGrade,
+  validateAvatarFile,
   validateMemberProfileDraft,
   type MemberProfileFormErrors,
 } from "~/utils/member-profile-form";
@@ -58,6 +58,8 @@ const avatarSource = computed(() => isMockApi
 const currentProfileAvatarSource = computed(() => isMockApi ? currentProfile.value.avatarUrl : productionProfile?.avatarSource.value);
 const productionLoading = computed(() => productionProfile?.status.value === "loading");
 const productionError = computed(() => productionProfile?.error.value ?? "");
+const productionLoadError = computed(() => productionProfile?.status.value === "error"
+  && status.value !== "error" ? productionError.value : "");
 
 function clearErrors() {
   delete errors.name;
@@ -95,8 +97,9 @@ function chooseAvatar(event: Event) {
   if (!file) return;
 
   delete errors.avatar;
-  if (!isSupportedAvatar(file)) {
-    errors.avatar = "请选择 JPG、PNG 或 WEBP 图片，且文件不超过 5MB。";
+  const validation = validateAvatarFile(file);
+  if (!validation.valid) {
+    errors.avatar = validation.message;
     (event.target as HTMLInputElement).value = "";
     return;
   }
@@ -221,7 +224,7 @@ onMounted(() => {
         <p class="member-profile-lead">完善你的个人与成员资料。姓名、年级和班级可由本人修改；学号和组织归属由部落统一维护。</p>
 
         <p v-if="productionLoading" class="member-profile-status" role="status"><strong>正在读取个人资料…</strong></p>
-        <p v-else-if="!isMockApi && productionError" class="member-profile-status member-profile-status--error" role="alert"><strong>{{ productionError }}</strong> <button type="button" class="text-link" @click="reloadProductionProfile">重新加载</button></p>
+        <p v-else-if="!isMockApi && productionLoadError" class="member-profile-status member-profile-status--error" role="alert"><strong>{{ productionLoadError }}</strong> <button type="button" class="text-link" @click="reloadProductionProfile">重新加载</button></p>
 
         <div class="member-profile-note">
           <strong>{{ isMockApi ? "前端演示预览" : "真实资料" }}</strong>
@@ -232,7 +235,7 @@ onMounted(() => {
 
         <p v-if="status === 'saving'" class="member-profile-status" role="status"><strong>正在保存资料…</strong> 请不要重复提交。</p>
         <p v-else-if="status === 'success'" class="member-profile-status" role="status"><strong>资料已更新。</strong> {{ isMockApi ? "当前前端演示页面已同步加载新资料。" : "已从服务器重新读取持久结果。" }}</p>
-        <p v-else-if="status === 'error' && !Object.keys(errors).length" class="member-profile-status member-profile-status--error" role="alert"><strong>暂未保存成功。</strong> 请检查填写内容后重试。</p>
+        <p v-else-if="status === 'error' && !Object.keys(errors).length" class="member-profile-status member-profile-status--error" role="alert"><strong>{{ productionError || "暂未保存成功。" }}</strong><span v-if="!productionError">请检查填写内容后重试。</span></p>
 
         <form v-if="isMockApi || productionProfile?.profile.value" class="member-profile-card" novalidate @submit.prevent="saveProfile">
           <section class="member-profile-section">
@@ -298,10 +301,11 @@ onMounted(() => {
               <HsdAvatar :name="draft.name" :src="avatarSource" size="lg" />
               <div class="member-profile-upload-box">
                 <strong>选择头像图片</strong>
-                <span>{{ isMockApi ? "当前为浏览器本地预览，保存后不会写入服务器。" : "支持 JPG、PNG 或 WEBP，保存后会同步到成员资料并按规则公开展示。" }}</span>
+                <span>{{ isMockApi ? "当前为浏览器本地预览，保存后不会写入服务器。" : "支持 JPG、PNG 或 WEBP，单个文件不超过 5 MiB，保存后会同步到成员资料并按规则公开展示。" }}</span>
                 <input ref="fileInput" class="member-profile-file-input" type="file" accept="image/jpeg,image/png,image/webp" @change="chooseAvatar">
                 <button class="text-link" type="button" @click="fileInput?.click()">选择图片</button>
                 <button v-if="draft.avatarUrl || currentProfileAvatarSource || pendingAvatarPreview" class="text-link member-profile-remove-avatar" type="button" @click="removeAvatar">移除头像</button>
+                <small v-if="pendingAvatarPreview" class="member-profile-upload-pending">已选择图片，保存后上传。</small>
                 <small v-if="errors.avatar" class="member-profile-error" role="alert">{{ errors.avatar }}</small>
               </div>
             </div>

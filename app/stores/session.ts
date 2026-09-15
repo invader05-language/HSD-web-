@@ -394,7 +394,19 @@ export const useSessionStore = defineStore("session", {
       try {
         this.applyApiSession(await gateway.changePassword(newPassword));
         return { status: "success" };
-      } catch {
+      } catch (cause) {
+        if (typeof cause === "object" && cause !== null && "code" in cause
+          && (cause as { code?: unknown }).code === "PASSWORD_POLICY_VIOLATION") {
+          const message = (cause as { message?: unknown }).message;
+          return {
+            status: "invalid_input",
+            errors: {
+              password: typeof message === "string" && message.trim()
+                ? message
+                : "密码不符合安全策略，请使用至少 15 位且不易猜测的密码。",
+            },
+          };
+        }
         return { status: "api_error", message: PASSWORD_CHANGE_API_ERROR_MESSAGE };
       }
     },

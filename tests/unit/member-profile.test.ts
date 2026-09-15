@@ -18,6 +18,7 @@ import {
   isSupportedAvatar,
   validateMemberProfileDraft,
 } from "../../app/utils/member-profile-form";
+import * as memberProfileForm from "../../app/utils/member-profile-form";
 
 const MEMBER_PROFILE_STORAGE_KEY = "baiyun-hsd-member-profiles";
 
@@ -406,5 +407,21 @@ describe("member profile domain", () => {
     expect(isSupportedAvatar({ type: "image/png", size: 1024 })).toBe(true);
     expect(isSupportedAvatar({ type: "image/svg+xml", size: 1024 })).toBe(false);
     expect(isSupportedAvatar({ type: "image/jpeg", size: 5 * 1024 * 1024 + 1 })).toBe(false);
+  });
+
+  it("reports actionable avatar validation failures without losing the selected-file workflow", () => {
+    expect(memberProfileForm.validateAvatarFile).toBeTypeOf("function");
+    expect(memberProfileForm.validateAvatarFile({ type: "image/png", size: 0 })).toMatchObject({
+      valid: false,
+      code: "empty",
+    });
+    expect(memberProfileForm.validateAvatarFile({ type: "image/gif", size: 1024 })).toMatchObject({
+      valid: false,
+      code: "type",
+    });
+    expect(memberProfileForm.validateAvatarFile({ type: "image/png", size: 5 * 1024 * 1024 + 1 })).toMatchObject({
+      valid: false,
+      code: "size",
+    });
   });
 });

@@ -10,6 +10,9 @@ import {
   type RecruitmentPreference,
   type SubmittedRecruitmentApplication,
 } from "../data/recruitment-application";
+import {
+  getInterviewSlotAvailability,
+} from "../utils/recruitment-interview-slots";
 import { useMemberProfileStore } from "./member-profile";
 import { useSessionStore } from "./session";
 import { useRecruitmentBatchStore } from "./recruitment-batch";
@@ -23,6 +26,7 @@ import {
   validateConfirmation,
   validateRegistrationStep,
 } from "../utils/recruitment-application-form";
+import type { RecruitmentInterviewSelection } from "../types/recruitment-interview";
 
 const CENTER_IDS: Record<RecruitmentCenter, string> = {
   "白泽开发中心": "baize-development",
@@ -35,6 +39,7 @@ type SubmitApplicationOptions = {
   batchId?: string;
   now?: Date;
   allowExistingUpdate?: boolean;
+  requireInterviewSlot?: boolean;
 };
 
 function applicationKey(batchId: string, memberId: string): string {
@@ -51,6 +56,9 @@ function cloneApplication(application: SubmittedRecruitmentApplication): Submitt
     applicantProfileSnapshot: { ...application.applicantProfileSnapshot },
     preferences: application.preferences.map((preference) => ({ ...preference })),
     centerConfigurationSnapshot: application.centerConfigurationSnapshot.map((center) => ({ ...center })),
+    interviewSelection: application.interviewSelection
+      ? { ...application.interviewSelection }
+      : undefined,
   };
 }
 
@@ -187,7 +195,10 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       }
       const errors = {
         ...validateRegistrationStep(profileDraft, applicationDraft),
-        ...validateApplicationDraft(applicationDraft),
+        ...validateApplicationDraft(applicationDraft, {
+          interviewSlots: options.requireInterviewSlot ? batch.interviewSlots : undefined,
+          now,
+        }),
         ...validateConfirmation(confirmed),
       };
       if (Object.keys(errors).length) {
@@ -207,6 +218,18 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
 
       profileStore.registerProfile(memberId, profileDraft);
       const timestamp = now.toISOString();
+      const selectedInterviewSlot = batch.interviewSlots?.find((slot) => slot.id === applicationDraft.interviewSlotId);
+      const interviewSelection: RecruitmentInterviewSelection | undefined = selectedInterviewSlot
+        ? {
+            status: "CONFIRMED",
+            slotId: selectedInterviewSlot.id,
+            startAt: selectedInterviewSlot.startAt,
+            endAt: selectedInterviewSlot.endAt,
+            timezone: selectedInterviewSlot.timezone,
+            canChange: getInterviewSlotAvailability(selectedInterviewSlot, now).selectable,
+            invalidationReason: null,
+          }
+        : undefined;
       this.applicationsByBatchAndMember[key] = {
         id: existing?.id ?? `application-${batch.id}-${memberId}`,
         batchId: batch.id,
@@ -234,6 +257,7 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         status: "submitted",
         submittedAt: timestamp,
         updatedAt: timestamp,
+        interviewSelection,
         withdrawnAt: undefined,
         lockedAt: undefined,
       };
@@ -259,6 +283,13 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
       application.status = "withdrawn";
       application.withdrawnAt = timestamp;
       application.updatedAt = timestamp;
+      if (application.interviewSelection) {
+        application.interviewSelection = {
+          ...application.interviewSelection,
+          status: "RELEASED",
+          canChange: false,
+        };
+      }
       return cloneApplication(application);
     },
     lockApplicationForAssessment(

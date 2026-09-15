@@ -18,16 +18,25 @@ describe("first-login password change", () => {
     expect(validateNewPassword("hsd1314", "hsd1314")).toEqual({
       password: "新密码不能与初始密码相同。"
     });
-    expect(validateNewPassword("new-pass-2026", "different")).toEqual({
+    expect(validateNewPassword("new-pass-2026!!", "different")).toEqual({
       confirmation: "两次输入的密码不一致。"
     });
   });
 
   it("requires a usable replacement password", () => {
     expect(validateNewPassword("short", "short")).toEqual({
-      password: "新密码至少 8 位。"
+      password: "新密码至少 15 位。"
     });
-    expect(validateNewPassword("new-pass-2026", "new-pass-2026")).toEqual({});
+    expect(validateNewPassword("new-password-2026", "new-password-2026")).toEqual({});
+  });
+
+  it("rejects passwords over the limit and common weak passwords", () => {
+    expect(validateNewPassword("a".repeat(129), "a".repeat(129))).toEqual({
+      password: "新密码不能超过 128 位。",
+    });
+    expect(validateNewPassword("password1234567", "password1234567")).toEqual({
+      password: "请勿使用常见或容易猜测的密码。",
+    });
   });
 
   it("keeps only safe member continuations", () => {

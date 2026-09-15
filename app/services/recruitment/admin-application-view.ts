@@ -1,4 +1,5 @@
 import type { AdminRecruitmentApplicationDto } from "../../../packages/api-client/src";
+import type { RecruitmentInterviewSelection } from "../../types/recruitment-interview";
 
 export interface AdminApplicationView {
   id: string;
@@ -15,6 +16,7 @@ export interface AdminApplicationView {
   version: number;
   submittedAt: string;
   withdrawnAt: string | null;
+  interviewSelection?: RecruitmentInterviewSelection;
 }
 
 const BAIZE_LABELS: Record<NonNullable<AdminRecruitmentApplicationDto["baizeDirection"]>, string> = {
@@ -48,6 +50,9 @@ export function mapAdminApplication(dto: AdminRecruitmentApplicationDto): AdminA
     version: dto.version,
     submittedAt: dto.submittedAt,
     withdrawnAt: dto.withdrawnAt,
+    interviewSelection: (dto as AdminRecruitmentApplicationDto & { interviewSelection?: RecruitmentInterviewSelection }).interviewSelection
+      ? { ...(dto as AdminRecruitmentApplicationDto & { interviewSelection?: RecruitmentInterviewSelection }).interviewSelection! }
+      : undefined,
   };
 }
 
