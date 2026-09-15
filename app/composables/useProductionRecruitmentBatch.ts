@@ -5,6 +5,7 @@ import type {
   RecruitmentBatchCommandDto,
   RecruitmentBatchLifecycleEventListDto,
   UpdateRecruitmentBatchDto,
+  ReconcileInterviewSlotsDto,
 } from "../../packages/api-client/src";
 import {
   mapAdminRecruitmentBatch,
@@ -20,6 +21,7 @@ interface AdminBatchGateway {
   archiveAdminBatch?(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
   runAdminBatchCommand?(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
   updateAdminBatch?(batchId: string, payload: UpdateRecruitmentBatchDto): Promise<AdminRecruitmentBatchDto>;
+  reconcileAdminInterviewSlots?(batchId: string, payload: ReconcileInterviewSlotsDto): Promise<AdminRecruitmentBatchDto>;
 }
 
 type DetailStatus = "idle" | "loading" | "success" | "unauthorized" | "forbidden" | "notFound" | "error";
@@ -321,6 +323,28 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     }
   }
 
+  async function updateInterviewSlots(payload: ReconcileInterviewSlotsDto): Promise<boolean> {
+    if (!batch.value || !currentBatchId || !gateway.reconcileAdminInterviewSlots) {
+      commandError.value = "真实面试时段保存接口暂不可用。";
+      return false;
+    }
+    const requestGeneration = loadGeneration;
+    commandError.value = "";
+    try {
+      const response = await gateway.reconcileAdminInterviewSlots(currentBatchId, payload);
+      if (requestGeneration !== loadGeneration) return false;
+      batch.value = mapAdminRecruitmentBatch(response);
+      await refreshLifecycle(currentBatchId, requestGeneration);
+      return true;
+    } catch (cause) {
+      if (requestGeneration === loadGeneration) {
+        commandError.value = getRecruitmentBatchCommandMessage(cause, "面试时段保存失败，请刷新后重试。");
+        if ((cause as { status?: number })?.status === 409) await refresh(currentBatchId, requestGeneration);
+      }
+      return false;
+    }
+  }
+
   return {
     batch,
     lifecycleEvents,
@@ -344,5 +368,6 @@ export function createProductionRecruitmentBatchController(gateway: AdminBatchGa
     archive,
     runCommand,
     updateDraft,
+    updateInterviewSlots,
   };
 }

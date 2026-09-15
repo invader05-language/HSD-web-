@@ -40,6 +40,7 @@ const currentBatch = computed(() => {
     effectiveStatusReason: "within-window" as const,
     openCenterIds: [...batch.openCenterIds],
     openCenters: batch.openCenterIds.map((id) => ({ id, name: id })),
+    interviewSlots: batch.interviewSlots?.map((slot) => ({ ...slot })) ?? [],
   } satisfies PublicRecruitmentBatchView : null;
 });
 const pausedBatch = computed(() => {

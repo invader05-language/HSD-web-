@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import type { ApiSessionGateway } from "../../app/services/api-session.gateway";
+import { SessionApiError, type ApiSessionGateway } from "../../app/services/api-session.gateway";
 import { SESSION_STORAGE_KEY, useSessionStore } from "../../app/stores/session";
 
 const ownerSession = {
@@ -171,6 +171,37 @@ describe("production session store", () => {
     )).resolves.toEqual({
       status: "api_error",
       message: "密码修改失败，请检查网络后重试。",
+    });
+
+    expect(session.mustChangePassword).toBe(true);
+  });
+
+  it("surfaces a server password policy violation as a password field error", async () => {
+    const gateway = {
+      login: vi.fn(),
+      currentSession: vi.fn().mockResolvedValue({
+        ...ownerSession,
+        account: { ...ownerSession.account, adminLevel: "MEMBER" as const, capabilities: [] },
+        mustChangePassword: true,
+      }),
+      changePassword: vi.fn().mockRejectedValue(new SessionApiError({
+        status: 422,
+        code: "PASSWORD_POLICY_VIOLATION",
+        message: "密码不能使用常见弱密码。",
+      })),
+      logout: vi.fn(),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+    await session.restoreForRuntime({ useMockApi: false }, gateway);
+
+    await expect(session.completePasswordChangeForRuntime(
+      { useMockApi: false },
+      gateway,
+      "new-password-2026",
+      "new-password-2026",
+    )).resolves.toEqual({
+      status: "invalid_input",
+      errors: { password: "密码不能使用常见弱密码。" },
     });
 
     expect(session.mustChangePassword).toBe(true);

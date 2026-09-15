@@ -121,6 +121,37 @@ describe("Task 3A production member profile", () => {
     expect(controller.status.value).toBe("conflict");
     expect(controller.error.value).toContain("重新加载");
   });
+
+  it("reuses a completed avatar upload when saving the profile can be retried", async () => {
+    const file = new File(["avatar"], "avatar.png", { type: "image/png" });
+    const avatarGateway = {
+      upload: vi.fn().mockResolvedValue({ assetId: "asset-uploaded-once" }),
+      remove: vi.fn(),
+    };
+    const conflict = Object.assign(new Error("Version conflict"), {
+      status: 409,
+      code: "MEMBER_PROFILE_VERSION_CONFLICT",
+    });
+    const updateCurrentProfile = vi.fn()
+      .mockRejectedValueOnce(conflict)
+      .mockResolvedValueOnce({ ...baseProfile, avatar: { kind: "asset", publicToken: "avatar-uploaded" }, version: 4 });
+    const getCurrentProfile = vi.fn()
+      .mockResolvedValueOnce(baseProfile)
+      .mockResolvedValueOnce({ ...baseProfile, avatar: { kind: "asset", publicToken: "avatar-uploaded" }, version: 4 });
+    const controller = createProductionMemberProfileController({
+      gateway: { getCurrentProfile, updateCurrentProfile },
+      apiBase: "https://api.example.test",
+      avatarGateway,
+    });
+
+    await controller.load();
+    await expect(controller.save({ avatarFile: file, avatarCenterId: "center-1" })).resolves.toBe(false);
+    await expect(controller.save({ avatarFile: file, avatarCenterId: "center-1" })).resolves.toBe(true);
+
+    expect(avatarGateway.upload).toHaveBeenCalledOnce();
+    expect(updateCurrentProfile).toHaveBeenNthCalledWith(1, expect.objectContaining({ avatarAssetId: "asset-uploaded-once" }));
+    expect(updateCurrentProfile).toHaveBeenNthCalledWith(2, expect.objectContaining({ avatarAssetId: "asset-uploaded-once" }));
+  });
 });
 
 describe("Task 3A public content gateway", () => {

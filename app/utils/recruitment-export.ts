@@ -1,4 +1,6 @@
 import type { AdminCandidate } from "~/data/recruitment-admin";
+import { formatInterviewTimestamp } from "./recruitment-interview-slots";
+import type { RecruitmentInterviewSelection } from "../types/recruitment-interview";
 
 const RECRUITMENT_CSV_HEADERS = [
   "姓名",
@@ -8,8 +10,11 @@ const RECRUITMENT_CSV_HEADERS = [
   "第二志愿",
   "第三志愿",
   "白泽方向",
-  "接受调剂",
-  "报名时间"
+  "是否接受调剂",
+  "面试开始（中国标准时间）",
+  "面试结束（中国标准时间）",
+  "面试安排状态",
+  "提交时间"
 ] as const;
 
 function protectFormula(value: string): string {
@@ -25,6 +30,16 @@ function escapeCsvCell(value: string): string {
 
 function formatSubmittedAt(submittedAt: string): string {
   return submittedAt.slice(0, 16).replace("T", " ");
+}
+
+function interviewExportCells(selection?: RecruitmentInterviewSelection): [string, string, string] {
+  if (!selection) return ["", "", "未安排"];
+  const status = selection.status === "CONFIRMED"
+    ? "已确认"
+    : selection.status === "RESELECTION_REQUIRED"
+      ? "待重新选择（原时段已调整）"
+      : "报名已撤回";
+  return [formatInterviewTimestamp(selection.startAt), formatInterviewTimestamp(selection.endAt), status];
 }
 
 /**
@@ -43,6 +58,7 @@ export function serializeRecruitmentCsv(records: readonly AdminCandidate[]): str
     record.preferences[2] ?? "",
     record.baizeDirection ?? "",
     record.acceptsAdjustment ? "接受调剂" : "不接受调剂",
+    ...interviewExportCells(record.interviewSelection),
     formatSubmittedAt(record.submittedAt)
   ].map((cell) => escapeCsvCell(cell)).join(","));
 

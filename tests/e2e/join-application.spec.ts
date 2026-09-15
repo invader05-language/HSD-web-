@@ -78,6 +78,7 @@ test.describe("join recruitment application navigation", () => {
     await firstChoice.selectOption("新媒体中心");
     await expect(baizeDirection).toHaveCount(0);
     await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
+    await page.locator('[data-field="interviewSlotId"] input').first().check();
     await page.getByRole("button", { name: "下一步" }).click();
 
     await expect(page.getByRole("heading", { name: "确认并提交" })).toBeVisible();
@@ -114,6 +115,7 @@ test.describe("join recruitment application navigation", () => {
     await page.getByRole("button", { name: "下一步" }).click();
     await page.locator('[data-field="firstChoice"] select').selectOption("新媒体中心");
     await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
+    await page.locator('[data-field="interviewSlotId"] input').first().check();
     await page.getByRole("button", { name: "下一步" }).click();
 
     await expect(page.getByText("当前批次：2026 秋季招新")).toBeVisible();
@@ -129,6 +131,7 @@ test.describe("join recruitment application navigation", () => {
     await page.getByRole("button", { name: "下一步" }).click();
     await page.locator('[data-field="firstChoice"] select').selectOption("新媒体中心");
     await page.getByRole("radio", { name: "接受调剂", exact: true }).check();
+    await page.locator('[data-field="interviewSlotId"] input').first().check();
     await page.getByRole("button", { name: "下一步" }).click();
     await page.getByRole("checkbox", { name: /我确认以上资料真实/ }).check();
     await page.getByRole("button", { name: "确认并提交报名" }).click();

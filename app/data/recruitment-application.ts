@@ -1,4 +1,5 @@
 import type { MemberProfile } from "./member-profile";
+import type { RecruitmentInterviewSelection } from "../types/recruitment-interview";
 
 export const RECRUITMENT_CENTERS = [
   "白泽开发中心",
@@ -37,6 +38,7 @@ export interface RecruitmentApplicationDraft {
   thirdChoice?: RecruitmentCenter;
   baizeDirection?: BaizeDirection;
   acceptsAdjustment?: boolean;
+  interviewSlotId?: string;
 }
 
 export type RecruitmentApplicationStatus =
@@ -82,6 +84,7 @@ export interface SubmittedRecruitmentApplication {
   preferences: RecruitmentPreference[];
   centerConfigurationSnapshot: CenterConfigurationSnapshot[];
   acceptsAdjustment: boolean;
+  interviewSelection?: RecruitmentInterviewSelection;
   status: RecruitmentApplicationStatus;
   submittedAt?: string;
   updatedAt: string;
@@ -115,6 +118,7 @@ export function createRecruitmentApplicationDraft(): RecruitmentApplicationDraft
     thirdChoice: undefined,
     baizeDirection: undefined,
     acceptsAdjustment: undefined,
+    interviewSlotId: undefined,
   };
 }
 

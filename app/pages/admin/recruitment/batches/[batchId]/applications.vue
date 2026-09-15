@@ -20,6 +20,7 @@ import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admi
 import { useSessionStore } from "~/stores/session";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
+import { formatInterviewTimestamp } from "~/utils/recruitment-interview-slots";
 
 definePageMeta({ layout: "admin" });
 
@@ -152,7 +153,7 @@ function exportRecruitmentCsv() {
       <p v-if="visible.length === 0" class="admin-empty-copy">当前批次没有可导出的报名人员</p>
       <div class="admin-table-scroll">
         <table aria-label="批次报名人员">
-          <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
+          <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>面试安排</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody>
             <tr v-for="candidate in visible" :key="candidate.id">
               <td><strong>{{ candidate.name }}</strong><small>{{ candidate.studentId }}</small></td>
@@ -161,6 +162,7 @@ function exportRecruitmentCsv() {
               <td>{{ candidate.preferences[2] || "—" }}</td>
               <td>{{ candidate.baizeDirection || "—" }}</td>
               <td>{{ candidate.acceptsAdjustment ? "接受" : "不接受" }}</td>
+              <td>{{ candidate.interviewSelection ? `${formatInterviewTimestamp(candidate.interviewSelection.startAt)} · ${candidate.interviewSelection.status === "CONFIRMED" ? "已确认" : candidate.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回"}` : "未安排" }}</td>
               <td>{{ formatRecruitmentApplicationSubmittedAt(candidate) }}</td>
               <td><NuxtLink :to="`/admin/recruitment/batches/${batchId}/applications/${candidate.id}`" :aria-label="`查看报名 ${candidate.name}`">查看报名</NuxtLink></td>
             </tr>
@@ -190,11 +192,11 @@ function exportRecruitmentCsv() {
       <div v-else-if="apiStatus === 'error'" class="admin-empty" role="alert"><strong>报名名单读取失败</strong><p>{{ apiError }}</p></div>
       <div v-else-if="apiRows.length" class="admin-table-scroll">
         <table aria-label="批次报名人员">
-          <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>状态</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
+          <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>状态</th><th>面试安排</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
           <tbody><tr v-for="application in apiRows" :key="application.id">
             <td><strong>{{ application.name }}</strong><small>{{ application.studentId }}</small></td>
             <td>{{ application.preferences[0] || "—" }}</td><td>{{ application.preferences[1] || "—" }}</td><td>{{ application.preferences[2] || "—" }}</td>
-            <td>{{ application.baizeDirection || "—" }}</td><td>{{ application.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ application.status }}</td><td>{{ formatAdminApplicationSubmittedAt(application.submittedAt) }}</td>
+            <td>{{ application.baizeDirection || "—" }}</td><td>{{ application.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ application.status }}</td><td>{{ application.interviewSelection ? `${formatInterviewTimestamp(application.interviewSelection.startAt)} · ${application.interviewSelection.status === "CONFIRMED" ? "已确认" : application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回"}` : "未安排" }}</td><td>{{ formatAdminApplicationSubmittedAt(application.submittedAt) }}</td>
             <td><NuxtLink :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(application.id)}`" :aria-label="`查看报名 ${application.name}`">查看报名</NuxtLink></td>
           </tr></tbody>
         </table>

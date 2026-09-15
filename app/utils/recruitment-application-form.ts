@@ -4,6 +4,8 @@ import {
   type RecruitmentApplicationDraft,
   type RegistrationProfileDraft,
 } from "../data/recruitment-application";
+import { getInterviewSlotAvailability } from "./recruitment-interview-slots";
+import type { RecruitmentInterviewSlot } from "../types/recruitment-interview";
 
 export type RegistrationProfileErrors = Partial<Record<keyof RegistrationProfileDraft, string>>;
 export type RecruitmentApplicationErrors = Partial<Record<keyof RecruitmentApplicationDraft, string>>;
@@ -43,6 +45,7 @@ export function validateRegistrationStep(
 
 export function validateApplicationDraft(
   draft: RecruitmentApplicationDraft,
+  options: { interviewSlots?: readonly RecruitmentInterviewSlot[]; now?: Date } = {},
 ): RecruitmentApplicationErrors {
   const errors: RecruitmentApplicationErrors = {};
   const firstChoice = draft.firstChoice;
@@ -70,6 +73,15 @@ export function validateApplicationDraft(
   }
 
   if (draft.acceptsAdjustment === undefined) errors.acceptsAdjustment = "请选择是否接受调剂。";
+  if (options.interviewSlots?.length) {
+    if (!draft.interviewSlotId) {
+      errors.interviewSlotId = "请选择面试时间。";
+    } else {
+      const selected = options.interviewSlots.find((slot) => slot.id === draft.interviewSlotId);
+      if (!selected) errors.interviewSlotId = "请选择有效的面试时间。";
+      else if (!getInterviewSlotAvailability(selected, options.now).selectable) errors.interviewSlotId = "该面试时段已不可选，请重新选择。";
+    }
+  }
   return errors;
 }
 

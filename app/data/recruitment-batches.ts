@@ -20,6 +20,28 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
     publishedAt: "2026-07-30T00:00:00.000Z",
     createdAt: "2026-07-29T00:00:00.000Z",
     updatedAt: "2026-07-30T00:00:00.000Z",
+    interviewSlots: [
+      {
+        id: "slot-current-1",
+        startAt: "2026-09-20T01:00:00.000Z",
+        endAt: "2026-09-20T01:30:00.000Z",
+        timezone: "Asia/Shanghai",
+        capacity: 20,
+        confirmedCount: 2,
+        status: "ACTIVE",
+        version: 1,
+      },
+      {
+        id: "slot-current-2",
+        startAt: "2026-09-20T02:00:00.000Z",
+        endAt: "2026-09-20T02:30:00.000Z",
+        timezone: "Asia/Shanghai",
+        capacity: null,
+        confirmedCount: 0,
+        status: "ACTIVE",
+        version: 1,
+      },
+    ],
   },
   {
     id: "batch-next",
@@ -35,6 +57,7 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
     publishedAt: "2026-12-15T00:00:00.000Z",
     createdAt: "2026-12-14T00:00:00.000Z",
     updatedAt: "2026-12-15T00:00:00.000Z",
+    interviewSlots: [],
   },
   {
     id: "batch-closed",
@@ -56,6 +79,7 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
     closedAt: "2025-09-20T00:00:00.000Z",
     createdAt: "2025-07-30T00:00:00.000Z",
     updatedAt: "2025-09-20T00:00:00.000Z",
+    interviewSlots: [],
   },
 ];
 
@@ -66,5 +90,6 @@ export function cloneRecruitmentBatches(
     ...batch,
     openCenterIds: [...batch.openCenterIds],
     responsibleAccountIds: [...batch.responsibleAccountIds],
+    interviewSlots: batch.interviewSlots?.map((slot) => ({ ...slot })),
   }));
 }
