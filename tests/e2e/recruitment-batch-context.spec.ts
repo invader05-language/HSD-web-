@@ -21,6 +21,20 @@ async function closeBatchBeforeAssessment(page: import("@playwright/test").Page)
   await expect(page.getByTestId("admin-toast")).toContainText("提前关闭已完成");
 }
 
+async function configureInterviewSlot(
+  page: import("@playwright/test").Page,
+  startAt: string,
+  endAt: string,
+) {
+  await page.getByRole("button", { name: "编辑批次" }).click();
+  const drawer = page.getByRole("dialog", { name: "编辑招新批次" });
+  await drawer.getByRole("button", { name: "添加时段" }).click();
+  await drawer.getByLabel("开始时间", { exact: true }).fill(startAt);
+  await drawer.getByLabel("结束时间", { exact: true }).fill(endAt);
+  await drawer.getByRole("button", { name: "保存修改" }).click();
+  await expect(drawer).toHaveCount(0);
+}
+
 test("batch links preserve batchId context across roster, assessment and publication", async ({ page }) => {
   await page.goto("/admin/recruitment/batches");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
@@ -119,6 +133,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
   const draftRow = page.getByRole("article").filter({ hasText: "111" });
   await draftRow.getByRole("link", { name: /进入批次/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "111" })).toBeVisible();
+  await configureInterviewSlot(page, "2026-10-01 09:00", "2026-10-01 09:30");
   await expect(page.getByRole("heading", { level: 2, name: "发布准备检查" })).toBeVisible();
   await expect(page.getByText(/与「2026 秋季招新」重叠/)).toBeVisible();
   await expect(page.getByRole("button", { name: "发布批次" })).toBeDisabled();
@@ -134,6 +149,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
 
   const readyRow = page.getByRole("article").filter({ hasText: "2027 春季补招" }).filter({ hasText: "草稿" });
   await readyRow.getByRole("link", { name: /进入批次/ }).click();
+  await configureInterviewSlot(page, "2027-04-10 09:00", "2027-04-10 09:30");
   await expect(page.getByRole("button", { name: "发布批次" })).toBeEnabled();
   await page.getByRole("button", { name: "发布批次" }).click();
   const dialog = page.getByRole("alertdialog", { name: /确认发布批次/ });
