@@ -35,18 +35,25 @@ describe("recruitment interview slots", () => {
     expect(getInterviewSlotAvailability({ ...slot, startAt: "2026-09-14T01:00:00.000Z" }, now).selectable).toBe(false);
   });
 
-  it("requires an active slot after registration closes before publishing", () => {
-    expect(hasPublishReadyInterviewSlots([slot], "2026-09-19T00:00:00.000Z")).toBe(true);
-    expect(hasPublishReadyInterviewSlots([{ ...slot, startAt: "2026-09-18T01:00:00.000Z" }], "2026-09-19T00:00:00.000Z")).toBe(false);
+  it("allows a future active slot before registration closes", () => {
+    expect(hasPublishReadyInterviewSlots([
+      { ...slot, startAt: "2026-09-18T01:00:00.000Z" },
+    ], now.toISOString())).toBe(true);
+  });
+
+  it("does not treat started slots as publish-ready", () => {
+    expect(hasPublishReadyInterviewSlots([
+      { ...slot, startAt: "2026-09-14T01:00:00.000Z" },
+    ], now.toISOString())).toBe(false);
   });
 
   it("validates repeatable editor rows and positive integer capacity", () => {
     expect(validateInterviewSlotDrafts([
       { startAt: "2026-09-20 09:00", endAt: "2026-09-20 09:30", capacity: "20" },
-    ], "2026-09-19T00:00:00.000Z")).toEqual([]);
+    ])).toEqual([]);
     expect(validateInterviewSlotDrafts([
       { startAt: "", endAt: "2026-09-20 09:30", capacity: "0" },
-    ], "2026-09-19T00:00:00.000Z")).toEqual([
+    ])).toEqual([
       "第 1 个时段必须填写开始和结束时间。",
       "第 1 个时段名额必须为正整数，留空表示不限人数。",
     ]);
