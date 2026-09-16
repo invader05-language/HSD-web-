@@ -178,7 +178,7 @@ const publishReadiness = computed(() => batch.value && isDraft.value && isMockAp
   : { ok: false });
 const interviewPublishReady = computed(() => {
   const slots = batch.value?.interviewSlots;
-  return slots === undefined || hasPublishReadyInterviewSlots(slots, batch.value?.endAt ?? "");
+  return slots === undefined || hasPublishReadyInterviewSlots(slots, now.value);
 });
 const openCenterNames = computed(() => !isMockApi
   ? productionBatch?.batch.value?.openCenters.map((center) => `${center.name}${center.active ? "" : "（已停用）"}`) ?? []
@@ -326,7 +326,7 @@ function requestAction(action: LifecycleAction) {
     return;
   }
   if (action === "publish" && !interviewPublishReady.value) {
-    actionError.value = "至少需要一个在报名截止后开始的有效面试时段。";
+    actionError.value = "至少需要一个尚未开始的有效面试时段。";
     return;
   }
   if (action === "publish" && !publishReadiness.value.ok) {
@@ -515,7 +515,7 @@ async function saveEditor() {
       if (!savedSlots) throw new Error(productionBatch.commandError.value || "面试时段保存失败");
     } else {
       if (!batchStore) return;
-      const slotErrors = validateInterviewSlotDrafts(editForm.interviewSlots, batch.value.endAt ?? "");
+      const slotErrors = validateInterviewSlotDrafts(editForm.interviewSlots);
       if (slotErrors.length) throw new Error(slotErrors.join(" "));
       batchStore.updateBatch(batchId.value, {
         ...payload,
@@ -695,7 +695,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div :class="['admin-batch-readiness__status', publishReadiness.ok ? 'is-ready' : 'is-blocked']">
           <strong>{{ publishReadiness.ok ? "可以发布" : "暂不可发布" }}</strong>
           <span v-if="publishReadiness.ok">当前批次的报名时间和开放中心配置均可生效。</span>
-          <span v-else>{{ interviewPublishReady ? getRecruitmentBatchCommandMessage(publishReadiness) : "至少需要一个在报名截止后开始的有效面试时段。" }}</span>
+          <span v-else>{{ interviewPublishReady ? getRecruitmentBatchCommandMessage(publishReadiness) : "至少需要一个尚未开始的有效面试时段。" }}</span>
         </div>
         <div v-if="!publishReadiness.ok && publishReadiness.code === 'BATCH_SCHEDULE_OVERLAP'" class="admin-batch-readiness__actions">
           <button type="button" class="button button--ghost" @click="openEditor">修改批次时间</button>
@@ -779,7 +779,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div class="admin-drawer__body">
           <div v-if="isDraft" class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
           <section v-if="isDraft" class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
-          <AdminInterviewSlotEditor v-model="editForm.interviewSlots" :registration-end-at="batch.endAt ?? ''" :impact-message="applications.length ? `${applications.length} 位已报名成员` : ''" :disabled="false" @publish="saveEditor" />
+          <AdminInterviewSlotEditor v-model="editForm.interviewSlots" :current-time="now.toISOString()" :impact-message="applications.length ? `${applications.length} 位已报名成员` : ''" :disabled="false" @publish="saveEditor" />
           <p v-if="editError" class="admin-save-message admin-save-message--error" role="alert">{{ editError }}</p>
         </div>
         <footer class="admin-drawer__footer"><span>{{ isDraft ? "联盟总负责人编辑 · 保存为草稿" : "联盟总负责人调整面试时段" }}</span><button type="button" class="button button--ghost" @click="editOpen = false">取消</button><button type="button" class="button" @click="saveEditor">保存修改</button></footer>

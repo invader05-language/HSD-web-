@@ -15,7 +15,8 @@ const SHANGHAI_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
   hourCycle: "h23",
 });
 
-function parseSlotInstant(value: string): Date {
+function parseSlotInstant(value: string | Date): Date {
+  if (value instanceof Date) return value;
   const normalized = value.trim();
   return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)
     ? new Date(`${normalized.replace(" ", "T")}:00+08:00`)
@@ -65,10 +66,10 @@ export function getInterviewSlotAvailability(
 
 export function hasPublishReadyInterviewSlots(
   slots: readonly Pick<RecruitmentInterviewSlot, "startAt" | "status">[],
-  registrationEndAt: string,
+  now: string | Date = new Date(),
 ): boolean {
-  const deadline = parseSlotInstant(registrationEndAt).getTime();
-  return slots.some((slot) => slot.status === "ACTIVE" && parseSlotInstant(slot.startAt).getTime() > deadline);
+  const currentTime = parseSlotInstant(now).getTime();
+  return slots.some((slot) => slot.status === "ACTIVE" && parseSlotInstant(slot.startAt).getTime() > currentTime);
 }
 
 function parseCapacity(value: string): number | null | undefined {
@@ -80,7 +81,6 @@ function parseCapacity(value: string): number | null | undefined {
 
 export function validateInterviewSlotDrafts(
   drafts: readonly Pick<RecruitmentInterviewSlotDraft, "startAt" | "endAt" | "capacity">[],
-  registrationEndAt: string,
 ): string[] {
   const errors: string[] = [];
   drafts.forEach((draft, index) => {
