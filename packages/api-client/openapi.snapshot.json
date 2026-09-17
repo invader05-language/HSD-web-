@@ -13347,6 +13347,79 @@
           "Notifications"
         ]
       }
+    },
+    "/api/v1/admin/organization/memberships/{personId}/transfer": {
+      "post": {
+        "operationId": "OrganizationAdminController_transferMembership",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferMembershipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Transfer a formal member to another active center",
+        "tags": [
+          "Administration"
+        ]
+      }
     }
   },
   "info": {
@@ -23402,6 +23475,53 @@
         },
         "required": [
           "ok"
+        ]
+      },
+      "TransferMembershipDto": {
+        "type": "object",
+        "properties": {
+          "targetCenterId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The active center that will own the member after the transfer"
+          },
+          "expectedMembershipVersion": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Current center-membership version"
+          },
+          "expectedPersonVersion": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Current person version"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200,
+            "description": "Required reason recorded in the audit trail"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "example": true
+          },
+          "baizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ]
+          }
+        },
+        "required": [
+          "targetCenterId",
+          "expectedMembershipVersion",
+          "expectedPersonVersion",
+          "reason",
+          "confirmed"
         ]
       }
     },

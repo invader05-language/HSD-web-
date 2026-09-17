@@ -33,6 +33,7 @@ const browserOperations = {
   organizationCenters: "GET /api/v1/admin/organization/centers",
   organizationMembershipCreate: "POST /api/v1/admin/organization/memberships",
   organizationMembershipUpdate: "PATCH /api/v1/admin/organization/memberships/{personId}",
+  organizationMembershipTransfer: "POST /api/v1/admin/organization/memberships/{personId}/transfer",
   organizationMembershipRetire: { operation: "POST /api/v1/admin/organization/memberships/{personId}/retire", successStatus: "200" },
   organizationPositionAppointAllianceOwner: "POST /api/v1/admin/organization/positions/alliance-owners/{personId}",
   organizationPositionRevokeAllianceOwner: { operation: "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke", successStatus: "200" },

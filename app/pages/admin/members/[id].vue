@@ -43,6 +43,14 @@ const promotionCenterId = ref("");
 const promotionDuty = ref<"REGULAR" | "CORE">("REGULAR");
 const promotionBaizeDirection = ref<BaizeDirectionCode | "">("");
 const selectedPromotionCenter = computed(() => memberAdministration.apiCenters.find((center) => center.id === promotionCenterId.value));
+const apiMember = computed(() => member.value ? memberAdministration.apiManagedMembers.find((candidate) => candidate.id === member.value!.id) : undefined);
+const currentCenterId = computed(() => apiMember.value?.membership?.center.id ?? "");
+const transferCenterId = ref("");
+const transferReason = ref("");
+const transferBaizeDirection = ref<BaizeDirectionCode | "">("");
+const showTransferConfirm = ref(false);
+const selectedTransferCenter = computed(() => memberAdministration.apiCenters.find((center) => center.id === transferCenterId.value));
+const canTransferMember = computed(() => Boolean(organizationGateway && session.adminLevel === "owner" && member.value?.identity === "正式成员" && apiMember.value?.membership));
 const positions = computed(() => member.value ? memberAdministration.positionsForPerson(member.value.id) : []);
 const canManagePositions = computed(() => Boolean(organizationGateway && session.canManageAdminAccounts && member.value?.identity === "正式成员"));
 const projectOptions = ref<ProjectActionOption[]>([]);
@@ -143,6 +151,30 @@ function requestSave() {
   saveStatus.value = "not-eligible";
 }
 
+function openTransferConfirm() {
+  if (!canTransferMember.value || !transferCenterId.value) return;
+  transferBaizeDirection.value = "";
+  transferReason.value = "";
+  showTransferConfirm.value = true;
+}
+
+async function confirmTransfer() {
+  if (!member.value || !organizationGateway || !apiMember.value?.membership || !transferCenterId.value || transferReason.value.trim().length < 2) return;
+  const result = await memberAdministration.transferMembershipFromApi(member.value.id, {
+    targetCenterId: transferCenterId.value,
+    expectedMembershipVersion: apiMember.value.membership.version,
+    expectedPersonVersion: apiMember.value.version,
+    reason: transferReason.value.trim(),
+    ...(selectedTransferCenter.value?.slug === "baize-development" && transferBaizeDirection.value
+      ? { baizeDirection: transferBaizeDirection.value }
+      : {}),
+  }, organizationGateway);
+  if (result) {
+    showTransferConfirm.value = false;
+    transferReason.value = "";
+  }
+}
+
 async function confirmPromotion() {
   if (!session.canManageAdminAccounts || !member.value) return;
   if (organizationGateway) {
@@ -177,6 +209,7 @@ onMounted(async () => {
   if (organizationGateway) {
     await memberAdministration.refreshFromApi(organizationGateway);
     promotionCenterId.value ||= memberAdministration.apiCenters[0]?.id ?? "";
+    transferCenterId.value ||= memberAdministration.apiCenters.find((center) => center.id !== currentCenterId.value)?.id ?? "";
     await loadProjectOptions();
   }
 });
@@ -250,7 +283,7 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
         </div>
 
         <section v-if="organizationGateway" class="admin-detail-form">
-          <header><span>Organization Positions</span><h2>组织职务</h2><p>正式成员所属中心只读；冲突后会刷新权威数据。</p></header>
+          <header><span>Organization Positions</span><h2>组织职务</h2><p>组织职务变更与所属中心调整相互独立，冲突后会刷新权威数据。</p></header>
           <p v-if="positions.length">{{ positions.map((position) => getOrganizationPositionLabel(position.type)).join("、") }}</p>
           <p v-else>暂无组织职务</p>
           <p v-if="projectOptionsLoading" class="admin-inline-note" role="status">正在加载项目目录…</p>
@@ -272,6 +305,15 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
           <p v-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
         </section>
 
+        <section v-if="canTransferMember" class="admin-detail-form admin-member-transfer">
+          <header><span>Center Assignment</span><h2>所属中心</h2><p>仅联盟负责人可以调整正式成员的所属中心；成员职责保持不变，操作需要填写原因并记录审计。</p></header>
+          <div class="admin-member-transfer__row">
+            <label>当前中心<input :value="member.center" readonly></label>
+            <label>目标中心<select v-model="transferCenterId"><option value="">请选择目标中心</option><option v-for="center in memberAdministration.apiCenters.filter((candidate) => candidate.id !== currentCenterId)" :key="center.id" :value="center.id">{{ center.name }}</option></select></label>
+            <button type="button" class="button" :disabled="memberAdministration.apiLoading || !transferCenterId" @click="openTransferConfirm">调整所属中心</button>
+          </div>
+        </section>
+
         <footer>
           <span v-if="saveStatus === 'saved'" class="admin-member-save-status" role="status">资料已保存并同步成员目录</span>
           <span v-else-if="saveStatus === 'storage-error'" class="admin-member-save-status is-error" role="alert">浏览器存储暂不可用，未保存身份变更</span>
@@ -289,6 +331,19 @@ useHead(() => ({ title: member.value ? `${member.value.name}｜成员管理｜HS
         <h2 id="identity-title">确认转为正式成员？</h2>
         <p>保存后将复用现有成员帐号，写入正式成员档案，并同步成员空间、中心关系和公开成员目录；不会创建新帐号、重置密码或修改管理员资格。</p>
         <div><button type="button" class="button button--ghost" @click="showPromotionConfirm = false">返回检查</button><button type="button" class="button" :disabled="memberAdministration.apiLoading" @click="confirmPromotion">确认保存</button></div>
+      </section>
+    </div>
+
+    <div v-if="showTransferConfirm" class="admin-modal-backdrop" @click.self="showTransferConfirm = false">
+      <section role="alertdialog" aria-modal="true" aria-labelledby="transfer-title">
+        <span>Center Assignment</span>
+        <h2 id="transfer-title">确认调整所属中心？</h2>
+        <p>成员：{{ member.name }}；{{ member.center }} → {{ selectedTransferCenter?.name || "—" }}。成员职责“{{ displayDuty }}”保持不变。</p>
+        <p v-if="selectedTransferCenter?.slug === 'baize-development'">进入白泽开发中心必须选择实践方向。</p>
+        <label v-if="selectedTransferCenter?.slug === 'baize-development'">实践方向<select v-model="transferBaizeDirection"><option value="">请选择实践方向</option><option v-for="(label, code) in BAIZE_DIRECTION_LABELS" :key="code" :value="code">{{ label }}</option></select></label>
+        <label>调整原因<textarea v-model="transferReason" rows="3" maxlength="200" placeholder="请输入至少 2 个字符的调整原因" /></label>
+        <p v-if="memberAdministration.apiError" class="member-profile-error" role="alert">{{ memberAdministration.apiError.message }}</p>
+        <div><button type="button" class="button button--ghost" :disabled="memberAdministration.apiLoading" @click="showTransferConfirm = false">取消</button><button type="button" class="button" :disabled="memberAdministration.apiLoading || transferReason.trim().length < 2 || (selectedTransferCenter?.slug === 'baize-development' && !transferBaizeDirection)" @click="confirmTransfer">确认调整</button></div>
       </section>
     </div>
 

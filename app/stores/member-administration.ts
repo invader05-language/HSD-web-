@@ -24,6 +24,7 @@ import type { AdminCenter, AdminMember } from "../data/admin-members";
 import type { BaizeDirection } from "../data/recruitment-application";
 import { BAIZE_DIRECTION_LABELS, baizeDirectionLabel, type BaizeDirectionCode } from "../utils/baize-direction-label";
 import type { OrganizationGateway } from "../services/organization/organization-gateway";
+import type { OrganizationMembershipResponseDto, TransferMembershipDto } from "../../packages/api-client/src";
 
 export type { CreateFormalMemberInput, CreateFormalMemberResult } from "../utils/member-account-form";
 
@@ -61,6 +62,8 @@ export interface PromoteMemberToFormalApiInput {
   baizeDirection?: BaizeDirectionCode;
 }
 
+export type TransferMembershipApiInput = Omit<TransferMembershipDto, "confirmed">;
+
 function apiError(cause: unknown): OrganizationStoreError {
   if (cause instanceof Error) {
     const error = cause as Error & { status?: number; code?: string; requestId?: string };
@@ -73,6 +76,25 @@ function apiError(cause: unknown): OrganizationStoreError {
   }
   return { code: "ORGANIZATION_API_REQUEST_FAILED", message: "Organization API request failed" };
 }
+
+const transferErrorMessages: Record<string, string> = {
+  OWNER_PERMISSION_REQUIRED: "仅联盟负责人可以调整成员所属中心",
+  FORMAL_MEMBER_REQUIRED: "只有正式成员可以调整所属中心",
+  ACTIVE_MEMBERSHIP_NOT_FOUND: "成员当前没有有效的中心关系",
+  PERSON_VERSION_CONFLICT: "成员资料已变化，请刷新后重试",
+  MEMBERSHIP_VERSION_CONFLICT: "成员所属中心已变化，请刷新后重试",
+  TRANSFER_TARGET_SAME_CENTER: "目标中心不能与当前中心相同",
+  CENTER_NOT_FOUND: "目标中心不存在",
+  CENTER_INACTIVE: "目标中心当前未启用",
+  BAIZE_DIRECTION_REQUIRED: "进入白泽开发中心必须选择实践方向",
+  BAIZE_DIRECTION_NOT_ALLOWED: "只有白泽开发中心成员可以设置实践方向",
+  CENTER_MINISTER_TRANSFER_BLOCKED: "请先处理成员的部长职务后再调整所属中心",
+  PROJECT_LEAD_TRANSFER_BLOCKED: "请先处理跨中心项目负责人职务后再调整所属中心",
+  SCOPED_ADMIN_TRANSFER_BLOCKED: "请先解除成员的中心管理员范围后再调整所属中心",
+  AVATAR_TRANSFER_UNSAFE: "成员头像资源无法安全迁移，请先处理共享或未就绪资源",
+  TRANSFER_REASON_REQUIRED: "请输入至少 2 个字符的调整原因",
+  CONFIRMATION_REQUIRED: "请确认本次所属中心调整",
+};
 
 function baizeDirectionCode(label: BaizeDirection | undefined): BaizeDirectionCode | undefined {
   return (Object.entries(BAIZE_DIRECTION_LABELS) as Array<[BaizeDirectionCode, BaizeDirection]>)
@@ -225,6 +247,27 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     } catch (cause) {
       apiErrorState.value = apiError(cause);
       return { status: "api_error" };
+    } finally {
+      apiLoading.value = false;
+    }
+  }
+
+  async function transferMembershipFromApi(
+    personId: string,
+    input: TransferMembershipApiInput,
+    gateway: OrganizationGateway,
+  ): Promise<OrganizationMembershipResponseDto | null> {
+    apiLoading.value = true;
+    apiErrorState.value = null;
+    try {
+      const membership = await gateway.transferMembership(personId, { ...input, confirmed: true });
+      await refreshFromApi(gateway);
+      return membership;
+    } catch (cause) {
+      const error = apiError(cause);
+      apiErrorState.value = { ...error, message: transferErrorMessages[error.code] ?? error.message };
+      await refreshFromApi(gateway);
+      return null;
     } finally {
       apiLoading.value = false;
     }
@@ -742,6 +785,7 @@ export const useMemberAdministrationStore = defineStore("member-administration",
     createFormalMemberFromApi,
     promoteMemberToFormalFromApi,
     promoteFormalMemberToCoreFromApi,
+    transferMembershipFromApi,
     setCoreMembershipFromApi,
     positionsForPerson,
     appointAllianceOwnerFromApi,

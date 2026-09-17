@@ -2018,6 +2018,15 @@ export type SubmitApplicationDto = {
   "acceptsAdjustment": boolean;
 };
 
+export type TransferMembershipDto = {
+  "targetCenterId": string;
+  "expectedMembershipVersion": number;
+  "expectedPersonVersion": number;
+  "reason": string;
+  "confirmed": boolean;
+  "baizeDirection"?: "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+};
+
 export type UpdateActivityDto = {
   "centerId"?: string;
   "slug"?: string;
@@ -2258,6 +2267,7 @@ export const API_V1_PATHS = {
   organizationCenters: "/api/v1/admin/organization/centers",
   organizationMembershipCreate: "/api/v1/admin/organization/memberships",
   organizationMembershipUpdate: "/api/v1/admin/organization/memberships/{personId}",
+  organizationMembershipTransfer: "/api/v1/admin/organization/memberships/{personId}/transfer",
   organizationMembershipRetire: "/api/v1/admin/organization/memberships/{personId}/retire",
   organizationPositionAppointAllianceOwner: "/api/v1/admin/organization/positions/alliance-owners/{personId}",
   organizationPositionRevokeAllianceOwner: "/api/v1/admin/organization/positions/alliance-owners/{personId}/revoke",
@@ -2410,6 +2420,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/organization/centers": { method: "GET", path: "/api/v1/admin/organization/centers" },
   "POST /api/v1/admin/organization/memberships": { method: "POST", path: "/api/v1/admin/organization/memberships" },
   "PATCH /api/v1/admin/organization/memberships/{personId}": { method: "PATCH", path: "/api/v1/admin/organization/memberships/{personId}" },
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": { method: "POST", path: "/api/v1/admin/organization/memberships/{personId}/transfer" },
   "POST /api/v1/admin/organization/memberships/{personId}/retire": { method: "POST", path: "/api/v1/admin/organization/memberships/{personId}/retire" },
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}": { method: "POST", path: "/api/v1/admin/organization/positions/alliance-owners/{personId}" },
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke": { method: "POST", path: "/api/v1/admin/organization/positions/alliance-owners/{personId}/revoke" },
@@ -2565,6 +2576,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/organization/centers": AdminCenterListResponseDto;
   "POST /api/v1/admin/organization/memberships": OrganizationMembershipResponseDto;
   "PATCH /api/v1/admin/organization/memberships/{personId}": OrganizationMembershipResponseDto;
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": OrganizationMembershipResponseDto;
   "POST /api/v1/admin/organization/memberships/{personId}/retire": RetiredOrganizationMembershipResponseDto;
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}": OrganizationPositionResponseDto;
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke": OrganizationPositionResponseDto;
@@ -2776,6 +2788,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
   },
   "PATCH /api/v1/admin/organization/memberships/{personId}": {
+    "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
+  },
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": {
     "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
   },
   "POST /api/v1/admin/organization/memberships/{personId}/retire": {
@@ -13111,31 +13126,6 @@ const API_COMPONENT_SCHEMAS = {
       "slots"
     ]
   },
-  "PortalReferenceResponseDto": {
-    "type": "object",
-    "properties": {
-      "entityType": {
-        "type": "string",
-        "enum": [
-          "flash",
-          "article",
-          "notice",
-          "project",
-          "activity",
-          "gallery",
-          "resource"
-        ]
-      },
-      "sourceId": {
-        "type": "string",
-        "description": "The persisted source identifier for the configured entry"
-      }
-    },
-    "required": [
-      "entityType",
-      "sourceId"
-    ]
-  },
   "MemberNotificationDto": {
     "type": "object",
     "properties": {
@@ -13221,6 +13211,53 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "ok"
+    ]
+  },
+  "TransferMembershipDto": {
+    "type": "object",
+    "properties": {
+      "targetCenterId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "The active center that will own the member after the transfer"
+      },
+      "expectedMembershipVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current center-membership version"
+      },
+      "expectedPersonVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current person version"
+      },
+      "reason": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 200,
+        "description": "Required reason recorded in the audit trail"
+      },
+      "confirmed": {
+        "type": "boolean",
+        "example": true
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      }
+    },
+    "required": [
+      "targetCenterId",
+      "expectedMembershipVersion",
+      "expectedPersonVersion",
+      "reason",
+      "confirmed"
     ]
   }
 } as const;
