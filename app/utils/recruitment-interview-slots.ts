@@ -4,6 +4,7 @@ import {
   type RecruitmentInterviewSlotAvailability,
   type RecruitmentInterviewSlotDraft,
 } from "../types/recruitment-interview";
+import { parseInterviewDraftDate } from "./interview-datetime";
 
 const SHANGHAI_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
   timeZone: INTERVIEW_TIMEZONE,
@@ -17,10 +18,7 @@ const SHANGHAI_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
 
 function parseSlotInstant(value: string | Date): Date {
   if (value instanceof Date) return value;
-  const normalized = value.trim();
-  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)
-    ? new Date(`${normalized.replace(" ", "T")}:00+08:00`)
-    : new Date(normalized);
+  return parseInterviewDraftDate(value) ?? new Date(Number.NaN);
 }
 
 function formatShanghaiDate(value: string): string {
@@ -85,11 +83,11 @@ export function validateInterviewSlotDrafts(
   const errors: string[] = [];
   drafts.forEach((draft, index) => {
     const label = `第 ${index + 1} 个时段`;
-    const start = parseSlotInstant(draft.startAt);
-    const end = parseSlotInstant(draft.endAt);
-    if (!draft.startAt.trim() || !draft.endAt.trim() || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
-      errors.push(`${label}必须填写开始和结束时间。`);
-    }
+    const start = parseInterviewDraftDate(draft.startAt);
+    const end = parseInterviewDraftDate(draft.endAt);
+    if (!start) errors.push(`${label}请选择有效的开始时间。`);
+    if (!end) errors.push(`${label}请选择有效的结束时间。`);
+    if (start && end && end.getTime() <= start.getTime()) errors.push(`${label}结束时间必须晚于开始时间。`);
     if (parseCapacity(draft.capacity) === undefined) {
       errors.push(`${label}名额必须为正整数，留空表示不限人数。`);
     }
