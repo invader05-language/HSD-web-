@@ -22,6 +22,7 @@ import type {
   RevokeOrganizationPositionDto,
   SetCoreMembershipDto,
   UpdateMembershipDto,
+  TransferMembershipDto,
 } from "../../../packages/api-client/src";
 
 export interface OrganizationGateway {
@@ -33,6 +34,7 @@ export interface OrganizationGateway {
   promoteMemberToFormal(personId: string, payload: PromoteManagedMemberDto): Promise<ManagedMemberResponseDto>;
   createMembership(payload: CreateMembershipDto): Promise<OrganizationMembershipResponseDto>;
   updateMembership(personId: string, payload: UpdateMembershipDto): Promise<OrganizationMembershipResponseDto>;
+  transferMembership(personId: string, payload: TransferMembershipDto): Promise<OrganizationMembershipResponseDto>;
   retireMembership(personId: string, payload: RetireMembershipDto): Promise<RetiredOrganizationMembershipResponseDto>;
   listAccounts(): Promise<AdminAccountListResponseDto>;
   dryRunImport(payload: PreparatoryMemberImportDto): Promise<PreparatoryMemberImportReportResponseDto>;

@@ -97,6 +97,7 @@ export function createApiOrganizationGateway(options: ApiOrganizationGatewayOpti
     promoteMemberToFormal: client.members.promoteManaged,
     createMembership: client.organization.createMembership,
     updateMembership: client.organization.updateMembership,
+    transferMembership: client.organization.transferMembership,
     retireMembership: client.organization.retireMembership,
     listAccounts: client.adminAccess.accounts,
     dryRunImport: client.imports.dryRun,

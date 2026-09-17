@@ -49,6 +49,7 @@ import {
   type RetireMembershipDto,
   type SavePortalConfigurationDto,
   type UpdateMembershipDto,
+  type TransferMembershipDto,
   type CreateHonorDto,
   type UpdateHonorConsentDto,
   type HonorCommandDto,
@@ -164,6 +165,7 @@ export interface HsdApiClient {
     centers(): Promise<ApiResponseFor<"GET /api/v1/admin/organization/centers">>;
     createMembership(payload: CreateMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships">>;
     updateMembership(personId: string, payload: UpdateMembershipDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/organization/memberships/{personId}">>;
+    transferMembership(personId: string, payload: TransferMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships/{personId}/transfer">>;
     retireMembership(personId: string, payload: RetireMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships/{personId}/retire">>;
     appointAllianceOwner(personId: string, payload: AppointOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/alliance-owners/{personId}">>;
     revokeAllianceOwner(personId: string, payload: RevokeOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke">>;
@@ -321,6 +323,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       centers: () => requestGenerated(transport, "GET /api/v1/admin/organization/centers"),
       createMembership: (payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships", payload),
       updateMembership: (personId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/organization/memberships/{personId}", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}`),
+      transferMembership: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships/{personId}/transfer", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}/transfer`),
       retireMembership: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships/{personId}/retire", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}/retire`),
       appointAllianceOwner: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/alliance-owners/{personId}", payload, `/api/v1/admin/organization/positions/alliance-owners/${encodeURIComponent(personId)}`),
       revokeAllianceOwner: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke", payload, `/api/v1/admin/organization/positions/alliance-owners/${encodeURIComponent(personId)}/revoke`),
