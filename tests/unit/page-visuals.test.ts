@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PAGE_VISUALS, resolvePageVisual } from "../../app/data/page-visuals";
+import { PAGE_VISUALS, PEOPLE_PAGE_VISUAL, resolvePageVisual } from "../../app/data/page-visuals";
 import { resolvePortalAssetMetadata, resolvePortalAssetSource } from "../../app/data/portal-assets";
 
 describe("approved page visuals", () => {
@@ -55,5 +55,25 @@ describe("approved page visuals", () => {
 
     expect(resolvePortalAssetMetadata("asset-projects-baize")?.srcSet).toContain("asset-projects-baize-v2");
     expect(resolvePortalAssetMetadata("asset-join-orientation")?.srcSet).toContain("asset-join-orientation-v2");
+  });
+
+  it("defines the shared people-directory visual with responsive derivatives", () => {
+    const visual = PEOPLE_PAGE_VISUAL;
+    expect(visual.assetId).toBe("asset-people-classroom");
+    expect(visual.alt).toContain("HSD");
+    expect(resolvePortalAssetSource(visual.assetId)).toMatch(/people-classroom-1440w\.jpg(?:\?|$)/);
+    const metadata = resolvePortalAssetMetadata(visual.assetId);
+    expect(metadata?.srcSet).toContain("828w");
+    expect(metadata?.srcSet).toContain("1440w");
+    expect(metadata?.srcSet).toContain("1920w");
+    expect(metadata?.fallbackSrc).toMatch(/people-classroom-1440w\.jpg(?:\?|$)/);
+  });
+
+  it("connects all people pages to the shared visual", () => {
+    for (const path of ["app/pages/people/core.vue", "app/pages/people/members.vue", "app/pages/people/[id].vue"]) {
+      const source = readFileSync(path, "utf8");
+      expect(source).toContain('from "~/data/page-visuals"');
+      expect(source).toContain(':visual="PEOPLE_PAGE_VISUAL"');
+    }
   });
 });

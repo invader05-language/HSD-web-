@@ -22,6 +22,13 @@ export type ActivityRegistrationFormResponseDto = {
   "fields": Array<RegistrationTemplateFieldResponseDto>;
 };
 
+export type AdminAccountCenterSummaryResponseDto = {
+  "id": string;
+  "slug": string;
+  "name": string;
+  "active": boolean;
+};
+
 export type AdminAccountListResponseDto = {
   "page": number;
   "pageSize": number;
@@ -41,7 +48,7 @@ export type AdminAccountResponseDto = {
   "createdAt": string;
   "updatedAt": string;
   "person": AdminPersonSummaryResponseDto;
-  "adminCenter": (AdminCenterResponseDto) | null;
+  "adminCenter": (AdminAccountCenterSummaryResponseDto) | null;
 };
 
 export type AdminActivityListResponseDto = {
@@ -12432,7 +12439,7 @@ const API_COMPONENT_SCHEMAS = {
         "nullable": true,
         "allOf": [
           {
-            "$ref": "#/components/schemas/AdminCenterResponseDto"
+            "$ref": "#/components/schemas/AdminAccountCenterSummaryResponseDto"
           }
         ]
       }
@@ -13164,6 +13171,30 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "ok"
+    ]
+  },
+  "AdminAccountCenterSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "active": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "slug",
+      "name",
+      "active"
     ]
   }
 } as const;
