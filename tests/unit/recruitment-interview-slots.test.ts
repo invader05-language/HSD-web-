@@ -54,8 +54,23 @@ describe("recruitment interview slots", () => {
     expect(validateInterviewSlotDrafts([
       { startAt: "", endAt: "2026-09-20 09:30", capacity: "0" },
     ])).toEqual([
-      "第 1 个时段必须填写开始和结束时间。",
+      "第 1 个时段请选择有效的开始时间。",
       "第 1 个时段名额必须为正整数，留空表示不限人数。",
     ]);
+  });
+
+  it("distinguishes an end time that is not after the start", () => {
+    expect(validateInterviewSlotDrafts([
+      { startAt: "2026-09-20T01:30:00.000Z", endAt: "2026-09-20T01:30:00.000Z", capacity: "" },
+    ])).toEqual(["第 1 个时段结束时间必须晚于开始时间。"]);
+    expect(validateInterviewSlotDrafts([
+      { startAt: "2026-09-20T02:00:00.000Z", endAt: "2026-09-20T01:30:00.000Z", capacity: "" },
+    ])).toEqual(["第 1 个时段结束时间必须晚于开始时间。"]);
+  });
+
+  it("allows a valid cross-midnight slot and a slot before registration close", () => {
+    expect(validateInterviewSlotDrafts([
+      { startAt: "2026-09-20T23:30:00.000Z", endAt: "2026-09-21T00:30:00.000Z", capacity: "" },
+    ])).toEqual([]);
   });
 });

@@ -26,11 +26,32 @@ async function configureInterviewSlot(
   startAt: string,
   endAt: string,
 ) {
+  async function chooseDateTime(label: string, value: string) {
+    const [datePart, timePart] = value.split(" ");
+    const [hours, minutes] = timePart.split(":");
+    const input = page.getByRole("dialog", { name: "编辑招新批次" }).getByRole("combobox", { name: label });
+    await input.click();
+    const menu = page.locator(".dp--menu").last();
+    const dateCell = menu.locator(`[data-test-id="dp-${datePart}"]`);
+    for (let month = 0; month < 24 && !(await dateCell.count()); month += 1) {
+      await menu.locator('[data-dp-element="action-next"]').click();
+    }
+    if (!(await dateCell.count())) throw new Error(`日期选择器未找到 ${datePart}`);
+    await dateCell.click();
+    await menu.locator('[data-test-id="open-time-picker-btn"]').click();
+    await menu.locator('[data-test-id="hours-toggle-overlay-btn-0"]').click();
+    await menu.locator(`[data-test-id="${hours}"]`).click();
+    await menu.locator('[data-test-id="minutes-toggle-overlay-btn-0"]').click();
+    await menu.locator(`[data-test-id="${minutes}"]`).click();
+    await menu.locator('[data-test-id="select-button"]').click();
+    await expect(input).toHaveValue(value);
+  }
+
   await page.getByRole("button", { name: "编辑批次" }).click();
   const drawer = page.getByRole("dialog", { name: "编辑招新批次" });
   await drawer.getByRole("button", { name: "添加时段" }).click();
-  await drawer.getByLabel("开始时间", { exact: true }).fill(startAt);
-  await drawer.getByLabel("结束时间", { exact: true }).fill(endAt);
+  await chooseDateTime("开始时间", startAt);
+  await chooseDateTime("结束时间", endAt);
   await drawer.getByRole("button", { name: "保存修改" }).click();
   await expect(drawer).toHaveCount(0);
 }

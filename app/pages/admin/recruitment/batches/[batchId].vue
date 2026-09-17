@@ -30,7 +30,8 @@ import { useAdminToast } from "~/composables/useAdminToast";
 import { lifecycleChangeSummary, lifecycleSnapshotValue } from "~/utils/recruitment-lifecycle-copy";
 import type { RecruitmentInterviewSlot, RecruitmentInterviewSlotDraft } from "~/types/recruitment-interview";
 import AdminInterviewSlotEditor from "~/components/admin/AdminInterviewSlotEditor.vue";
-import { hasPublishReadyInterviewSlots, validateInterviewSlotDrafts } from "~/utils/recruitment-interview-slots";
+import { hasPublishReadyInterviewSlots, parseInterviewSlotCapacity, validateInterviewSlotDrafts } from "~/utils/recruitment-interview-slots";
+import { parseInterviewDraftDate } from "~/utils/interview-datetime";
 
 definePageMeta({ layout: "admin" });
 
@@ -131,6 +132,8 @@ const canConfirmPendingAction = computed(() => {
 });
 const editOpen = ref(false);
 const editError = ref("");
+const editSaving = ref(false);
+const interviewSlotEditor = ref<InstanceType<typeof AdminInterviewSlotEditor> | null>(null);
 const productionCenterOptions = ref<ReadonlyArray<readonly [string, string]>>([]);
 // Keep the transient toast scoped to the current page.  Some lightweight
 // route fixtures (and older Nuxt test harnesses) expose only `path`, while
@@ -460,17 +463,6 @@ function toDateTime(value: string, endOfDay = false) {
   return value ? new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+08:00`).toISOString() : "";
 }
 
-function dateTimeInput(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
-}
-
 function openEditor() {
   if (!batch.value || !canManage.value || isArchived.value) return;
   editError.value = "";
@@ -480,18 +472,46 @@ function openEditor() {
   editForm.openCenterIds = [...(batch.value.openCenterIds ?? [])];
   editForm.interviewSlots = (batch.value.interviewSlots ?? []).map((slot) => ({
     id: slot.id,
-    startAt: dateTimeInput(slot.startAt),
-    endAt: dateTimeInput(slot.endAt),
+    startAt: slot.startAt,
+    endAt: slot.endAt,
     capacity: slot.capacity === null ? "" : String(slot.capacity),
   }));
   editOpen.value = true;
 }
 
+function closeEditor() {
+  if (editSaving.value) return;
+  editOpen.value = false;
+}
+
 async function saveEditor() {
-  if (!batch.value) return;
+  if (!batch.value || editSaving.value) return;
+  const formErrors: string[] = [];
+  if (isDraft.value) {
+    if (!editForm.name.trim()) formErrors.push("请输入批次名称。");
+    if (!editForm.startAt) formErrors.push("请选择报名开始时间。");
+    if (!editForm.endAt) formErrors.push("请选择报名截止时间。");
+    if (editForm.startAt && editForm.endAt && editForm.endAt < editForm.startAt) formErrors.push("报名截止时间必须晚于报名开始时间。");
+    if (!editForm.openCenterIds.length) formErrors.push("请至少选择一个开放中心。");
+  }
+  const slotErrors = validateInterviewSlotDrafts(editForm.interviewSlots);
+  if (!editForm.interviewSlots.length) slotErrors.unshift("至少配置一个面试时段。");
+  const validationErrors = [...formErrors, ...slotErrors];
+  if (validationErrors.length) {
+    editError.value = validationErrors.join(" ");
+    return;
+  }
+
+  const normalizedSlots = editForm.interviewSlots.map((slot) => ({
+    ...slot,
+    startAt: parseInterviewDraftDate(slot.startAt)!.toISOString(),
+    endAt: parseInterviewDraftDate(slot.endAt)!.toISOString(),
+    capacity: parseInterviewSlotCapacity(slot.capacity),
+  }));
+  editSaving.value = true;
   try {
     const payload = {
-      name: editForm.name,
+      name: editForm.name.trim(),
       startAt: toDateTime(editForm.startAt),
       endAt: toDateTime(editForm.endAt, true),
       openCenterIds: editForm.openCenterIds,
@@ -503,32 +523,29 @@ async function saveEditor() {
         if (!saved) throw new Error(productionBatch.commandError.value || "批次草稿保存失败");
       }
       const expectedBatchVersion = productionBatch.batch.value?.version ?? batch.value.version ?? 1;
-      const slots: ReconcileInterviewSlotsDto["slots"] = editForm.interviewSlots.map((slot) => ({
+      const slots: ReconcileInterviewSlotsDto["slots"] = normalizedSlots.map((slot) => ({
         ...(slot.id ? { publicToken: slot.id } : {}),
-        startAt: new Date(`${slot.startAt.replace(" ", "T")}:00+08:00`).toISOString(),
-        endAt: new Date(`${slot.endAt.replace(" ", "T")}:00+08:00`).toISOString(),
-        capacity: slot.capacity.trim() ? Number(slot.capacity) as unknown as ReconcileInterviewSlotsDto["slots"][number]["capacity"] : null,
+        startAt: slot.startAt,
+        endAt: slot.endAt,
+        capacity: slot.capacity as unknown as ReconcileInterviewSlotsDto["slots"][number]["capacity"],
         status: "ACTIVE" as const,
       }));
-      if (slots.length === 0) throw new Error("至少配置一个面试时段。");
       const savedSlots = await productionBatch.updateInterviewSlots({ expectedBatchVersion, slots, confirmed: true });
       if (!savedSlots) throw new Error(productionBatch.commandError.value || "面试时段保存失败");
     } else {
       if (!batchStore) return;
-      const slotErrors = validateInterviewSlotDrafts(editForm.interviewSlots);
-      if (slotErrors.length) throw new Error(slotErrors.join(" "));
       batchStore.updateBatch(batchId.value, {
         ...payload,
-          interviewSlots: editForm.interviewSlots.map((slot, index) => ({
+        interviewSlots: normalizedSlots.map((slot, index) => ({
           id: slot.id ?? `slot-${batchId.value}-${index + 1}`,
-          startAt: new Date(`${slot.startAt.replace(" ", "T")}:00+08:00`).toISOString(),
-          endAt: new Date(`${slot.endAt.replace(" ", "T")}:00+08:00`).toISOString(),
+          startAt: slot.startAt,
+          endAt: slot.endAt,
           timezone: "Asia/Shanghai",
-          capacity: slot.capacity.trim() ? Number(slot.capacity) : null,
+          capacity: slot.capacity,
           status: "ACTIVE" as const,
           confirmedCount: batch.value?.interviewSlots?.find((existing) => existing.id === slot.id)?.confirmedCount ?? 0,
           version: batch.value?.interviewSlots?.find((existing) => existing.id === slot.id)?.version ?? 1,
-          })),
+        })),
       }, "更新招新批次草稿与面试时段");
     }
     editOpen.value = false;
@@ -537,6 +554,8 @@ async function saveEditor() {
     adminToast.success(actionMessage.value);
   } catch (error) {
     editError.value = getRecruitmentBatchCommandMessage(error);
+  } finally {
+    editSaving.value = false;
   }
 }
 
@@ -773,16 +792,16 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
       </aside>
     </div>
 
-    <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="editOpen = false">
+    <div v-if="editOpen" class="admin-drawer-backdrop" @click.self="closeEditor">
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="编辑招新批次">
-        <header class="admin-drawer__header"><div><span>{{ isDraft ? "编辑批次" : "调整面试时段" }}</span><h2>{{ isDraft ? "编辑招新批次" : "调整面试时段" }}</h2><p>{{ isDraft ? "保存后需要重新完成发布准备检查。" : "已被选择的时段发生调整时，受影响成员将收到站内通知并必须主动重新选择。" }}</p></div><button type="button" aria-label="关闭编辑批次" @click="editOpen = false">×</button></header>
+        <header class="admin-drawer__header"><div><span>{{ isDraft ? "编辑批次" : "调整面试时段" }}</span><h2>{{ isDraft ? "编辑招新批次" : "调整面试时段" }}</h2><p>{{ isDraft ? "保存后需要重新完成发布准备检查。" : "已被选择的时段发生调整时，受影响成员将收到站内通知并必须主动重新选择。" }}</p></div><button type="button" aria-label="关闭编辑批次" :disabled="editSaving" @click="closeEditor">×</button></header>
         <div class="admin-drawer__body">
           <div v-if="isDraft" class="admin-form-grid"><label>批次名称<input v-model="editForm.name" required></label><label>负责人<input value="联盟总负责人" readonly></label><label>报名开始时间<input v-model="editForm.startAt" type="date" required></label><label>报名截止时间<input v-model="editForm.endAt" type="date" required></label></div>
           <section v-if="isDraft" class="admin-batch-editor-centers"><header><span>开放中心</span><small>至少选择一个中心</small></header><div class="admin-check-grid"><label v-for="[id, label] in availableCenterOptions" :key="id"><span>{{ label }}</span><input v-model="editForm.openCenterIds" type="checkbox" :value="id"></label></div></section>
-          <AdminInterviewSlotEditor v-model="editForm.interviewSlots" :current-time="now.toISOString()" :impact-message="applications.length ? `${applications.length} 位已报名成员` : ''" :disabled="false" @publish="saveEditor" />
+          <AdminInterviewSlotEditor ref="interviewSlotEditor" v-model="editForm.interviewSlots" :current-time="now.toISOString()" :impact-message="applications.length ? `${applications.length} 位已报名成员` : ''" :disabled="editSaving" @publish="saveEditor" />
           <p v-if="editError" class="admin-save-message admin-save-message--error" role="alert">{{ editError }}</p>
         </div>
-        <footer class="admin-drawer__footer"><span>{{ isDraft ? "联盟总负责人编辑 · 保存为草稿" : "联盟总负责人调整面试时段" }}</span><button type="button" class="button button--ghost" @click="editOpen = false">取消</button><button type="button" class="button" @click="saveEditor">保存修改</button></footer>
+        <footer class="admin-drawer__footer"><span>{{ isDraft ? "联盟总负责人编辑 · 保存为草稿" : "联盟总负责人调整面试时段" }}</span><button type="button" class="button button--ghost" :disabled="editSaving" @click="closeEditor">取消</button><button type="button" class="button" :disabled="editSaving" @click="interviewSlotEditor?.publish()">保存修改</button></footer>
       </aside>
     </div>
   </div>

@@ -9,6 +9,7 @@ import type {
   RecruitmentInterviewSlot,
   RecruitmentInterviewSlotDraft,
 } from "~/types/recruitment-interview";
+import AdminDateTimePicker from "~/components/admin/AdminDateTimePicker.vue";
 
 const props = withDefaults(defineProps<{
   modelValue: RecruitmentInterviewSlotDraft[];
@@ -81,9 +82,9 @@ defineExpose({ publish, hasReadySlot, toSlot });
     </header>
     <p v-if="!modelValue.length" class="admin-empty-copy">尚未配置面试时段。发布前至少添加一个尚未开始的有效时段。</p>
     <div v-for="(row, index) in modelValue" :key="row.id ?? index" class="admin-interview-slot-editor__row">
-      <label>开始时间<input :value="row.startAt" type="text" inputmode="numeric" placeholder="2026-09-20 09:00" :disabled="disabled" @input="update(index, { startAt: ($event.target as HTMLInputElement).value })"></label>
-      <label>结束时间<input :value="row.endAt" type="text" inputmode="numeric" placeholder="2026-09-20 09:30" :disabled="disabled" @input="update(index, { endAt: ($event.target as HTMLInputElement).value })"></label>
-      <label>人数上限<input :value="row.capacity" type="text" inputmode="numeric" placeholder="不限人数" :disabled="disabled" @input="update(index, { capacity: ($event.target as HTMLInputElement).value })"></label>
+      <div class="admin-interview-slot-editor__field"><label :for="`slot-start-${row.id ?? index}`">开始时间</label><AdminDateTimePicker :input-id="`slot-start-${row.id ?? index}`" label="开始时间" :model-value="row.startAt" :disabled="disabled" @update:model-value="update(index, { startAt: $event })" /></div>
+      <div class="admin-interview-slot-editor__field"><label :for="`slot-end-${row.id ?? index}`">结束时间</label><AdminDateTimePicker :input-id="`slot-end-${row.id ?? index}`" label="结束时间" :model-value="row.endAt" :disabled="disabled" @update:model-value="update(index, { endAt: $event })" /></div>
+      <label class="admin-interview-slot-editor__field">人数上限<input :value="row.capacity" type="text" inputmode="numeric" placeholder="不限人数" :disabled="disabled" @input="update(index, { capacity: ($event.target as HTMLInputElement).value })"></label>
       <button class="text-link" type="button" :disabled="disabled" :aria-label="`删除第 ${index + 1} 个面试时段`" @click="remove(index)">删除</button>
     </div>
     <p v-if="!hasReadySlot() && modelValue.length" class="form-error" role="alert">至少需要一个尚未开始的有效面试时段。</p>
@@ -104,9 +105,10 @@ defineExpose({ publish, hasReadySlot, toSlot });
 .admin-interview-slot-editor__add:hover { border-color: var(--brand-red, #b1202b); background: #fff5f6; color: var(--brand-red, #b1202b); }
 .admin-interview-slot-editor__add:focus-visible { outline: 2px solid var(--brand-red, #b1202b); outline-offset: 2px; }
 .admin-interview-slot-editor__add span { font-size: 1.15rem; font-weight: 400; line-height: 1; }
-.admin-interview-slot-editor__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: .75rem; align-items: end; padding: .85rem; border: 1px solid var(--line, #ddd); }
-.admin-interview-slot-editor__row label { display: grid; gap: .35rem; }
+.admin-interview-slot-editor__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; align-items: end; padding: .85rem; border: 1px solid var(--line, #ddd); }
+.admin-interview-slot-editor__field { display: grid; gap: .35rem; min-width: 0; }
+.admin-interview-slot-editor__row > .text-link { grid-column: 2; justify-self: end; }
 .admin-interview-slot-editor__impact { display: flex; gap: .5rem; align-items: flex-start; }
-@media (max-width: 760px) { .admin-interview-slot-editor__row { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .admin-interview-slot-editor__row { grid-template-columns: 1fr; } .admin-interview-slot-editor__row > .text-link { grid-column: auto; justify-self: start; } }
 @media (max-width: 460px) { .admin-interview-slot-editor__header { grid-template-columns: 1fr; } .admin-interview-slot-editor__add { justify-self: start; } }
 </style>
