@@ -152,8 +152,7 @@ function requestSave() {
 }
 
 function openTransferConfirm() {
-  if (!canTransferMember.value) return;
-  transferCenterId.value = memberAdministration.apiCenters.find((center) => center.id !== currentCenterId.value)?.id ?? "";
+  if (!canTransferMember.value || !transferCenterId.value) return;
   transferBaizeDirection.value = "";
   transferReason.value = "";
   showTransferConfirm.value = true;
