@@ -46,6 +46,12 @@ function publicTarget(kind: PortalContentRecord["kind"], slug: string, target: P
     : clone(target);
 }
 
+function publishedTarget(kind: PortalContentRecord["kind"], slug: string, target: PortalContentRecord["target"]) {
+  return kind === "article" || kind === "notice" || kind === "flash"
+    ? { type: "internal-route" as const, value: `/updates/${encodeURIComponent(slug)}` }
+    : clone(target);
+}
+
 function assertUniqueSlug(records: readonly PortalContentRecord[], slug: string, excludedId?: string) {
   const duplicate = records.some((record) => {
     if (record.id === excludedId) return false;
@@ -609,7 +615,7 @@ export const usePortalContentStore = defineStore("portal-content", {
       const publishedAt = now.toISOString();
       const next = clone(record);
       next.slug = slug;
-      next.target = publicTarget(next.kind, slug, next.target);
+      next.target = publishedTarget(next.kind, slug, next.target);
       next.status = "published";
       next.publishedState = "published";
       next.publishedAt = publishedAt;

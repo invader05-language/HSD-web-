@@ -97,6 +97,7 @@ describe("mock dashboard gateway", () => {
     expect(snapshot.operator.capabilities).toEqual([
       "recruitment.assessment.edit",
       "content.create",
+      "content.submit_review",
     ]);
     expect(snapshot.tasks.every((task) => !task.capability || snapshot.operator.capabilities.includes(task.capability))).toBe(true);
     expect(snapshot.tasks.map((task) => task.target.action)).not.toContain("publish-results");

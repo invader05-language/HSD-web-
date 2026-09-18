@@ -138,4 +138,11 @@ describe("published activity and update details", () => {
     expect(styles).toContain(".public-update-detail__image");
     expect(styles).toContain("max-width: 100%");
   });
+
+  it("renders flash details through the same public update route", () => {
+    const source = readFileSync("app/pages/updates/[slug].vue", "utf8");
+    expect(source).toContain('kind: "flash"');
+    expect(source).toContain("HSD 快讯");
+    expect(source).toContain("快讯正文");
+  });
 });

@@ -14,7 +14,7 @@ export const PORTAL_CONFIG_STORAGE_KEY = "baiyun-hsd.portal-config";
 export const PORTAL_CONFIG_STORAGE_VERSION = 4;
 
 export const PORTAL_SLOT_IDS = ["flash", "news", "projects", "activities", "gallery", "resources"] as const;
-export const PORTAL_SLOT_CAPACITY = { flash: 1, news: 3, projects: 4, activities: 3, gallery: 3, resources: 3 } as const;
+export const PORTAL_SLOT_CAPACITY = { flash: 3, news: 3, projects: 4, activities: 3, gallery: 3, resources: 3 } as const;
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 
@@ -82,6 +82,9 @@ function errorFrom(error: unknown) {
 }
 
 function apiEntryToReference(entry: PortalResolvedEntryResponseDto): { slot: typeof PORTAL_SLOT_IDS[number]; reference: PortalReference } | undefined {
+  if (entry.reference && PORTAL_SLOT_IDS.includes(entry.slot)) {
+    return { slot: entry.slot, reference: { entityType: entry.reference.entityType, sourceId: entry.reference.sourceId } };
+  }
   if (!entry.content) return undefined;
   const content = entry.content as Record<string, unknown>;
   const sourceId = typeof content.slug === "string" ? content.slug : undefined;
@@ -115,9 +118,8 @@ function savePayload(config: PortalConfig) {
   const entries = PORTAL_SLOT_IDS.flatMap((slot) => config.slots[slot].map((reference, index) => ({
     slot,
     position: index + 1,
-    ...(reference.entityType === "flash" || reference.entityType === "article" || reference.entityType === "notice"
-      ? { contentSlug: reference.sourceId }
-      : { entityType: reference.entityType, sourceId: reference.sourceId }),
+    entityType: reference.entityType,
+    sourceId: reference.sourceId,
   })));
   const visual = (value: PortalVisualConfig) => ({
     ...(value.attachmentId || value.media?.id ? { attachmentId: value.attachmentId ?? value.media?.id } : {}),

@@ -93,6 +93,6 @@ describe("published portal visuals", () => {
     expect(homeSource).toContain("ContentMediaView");
     expect(bannerSource).toContain("ContentMediaView");
     expect(configSource).toContain("ContentMediaUploader");
-    expect(configSource).toContain("直接上传主视觉素材");
+    expect(configSource).toContain("上传横幅图片");
   });
 });

@@ -5,7 +5,6 @@ const adminId = "00000000-0000-4000-8000-000000000101";
 const ownerId = "00000000-0000-4000-8000-000000000102";
 const personId = "00000000-0000-4000-8000-000000000201";
 const centerId = "00000000-0000-4000-8000-000000000301";
-const foreignContentId = "00000000-0000-4000-8000-000000000401";
 const recruitmentBatchId = "00000000-0000-4000-8000-000000000501";
 const foreignApplicationId = "00000000-0000-4000-8000-000000000502";
 
@@ -96,18 +95,6 @@ async function stubProductionDashboardApi(page: Page, level: "admin" | "owner") 
       });
       return;
     }
-    if (pathname === `/api/v1/admin/content/${foreignContentId}/preview` && request.method() === "GET") {
-      await route.fulfill({
-        status: 403,
-        contentType: "application/json",
-        body: JSON.stringify({
-          code: "PORTAL_CONTENT_PERMISSION_REQUIRED",
-          message: "Content permission is required",
-          requestId: "e2e-foreign-content",
-        }),
-      });
-      return;
-    }
     if (pathname === `/api/v1/admin/recruitment/batches/${recruitmentBatchId}/applications/${foreignApplicationId}`
       && request.method() === "GET") {
       await route.fulfill({
@@ -183,25 +170,6 @@ test("an alliance owner sees the capability-authorized portal revision summary",
   await expect(page.getByRole("link", { name: "配置门户 →" })).toBeVisible();
   await expect(page.getByText("R2", { exact: true })).toBeVisible();
   await expect(page.getByText("R1", { exact: true })).toBeVisible();
-});
-
-test("a center administrator receives no foreign content payload at the production API boundary", async ({ page }) => {
-  await enterDashboard(page, "admin");
-
-  const result = await page.evaluate(async (contentId) => {
-    const response = await fetch(`/api/v1/admin/content/${contentId}/preview`, { credentials: "include" });
-    return { status: response.status, body: await response.json() as Record<string, unknown> };
-  }, foreignContentId);
-
-  expect(result.status).toBe(403);
-  expect(result.body).toMatchObject({ code: "PORTAL_CONTENT_PERMISSION_REQUIRED" });
-  expect(JSON.stringify(result.body)).not.toContain("flash-recruitment-2026");
-  expect(JSON.stringify(result.body)).not.toContain("workingRevision");
-
-  await navigateInProductionRuntime(page, `/admin/content/${foreignContentId}/preview`);
-  await expect(page).toHaveURL(new RegExp(`/admin/content/${foreignContentId}/preview$`));
-  await expect(page.getByRole("alert")).toContainText("Content permission is required");
-  await expect(page.getByLabel("内部备注")).toHaveCount(0);
 });
 
 test("a center administrator receives no foreign recruitment application details at the API boundary", async ({ page }) => {

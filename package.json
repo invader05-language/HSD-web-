@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "verify:build-assets": "node scripts/verify-client-build-assets.mjs",
+    "build:verify": "pnpm build && pnpm verify:build-assets",
     "vercel:materialize": "node scripts/materialize-vercel-functions.mjs",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -21,6 +23,8 @@
   },
   "dependencies": {
     "@chenglou/pretext": "0.0.8",
+    "@vuepic/vue-datepicker": "14.0.0",
+    "date-fns": "4.4.0",
     "nuxt": "4.5.1",
     "pinia": "4.0.2",
     "vee-validate": "4.15.1",
@@ -29,14 +33,14 @@
   },
   "devDependencies": {
     "@nuxt/test-utils": "4.1.0",
-    "@vitejs/plugin-vue": "6.0.8",
     "@playwright/test": "1.62.0",
     "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-vue": "6.0.8",
     "@vue/test-utils": "2.4.6",
     "happy-dom": "20.8.4",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
-    "vue-tsc": "3.3.8",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "vue-tsc": "3.3.8"
   }
 }

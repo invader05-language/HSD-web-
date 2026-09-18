@@ -89,6 +89,7 @@ function getCapabilities(): DashboardOperator {
         "recruitment.assessment.edit",
         "recruitment.result.publish",
         "content.create",
+        "content.submit_review",
         "content.review",
         "content.publish",
         "portal.configure",
@@ -103,7 +104,7 @@ function getCapabilities(): DashboardOperator {
       name: account.name,
       level: "admin",
       ...(account.adminCenterRole ? { centerRole: account.adminCenterRole } : {}),
-      capabilities: ["recruitment.assessment.edit", "content.create"],
+      capabilities: ["recruitment.assessment.edit", "content.create", "content.submit_review"],
     };
   }
   return { id: account.account, name: account.name, level: "member", capabilities: [] };

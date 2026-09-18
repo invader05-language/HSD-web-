@@ -49,6 +49,7 @@ import {
   type RetireMembershipDto,
   type SavePortalConfigurationDto,
   type UpdateMembershipDto,
+  type TransferMembershipDto,
   type CreateHonorDto,
   type UpdateHonorConsentDto,
   type HonorCommandDto,
@@ -164,6 +165,7 @@ export interface HsdApiClient {
     centers(): Promise<ApiResponseFor<"GET /api/v1/admin/organization/centers">>;
     createMembership(payload: CreateMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships">>;
     updateMembership(personId: string, payload: UpdateMembershipDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/organization/memberships/{personId}">>;
+    transferMembership(personId: string, payload: TransferMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships/{personId}/transfer">>;
     retireMembership(personId: string, payload: RetireMembershipDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/memberships/{personId}/retire">>;
     appointAllianceOwner(personId: string, payload: AppointOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/alliance-owners/{personId}">>;
     revokeAllianceOwner(personId: string, payload: RevokeOrganizationPositionDto): Promise<ApiResponseFor<"POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke">>;
@@ -217,11 +219,11 @@ export interface HsdApiClient {
     detail(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}">>;
     create(payload: CreateContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content">>;
     update(contentId: string, payload: UpdateContentDto): Promise<ApiResponseFor<"PATCH /api/v1/admin/content/{contentId}">>;
-    preview(contentId: string): Promise<ApiResponseFor<"GET /api/v1/admin/content/{contentId}/preview">>;
     submitReview(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/submit-review">>;
     returnDraft(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/return-draft">>;
     approvePublication(contentId: string, payload: ContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/approve-publication">>;
     publish(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish">>;
+    publishDirect(contentId: string, payload: PublishContentDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/publish-direct">>;
     offline(contentId: string, payload: ReasonedContentCommandDto): Promise<ApiResponseFor<"POST /api/v1/admin/content/{contentId}/offline">>;
   };
   uploads: {
@@ -321,6 +323,7 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       centers: () => requestGenerated(transport, "GET /api/v1/admin/organization/centers"),
       createMembership: (payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships", payload),
       updateMembership: (personId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/organization/memberships/{personId}", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}`),
+      transferMembership: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships/{personId}/transfer", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}/transfer`),
       retireMembership: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/memberships/{personId}/retire", payload, `/api/v1/admin/organization/memberships/${encodeURIComponent(personId)}/retire`),
       appointAllianceOwner: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/alliance-owners/{personId}", payload, `/api/v1/admin/organization/positions/alliance-owners/${encodeURIComponent(personId)}`),
       revokeAllianceOwner: (personId, payload) => requestGenerated(transport, "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke", payload, `/api/v1/admin/organization/positions/alliance-owners/${encodeURIComponent(personId)}/revoke`),
@@ -407,11 +410,11 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       ),
       create: (payload) => requestGenerated(transport, "POST /api/v1/admin/content", payload),
       update: (contentId, payload) => requestGenerated(transport, "PATCH /api/v1/admin/content/{contentId}", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}`),
-      preview: (contentId) => requestGenerated(transport, "GET /api/v1/admin/content/{contentId}/preview", undefined, `/api/v1/admin/content/${encodeURIComponent(contentId)}/preview`),
       submitReview: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/submit-review", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/submit-review`),
       returnDraft: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/return-draft", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/return-draft`),
       approvePublication: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/approve-publication", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/approve-publication`),
       publish: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish`),
+      publishDirect: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/publish-direct", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/publish-direct`),
       offline: (contentId, payload) => requestGenerated(transport, "POST /api/v1/admin/content/{contentId}/offline", payload, `/api/v1/admin/content/${encodeURIComponent(contentId)}/offline`),
     },
     uploads: {

@@ -614,6 +614,8 @@ export type ContentAttachmentImageBlockResponseDto = {
   "attachmentId": string;
   "alt": string;
   "caption"?: string;
+  "url"?: string;
+  "thumbnailUrl"?: string;
 };
 
 export type ContentCommandDto = {
@@ -703,7 +705,7 @@ export type CreateAdjustmentProposalDto = {
 export type CreateContentDto = {
   "centerId": string;
   "kind": "flash" | "article" | "notice";
-  "slug": string;
+  "slug"?: string;
   "title": string;
   "summary"?: string;
   "tag"?: string;
@@ -776,7 +778,7 @@ export type CreateMediaAttachmentDto = {
   "expectedUploadVersion": number;
   "ownerType": "content" | "portal_home" | "portal_join" | "project" | "activity" | "gallery" | "resource";
   "ownerId": string;
-  "centerId": string;
+  "centerId"?: string;
   "role": "cover" | "detail" | "visual";
   "kind": "image" | "video";
   "title": string;
@@ -1378,6 +1380,8 @@ export type PortalResolvedEntryResponseDto = {
   "slot": "flash" | "news" | "projects" | "activities" | "gallery" | "resources";
   "position": number;
   "content": (PublicContentResponseDto | PortalCatalogSnapshotResponseDto) | null;
+  "reference"?: PortalReferenceResponseDto;
+  "invalidReason"?: string;
 };
 
 export type PortalVisualDto = {
@@ -1449,7 +1453,8 @@ export type PublicActivityResponseDto = {
   "agenda": Array<string>;
   "registrationEndAt": string;
   "cover": Record<string, unknown>;
-  "details": Array<Record<string, unknown>>;
+  "details"?: Array<Record<string, unknown>>;
+  "detailCount"?: number;
   "available": boolean;
   "registrationOpen": boolean;
   "registrationOverride"?: boolean;
@@ -1528,7 +1533,8 @@ export type PublicGalleryResponseDto = {
   "year": string;
   "description": string;
   "cover": PublicGalleryMediaResponseDto;
-  "details": Array<PublicGalleryMediaResponseDto>;
+  "details"?: Array<PublicGalleryMediaResponseDto>;
+  "detailCount"?: number;
   "available": boolean;
 };
 
@@ -2019,6 +2025,15 @@ export type SubmitApplicationDto = {
   "acceptsAdjustment": boolean;
 };
 
+export type TransferMembershipDto = {
+  "targetCenterId": string;
+  "expectedMembershipVersion": number;
+  "expectedPersonVersion": number;
+  "reason": string;
+  "confirmed": boolean;
+  "baizeDirection"?: "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+};
+
 export type UpdateActivityDto = {
   "centerId"?: string;
   "slug"?: string;
@@ -2259,6 +2274,7 @@ export const API_V1_PATHS = {
   organizationCenters: "/api/v1/admin/organization/centers",
   organizationMembershipCreate: "/api/v1/admin/organization/memberships",
   organizationMembershipUpdate: "/api/v1/admin/organization/memberships/{personId}",
+  organizationMembershipTransfer: "/api/v1/admin/organization/memberships/{personId}/transfer",
   organizationMembershipRetire: "/api/v1/admin/organization/memberships/{personId}/retire",
   organizationPositionAppointAllianceOwner: "/api/v1/admin/organization/positions/alliance-owners/{personId}",
   organizationPositionRevokeAllianceOwner: "/api/v1/admin/organization/positions/alliance-owners/{personId}/revoke",
@@ -2279,11 +2295,11 @@ export const API_V1_PATHS = {
   adminContentDetail: "/api/v1/admin/content/{contentId}",
   adminContentCreate: "/api/v1/admin/content",
   adminContentUpdate: "/api/v1/admin/content/{contentId}",
-  adminContentPreview: "/api/v1/admin/content/{contentId}/preview",
   adminContentSubmitReview: "/api/v1/admin/content/{contentId}/submit-review",
   adminContentReturnDraft: "/api/v1/admin/content/{contentId}/return-draft",
   adminContentApprovePublication: "/api/v1/admin/content/{contentId}/approve-publication",
   adminContentPublish: "/api/v1/admin/content/{contentId}/publish",
+  adminContentPublishDirect: "/api/v1/admin/content/{contentId}/publish-direct",
   adminContentOffline: "/api/v1/admin/content/{contentId}/offline",
   adminUploads: "/api/v1/admin/uploads",
   adminUploadIntent: "/api/v1/admin/uploads/intents",
@@ -2411,6 +2427,7 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/organization/centers": { method: "GET", path: "/api/v1/admin/organization/centers" },
   "POST /api/v1/admin/organization/memberships": { method: "POST", path: "/api/v1/admin/organization/memberships" },
   "PATCH /api/v1/admin/organization/memberships/{personId}": { method: "PATCH", path: "/api/v1/admin/organization/memberships/{personId}" },
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": { method: "POST", path: "/api/v1/admin/organization/memberships/{personId}/transfer" },
   "POST /api/v1/admin/organization/memberships/{personId}/retire": { method: "POST", path: "/api/v1/admin/organization/memberships/{personId}/retire" },
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}": { method: "POST", path: "/api/v1/admin/organization/positions/alliance-owners/{personId}" },
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke": { method: "POST", path: "/api/v1/admin/organization/positions/alliance-owners/{personId}/revoke" },
@@ -2431,11 +2448,11 @@ export const API_OPERATIONS = {
   "GET /api/v1/admin/content/{contentId}": { method: "GET", path: "/api/v1/admin/content/{contentId}" },
   "POST /api/v1/admin/content": { method: "POST", path: "/api/v1/admin/content" },
   "PATCH /api/v1/admin/content/{contentId}": { method: "PATCH", path: "/api/v1/admin/content/{contentId}" },
-  "GET /api/v1/admin/content/{contentId}/preview": { method: "GET", path: "/api/v1/admin/content/{contentId}/preview" },
   "POST /api/v1/admin/content/{contentId}/submit-review": { method: "POST", path: "/api/v1/admin/content/{contentId}/submit-review" },
   "POST /api/v1/admin/content/{contentId}/return-draft": { method: "POST", path: "/api/v1/admin/content/{contentId}/return-draft" },
   "POST /api/v1/admin/content/{contentId}/approve-publication": { method: "POST", path: "/api/v1/admin/content/{contentId}/approve-publication" },
   "POST /api/v1/admin/content/{contentId}/publish": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish" },
+  "POST /api/v1/admin/content/{contentId}/publish-direct": { method: "POST", path: "/api/v1/admin/content/{contentId}/publish-direct" },
   "POST /api/v1/admin/content/{contentId}/offline": { method: "POST", path: "/api/v1/admin/content/{contentId}/offline" },
   "GET /api/v1/admin/uploads": { method: "GET", path: "/api/v1/admin/uploads" },
   "POST /api/v1/admin/uploads/intents": { method: "POST", path: "/api/v1/admin/uploads/intents" },
@@ -2566,6 +2583,7 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/organization/centers": AdminCenterListResponseDto;
   "POST /api/v1/admin/organization/memberships": OrganizationMembershipResponseDto;
   "PATCH /api/v1/admin/organization/memberships/{personId}": OrganizationMembershipResponseDto;
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": OrganizationMembershipResponseDto;
   "POST /api/v1/admin/organization/memberships/{personId}/retire": RetiredOrganizationMembershipResponseDto;
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}": OrganizationPositionResponseDto;
   "POST /api/v1/admin/organization/positions/alliance-owners/{personId}/revoke": OrganizationPositionResponseDto;
@@ -2589,11 +2607,11 @@ export interface ApiResponseByOperation {
   "GET /api/v1/admin/content/{contentId}": AdminContentResponseDto;
   "POST /api/v1/admin/content": AdminContentResponseDto;
   "PATCH /api/v1/admin/content/{contentId}": AdminContentResponseDto;
-  "GET /api/v1/admin/content/{contentId}/preview": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/submit-review": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/return-draft": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/approve-publication": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/publish": AdminContentResponseDto;
+  "POST /api/v1/admin/content/{contentId}/publish-direct": AdminContentResponseDto;
   "POST /api/v1/admin/content/{contentId}/offline": AdminContentResponseDto;
   "GET /api/v1/admin/uploads": UploadListResponseDto;
   "POST /api/v1/admin/uploads/intents": UploadIntentResponseDto;
@@ -2779,6 +2797,9 @@ const API_RESPONSE_SCHEMAS = {
   "PATCH /api/v1/admin/organization/memberships/{personId}": {
     "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
   },
+  "POST /api/v1/admin/organization/memberships/{personId}/transfer": {
+    "$ref": "#/components/schemas/OrganizationMembershipResponseDto"
+  },
   "POST /api/v1/admin/organization/memberships/{personId}/retire": {
     "$ref": "#/components/schemas/RetiredOrganizationMembershipResponseDto"
   },
@@ -2851,9 +2872,6 @@ const API_RESPONSE_SCHEMAS = {
   "PATCH /api/v1/admin/content/{contentId}": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
-  "GET /api/v1/admin/content/{contentId}/preview": {
-    "$ref": "#/components/schemas/AdminContentResponseDto"
-  },
   "POST /api/v1/admin/content/{contentId}/submit-review": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
@@ -2864,6 +2882,9 @@ const API_RESPONSE_SCHEMAS = {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "POST /api/v1/admin/content/{contentId}/publish": {
+    "$ref": "#/components/schemas/AdminContentResponseDto"
+  },
+  "POST /api/v1/admin/content/{contentId}/publish-direct": {
     "$ref": "#/components/schemas/AdminContentResponseDto"
   },
   "POST /api/v1/admin/content/{contentId}/offline": {
@@ -4074,7 +4095,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "centerId": {
         "type": "string",
-        "format": "uuid"
+        "format": "uuid",
+        "description": "Ignored for portal_home and portal_join; the server assigns the portal system center"
       },
       "role": {
         "type": "string",
@@ -4121,7 +4143,6 @@ const API_COMPONENT_SCHEMAS = {
       "expectedUploadVersion",
       "ownerType",
       "ownerId",
-      "centerId",
       "role",
       "kind",
       "title",
@@ -6296,7 +6317,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "slug": {
         "type": "string",
-        "example": "community-update"
+        "example": "community-update",
+        "description": "可选；留空时由服务端根据标题生成唯一地址"
       },
       "title": {
         "type": "string",
@@ -6333,7 +6355,6 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "centerId",
       "kind",
-      "slug",
       "title"
     ]
   },
@@ -7535,6 +7556,31 @@ const API_COMPONENT_SCHEMAS = {
       "csv"
     ]
   },
+  "PortalReferenceResponseDto": {
+    "type": "object",
+    "properties": {
+      "entityType": {
+        "type": "string",
+        "enum": [
+          "flash",
+          "article",
+          "notice",
+          "project",
+          "activity",
+          "gallery",
+          "resource"
+        ]
+      },
+      "sourceId": {
+        "type": "string",
+        "description": "The persisted source identifier for the configured entry"
+      }
+    },
+    "required": [
+      "entityType",
+      "sourceId"
+    ]
+  },
   "PortalResolvedEntryResponseDto": {
     "type": "object",
     "properties": {
@@ -7564,6 +7610,18 @@ const API_COMPONENT_SCHEMAS = {
             "$ref": "#/components/schemas/PortalCatalogSnapshotResponseDto"
           }
         ]
+      },
+      "reference": {
+        "description": "Original reference when the configured source is unavailable",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PortalReferenceResponseDto"
+          }
+        ]
+      },
+      "invalidReason": {
+        "type": "string",
+        "description": "Machine-readable reason why the configured source could not be resolved"
       }
     },
     "required": [
@@ -9097,6 +9155,10 @@ const API_COMPONENT_SCHEMAS = {
           "type": "object"
         }
       },
+      "detailCount": {
+        "type": "number",
+        "description": "仅列表响应返回的详情素材数量"
+      },
       "available": {
         "type": "boolean"
       },
@@ -9119,7 +9181,6 @@ const API_COMPONENT_SCHEMAS = {
       "agenda",
       "registrationEndAt",
       "cover",
-      "details",
       "available",
       "registrationOpen"
     ]
@@ -10046,6 +10107,10 @@ const API_COMPONENT_SCHEMAS = {
           "$ref": "#/components/schemas/PublicGalleryMediaResponseDto"
         }
       },
+      "detailCount": {
+        "type": "number",
+        "description": "仅列表响应返回的详情素材数量"
+      },
       "available": {
         "type": "boolean"
       }
@@ -10057,7 +10122,6 @@ const API_COMPONENT_SCHEMAS = {
       "year",
       "description",
       "cover",
-      "details",
       "available"
     ]
   },
@@ -12730,6 +12794,14 @@ const API_COMPONENT_SCHEMAS = {
       },
       "caption": {
         "type": "string"
+      },
+      "url": {
+        "type": "string",
+        "description": "管理端工作版本预览地址，仅对已绑定素材返回"
+      },
+      "thumbnailUrl": {
+        "type": "string",
+        "description": "管理端工作版本缩略图地址，仅对已绑定素材返回"
       }
     },
     "required": [
@@ -13061,31 +13133,6 @@ const API_COMPONENT_SCHEMAS = {
       "slots"
     ]
   },
-  "PortalReferenceResponseDto": {
-    "type": "object",
-    "properties": {
-      "entityType": {
-        "type": "string",
-        "enum": [
-          "flash",
-          "article",
-          "notice",
-          "project",
-          "activity",
-          "gallery",
-          "resource"
-        ]
-      },
-      "sourceId": {
-        "type": "string",
-        "description": "The persisted source identifier for the configured entry"
-      }
-    },
-    "required": [
-      "entityType",
-      "sourceId"
-    ]
-  },
   "MemberNotificationDto": {
     "type": "object",
     "properties": {
@@ -13171,6 +13218,53 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "ok"
+    ]
+  },
+  "TransferMembershipDto": {
+    "type": "object",
+    "properties": {
+      "targetCenterId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "The active center that will own the member after the transfer"
+      },
+      "expectedMembershipVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current center-membership version"
+      },
+      "expectedPersonVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current person version"
+      },
+      "reason": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 200,
+        "description": "Required reason recorded in the audit trail"
+      },
+      "confirmed": {
+        "type": "boolean",
+        "example": true
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      }
+    },
+    "required": [
+      "targetCenterId",
+      "expectedMembershipVersion",
+      "expectedPersonVersion",
+      "reason",
+      "confirmed"
     ]
   },
   "AdminAccountCenterSummaryResponseDto": {

@@ -128,7 +128,7 @@ async function initializePortal() {
     catalogError.value = failures.length
       ? `以下候选模块读取失败：${failedCatalogLabels.value.join("、")}。其余模块仍可配置。`
       : "";
-    catalogReady.value = true;
+  catalogReady.value = true;
   }
   catalogLoading.value = false;
 }
@@ -367,7 +367,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-recruitment-page admin-section-page admin-portal-config">
-    <AdminPageHeading eyebrow="Portal Publishing" title="门户配置" description="维护首页推荐位和预定义页面主视觉。所有更改先进入草稿，联盟总负责人确认后整份发布。">
+    <AdminPageHeading eyebrow="首页展示管理" title="门户配置" description="管理首页推荐内容和顶部横幅图片。所有更改先保存为草稿，确认后一次发布。">
       <template #actions>
         <button v-if="canConfigure" type="button" class="button button--ghost" :disabled="mutationBusy" @click="openDialog('preview', $event)">预览门户草稿</button>
         <button v-if="canPublish" type="button" class="button" :disabled="mutationBusy" @click="openDialog('publish', $event)">发布门户配置</button>
@@ -401,16 +401,16 @@ onBeforeUnmount(() => {
               <label><span class="sr-only">添加{{ slot.label }}</span><select value="" :disabled="mutationBusy || slotLoadFailed(slot.id)" @change="selectReference(slot.id, configStore.draftConfig.slots[slot.id].length, $event)"><option value="" disabled>{{ catalogLoading ? "正在读取内容…" : failedSlots.has(slot.id) ? "该模块读取失败，请重试" : "选择已发布内容" }}</option><option v-for="candidate in candidatesFor(slot.id, configStore.draftConfig.slots[slot.id].length)" :key="referenceKey(candidate)" :value="referenceKey(candidate)">{{ candidate.title }}</option></select></label>
             </li>
           </ol>
-          <footer><small>容量上限 {{ slot.capacity }} 条</small><span>{{ slot.allowedTypes.join(" / ") }}</span><em>{{ slot.sourceHint }}</em></footer>
+          <footer><em>{{ slot.sourceHint }}</em></footer>
         </article>
       </section>
     </section>
 
     <section v-else id="portal-panel-visuals" class="admin-portal-visuals" role="tabpanel" aria-labelledby="portal-tab-visuals" tabindex="0">
-      <article v-for="visual in [{ id: 'home' as const, label: '官网首页', note: '首页首屏主视觉' }, { id: 'join' as const, label: '加入我们', note: '招新页面主视觉' }]" :key="visual.id">
-          <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill status="预定义位置" /></header>
-        <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].assetId ? "历史主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "等待替代文本" }}</small></div>
-        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" :owner="visualOwner(visual.id)" :disabled="Boolean(organizationGateway && !visualOwner(visual.id))" title="直接上传主视觉素材" description="上传后可立即预览；新主视觉不经过媒体素材库。" @update:model-value="updateVisualMedia(visual.id, $event)" />
+      <article v-for="visual in [{ id: 'home' as const, label: '官网首页横幅', note: '显示在官网首页顶部大图区域' }, { id: 'join' as const, label: '加入我们横幅', note: '显示在加入我们页面顶部大图区域' }]" :key="visual.id">
+          <header><div><h2>{{ visual.label }}</h2><p>{{ visual.note }}</p></div><AdminStatusPill :status="visualDraft[visual.id].media || visualDraft[visual.id].assetId ? '已配置' : '未配置'" /></header>
+        <div class="admin-portal-visual-preview"><ContentMediaView v-if="visualDraft[visual.id].media" :item="visualDraft[visual.id].media!" preview="thumbnail" :controls="false" /><strong>{{ visualDraft[visual.id].media ? "已上传主视觉素材" : visualDraft[visual.id].attachmentId || visualDraft[visual.id].assetId ? "已配置主视觉素材" : "未选择素材" }}</strong><small>{{ visualDraft[visual.id].alt || "请填写图片说明，便于无障碍访问" }}</small></div>
+        <ContentMediaUploader :aria-label="`${visual.label}主视觉素材`" :model-value="visualMedia(visual.id)" mode="cover" :owner="visualOwner(visual.id)" :disabled="!visualOwner(visual.id)" title="上传横幅图片" description="上传完成后会用于对应页面顶部大图；替换前请先确认图片已准备好。" @update:model-value="updateVisualMedia(visual.id, $event)" />
         <label>替代文本<input v-model="visualDraft[visual.id].alt" type="text" :placeholder="`${visual.label}主视觉的无障碍描述`"></label>
         <label v-if="runtimeConfig.public.useMockApi">辅助文案<textarea v-model="visualDraft[visual.id].supportingText" rows="3" placeholder="显示在主视觉素材位中的简短说明"></textarea></label>
       </article>
@@ -422,10 +422,10 @@ onBeforeUnmount(() => {
       <div v-if="showPreview" class="admin-drawer-backdrop" @click.self="closeDialog('preview')" @keydown="handleDialogKeydown($event, 'preview')">
         <aside ref="previewDialog" class="admin-candidate-drawer admin-portal-preview" role="dialog" aria-modal="true" aria-labelledby="portal-preview-title" aria-describedby="portal-preview-description">
           <header class="admin-drawer__header"><div><h2 id="portal-preview-title">门户草稿预览</h2></div><button ref="previewCloseButton" type="button" aria-label="关闭预览" @click="closeDialog('preview')">×</button></header>
-          <div class="admin-drawer__body"><section v-for="slot in HOMEPAGE_SLOTS" :key="slot.id"><header><span>{{ slot.capacity }}</span><h3>{{ slot.label }}</h3></header><ol :aria-label="`${slot.label}预览`"><li v-for="item in previewProjection.slots[slot.id]" :key="item.sourceId"><strong>{{ item.title }}</strong><small v-if="item.fallbackFor">自动补位：替代 {{ item.fallbackFor }}</small></li><li v-if="!previewProjection.slots[slot.id].length">暂无可用内容</li></ol></section></div>
+          <div class="admin-drawer__body"><section v-for="slot in HOMEPAGE_SLOTS" :key="slot.id"><header><span>容量上限：{{ slot.capacity }} 条</span><h3>{{ slot.label }}</h3></header><ol :aria-label="`${slot.label}预览`"><li v-for="item in previewProjection.slots[slot.id]" :key="item.sourceId"><strong>{{ item.title }}</strong><small v-if="item.fallbackFor">自动补位：替代 {{ item.fallbackFor }}</small></li><li v-if="!previewProjection.slots[slot.id].length">暂无可用内容</li></ol></section></div>
         </aside>
       </div>
-      <div v-if="showPublishConfirmation" class="admin-confirm-backdrop" @keydown="handleDialogKeydown($event, 'publish')"><section ref="publishDialog" role="dialog" aria-modal="true" aria-labelledby="portal-publish-title" aria-describedby="portal-publish-description"><span>ATOMIC PORTAL PUBLICATION</span><h2 id="portal-publish-title">确认整份发布门户配置？</h2><p id="portal-publish-description">发布前会校验全部容量、重复引用和候选有效性。任一校验失败时，当前公开版本保持不变。</p><div><button ref="publishCancelButton" type="button" class="button button--ghost" @click="closeDialog('publish')">返回检查</button><button type="button" class="button" @click="publishConfiguration">确认整份发布</button></div></section></div>
+      <div v-if="showPublishConfirmation" class="admin-confirm-backdrop" @keydown="handleDialogKeydown($event, 'publish')"><section ref="publishDialog" role="dialog" aria-modal="true" aria-labelledby="portal-publish-title" aria-describedby="portal-publish-description"><h2 id="portal-publish-title">确认整份发布门户配置？</h2><p id="portal-publish-description">发布前会校验全部容量、重复引用和候选有效性。任一校验失败时，当前公开版本保持不变。</p><div><button ref="publishCancelButton" type="button" class="button button--ghost" @click="closeDialog('publish')">返回检查</button><button type="button" class="button" @click="publishConfiguration">确认整份发布</button></div></section></div>
     </Teleport>
   </div>
 </template>

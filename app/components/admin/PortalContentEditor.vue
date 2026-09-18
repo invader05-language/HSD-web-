@@ -9,6 +9,7 @@ import ContentMediaUploader from "./ContentMediaUploader.vue";
 import ContentMediaView from "~/components/ContentMediaView.vue";
 import type { ContentMediaAttachment } from "~/types/content-media";
 import { useAdminToast } from "~/composables/useAdminToast";
+import { missingContentPublicationFields } from "~/utils/content-editor-rules";
 
 const props = defineProps<{ record?: PortalContentRecord; initialKind?: PortalContentKind }>();
 const emit = defineEmits<{ saved: [id: string] }>();
@@ -20,7 +21,7 @@ const title = ref(props.record?.title ?? "");
 const summary = ref(props.record?.summary ?? "");
 const target = ref(props.record?.target.value ?? "/activities");
 const expiresAt = ref(props.record?.expiresAt?.slice(0, 16) ?? "");
-const blocks = ref<ContentBlock[]>(structuredClone(props.record?.blocks ?? [{ type: "paragraph", text: "" }]));
+const blocks = ref<ContentBlock[]>(structuredClone(props.record?.blocks?.length ? props.record.blocks : [{ type: "paragraph", text: "" }]));
 const error = ref("");
 const notice = ref("");
 const unpublishReason = ref("");
@@ -30,6 +31,17 @@ const actionPending = ref(false);
 const isOwner = computed(() => session.adminLevel === "owner");
 const currentStatus = computed(() => props.record ? PORTAL_CONTENT_STATUS_LABELS[props.record.status] : "草稿");
 const isReadOnly = computed(() => Boolean(props.record && ["in-review", "pending-publication"].includes(props.record.status)));
+const bodyText = computed<string>({
+  get() {
+    const block = blocks.value.find((candidate) => candidate.type === "paragraph");
+    return block?.type === "paragraph" ? block.text : "";
+  },
+  set(value) {
+    const index = blocks.value.findIndex((candidate) => candidate.type === "paragraph");
+    if (index >= 0 && blocks.value[index]?.type === "paragraph") blocks.value[index] = { type: "paragraph", text: value };
+    else blocks.value.unshift({ type: "paragraph", text: value });
+  },
+});
 
 function buildInput(): PortalContentDraftInput {
   return {
@@ -42,9 +54,9 @@ function buildInput(): PortalContentDraftInput {
   };
 }
 
-function validate() {
-  if (!title.value.trim() || !summary.value.trim()) {
-    error.value = "请填写标题和摘要。";
+function validate(forPublication = false) {
+  if (!title.value.trim()) {
+    error.value = "请填写标题。";
     return false;
   }
   if (kind.value === "flash" && !isSafeInternalPath(target.value)) {
@@ -62,8 +74,13 @@ function validate() {
         : "图片内容块必须填写替代文本。";
     return false;
   }
-  if ((kind.value === "article" || kind.value === "notice") && !blocks.value.some((block) => block.type !== "image" && block.text.trim())) {
-    error.value = "新闻和公告至少需要一个标题或正文内容块。";
+  const missing = forPublication ? missingContentPublicationFields(kind.value, {
+    title: title.value,
+    summary: summary.value,
+    blocks: blocks.value,
+  }) : [];
+  if (missing.length) {
+    error.value = `发布前请补充：${missing.join("、")}。`;
     return false;
   }
   return true;
@@ -72,7 +89,7 @@ function validate() {
 function saveDraft() {
   error.value = "";
   notice.value = "";
-  if (!validate()) return;
+  if (!validate(false)) return;
   try {
     const saved = props.record
       ? content.updateDraft(props.record.id, buildInput())
@@ -90,6 +107,7 @@ function saveDraft() {
 }
 
 function submitForReview() {
+  if (!validate(true)) return;
   saveDraft();
   if (error.value || !props.record) return;
   try {
@@ -150,10 +168,10 @@ function removeBlock(index: number) {
     <div class="admin-content-editor__layout">
       <div class="admin-content-editor__form">
         <section><header><span>01</span><h2>基础信息</h2><AdminStatusPill :status="currentStatus" /></header><div class="admin-editor-grid"><label>内容类型<select v-model="kind" :disabled="Boolean(record)"><option v-for="(label, value) in PORTAL_CONTENT_KIND_LABELS" :key="value" :value="value">{{ label }}</option></select></label><label v-if="kind === 'flash'">站内目标<input v-model="target" :disabled="isReadOnly" placeholder="/activities"></label><p v-else class="admin-inline-note">详情地址将在保存后按内容 Slug 自动生成。</p><label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label><label class="is-wide">摘要<textarea v-model="summary" :disabled="isReadOnly" rows="4"></textarea></label><label v-if="kind === 'flash'">失效时间（可选）<input v-model="expiresAt" :disabled="isReadOnly" type="datetime-local"></label></div></section>
+        <section v-if="kind === 'flash'"><header><span>02</span><h2>正文</h2></header><label>正文段落<textarea v-model="bodyText" :disabled="isReadOnly" rows="4" placeholder="请输入快讯正文"></textarea></label></section>
         <section v-if="kind !== 'flash'"><header><span>02</span><h2>结构化正文</h2></header><div class="admin-content-blocks"><article v-for="(block, index) in blocks" :key="index"><template v-if="block.type === 'image'"><ContentMediaView v-if="isReadOnly && block.media" :item="block.media" preview="thumbnail" :controls="false" /><ContentMediaUploader v-else :model-value="block.media ? [block.media] : []" mode="cover" title="直接上传正文配图" description="上传后立即预览；新内容不经过媒体素材库。" @update:model-value="updateImageBlock(index, $event)" /></template><label v-else>{{ block.type === 'heading' ? '小标题' : '正文段落' }}<textarea v-model="block.text" :disabled="isReadOnly" :rows="block.type === 'heading' ? 2 : 4"></textarea></label><button v-if="!isReadOnly" type="button" :aria-label="`移除第 ${index + 1} 个内容块`" @click="removeBlock(index)">移除</button></article></div><div v-if="!isReadOnly" class="admin-content-editor__block-actions"><button type="button" @click="addBlock('heading')">添加标题</button><button type="button" @click="addBlock('paragraph')">添加段落</button><button type="button" @click="addBlock('image')">添加图片</button></div></section>
-        <section v-if="record"><header><span>03</span><h2>审核与发布</h2></header><p v-if="!isOwner" class="admin-inline-note">普通管理员可保存草稿、提交审核和预览；审核、发布与下架由联盟总负责人执行。</p><div v-else class="admin-content-editor__review-actions"><template v-if="record.status === 'in-review'"><label>退回原因<input v-model="rejectionReason" placeholder="必填：说明需要修改的内容"></label><button type="button" :disabled="!rejectionReason.trim()" @click="completeAction('return')">退回草稿</button><button type="button" @click="actionPending = true">审核通过</button></template><button v-if="record.status === 'pending-publication'" type="button" class="button" @click="actionPending = true">发布内容</button><label v-if="record.publishedState === 'published'">下架原因<input v-model="unpublishReason" placeholder="说明下架原因"></label><button v-if="record.publishedState === 'published'" type="button" @click="completeAction('unpublish')">确认下架</button></div></section>
+        <section v-if="record"><header><span>03</span><h2>审核与发布</h2></header><p v-if="!isOwner" class="admin-inline-note">普通管理员可保存草稿、提交审核；审核、发布与下架由联盟总负责人执行。</p><div v-else class="admin-content-editor__review-actions"><template v-if="record.status === 'in-review'"><label>退回原因<input v-model="rejectionReason" placeholder="必填：说明需要修改的内容"></label><button type="button" :disabled="!rejectionReason.trim()" @click="completeAction('return')">退回草稿</button><button type="button" @click="actionPending = true">审核通过</button></template><button v-if="record.status === 'pending-publication'" type="button" class="button" @click="actionPending = true">发布内容</button><label v-if="record.publishedState === 'published'">下架原因<input v-model="unpublishReason" placeholder="说明下架原因"></label><button v-if="record.publishedState === 'published'" type="button" @click="completeAction('unpublish')">确认下架</button></div></section>
       </div>
-      <aside class="admin-content-editor__sidebar"><span>Public Projection</span><h2>{{ title || '未命名内容' }}</h2><p>{{ summary || '摘要将在这里显示。' }}</p><small>{{ PORTAL_CONTENT_KIND_LABELS[kind] }} · {{ currentStatus }}</small><NuxtLink v-if="record" :to="`/admin/content/${record.id}/preview`">打开预览</NuxtLink></aside>
     </div>
     <footer class="admin-content-editor__footer"><NuxtLink class="button button--ghost" to="/admin/content">返回列表</NuxtLink><button v-if="!isReadOnly" type="button" class="button button--ghost" @click="saveDraft">保存草稿</button><button v-if="record?.status === 'draft'" type="button" class="button" @click="submitForReview">提交审核</button></footer>
     <div v-if="actionPending" class="admin-confirm-backdrop"><section role="alertdialog" aria-label="发布确认"><span>Publication Confirmation</span><h2>{{ record?.status === 'in-review' ? '确认审核通过？' : '确认发布内容？' }}</h2><p>此操作会记录操作者、实际时间与内容版本。</p><div><button type="button" class="button button--ghost" @click="actionPending = false">返回检查</button><button type="button" class="button" @click="completeAction(record?.status === 'in-review' ? 'approve' : 'publish')">确认操作</button></div></section></div>

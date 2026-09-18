@@ -322,11 +322,12 @@ describe("portal configuration store", () => {
       },
     ]);
 
-    expect(projection.slots.flash.map((item) => item.sourceId)).toEqual(["flash-new"]);
+    expect(projection.slots.flash.map((item) => item.sourceId)).toEqual(["flash-new", "flash-old"]);
     expect(projection.slots.news.map((item) => item.sourceId)).toEqual(["article-new", "notice-new"]);
     expect(projection.slots.news.every((item) => item.fallbackFor === "automatic")).toBe(true);
     expect(projection.warnings).toEqual([
       { slot: "flash", sourceId: "flash", entityType: "flash", fallbackSourceId: "flash-new", code: "automatic-fallback" },
+      { slot: "flash", sourceId: "flash", entityType: "flash", fallbackSourceId: "flash-old", code: "automatic-fallback" },
       { slot: "news", sourceId: "news", entityType: "article", fallbackSourceId: "article-new", code: "automatic-fallback" },
       { slot: "news", sourceId: "news", entityType: "notice", fallbackSourceId: "notice-new", code: "automatic-fallback" },
     ]);
@@ -442,8 +443,8 @@ describe("portal configuration surfaces", () => {
     expect(source).toContain("removeReference");
     expect(source).toContain("页面主视觉");
     expect(source).toContain("确认整份发布");
+    expect(source).toContain('session.hasCapability("portal.configure")');
     expect(source).toContain('session.hasCapability("portal.publish")');
-    expect(source).not.toContain('session.adminLevel === "owner"');
     expect(legacySource).toContain('query: { view: "visuals" }');
     expect(legacySource).not.toContain("const banners");
   });

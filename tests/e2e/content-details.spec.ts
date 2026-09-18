@@ -43,7 +43,7 @@ test("published news and notices have public details while unknown updates retur
   await expect(page.getByText(/审核|退回|下架原因/)).toHaveCount(0);
 
   await page.goto("/updates/studio-hours");
-  await expect(page.getByText("公开公告", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("通知公告", { exact: true }).first()).toBeVisible();
 
   await page.goto("/updates/missing");
   await expect(page.getByRole("heading", { level: 1, name: "404" })).toBeVisible();

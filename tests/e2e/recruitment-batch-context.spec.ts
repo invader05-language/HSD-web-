@@ -21,6 +21,41 @@ async function closeBatchBeforeAssessment(page: import("@playwright/test").Page)
   await expect(page.getByTestId("admin-toast")).toContainText("提前关闭已完成");
 }
 
+async function configureInterviewSlot(
+  page: import("@playwright/test").Page,
+  startAt: string,
+  endAt: string,
+) {
+  async function chooseDateTime(label: string, value: string) {
+    const [datePart, timePart] = value.split(" ");
+    const [hours, minutes] = timePart.split(":");
+    const input = page.getByRole("dialog", { name: "编辑招新批次" }).getByRole("combobox", { name: label });
+    await input.click();
+    const menu = page.locator(".dp--menu").last();
+    const dateCell = menu.locator(`[data-test-id="dp-${datePart}"]`);
+    for (let month = 0; month < 24 && !(await dateCell.count()); month += 1) {
+      await menu.locator('[data-dp-element="action-next"]').click();
+    }
+    if (!(await dateCell.count())) throw new Error(`日期选择器未找到 ${datePart}`);
+    await dateCell.click();
+    await menu.locator('[data-test-id="open-time-picker-btn"]').click();
+    await menu.locator('[data-test-id="hours-toggle-overlay-btn-0"]').click();
+    await menu.locator(`[data-test-id="${hours}"]`).click();
+    await menu.locator('[data-test-id="minutes-toggle-overlay-btn-0"]').click();
+    await menu.locator(`[data-test-id="${minutes}"]`).click();
+    await menu.locator('[data-test-id="select-button"]').click();
+    await expect(input).toHaveValue(value);
+  }
+
+  await page.getByRole("button", { name: "编辑批次" }).click();
+  const drawer = page.getByRole("dialog", { name: "编辑招新批次" });
+  await drawer.getByRole("button", { name: "添加时段" }).click();
+  await chooseDateTime("开始时间", startAt);
+  await chooseDateTime("结束时间", endAt);
+  await drawer.getByRole("button", { name: "保存修改" }).click();
+  await expect(drawer).toHaveCount(0);
+}
+
 test("batch links preserve batchId context across roster, assessment and publication", async ({ page }) => {
   await page.goto("/admin/recruitment/batches");
   await completeAdminDemoLogin(page, "admin-alliance", "/admin/recruitment/batches");
@@ -119,6 +154,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
   const draftRow = page.getByRole("article").filter({ hasText: "111" });
   await draftRow.getByRole("link", { name: /进入批次/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "111" })).toBeVisible();
+  await configureInterviewSlot(page, "2026-10-01 09:00", "2026-10-01 09:30");
   await expect(page.getByRole("heading", { level: 2, name: "发布准备检查" })).toBeVisible();
   await expect(page.getByText(/与「2026 秋季招新」重叠/)).toBeVisible();
   await expect(page.getByRole("button", { name: "发布批次" })).toBeDisabled();
@@ -134,6 +170,7 @@ test("draft publish readiness explains schedule conflicts and successful publish
 
   const readyRow = page.getByRole("article").filter({ hasText: "2027 春季补招" }).filter({ hasText: "草稿" });
   await readyRow.getByRole("link", { name: /进入批次/ }).click();
+  await configureInterviewSlot(page, "2027-04-10 09:00", "2027-04-10 09:30");
   await expect(page.getByRole("button", { name: "发布批次" })).toBeEnabled();
   await page.getByRole("button", { name: "发布批次" }).click();
   const dialog = page.getByRole("alertdialog", { name: /确认发布批次/ });

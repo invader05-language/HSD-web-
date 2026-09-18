@@ -31,6 +31,10 @@ function titleFromFileName(name: string) {
   return name.replace(/\.[^/.]+$/, "").trim();
 }
 
+function altFromFileName(name: string) {
+  return titleFromFileName(name).replace(/[<>]/g, "").slice(0, 300).trim() || "上传图片";
+}
+
 export function createContentMediaAttachment(
   file: File,
   role: ContentMediaRole,
@@ -44,7 +48,7 @@ export function createContentMediaAttachment(
     kind,
     title: role === "cover" ? "" : titleFromFileName(file.name),
     caption: "",
-    alt: "",
+    alt: altFromFileName(file.name),
     aspect: "landscape",
     sortOrder,
     status: "uploading",

@@ -48,6 +48,7 @@ const isError = (value: unknown): value is ErrorResponse => Boolean(
 );
 const defaultChecksum = sha256File;
 const title = (name: string) => name.replace(/\.[^/.]+$/, "").trim();
+const alt = (name: string) => title(name).replace(/[<>]/g, "").slice(0, 300).trim() || "上传图片";
 const usesAccessibilityMetadata = (ownerType: ContentMediaUploadOwner["ownerType"]) => ownerType !== "activity" && ownerType !== "gallery";
 
 export function createApiContentMediaGateway(options: ApiContentMediaGatewayOptions): ContentMediaGateway {
@@ -120,7 +121,7 @@ export function createApiContentMediaGateway(options: ApiContentMediaGatewayOpti
         uploadId: current.id, expectedUploadVersion: current.version,
         ownerType: owner.ownerType, ownerId: owner.ownerId, centerId: owner.centerId,
         role: owner.role, kind, title: owner.title ?? (owner.role === "cover" ? "" : title(file.name)),
-        caption: owner.caption ?? "", ...(usesAccessibilityMetadata(owner.ownerType) ? { alt: owner.alt ?? "" } : {}), aspect: owner.aspect ?? "landscape",
+        caption: owner.caption ?? "", ...(usesAccessibilityMetadata(owner.ownerType) ? { alt: owner.alt?.trim() || alt(file.name) } : {}), aspect: owner.aspect ?? "landscape",
         sortOrder: owner.sortOrder,
       });
       return {

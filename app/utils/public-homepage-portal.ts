@@ -75,7 +75,7 @@ function entryToCatalog(entry: PortalResolvedEntryResponseDto, publishedAt: stri
     : slot === "flash" ? "flash" : slot === "projects" ? "project" : slot === "activities" ? "activity" : slot === "gallery" ? "gallery" : "resource";
   const summary = typeof content.summary === "string" ? content.summary : typeof content.description === "string" ? content.description : "";
   const to = entityType === "flash"
-    ? (asRecord(content.target)?.value as string | undefined) ?? `/updates/${encodeURIComponent(content.slug)}`
+    ? `/updates/${encodeURIComponent(content.slug)}`
     : entityType === "article" || entityType === "notice" ? `/updates/${encodeURIComponent(content.slug)}`
       : `/${entityType === "project" ? "projects" : entityType === "activity" ? "activities" : entityType === "gallery" ? "gallery" : "resources"}/${encodeURIComponent(content.slug)}`;
   const media = mediaFrom(content.cover, "cover");

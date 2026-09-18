@@ -117,6 +117,41 @@ describe("organization API gateway", () => {
     ]);
   });
 
+  it("sends the explicit owner-only center transfer command with optimistic versions and reason", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(membership), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    }));
+    const gateway = createApiOrganizationGateway({
+      apiBase: "https://api.example.test",
+      fetcher: fetcher as typeof fetch,
+      readCookie: () => "csrf",
+      createRequestId: () => "transfer-request",
+    });
+
+    await gateway.transferMembership(personId, {
+      targetCenterId: "77777777-7777-4777-8777-777777777777",
+      expectedMembershipVersion: 2,
+      expectedPersonVersion: 8,
+      reason: "组织安排调整",
+      confirmed: true,
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      `https://api.example.test/api/v1/admin/organization/memberships/${personId}/transfer`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          targetCenterId: "77777777-7777-4777-8777-777777777777",
+          expectedMembershipVersion: 2,
+          expectedPersonVersion: 8,
+          reason: "组织安排调整",
+          confirmed: true,
+        }),
+      }),
+    );
+  });
+
   it("surfaces an API center-scope rejection without retrying or falling back", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({
       code: "CENTER_SCOPE_FORBIDDEN",

@@ -14,9 +14,10 @@ type DisplayBlock =
 
 interface DisplayUpdate {
   slug: string;
-  kind: "article" | "notice";
+  kind: "flash" | "article" | "notice";
   title: string;
   summary: string;
+  tag?: string;
   publishedAt: string;
   blocks: DisplayBlock[];
 }
@@ -49,7 +50,7 @@ function normalizeMockBlock(block: Record<string, unknown>): DisplayBlock | unde
 
 function loadMockUpdate() {
   const record = usePortalContentStore().getPublicBySlug(slug.value);
-  if (!record || (record.kind !== "article" && record.kind !== "notice")) {
+  if (!record || !["flash", "article", "notice"].includes(record.kind)) {
     throw createError({ statusCode: 404, statusMessage: "动态不存在" });
   }
   update.value = {
@@ -75,15 +76,12 @@ async function loadProductionUpdate() {
   try {
     const response = await gateway.getBySlug(requestedSlug);
     if (requestGeneration !== productionRequestGeneration) return;
-    if (response.kind !== "article" && response.kind !== "notice") {
-      notFound.value = true;
-      return;
-    }
     update.value = {
       slug: response.slug,
       kind: response.kind,
       title: response.title,
       summary: response.summary ?? "",
+      ...(response.tag ? { tag: response.tag } : {}),
       publishedAt: response.publishedAt ?? "",
       blocks: response.blocks.map((block): DisplayBlock => block.type === "image"
         ? {
@@ -115,7 +113,7 @@ useHead(() => ({ title: `${update.value?.title ?? "动态详情"}｜动态与活
 <template>
   <div v-if="update">
     <PageBanner
-      :eyebrow="`${update.kind === 'article' ? '新闻' : '公开公告'} · ${update.publishedAt ? update.publishedAt.slice(0, 10) : '发布时间待确认'}`"
+      :eyebrow="`${update.kind === 'flash' ? 'HSD 快讯' : update.kind === 'article' ? '新闻动态' : '通知公告'}${update.tag ? ` · ${update.tag}` : ''} · ${update.publishedAt ? update.publishedAt.slice(0, 10) : '发布时间待确认'}`"
       :title="update.title"
       :description="update.summary"
       :tone="update.kind === 'notice' ? 'warm' : 'red'"
@@ -125,7 +123,7 @@ useHead(() => ({ title: `${update.value?.title ?? "动态详情"}｜动态与活
       <div class="shell detail-layout">
         <article class="detail-main public-update-detail">
           <p class="eyebrow">已发布动态</p>
-          <h2>{{ update.kind === "article" ? "新闻正文" : "公告正文" }}</h2>
+          <h2>{{ update.kind === "flash" ? "快讯正文" : update.kind === "article" ? "新闻正文" : "公告正文" }}</h2>
           <template v-if="update.blocks.length">
             <template v-for="(block, index) in update.blocks" :key="index">
               <h3 v-if="block.type === 'heading'">{{ block.text }}</h3>
@@ -143,7 +141,7 @@ useHead(() => ({ title: `${update.value?.title ?? "动态详情"}｜动态与活
         <aside class="detail-aside detail-aside--sticky">
           <h2>发布信息</h2>
           <dl>
-            <div><dt>类型</dt><dd>{{ update.kind === "article" ? "新闻" : "公开公告" }}</dd></div>
+            <div><dt>类型</dt><dd>{{ update.kind === "flash" ? "HSD 快讯" : update.kind === "article" ? "新闻动态" : "通知公告" }}</dd></div>
             <div><dt>发布时间</dt><dd>{{ update.publishedAt ? update.publishedAt.slice(0, 10) : "待确认" }}</dd></div>
           </dl>
           <NuxtLink class="button" to="/activities">返回动态与活动</NuxtLink>

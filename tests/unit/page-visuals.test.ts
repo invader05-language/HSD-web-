@@ -58,11 +58,10 @@ describe("approved page visuals", () => {
   });
 
   it("defines the shared people-directory visual with responsive derivatives", () => {
-    const visual = PEOPLE_PAGE_VISUAL;
-    expect(visual.assetId).toBe("asset-people-classroom");
-    expect(visual.alt).toContain("HSD");
-    expect(resolvePortalAssetSource(visual.assetId)).toMatch(/people-classroom-1440w\.jpg(?:\?|$)/);
-    const metadata = resolvePortalAssetMetadata(visual.assetId);
+    expect(PEOPLE_PAGE_VISUAL.assetId).toBe("asset-people-classroom");
+    expect(PEOPLE_PAGE_VISUAL.alt).toContain("HSD");
+    expect(resolvePortalAssetSource(PEOPLE_PAGE_VISUAL.assetId)).toMatch(/people-classroom-1440w\.jpg(?:\?|$)/);
+    const metadata = resolvePortalAssetMetadata(PEOPLE_PAGE_VISUAL.assetId);
     expect(metadata?.srcSet).toContain("828w");
     expect(metadata?.srcSet).toContain("1440w");
     expect(metadata?.srcSet).toContain("1920w");

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 async function signInToAdmin(
   page: import("@playwright/test").Page,
-  target = "/admin/recruitment",
+  target = "/admin/recruitment/batches",
   account = "admin-alliance"
 ) {
   await page.goto(target);
@@ -35,6 +35,35 @@ test("administration navigation stays isolated from the public site header", asy
 
   await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "返回官网" })).toBeVisible();
+});
+
+test("portal configuration loads its client route without failed Nuxt chunks", async ({ page }) => {
+  const failedChunkRequests: string[] = [];
+  const failedChunkResponses: Array<{ url: string; status: number }> = [];
+  const chunkConsoleErrors: string[] = [];
+
+  page.on("requestfailed", (request) => {
+    if (request.resourceType() === "script" && request.url().includes("/_nuxt/")) {
+      failedChunkRequests.push(`${request.url()} (${request.failure()?.errorText ?? "unknown"})`);
+    }
+  });
+  page.on("response", (response) => {
+    if (response.request().resourceType() === "script" && response.url().includes("/_nuxt/") && !response.ok()) {
+      failedChunkResponses.push({ url: response.url(), status: response.status() });
+    }
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error" && /dynamically imported|CORS|1\.1\.1\.3/i.test(message.text())) {
+      chunkConsoleErrors.push(message.text());
+    }
+  });
+
+  await signInToAdmin(page, "/admin/content/home");
+  await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
+
+  expect(failedChunkRequests).toEqual([]);
+  expect(failedChunkResponses).toEqual([]);
+  expect(chunkConsoleErrors).toEqual([]);
 });
 
 test("administrator denial identifies the owner-only destination", async ({ page }) => {
@@ -266,8 +295,8 @@ test("portal visuals are merged and the legacy banner route redirects to them", 
   await expect.poll(() => new URL(page.url()).searchParams.get("view")).toBe("visuals");
   await expect(page.getByRole("heading", { level: 1, name: "门户配置" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "页面主视觉" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByLabel("官网首页主视觉素材")).toBeVisible();
-  await expect(page.getByLabel("加入我们主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("官网首页横幅主视觉素材")).toBeVisible();
+  await expect(page.getByLabel("加入我们横幅主视觉素材")).toBeVisible();
   await expect(page.getByText("招新按钮是否可用仍由招新批次控制")).toBeVisible();
 });
 

@@ -38,8 +38,8 @@ describe("administration content workflow", () => {
 
   it("keeps homepage modules fixed with explicit capacity", () => {
     expect(HOMEPAGE_SLOTS.map((slot) => [slot.label, slot.capacity])).toEqual([
-      ["HSD 快讯", 1],
-      ["推荐新闻", 3],
+      ["首页快讯", 3],
+      ["首页新闻", 3],
       ["精选项目", 4],
       ["近期活动", 3],
       ["媒体专题", 3],
@@ -111,13 +111,22 @@ describe("administration content workflow", () => {
     expect(editPage).toContain('import PortalContentEditor from "~/components/admin/PortalContentEditor.vue"');
   });
 
+  it("keeps slug server-managed and lets a center administrator submit a draft", () => {
+    const editor = readFileSync("app/components/admin/ApiContentEditor.vue", "utf8");
+    const session = readFileSync("app/stores/session.ts", "utf8");
+    expect(editor).not.toContain("Slug（可选）");
+    expect(editor).not.toContain("createSlug");
+    expect(editor).toContain("content.submit_review");
+    expect(session).toContain("content.submit_review");
+  });
+
   it("keeps portal configuration helper copy visible without the removed warning panels", () => {
     const source = readFileSync("app/pages/admin/content/home.vue", "utf8");
     const slotData = readFileSync("app/data/admin-content.ts", "utf8");
 
     expect(source).toContain("slot.sourceHint");
-    expect(slotData).toContain("来自已发布官网内容");
-    expect(slotData).toContain("当前为系统预置资源");
+    expect(slotData).toContain("来源于官网内容中的已发布快讯");
+    expect(slotData).toContain("来源于资源管理中可公开访问的资料");
     expect(source).not.toContain("公开配置需要重新确认");
     expect(source).not.toContain("固定模块，不允许删除");
   });
