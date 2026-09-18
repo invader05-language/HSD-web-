@@ -180,7 +180,7 @@ export interface HsdApiClient {
     stats(): Promise<ApiResponseFor<"GET /api/v1/public/homepage/stats">>;
   };
   adminAccess: {
-    accounts(): Promise<ApiResponseFor<"GET /api/v1/admin/accounts">>;
+    accounts(page?: number, pageSize?: number): Promise<ApiResponseFor<"GET /api/v1/admin/accounts">>;
   };
   auditEvents: {
     list(query?: string): Promise<ApiResponseFor<"GET /api/v1/admin/audit-events">>;
@@ -338,7 +338,12 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       stats: () => requestGenerated(transport, "GET /api/v1/public/homepage/stats"),
     },
     adminAccess: {
-      accounts: () => requestGenerated(transport, "GET /api/v1/admin/accounts"),
+      accounts: (page = 1, pageSize = 20) => requestGenerated(
+        transport,
+        "GET /api/v1/admin/accounts",
+        undefined,
+        `/api/v1/admin/accounts?page=${page}&pageSize=${pageSize}`,
+      ),
     },
     auditEvents: {
       list: (query = "") => requestGenerated(

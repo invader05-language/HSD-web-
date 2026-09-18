@@ -158,6 +158,20 @@ function accessApiError(cause: unknown): AdminAccessApiError {
   return { code: "ORGANIZATION_API_REQUEST_FAILED", message: "Organization API request failed" };
 }
 
+const ADMIN_ACCOUNT_PAGE_SIZE = 100;
+
+async function loadAllAdminAccounts(gateway: OrganizationGateway): Promise<AdminAccountResponseDto[]> {
+  const firstPage = await gateway.listAccounts(1, ADMIN_ACCOUNT_PAGE_SIZE);
+  const pageCount = Math.ceil(firstPage.total / ADMIN_ACCOUNT_PAGE_SIZE);
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) => (
+      gateway.listAccounts(index + 2, ADMIN_ACCOUNT_PAGE_SIZE)
+    )),
+  );
+
+  return [firstPage, ...remainingPages].flatMap((response) => response.items);
+}
+
 function apiCenterRole(centerName: string | undefined): AdminCenterRole | undefined {
   if (!centerName) return undefined;
   const role = `${centerName}负责人` as AdminCenterRole;
@@ -390,11 +404,11 @@ export const useAdminAccessStore = defineStore("admin-access", {
       this.apiError = null;
       try {
         const [accounts, centers, members] = await Promise.all([
-          gateway.listAccounts(),
+          loadAllAdminAccounts(gateway),
           gateway.listCenters(),
           gateway.listManagedMembers(),
         ]);
-        this.apiAccountRecords = accounts.items;
+        this.apiAccountRecords = accounts;
         this.apiCenters = centers.items;
         this.apiManagedMembers = members.items;
         this.accounts = this.apiAccountRecords.map(apiAccountToStoreAccount);
