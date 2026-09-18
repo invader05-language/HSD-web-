@@ -29,6 +29,9 @@ import resourcesProgrammerDayV2Source1920 from "../assets/images/page-banners/v2
 import joinOrientationV2Source828 from "../assets/images/page-banners/v2/asset-join-orientation-v2-828w.webp?url";
 import joinOrientationV2Source1440 from "../assets/images/page-banners/v2/asset-join-orientation-v2-1440w.webp?url";
 import joinOrientationV2Source1920 from "../assets/images/page-banners/v2/asset-join-orientation-v2-1920w.webp?url";
+import peopleClassroomSource828 from "../assets/images/page-banners/people/asset-people-classroom-828w.jpg?url";
+import peopleClassroomSource1440 from "../assets/images/page-banners/people/asset-people-classroom-1440w.jpg?url";
+import peopleClassroomSource1920 from "../assets/images/page-banners/people/asset-people-classroom-1920w.jpg?url";
 
 export interface PortalAssetMetadata {
   src: string;
@@ -49,6 +52,7 @@ const PUBLISHED_PORTAL_ASSET_SOURCES: Readonly<Record<string, string>> = {
   "asset-gallery-transition": galleryTransitionV2Source1440,
   "asset-resources-programmer-day": resourcesProgrammerDayV2Source1440,
   "asset-join-orientation": joinOrientationV2Source1440,
+  "asset-people-classroom": peopleClassroomSource1440,
 };
 
 export function resolvePortalAssetSource(assetId?: string) {
@@ -122,6 +126,14 @@ const PUBLISHED_PORTAL_ASSET_METADATA: Readonly<Record<string, PortalAssetMetada
     width: 3472,
     height: 1769,
     fallbackSrc: joinOrientationSource,
+  },
+  "asset-people-classroom": {
+    src: peopleClassroomSource1440,
+    srcSet: `${peopleClassroomSource828} 828w, ${peopleClassroomSource1440} 1440w, ${peopleClassroomSource1920} 1920w`,
+    sizes: PAGE_BANNER_SIZES,
+    width: 1920,
+    height: 1032,
+    fallbackSrc: peopleClassroomSource1440,
   },
 };
 

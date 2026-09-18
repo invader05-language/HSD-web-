@@ -22760,7 +22760,7 @@
             "nullable": true,
             "allOf": [
               {
-                "$ref": "#/components/schemas/AdminCenterResponseDto"
+                "$ref": "#/components/schemas/AdminAccountCenterSummaryResponseDto"
               }
             ]
           }
@@ -23522,6 +23522,30 @@
           "expectedPersonVersion",
           "reason",
           "confirmed"
+        ]
+      },
+      "AdminAccountCenterSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "active"
         ]
       }
     },

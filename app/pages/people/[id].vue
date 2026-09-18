@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { resolvePublicAvatar } from "~/data/people";
+import { PEOPLE_PAGE_VISUAL } from "~/data/page-visuals";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { usePublicMembersGateway } from '~/composables/usePublicMembersGateway'
 import { usePublicMembersStore } from '~/stores/public-members'
@@ -49,6 +50,7 @@ useHead(() => ({
       :description="person.bio || `${person.centerName} · ${person.memberDuty}`"
       tone="warm"
       :media-label="`${person.name}公开风采素材位`"
+      :visual="PEOPLE_PAGE_VISUAL"
     />
 
     <section class="section section--cool">

@@ -14,6 +14,13 @@ export const PAGE_VISUALS = {
   join: { assetId: "asset-join-orientation", alt: "广东白云学院新学期迎新活动现场", supportingText: "新学期迎新活动记录", objectPosition: "50% 50%" },
 } as const satisfies Record<PageVisualId, PortalVisualConfig>;
 
+export const PEOPLE_PAGE_VISUAL: PortalVisualConfig = {
+  assetId: "asset-people-classroom",
+  alt: "白云 HSD 成员参加鸿蒙生态学堂活动的现场照片",
+  supportingText: "成员学习与协作现场",
+  objectPosition: "50% 52%",
+};
+
 export function resolvePageVisual(configured: PortalVisualConfig, page: PageVisualId): PortalVisualConfig {
   return configured.media || resolvePortalAssetSource(configured.assetId) ? configured : PAGE_VISUALS[page];
 }

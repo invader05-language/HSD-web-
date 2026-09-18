@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CENTER_OPTIONS } from "~/data/centers";
+import { PEOPLE_PAGE_VISUAL } from "~/data/page-visuals";
 import { resolvePublicAvatar } from "~/data/people";
 import { useMemberRepository } from "~/composables/useMemberRepository";
 import { usePublicMembersGateway } from '~/composables/usePublicMembersGateway'
@@ -73,6 +74,7 @@ watch(pageCount, (nextPageCount) => {
       description="浏览正式成员默认公开的基础风采资料。白泽开发中心成员同时展示统一实践方向；头像未上传时使用白底 HSD 默认头像。"
       tone="dark"
       media-label="成员共同实践影像素材位"
+      :visual="PEOPLE_PAGE_VISUAL"
     />
 
     <section class="section section--cool">
