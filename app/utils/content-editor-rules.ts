@@ -8,6 +8,10 @@ type ContentBlockLike =
   | { type: 'paragraph'; text: string }
   | { type: 'image'; alt?: string; caption?: string; attachmentId?: string; assetId?: string; media?: unknown }
 
+export interface ContentPublicationValidationOptions {
+  requireCenter?: boolean
+}
+
 export function initialContentEditorBlocks(hasRecord: boolean): ContentEditorBlock[] {
   return hasRecord ? [] : [{ type: 'paragraph', text: '' }]
 }
@@ -19,10 +23,10 @@ export function missingContentPublicationFields(kind: 'flash' | 'article' | 'not
   tag?: string
   internalTarget?: string
   blocks: readonly ContentBlockLike[]
-}): string[] {
+}, options: ContentPublicationValidationOptions = {}): string[] {
   const missing: string[] = []
   if (!input.title.trim()) missing.push('标题')
-  if (input.centerId !== undefined && !input.centerId.trim()) missing.push('归属中心')
+  if ((options.requireCenter ?? true) && !input.centerId?.trim()) missing.push('归属中心')
   if (kind === 'flash') {
     if (!input.tag?.trim()) missing.push('标签')
     if (!input.internalTarget?.trim()) missing.push('关联页面')

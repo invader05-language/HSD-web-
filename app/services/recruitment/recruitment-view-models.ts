@@ -302,7 +302,7 @@ export function mapMemberProfileUpdatePayload(
     grade: serializeMemberGrade(draft.grade),
     className: draft.className.trim(),
     bio: draft.bio.trim(),
-    ...(draft.contact !== undefined ? { contact: draft.contact.trim() } : {}),
+    ...(draft.contact?.trim() ? { contact: draft.contact.trim() } : {}),
     ...(draft.avatarAssetId !== undefined ? { avatarAssetId: draft.avatarAssetId } : {}),
   };
 }

@@ -11,4 +11,18 @@ describe('content editor publication rules', () => {
       title: '标题', centerId: 'center', summary: '摘要', tag: '', internalTarget: '', blocks: [],
     })).toEqual(['正文'])
   })
+
+  it('allows an existing system-wide record to publish without a center', () => {
+    expect(missingContentPublicationFields('flash', {
+      title: '系统快讯', centerId: '', summary: '', tag: '通知', internalTarget: '/activities',
+      blocks: [{ type: 'paragraph', text: '正文' }],
+    }, { requireCenter: false })).toEqual([])
+  })
+
+  it('still requires a center for a manually created record', () => {
+    expect(missingContentPublicationFields('article', {
+      title: '人工内容', centerId: '', summary: '摘要', tag: '', internalTarget: '',
+      blocks: [{ type: 'paragraph', text: '正文' }],
+    }, { requireCenter: true })).toEqual(['归属中心'])
+  })
 })

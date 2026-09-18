@@ -28,7 +28,7 @@ const apiBase = (useRuntimeConfig() as { public: { apiBase: string } }).public.a
 const isNew = computed(() => !props.record);
 
 const kind = ref<ContentKind>(props.record?.kind ?? "article");
-const centerId = ref(props.record?.centerId ?? session.currentAccount?.adminCenterId ?? "");
+const centerId = ref(props.record ? (props.record.centerId ?? "") : (session.currentAccount?.adminCenterId ?? ""));
 const centerOptions = ref<Array<{ id: string; name: string }>>([]);
 const title = ref(props.record?.title ?? "");
 const summary = ref(props.record?.summary ?? "");
@@ -46,6 +46,7 @@ const reloadRequired = ref(false);
 const isOwner = computed(() => session.adminLevel === "owner");
 const isReadOnly = computed(() => Boolean(props.record && ["review", "pending_publication"].includes(props.record.canonicalStatus)));
 const isOwnerCreated = computed(() => Boolean(props.record && isOwner.value && props.record.createdByAccountId === session.currentAccount?.account));
+const requiresCenter = computed(() => isNew.value || props.record?.centerId !== null);
 const canSubmit = computed(() => session.hasCapability("content.submit_review"));
 const canReview = computed(() => session.hasCapability("content.review"));
 const canPublish = computed(() => session.hasCapability("content.publish"));
@@ -64,7 +65,7 @@ function blockFromRecord(block: AdminContentDetailBlock): EditableBlock {
 function syncFromRecord(record: AdminContentDetail | undefined) {
   if (!record) return;
   kind.value = record.kind;
-  centerId.value = record.centerId ?? session.currentAccount?.adminCenterId ?? "";
+  centerId.value = record.centerId ?? "";
   title.value = record.title;
   summary.value = record.summary;
   tag.value = record.tag ?? "";
@@ -95,7 +96,7 @@ const missingFields = computed(() => missingContentPublicationFields(kind.value,
   tag: tag.value,
   internalTarget: internalTarget.value,
   blocks: blocks.value,
-}));
+}, { requireCenter: requiresCenter.value }));
 
 function blocksPayload(): Array<Record<string, unknown>> {
   return blocks.value.filter((block) => block.type === "image" || block.text.trim()).map((block) => {
@@ -109,7 +110,7 @@ function validate(forPublication = false) {
   if (!gateway) { error.value = "官网内容服务不可用，请稍后重试。"; return false; }
   const missing = forPublication ? missingFields.value : [
     ...(!title.value.trim() ? ["标题"] : []),
-    ...(!centerId.value.trim() ? ["归属中心"] : []),
+    ...(requiresCenter.value && !centerId.value.trim() ? ["归属中心"] : []),
   ];
   if (missing.length) { error.value = `请补充：${missing.join("、")}。`; return false; }
   return true;
@@ -208,6 +209,7 @@ async function command(action: "submit" | "return" | "approve" | "publish" | "pu
         <section>
           <header><h2>基础信息</h2><AdminStatusPill :status="record?.status ?? '草稿'" /></header>
           <div class="admin-editor-grid">
+            <p v-if="record && !requiresCenter" class="admin-inline-note is-wide">归属范围：联盟全局（系统生成），无需选择所属中心。</p>
             <label v-if="isNew">归属中心<select v-model="centerId" :disabled="!isOwner"><option value="" disabled>选择归属中心</option><option v-if="!isOwner && centerId" :value="centerId">当前管理中心</option><option v-for="option in centerOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select></label>
             <label v-if="isNew">内容类型<select v-model="kind"><option value="article">新闻动态</option><option value="notice">通知公告</option><option value="flash">HSD 快讯</option></select></label>
             <label class="is-wide">标题<input v-model="title" :disabled="isReadOnly"></label>
