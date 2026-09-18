@@ -89,6 +89,38 @@ describe("organization production Pinia gateways", () => {
     localStorage.clear();
   });
 
+  it("loads every account page before projecting administrator qualifications", async () => {
+    const pageOne = Array.from({ length: 100 }, (_, index) => ({
+      ...adminAccount,
+      id: `account-page-one-${index}`,
+      username: `member-${index}`,
+    }));
+    const secondPageOwner = {
+      ...adminAccount,
+      id: "account-page-two-owner",
+      username: "owner-on-page-two",
+      adminLevel: "OWNER" as const,
+    };
+    const listAccounts = vi.fn(async (page = 1, pageSize = 100) => ({
+      page,
+      pageSize,
+      total: 101,
+      items: page === 1 ? pageOne : [secondPageOwner],
+    }));
+    const organization = gateway({ listAccounts });
+    const store = useAdminAccessStore();
+    store.activateApiMode();
+
+    await store.refreshFromApi(organization);
+
+    expect(listAccounts.mock.calls).toEqual([[1, 100], [2, 100]]);
+    expect(store.accounts).toHaveLength(101);
+    expect(store.accounts).toContainEqual(expect.objectContaining({
+      account: "owner-on-page-two",
+      adminLevel: "owner",
+    }));
+  });
+
   it("keeps a successfully loaded member list when centers fail independently", async () => {
     const store = useMemberAdministrationStore();
     store.activateApiMode();

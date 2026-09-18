@@ -79,6 +79,31 @@ describe("organization API gateway", () => {
     expect(gateway).not.toHaveProperty("demoteOwner");
   });
 
+  it("forwards account pagination to the admin account endpoint", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      page: 2,
+      pageSize: 100,
+      total: 125,
+      items: [],
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    const gateway = createApiOrganizationGateway({
+      apiBase: "https://api.example.test",
+      fetcher: fetcher as typeof fetch,
+      readCookie: () => "csrf",
+      createRequestId: () => "accounts-page-request",
+    });
+
+    await gateway.listAccounts(2, 100);
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/admin/accounts?page=2&pageSize=100",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("sends CSRF-protected versioned membership and organization-position mutations", async () => {
     const position = {
       id: "55555555-5555-4555-8555-555555555555",

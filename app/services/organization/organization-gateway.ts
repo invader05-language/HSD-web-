@@ -36,7 +36,7 @@ export interface OrganizationGateway {
   updateMembership(personId: string, payload: UpdateMembershipDto): Promise<OrganizationMembershipResponseDto>;
   transferMembership(personId: string, payload: TransferMembershipDto): Promise<OrganizationMembershipResponseDto>;
   retireMembership(personId: string, payload: RetireMembershipDto): Promise<RetiredOrganizationMembershipResponseDto>;
-  listAccounts(): Promise<AdminAccountListResponseDto>;
+  listAccounts(page?: number, pageSize?: number): Promise<AdminAccountListResponseDto>;
   dryRunImport(payload: PreparatoryMemberImportDto): Promise<PreparatoryMemberImportReportResponseDto>;
   commitImport(payload: PreparatoryMemberImportDto): Promise<PreparatoryMemberImportReportResponseDto>;
   appointAllianceOwner(personId: string, payload: AppointOrganizationPositionDto): Promise<unknown>;
