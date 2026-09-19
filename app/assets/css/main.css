@@ -1824,6 +1824,14 @@ a {
   margin-top: 40px;
 }
 
+.admin-list-card > .pagination {
+  margin: 24px 22px;
+}
+
+.admin-audit-projection {
+  white-space: pre-line;
+}
+
 .pagination button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -5961,6 +5969,10 @@ label small:not(:empty),
 @media (max-width: 640px) {
   .pagination {
     flex-wrap: wrap;
+  }
+
+  .admin-list-card > .pagination {
+    margin-inline: 16px;
   }
 
   .activity-detail-media,
