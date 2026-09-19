@@ -25,8 +25,8 @@ test("owner real audit log uses only safe API rows and server filters", async ({
   await expect.poll(() => requests.at(-1)).toContain("actionPrefix=content.");
   await page.getByRole("button", { name: "变更前 / 变更后" }).click();
   const drawer = page.getByRole("complementary", { name: "日志详情" });
-  await expect(drawer).toContainText("status: review");
-  await expect(drawer).toContainText("allowed: published, true");
+  await expect(drawer).toContainText("状态：审核中");
+  await expect(drawer).toContainText("允许：已发布、是");
   await expect(drawer).not.toContainText(/must-not-render|127\.0\.0\.1|10\.0\.0\.1|token|cookie|IP|设备|请求环境/);
 });
 

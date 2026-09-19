@@ -78,6 +78,7 @@ const FIELD_LABELS: Record<string, string> = {
   currentRound: "当前轮次",
   round: "轮次",
   deleted: "已删除",
+  allowed: "允许",
 };
 
 const VALUE_LABELS: Record<string, string> = {
@@ -86,6 +87,8 @@ const VALUE_LABELS: Record<string, string> = {
   DRAFT: "草稿",
   REVIEW: "审核中",
   PUBLISHED: "已发布",
+  review: "审核中",
+  published: "已发布",
   PENDING_PUBLICATION: "待发布",
   CLOSED: "已关闭",
   ARCHIVED: "已归档",
