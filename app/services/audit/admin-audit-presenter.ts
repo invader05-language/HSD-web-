@@ -94,7 +94,7 @@ const VALUE_LABELS: Record<string, string> = {
   ARCHIVED: "已归档",
   NONE: "无",
   FORCE_OPEN: "强制开放",
-  FORCE_CLOSED: "强制关闭",
+  FORCE_CLOSED: "已关闭",
   PAUSED: "已暂停",
   OWNER: "联盟负责人",
   ADMIN: "中心管理员",
@@ -115,11 +115,7 @@ function truncateId(value: string): string {
 
 export function presentAuditAction(code: string): PresentedAuditAction {
   const known = ACTIONS[code];
-  return {
-    label: known?.label ?? "其他系统操作",
-    module: known?.module ?? "系统管理",
-    technicalCode: code,
-  };
+  return { label: known?.label ?? "其他系统操作", module: known?.module ?? "系统管理", technicalCode: code };
 }
 
 export function presentAuditTarget(row: Pick<AdminAuditListRow, "targetType" | "targetId" | "before" | "after">): PresentedAuditTarget {
@@ -140,15 +136,6 @@ export function formatAuditProjection(value: SafeAuditProjection | null): string
 export function formatAuditOccurredAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const formatted = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date).replace(/年|月/g, "/").replace("日", "");
+  const formatted = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date).replace(/年|月/g, "/").replace("日", "");
   return `${formatted} (UTC+8)`;
 }

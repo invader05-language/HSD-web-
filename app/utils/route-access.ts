@@ -15,6 +15,7 @@ const OWNER_ADMIN_ROUTES = [
   "/admin/members",
   "/admin/core-members",
   "/admin/centers",
+  "/admin/password-recovery",
 ] as const;
 
 function normalizeRoutePath(path: string): string {

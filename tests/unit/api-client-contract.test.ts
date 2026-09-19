@@ -385,6 +385,14 @@ describe("generated browser API client", () => {
         effectiveStatus: "open",
         effectiveStatusReason: "within-window",
         openCenters: [{ slug: "new-media", name: "New Media" }],
+        interviewSlots: [{
+          id: "slot-1",
+          startAt: "2026-09-20T01:00:00.000Z",
+          endAt: "2026-09-20T01:30:00.000Z",
+          timezone: "Asia/Shanghai",
+          capacity: null,
+          remainingCapacity: null,
+        }],
       },
     };
 

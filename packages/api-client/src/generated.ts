@@ -805,6 +805,10 @@ export type CreateMembershipDto = {
   "expectedPersonVersion": number;
 };
 
+export type CreatePasswordRecoveryRequestDto = {
+  "account": string;
+};
+
 export type CreateProjectDto = {
   "expectedVersion": number;
   "centerId": string;
@@ -1323,6 +1327,53 @@ export type OrganizationPositionResponseDto = {
 export type OwnerRoleQualificationDto = {
   "confirmed"?: boolean;
   "expectedVersion": number;
+};
+
+export type PasswordRecoveryAcceptedResponseDto = {
+  "accepted": boolean;
+  "message": string;
+};
+
+export type PasswordRecoveryPendingCountResponseDto = {
+  "count": number;
+};
+
+export type PasswordRecoveryRejectResponseDto = {
+  "status": "REJECTED";
+  "resolvedAt": string;
+};
+
+export type PasswordRecoveryRequestListResponseDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<PasswordRecoveryRequestResponseDto>;
+};
+
+export type PasswordRecoveryRequestResponseDto = {
+  "id": string;
+  "status": "PENDING" | "COMPLETED" | "REJECTED";
+  "version": number;
+  "requestedAt": string;
+  "lastRequestedAt": string;
+  "target": PasswordRecoveryTargetSummaryDto;
+  "resolvedAt": (string) | null;
+  "resolutionReason": (string) | null;
+};
+
+export type PasswordRecoveryResetResponseDto = {
+  "status": "COMPLETED";
+  "resolvedAt": string;
+  "targetName": string;
+  "revokedSessionCount": number;
+};
+
+export type PasswordRecoveryTargetSummaryDto = {
+  "maskedAccount": string;
+  "name": string;
+  "centerName": (string) | null;
+  "status": "ENABLED" | "DISABLED";
+  "accountVersion": number;
 };
 
 export type PortalCatalogSnapshotResponseDto = {
@@ -1922,6 +1973,20 @@ export type RegistrationTemplateRevisionResponseDto = {
   "createdAt": string;
 };
 
+export type RejectPasswordRecoveryRequestDto = {
+  "requestVersion": number;
+  "resolutionReason": string;
+};
+
+export type ResolvePasswordRecoveryRequestDto = {
+  "requestVersion": number;
+  "accountVersion": number;
+  "contactedInPerson": boolean;
+  "identityMatched": boolean;
+  "organizationMatched": boolean;
+  "resolutionReason": string;
+};
+
 export type ResourceCommandDto = {
   "expectedVersion": number;
 };
@@ -2019,6 +2084,7 @@ export type SetCoreMembershipDto = {
 };
 
 export type SubmitApplicationDto = {
+  "interviewSlotId"?: string;
   "contact": string;
   "preferences": Array<RecruitmentPreferenceInputDto>;
   "baizeDirection"?: "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
@@ -2052,6 +2118,7 @@ export type UpdateActivityDto = {
 };
 
 export type UpdateApplicationDto = {
+  "interviewSlotId"?: string;
   "contact": string;
   "preferences": Array<RecruitmentPreferenceInputDto>;
   "baizeDirection"?: "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
@@ -3208,7 +3275,9 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "newPassword": {
         "type": "string",
-        "example": "a-new-password"
+        "example": "a-new-password-that-is-long-enough",
+        "minLength": 15,
+        "maxLength": 128
       }
     },
     "required": [
@@ -3490,7 +3559,8 @@ const API_COMPONENT_SCHEMAS = {
       },
       "byteSize": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "maximum": 5242880
       },
       "checksumSha256": {
         "type": "string",
@@ -4636,6 +4706,45 @@ const API_COMPONENT_SCHEMAS = {
       "name"
     ]
   },
+  "PublicRecruitmentInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Opaque public slot token"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      },
+      "capacity": {
+        "type": "number",
+        "nullable": true
+      },
+      "remainingCapacity": {
+        "type": "number",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "startAt",
+      "endAt",
+      "timezone",
+      "capacity",
+      "remainingCapacity"
+    ]
+  },
   "PublicRecruitmentBatchDto": {
     "type": "object",
     "properties": {
@@ -4765,6 +4874,44 @@ const API_COMPONENT_SCHEMAS = {
       "center"
     ]
   },
+  "RecruitmentInterviewSelectionDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Opaque public slot token"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "RESELECTION_REQUIRED",
+          "RELEASED"
+        ]
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "status",
+      "startAt",
+      "endAt",
+      "timezone"
+    ]
+  },
   "MyRecruitmentApplicationResponseDto": {
     "type": "object",
     "properties": {
@@ -4883,6 +5030,10 @@ const API_COMPONENT_SCHEMAS = {
   "SubmitApplicationDto": {
     "type": "object",
     "properties": {
+      "interviewSlotId": {
+        "type": "string",
+        "description": "Opaque public interview slot token; required when the batch has interview slots"
+      },
       "contact": {
         "type": "string",
         "minLength": 4,
@@ -4919,6 +5070,10 @@ const API_COMPONENT_SCHEMAS = {
   "UpdateApplicationDto": {
     "type": "object",
     "properties": {
+      "interviewSlotId": {
+        "type": "string",
+        "description": "Opaque public interview slot token; required when the batch has interview slots"
+      },
       "contact": {
         "type": "string",
         "minLength": 4,
@@ -4955,6 +5110,23 @@ const API_COMPONENT_SCHEMAS = {
       "preferences",
       "acceptsAdjustment",
       "expectedVersion"
+    ]
+  },
+  "ChangeInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "expectedApplicationVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "interviewSlotId": {
+        "type": "string",
+        "description": "Opaque public interview slot token"
+      }
+    },
+    "required": [
+      "expectedApplicationVersion",
+      "interviewSlotId"
     ]
   },
   "WithdrawApplicationDto": {
@@ -5095,6 +5267,48 @@ const API_COMPONENT_SCHEMAS = {
       "status",
       "adminLevel",
       "person"
+    ]
+  },
+  "AdminRecruitmentInterviewSlotDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "capacity": {
+        "type": "number",
+        "nullable": true
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "RETIRED"
+        ]
+      },
+      "version": {
+        "type": "number"
+      },
+      "confirmedCount": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "id",
+      "startAt",
+      "endAt",
+      "capacity",
+      "status",
+      "version",
+      "confirmedCount"
     ]
   },
   "AdminRecruitmentBatchDto": {
@@ -5965,6 +6179,65 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "expectedVersion"
+    ]
+  },
+  "InterviewSlotInputDto": {
+    "type": "object",
+    "properties": {
+      "publicToken": {
+        "type": "string",
+        "description": "Existing opaque public token; omit to create a slot"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "capacity": {
+        "type": "object",
+        "minimum": 1,
+        "nullable": true,
+        "description": "Null means unlimited capacity"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "RETIRED"
+        ]
+      }
+    },
+    "required": [
+      "startAt",
+      "endAt"
+    ]
+  },
+  "ReconcileInterviewSlotsDto": {
+    "type": "object",
+    "properties": {
+      "expectedBatchVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "slots": {
+        "minItems": 1,
+        "maxItems": 100,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/InterviewSlotInputDto"
+        }
+      },
+      "confirmed": {
+        "type": "boolean",
+        "description": "Required for disruptive changes affecting confirmed applicants"
+      }
+    },
+    "required": [
+      "expectedBatchVersion",
+      "slots"
     ]
   },
   "RecruitmentBatchCommandDto": {
@@ -7449,6 +7722,112 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "expectedVersion"
+    ]
+  },
+  "TransferMembershipDto": {
+    "type": "object",
+    "properties": {
+      "targetCenterId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "The active center that will own the member after the transfer"
+      },
+      "expectedMembershipVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current center-membership version"
+      },
+      "expectedPersonVersion": {
+        "type": "number",
+        "minimum": 1,
+        "description": "Current person version"
+      },
+      "reason": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 200,
+        "description": "Required reason recorded in the audit trail"
+      },
+      "confirmed": {
+        "type": "boolean",
+        "example": true
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      }
+    },
+    "required": [
+      "targetCenterId",
+      "expectedMembershipVersion",
+      "expectedPersonVersion",
+      "reason",
+      "confirmed"
+    ]
+  },
+  "OrganizationMembershipResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "personId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "centerId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "duty": {
+        "type": "string",
+        "enum": [
+          "REGULAR",
+          "CORE"
+        ]
+      },
+      "source": {
+        "type": "string",
+        "enum": [
+          "DIRECT_ENTRY",
+          "RECRUITMENT",
+          "ADJUSTMENT"
+        ]
+      },
+      "version": {
+        "type": "number",
+        "minimum": 1
+      },
+      "joinedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endedAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "center": {
+        "$ref": "#/components/schemas/CenterSummaryResponseDto"
+      }
+    },
+    "required": [
+      "id",
+      "personId",
+      "centerId",
+      "duty",
+      "source",
+      "version",
+      "joinedAt",
+      "endedAt",
+      "center"
     ]
   },
   "RetireMembershipDto": {
@@ -11379,6 +11758,179 @@ const API_COMPONENT_SCHEMAS = {
       "total"
     ]
   },
+  "MemberNotificationDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "body": {
+        "type": "string"
+      },
+      "actionPath": {
+        "type": "string",
+        "nullable": true
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "readAt": {
+        "type": "string",
+        "format": "date-time",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "type",
+      "title",
+      "body",
+      "createdAt"
+    ]
+  },
+  "MemberNotificationListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number"
+      },
+      "pageSize": {
+        "type": "number"
+      },
+      "total": {
+        "type": "number"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MemberNotificationDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
+    ]
+  },
+  "NotificationUnreadCountDto": {
+    "type": "object",
+    "properties": {
+      "unreadCount": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "unreadCount"
+    ]
+  },
+  "NotificationActionResponseDto": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "ok"
+    ]
+  },
+  "CreatePasswordRecoveryRequestDto": {
+    "type": "object",
+    "properties": {
+      "account": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 64,
+        "description": "学号或成员账号"
+      }
+    },
+    "required": [
+      "account"
+    ]
+  },
+  "PasswordRecoveryAcceptedResponseDto": {
+    "type": "object",
+    "properties": {
+      "accepted": {
+        "type": "boolean",
+        "default": true
+      },
+      "message": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "accepted",
+      "message"
+    ]
+  },
+  "ResolvePasswordRecoveryRequestDto": {
+    "type": "object",
+    "properties": {
+      "requestVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "accountVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "contactedInPerson": {
+        "type": "boolean",
+        "default": true
+      },
+      "identityMatched": {
+        "type": "boolean",
+        "default": true
+      },
+      "organizationMatched": {
+        "type": "boolean",
+        "default": true
+      },
+      "resolutionReason": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "requestVersion",
+      "accountVersion",
+      "contactedInPerson",
+      "identityMatched",
+      "organizationMatched",
+      "resolutionReason"
+    ]
+  },
+  "RejectPasswordRecoveryRequestDto": {
+    "type": "object",
+    "properties": {
+      "requestVersion": {
+        "type": "number",
+        "minimum": 1
+      },
+      "resolutionReason": {
+        "type": "string",
+        "minLength": 10,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "requestVersion",
+      "resolutionReason"
+    ]
+  },
   "HealthLiveResponseDto": {
     "type": "object",
     "properties": {
@@ -11914,65 +12466,6 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "OrganizationMembershipResponseDto": {
-    "type": "object",
-    "properties": {
-      "id": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "personId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "centerId": {
-        "type": "string",
-        "format": "uuid"
-      },
-      "duty": {
-        "type": "string",
-        "enum": [
-          "REGULAR",
-          "CORE"
-        ]
-      },
-      "source": {
-        "type": "string",
-        "enum": [
-          "DIRECT_ENTRY",
-          "RECRUITMENT",
-          "ADJUSTMENT"
-        ]
-      },
-      "version": {
-        "type": "number",
-        "minimum": 1
-      },
-      "joinedAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "endedAt": {
-        "type": "string",
-        "format": "date-time",
-        "nullable": true
-      },
-      "center": {
-        "$ref": "#/components/schemas/CenterSummaryResponseDto"
-      }
-    },
-    "required": [
-      "id",
-      "personId",
-      "centerId",
-      "duty",
-      "source",
-      "version",
-      "joinedAt",
-      "endedAt",
-      "center"
-    ]
-  },
   "RetiredOrganizationMembershipResponseDto": {
     "type": "object",
     "properties": {
@@ -12444,6 +12937,30 @@ const API_COMPONENT_SCHEMAS = {
       "studentId",
       "grade",
       "className"
+    ]
+  },
+  "AdminAccountCenterSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "active": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "slug",
+      "name",
+      "active"
     ]
   },
   "AdminAccountResponseDto": {
@@ -12938,256 +13455,118 @@ const API_COMPONENT_SCHEMAS = {
       "title"
     ]
   },
-  "PublicRecruitmentInterviewSlotDto": {
+  "PasswordRecoveryPendingCountResponseDto": {
     "type": "object",
     "properties": {
-      "id": {
-        "type": "string",
-        "description": "Opaque public slot token"
-      },
-      "startAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "endAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "timezone": {
-        "type": "string",
-        "enum": [
-          "Asia/Shanghai"
-        ]
-      },
-      "capacity": {
+      "count": {
         "type": "number",
-        "nullable": true
-      },
-      "remainingCapacity": {
-        "type": "number",
-        "nullable": true
+        "minimum": 0
       }
     },
     "required": [
-      "id",
-      "startAt",
-      "endAt",
-      "timezone",
-      "capacity",
-      "remainingCapacity"
+      "count"
     ]
   },
-  "RecruitmentInterviewSelectionDto": {
+  "PasswordRecoveryTargetSummaryDto": {
     "type": "object",
     "properties": {
-      "id": {
-        "type": "string",
-        "description": "Opaque public slot token"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "CONFIRMED",
-          "RESELECTION_REQUIRED",
-          "RELEASED"
-        ]
-      },
-      "startAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "endAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "timezone": {
-        "type": "string",
-        "enum": [
-          "Asia/Shanghai"
-        ]
-      }
-    },
-    "required": [
-      "id",
-      "status",
-      "startAt",
-      "endAt",
-      "timezone"
-    ]
-  },
-  "ChangeInterviewSlotDto": {
-    "type": "object",
-    "properties": {
-      "expectedApplicationVersion": {
-        "type": "number",
-        "minimum": 1
-      },
-      "interviewSlotId": {
-        "type": "string",
-        "description": "Opaque public interview slot token"
-      }
-    },
-    "required": [
-      "expectedApplicationVersion",
-      "interviewSlotId"
-    ]
-  },
-  "AdminRecruitmentInterviewSlotDto": {
-    "type": "object",
-    "properties": {
-      "id": {
+      "maskedAccount": {
         "type": "string"
       },
-      "startAt": {
-        "type": "string",
-        "format": "date-time"
+      "name": {
+        "type": "string"
       },
-      "endAt": {
+      "centerName": {
         "type": "string",
-        "format": "date-time"
-      },
-      "capacity": {
-        "type": "number",
         "nullable": true
       },
       "status": {
         "type": "string",
         "enum": [
-          "ACTIVE",
-          "RETIRED"
+          "ENABLED",
+          "DISABLED"
+        ]
+      },
+      "accountVersion": {
+        "type": "number",
+        "minimum": 1
+      }
+    },
+    "required": [
+      "maskedAccount",
+      "name",
+      "centerName",
+      "status",
+      "accountVersion"
+    ]
+  },
+  "PasswordRecoveryRequestResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "COMPLETED",
+          "REJECTED"
         ]
       },
       "version": {
-        "type": "number"
-      },
-      "confirmedCount": {
-        "type": "number"
-      }
-    },
-    "required": [
-      "id",
-      "startAt",
-      "endAt",
-      "capacity",
-      "status",
-      "version",
-      "confirmedCount"
-    ]
-  },
-  "InterviewSlotInputDto": {
-    "type": "object",
-    "properties": {
-      "publicToken": {
-        "type": "string",
-        "description": "Existing opaque public token; omit to create a slot"
-      },
-      "startAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "endAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "capacity": {
-        "type": "object",
-        "minimum": 1,
-        "nullable": true,
-        "description": "Null means unlimited capacity"
-      },
-      "status": {
-        "type": "string",
-        "enum": [
-          "ACTIVE",
-          "RETIRED"
-        ]
-      }
-    },
-    "required": [
-      "startAt",
-      "endAt"
-    ]
-  },
-  "ReconcileInterviewSlotsDto": {
-    "type": "object",
-    "properties": {
-      "expectedBatchVersion": {
         "type": "number",
         "minimum": 1
       },
-      "slots": {
-        "minItems": 1,
-        "maxItems": 100,
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/InterviewSlotInputDto"
-        }
-      },
-      "confirmed": {
-        "type": "boolean",
-        "description": "Required for disruptive changes affecting confirmed applicants"
-      }
-    },
-    "required": [
-      "expectedBatchVersion",
-      "slots"
-    ]
-  },
-  "MemberNotificationDto": {
-    "type": "object",
-    "properties": {
-      "id": {
+      "requestedAt": {
         "type": "string"
       },
-      "type": {
+      "lastRequestedAt": {
         "type": "string"
       },
-      "title": {
-        "type": "string"
+      "target": {
+        "$ref": "#/components/schemas/PasswordRecoveryTargetSummaryDto"
       },
-      "body": {
-        "type": "string"
-      },
-      "actionPath": {
+      "resolvedAt": {
         "type": "string",
         "nullable": true
       },
-      "metadata": {
-        "type": "object"
-      },
-      "readAt": {
+      "resolutionReason": {
         "type": "string",
-        "format": "date-time",
         "nullable": true
-      },
-      "createdAt": {
-        "type": "string"
       }
     },
     "required": [
       "id",
-      "type",
-      "title",
-      "body",
-      "createdAt"
+      "status",
+      "version",
+      "requestedAt",
+      "lastRequestedAt",
+      "target",
+      "resolvedAt",
+      "resolutionReason"
     ]
   },
-  "MemberNotificationListDto": {
+  "PasswordRecoveryRequestListResponseDto": {
     "type": "object",
     "properties": {
       "page": {
-        "type": "number"
+        "type": "number",
+        "minimum": 1
       },
       "pageSize": {
-        "type": "number"
+        "type": "number",
+        "minimum": 1
       },
       "total": {
-        "type": "number"
+        "type": "number",
+        "minimum": 0
       },
       "items": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/MemberNotificationDto"
+          "$ref": "#/components/schemas/PasswordRecoveryRequestResponseDto"
         }
       }
     },
@@ -13198,97 +13577,49 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
-  "NotificationUnreadCountDto": {
+  "PasswordRecoveryResetResponseDto": {
     "type": "object",
     "properties": {
-      "unreadCount": {
-        "type": "number"
-      }
-    },
-    "required": [
-      "unreadCount"
-    ]
-  },
-  "NotificationActionResponseDto": {
-    "type": "object",
-    "properties": {
-      "ok": {
-        "type": "boolean"
-      }
-    },
-    "required": [
-      "ok"
-    ]
-  },
-  "TransferMembershipDto": {
-    "type": "object",
-    "properties": {
-      "targetCenterId": {
-        "type": "string",
-        "format": "uuid",
-        "description": "The active center that will own the member after the transfer"
-      },
-      "expectedMembershipVersion": {
-        "type": "number",
-        "minimum": 1,
-        "description": "Current center-membership version"
-      },
-      "expectedPersonVersion": {
-        "type": "number",
-        "minimum": 1,
-        "description": "Current person version"
-      },
-      "reason": {
-        "type": "string",
-        "minLength": 2,
-        "maxLength": 200,
-        "description": "Required reason recorded in the audit trail"
-      },
-      "confirmed": {
-        "type": "boolean",
-        "example": true
-      },
-      "baizeDirection": {
+      "status": {
         "type": "string",
         "enum": [
-          "HARMONYOS_DEVELOPMENT",
-          "BACKEND_ARCHITECTURE",
-          "AIGC_LARGE_MODEL",
-          "UI_UX_DESIGN",
-          "EMBEDDED_DEVELOPMENT"
+          "COMPLETED"
         ]
+      },
+      "resolvedAt": {
+        "type": "string"
+      },
+      "targetName": {
+        "type": "string"
+      },
+      "revokedSessionCount": {
+        "type": "number",
+        "minimum": 0
       }
     },
     "required": [
-      "targetCenterId",
-      "expectedMembershipVersion",
-      "expectedPersonVersion",
-      "reason",
-      "confirmed"
+      "status",
+      "resolvedAt",
+      "targetName",
+      "revokedSessionCount"
     ]
   },
-  "AdminAccountCenterSummaryResponseDto": {
+  "PasswordRecoveryRejectResponseDto": {
     "type": "object",
     "properties": {
-      "id": {
+      "status": {
         "type": "string",
-        "format": "uuid"
+        "enum": [
+          "REJECTED"
+        ]
       },
-      "slug": {
+      "resolvedAt": {
         "type": "string"
-      },
-      "name": {
-        "type": "string"
-      },
-      "active": {
-        "type": "boolean"
       }
     },
     "required": [
-      "id",
-      "slug",
-      "name",
-      "active"
+      "status",
+      "resolvedAt"
     ]
   }
 } as const;

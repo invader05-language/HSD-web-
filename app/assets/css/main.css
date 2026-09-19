@@ -11686,6 +11686,80 @@ body.is-admin-drawer-open {
   color: var(--near-black);
 }
 
+.login-page__forgot,
+.password-recovery-public-page__back {
+  display: inline-block;
+  margin-top: 12px;
+  color: #b1202b;
+  font-size: 14px;
+  text-decoration: none;
+}
+.login-page__forgot:hover,
+.password-recovery-public-page__back:hover { text-decoration: underline; }
+.password-recovery-public-page__intro { color: #5b6570; line-height: 1.75; margin: 0 0 22px; }
+.password-recovery-public-page__success { border: 1px solid #d6e7dc; background: #f1faf4; padding: 22px; }
+.password-recovery-public-page__success strong { display: block; font-size: 20px; margin-bottom: 10px; }
+.password-recovery-public-page__success p { line-height: 1.7; margin: 0 0 18px; }
+.admin-nav-badge { display: inline-flex; min-width: 20px; height: 20px; align-items: center; justify-content: center; margin-left: auto; border-radius: 999px; background: #b1202b; color: #fff; font-size: 11px; font-weight: 700; }
+.admin-recovery-page { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 44px 0 72px; }
+.admin-recovery-notice { padding: 14px 16px; background: #f1faf4; border: 1px solid #cde5d5; color: #27623a; }
+.admin-recovery-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 28px; border: 1px solid #dce1e5; background: #fff; }
+.admin-recovery-metrics article { padding: 22px 24px; border-right: 1px solid #e5e8eb; }
+.admin-recovery-metrics article:last-child { border-right: 0; }
+.admin-recovery-metrics span, .admin-recovery-metrics small { display: block; color: #6f7984; }
+.admin-recovery-metrics strong { display: block; margin: 6px 0; color: #b1202b; font-size: 34px; }
+.admin-recovery-toolbar { display: flex; align-items: end; gap: 14px; margin-top: 24px; padding: 18px; background: #fff; border: 1px solid #dce1e5; }
+.admin-recovery-toolbar label { display: grid; gap: 6px; color: #4f5964; font-size: 13px; }
+.admin-recovery-toolbar input, .admin-recovery-toolbar select { min-width: 210px; border: 1px solid #c8d0d7; padding: 10px 12px; background: #fff; }
+.admin-recovery-list { margin-top: 18px; overflow: hidden; border: 1px solid #dce1e5; background: #fff; }
+.admin-recovery-list__header { display: flex; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #e5e8eb; }
+.admin-recovery-list__header span { color: #6f7984; }
+.admin-recovery-row { display: grid; grid-template-columns: 1.2fr 1fr 28px; width: 100%; gap: 18px; padding: 18px 22px; border: 0; border-bottom: 1px solid #edf0f2; background: #fff; text-align: left; cursor: pointer; }
+.admin-recovery-row:hover { background: #fff8f8; }
+.admin-recovery-row span { display: grid; gap: 5px; }
+.admin-recovery-row small { color: #72808c; }
+.admin-recovery-row b { color: #b1202b; font-size: 13px; }
+.admin-recovery-state { padding: 42px 22px; color: #6f7984; }
+.admin-recovery-state.is-error { color: #b1202b; }
+.admin-recovery-drawer { position: fixed; z-index: 20; inset: 0 0 0 auto; display: flex; width: min(520px, 100%); flex-direction: column; background: #fff; box-shadow: -12px 0 36px #1113; }
+.admin-recovery-drawer__head { display: flex; justify-content: space-between; padding: 26px; background: #17191c; color: #fff; }
+.admin-recovery-drawer__head span { color: #e56d76; font-size: 12px; text-transform: uppercase; }
+.admin-recovery-drawer__head h2 { margin: 8px 0 4px; font-size: 28px; }
+.admin-recovery-drawer__head small { color: #cbd1d7; }
+.admin-recovery-drawer__head button { align-self: start; border: 1px solid #ffffff55; border-radius: 50%; width: 32px; height: 32px; color: #fff; background: transparent; font-size: 20px; }
+.admin-recovery-drawer__body { flex: 1; overflow: auto; padding: 26px; }
+.admin-recovery-drawer__body dl { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 28px; }
+.admin-recovery-drawer__body dt { color: #73808c; font-size: 12px; }
+.admin-recovery-drawer__body dd { margin: 5px 0 0; font-weight: 650; }
+.admin-recovery-checks { display: grid; gap: 15px; border: 0; padding: 0; }
+.admin-recovery-checks legend { margin-bottom: 12px; font-weight: 700; }
+.admin-recovery-checks label { display: flex; gap: 9px; align-items: center; }
+.admin-recovery-checks label:last-child { align-items: stretch; flex-direction: column; }
+.admin-recovery-checks textarea { border: 1px solid #c8d0d7; padding: 10px; resize: vertical; }
+.admin-recovery-drawer__actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding: 20px 26px; border-top: 1px solid #e5e8eb; }
+.admin-recovery-drawer__actions input { grid-column: 1 / -1; border: 1px solid #c8d0d7; padding: 10px; }
+.admin-recovery-confirm { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; background: #1118; padding: 22px; }
+.admin-recovery-confirm > div { width: min(460px, 100%); padding: 26px; background: #fff; }
+.admin-recovery-confirm h2 { margin-top: 0; }
+.admin-recovery-confirm p { line-height: 1.7; color: #56616c; }
+.admin-recovery-confirm .button { margin-right: 8px; }
+.admin-recovery-dashboard-card { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 18px 0; padding: 18px 22px; border: 1px solid #e8c2c6; background: #fff8f8; color: inherit; text-decoration: none; }
+.admin-recovery-dashboard-card span { color: #b1202b; font-size: 13px; }
+.admin-recovery-dashboard-card strong { font-size: 18px; }
+.admin-recovery-dashboard-card small { grid-column: 1 / -1; color: #6f7984; }
+
+@media (max-width: 720px) {
+  .admin-recovery-page { width: min(100% - 28px, 1180px); padding-top: 28px; }
+  .admin-recovery-metrics { grid-template-columns: 1fr; }
+  .admin-recovery-metrics article { border-right: 0; border-bottom: 1px solid #e5e8eb; }
+  .admin-recovery-metrics article:last-child { border-bottom: 0; }
+  .admin-recovery-toolbar { align-items: stretch; flex-direction: column; }
+  .admin-recovery-toolbar input, .admin-recovery-toolbar select { width: 100%; }
+  .admin-recovery-row { grid-template-columns: 1fr 24px; }
+  .admin-recovery-row > span:nth-child(2) { grid-column: 1; }
+  .admin-recovery-row > span:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
