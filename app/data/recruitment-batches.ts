@@ -5,7 +5,7 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
     id: "batch-current",
     name: "2026 秋季招新",
     startAt: "2026-07-31T16:00:00.000Z",
-    endAt: "2026-09-18T15:59:59.999Z",
+    endAt: "2026-10-18T15:59:59.999Z",
     timezone: "Asia/Shanghai",
     openCenterIds: [
       "baize-development",
@@ -23,8 +23,8 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
     interviewSlots: [
       {
         id: "slot-current-1",
-        startAt: "2026-09-20T01:00:00.000Z",
-        endAt: "2026-09-20T01:30:00.000Z",
+        startAt: "2026-10-20T01:00:00.000Z",
+        endAt: "2026-10-20T01:30:00.000Z",
         timezone: "Asia/Shanghai",
         capacity: 20,
         confirmedCount: 2,
@@ -33,8 +33,8 @@ export const RECRUITMENT_BATCHES: RecruitmentBatch[] = [
       },
       {
         id: "slot-current-2",
-        startAt: "2026-09-20T02:00:00.000Z",
-        endAt: "2026-09-20T02:30:00.000Z",
+        startAt: "2026-10-20T02:00:00.000Z",
+        endAt: "2026-10-20T02:30:00.000Z",
         timezone: "Asia/Shanghai",
         capacity: null,
         confirmedCount: 0,

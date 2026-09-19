@@ -70,6 +70,15 @@ function clearErrors() {
   delete errors.avatar;
 }
 
+function applyProductionFieldErrors() {
+  const serverErrors = productionProfile?.fieldErrors.value ?? {};
+  const visibleFields = ["name", "grade", "className", "bio", "avatarAssetId"] as const;
+  for (const field of visibleFields) {
+    const message = serverErrors[field];
+    if (message) Object.assign(errors, { [field === "avatarAssetId" ? "avatar" : field]: message });
+  }
+}
+
 function releaseDraftObjectUrl() {
   if (draftObjectUrl && draftObjectUrl !== currentProfile.value.avatarUrl) {
     URL.revokeObjectURL(draftObjectUrl);
@@ -161,6 +170,7 @@ async function saveProfile() {
       pendingAvatarPreview.value = undefined;
       pendingAvatarFile.value = undefined;
     }
+    if (!saved) applyProductionFieldErrors();
     if (saved) status.value = "success";
     else status.value = "error";
     return;

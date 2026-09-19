@@ -122,6 +122,30 @@ describe("Task 3A production member profile", () => {
     expect(controller.error.value).toContain("重新加载");
   });
 
+  it("exposes structured profile field errors and clears them after a reload", async () => {
+    const validationError = Object.assign(new Error("字段校验失败"), {
+      name: "RecruitmentApiError",
+      status: 422,
+      code: "VALIDATION_FAILED",
+      requestId: "request-field-errors",
+      fieldErrors: { name: "姓名不能为空" },
+    });
+    const getCurrentProfile = vi.fn().mockResolvedValue(baseProfile);
+    const controller = createProductionMemberProfileController({
+      gateway: {
+        getCurrentProfile,
+        updateCurrentProfile: vi.fn().mockRejectedValue(validationError),
+      },
+      apiBase: "",
+    });
+
+    await controller.load();
+    await expect(controller.save()).resolves.toBe(false);
+    expect(controller.fieldErrors.value).toEqual({ name: "姓名不能为空" });
+    await controller.load();
+    expect(controller.fieldErrors.value).toEqual({});
+  });
+
   it("reuses a completed avatar upload when saving the profile can be retried", async () => {
     const file = new File(["avatar"], "avatar.png", { type: "image/png" });
     const avatarGateway = {
