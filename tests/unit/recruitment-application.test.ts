@@ -370,8 +370,8 @@ describe("recruitment application domain", () => {
     const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
-    const beforeDeadline = new Date("2026-09-18T15:00:00.000Z");
-    const afterDeadline = new Date("2026-09-18T16:00:00.000Z");
+    const beforeDeadline = new Date("2026-10-18T15:00:00.000Z");
+    const afterDeadline = new Date("2026-10-18T16:00:00.000Z");
 
     applicationStore.submitApplication(
       createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
@@ -391,8 +391,8 @@ describe("recruitment application domain", () => {
     const session = signInApplicant();
     const profileStore = useMemberProfileStore();
     const applicationStore = useRecruitmentApplicationStore();
-    const beforeDeadline = new Date("2026-09-18T15:00:00.000Z");
-    const afterDeadline = new Date("2026-09-18T16:00:00.000Z");
+    const beforeDeadline = new Date("2026-10-18T15:00:00.000Z");
+    const afterDeadline = new Date("2026-10-18T16:00:00.000Z");
 
     applicationStore.submitApplication(
       createRegistrationProfileDraft(profileStore.getProfile(session.currentMemberId)),
