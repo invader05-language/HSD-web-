@@ -29,6 +29,7 @@ describe("admin audit presenter", () => {
       module: "系统管理",
       technicalCode: "account.password.reset",
     });
+    expect(presentAuditAction("content.publish")).toMatchObject({ label: "发布官网内容", module: "内容与门户" });
   });
 
   it("uses a readable target summary and truncates a UUID when no name exists", () => {

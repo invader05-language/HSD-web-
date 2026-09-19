@@ -29,6 +29,7 @@ const ACTIONS: Record<string, { label: string; module: string }> = {
   "project.published": { label: "发布项目", module: "项目与活动" },
   "password.changed": { label: "修改密码", module: "系统管理" },
   "account.password.reset": { label: "重置账号临时密码", module: "系统管理" },
+  "content.publish": { label: "发布官网内容", module: "内容与门户" },
 };
 
 const TARGET_TYPES: Record<string, string> = {

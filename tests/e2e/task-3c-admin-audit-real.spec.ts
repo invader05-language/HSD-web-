@@ -16,7 +16,7 @@ test("owner real audit log uses only safe API rows and server filters", async ({
 
   await page.goto("/admin/logs");
   await expect(page.getByRole("heading", { level: 1, name: "操作日志" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "管理员操作日志" })).toContainText("content.publish");
+  await expect(page.getByRole("table", { name: "管理员操作日志" })).toContainText("发布官网内容");
   await expect(page.getByText("旧本地审计记录", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/IP 地址|请求环境|导出日志|保留 180 天/)).toHaveCount(0);
   expect(requests).toEqual([expect.stringContaining("/api/v1/admin/audit-events?page=1&pageSize=20")]);
