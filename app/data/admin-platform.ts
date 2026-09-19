@@ -15,6 +15,7 @@ export interface AdminNavigationGroup {
 
 export interface AdminNavigationAccess {
   canManageAdminAccounts: boolean;
+  canManagePasswordRecovery?: boolean;
   canManageOrganizationPersonnel?: boolean;
   canConfigurePortal?: boolean;
 }
@@ -78,6 +79,7 @@ export const ADMIN_NAVIGATION: AdminNavigationGroup[] = [
     label: "系统管理",
     items: [
       { id: "accounts", label: "管理员资格配置", to: "/admin/accounts" },
+      { id: "password-recovery", label: "密码恢复申请", to: "/admin/password-recovery" },
       { id: "logs", label: "操作日志", to: "/admin/logs", feature: "auditLog" }
     ]
   }
@@ -94,11 +96,13 @@ export function getAdminNavigationForAccess(
 ) {
   const canManageOrganizationPersonnel = access.canManageOrganizationPersonnel ?? access.canManageAdminAccounts;
   const canConfigurePortal = access.canConfigurePortal ?? access.canManageAdminAccounts;
+  const canManagePasswordRecovery = access.canManagePasswordRecovery ?? access.canManageAdminAccounts;
   const navigation = ADMIN_NAVIGATION;
   return navigation.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) => (item.id !== "accounts" || access.canManageAdminAccounts)
+        && (item.id !== "password-recovery" || canManagePasswordRecovery)
         && (!["members", "core-members", "centers"].includes(item.id) || canManageOrganizationPersonnel)
         && (item.id !== "homepage" || canConfigurePortal)
         && (item.id !== "help" || canConfigurePortal)

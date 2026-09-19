@@ -9,15 +9,17 @@ import { getAdminQualificationLabel } from "~/data/admin-system";
 import { useSessionStore } from "~/stores/session";
 import { useSessionGateway } from "~/composables/useSessionGateway";
 import { createReleaseNoticeState } from "~/utils/admin-release-access";
+import { createPasswordRecoveryGateway } from "~/services/password-recovery/password-recovery.gateway";
 
 const route = useRoute();
 const session = useSessionStore();
 const sessionGateway = useSessionGateway();
-const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean; apiBase: string } };
 const activeNavigation = computed(() => getAdminNavigationState(route.path));
 const topbarLabel = computed(() => getAdminTopbarLabel(route.path));
 const navigation = computed(() => getAdminNavigationForAccess({
   canManageAdminAccounts: session.canManageAdminAccounts,
+  canManagePasswordRecovery: session.canManageAdminAccounts,
   canManageOrganizationPersonnel: session.canManageAdminAccounts,
   canConfigurePortal: session.hasCapability("portal.configure"),
 }, RELEASE_FEATURES, { useMockApi: apiRuntime.public.useMockApi }));
@@ -28,6 +30,17 @@ const adminLevelLabel = computed(() => session.currentAccount
   : "未登录");
 const expandedGroups = ref(new Set([activeNavigation.value.groupId]));
 const mobileNavigationOpen = ref(false);
+const passwordRecoveryPendingCount = ref(0);
+const passwordRecoveryGateway = createPasswordRecoveryGateway({ apiBase: apiRuntime.public.apiBase });
+
+async function refreshPasswordRecoveryCount() {
+  if (!session.canManageAdminAccounts || apiRuntime.public.useMockApi) return;
+  try {
+    passwordRecoveryPendingCount.value = (await passwordRecoveryGateway.pendingCount()).count;
+  } catch {
+    // The dedicated page owns visible errors; a badge failure must not break navigation.
+  }
+}
 
 watch(
   () => activeNavigation.value.groupId,
@@ -52,7 +65,11 @@ function syncReleaseNotice(value: unknown) {
 
 onMounted(() => {
   syncReleaseNotice(route.query.notice);
+  void refreshPasswordRecoveryCount();
+  document.addEventListener("visibilitychange", refreshPasswordRecoveryCount);
 });
+
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", refreshPasswordRecoveryCount));
 
 watch(
   () => route.query.notice,
@@ -63,6 +80,7 @@ watch(
   () => route.fullPath,
   () => {
     mobileNavigationOpen.value = false;
+    void refreshPasswordRecoveryCount();
   }
 );
 
@@ -120,7 +138,7 @@ async function signOut() {
               :to="item.to"
               :class="{ 'is-active': activeNavigation.itemId === item.id }"
             >
-              {{ item.label }}
+              {{ item.label }}<span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span>
             </NuxtLink>
           </div>
         </section>
@@ -169,7 +187,7 @@ async function signOut() {
             :to="item.to"
             :class="{ 'is-active': activeNavigation.itemId === item.id }"
             @click="mobileNavigationOpen = false"
-          >{{ item.label }}</NuxtLink>
+          >{{ item.label }}<span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span></NuxtLink>
         </section>
       </nav>
 

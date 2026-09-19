@@ -112,6 +112,7 @@ async function signIn(values: Record<string, unknown>) {
         <Form v-slot="{ errors }" method="post" @submit="signIn">
           <label>学号或成员账号<Field name="account" autocomplete="username" :rules="rules.account" :disabled="!hydrated" /><small>{{ errors.account }}</small></label>
           <label>密码<Field name="password" type="password" autocomplete="current-password" :rules="rules.password" :disabled="!hydrated" /><small>{{ errors.password }}</small></label>
+          <NuxtLink class="login-page__forgot" to="/forgot-password">忘记密码？</NuxtLink>
           <p v-if="serverError" class="form-error" role="alert">{{ serverError }}</p>
           <button class="button" type="submit" :disabled="submitting || !hydrated">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
         </Form>
