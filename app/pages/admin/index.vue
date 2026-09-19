@@ -4,6 +4,8 @@ import { PORTAL_CONTENT_KIND_LABELS, PORTAL_CONTENT_STATUS_LABELS } from "~/data
 import { useAdminDashboard } from "~/composables/useAdminDashboard";
 import { dashboardTargetToRoute } from "~/utils/admin-dashboard-routes";
 import type { DashboardCapability, DashboardTarget, RecruitmentDashboardContext } from "~/types/admin-dashboard";
+import { useAdminPasswordRecovery } from "~/composables/useAdminPasswordRecovery";
+import { useSessionStore } from "~/stores/session";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "管理工作台｜白云 HSD 开发者部落" });
@@ -12,6 +14,8 @@ const quickCreateOpen = ref(false);
 const quickMenu = ref<HTMLElement>();
 const { snapshot, loading, error, refresh } = useAdminDashboard();
 const runtime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const recovery = useAdminPasswordRecovery();
+const session = useSessionStore();
 
 const quickActions: Array<{
   label: string;
@@ -107,6 +111,7 @@ function handleQuickMenuKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   void refresh();
+  void recovery.refresh({ status: "PENDING" });
 });
 </script>
 
@@ -161,6 +166,9 @@ onMounted(() => {
     </section>
 
     <template v-else-if="snapshot">
+      <NuxtLink v-if="session.canManageAdminAccounts && recovery.pendingCount" class="admin-recovery-dashboard-card" to="/admin/password-recovery">
+        <span>密码恢复申请</span><strong>{{ recovery.pendingCount }} 项待处理</strong><small>已完成线下核验后进入处理 →</small>
+      </NuxtLink>
       <section v-if="snapshot.warnings.length" class="admin-dashboard-warnings" aria-label="需要关注的异常">
         <NuxtLink
           v-for="warning in snapshot.warnings"

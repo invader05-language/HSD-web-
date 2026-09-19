@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import {
   createRecruitmentApplicationDraft,
@@ -40,7 +40,13 @@ function validApplicationDraft(): RecruitmentApplicationDraft {
 describe("recruitment application domain", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T12:00:00.000Z"));
     setActivePinia(createPinia());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("creates a registration draft without experience-and-expectation fields", () => {
