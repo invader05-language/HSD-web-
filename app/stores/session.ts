@@ -15,6 +15,7 @@ import type { ApiSessionGateway } from "../services/api-session.gateway";
 import { useAdminAccessStore } from "./admin-access";
 import { DEFAULT_FORMAL_MEMBER_PASSWORD } from "../utils/member-account-form";
 import {
+  MIN_PASSWORD_LENGTH,
   validateNewPassword,
   type PasswordChangeErrors,
 } from "../utils/password-change";
@@ -403,7 +404,7 @@ export const useSessionStore = defineStore("session", {
             errors: {
               password: typeof message === "string" && message.trim()
                 ? message
-                : "密码不符合安全策略，请使用至少 15 位且不易猜测的密码。",
+                : `密码不符合安全策略，请使用至少 ${MIN_PASSWORD_LENGTH} 位且不易猜测的密码。`,
             },
           };
         }
