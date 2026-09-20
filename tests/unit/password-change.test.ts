@@ -24,10 +24,13 @@ describe("first-login password change", () => {
   });
 
   it("requires a usable replacement password", () => {
-    expect(validateNewPassword("short", "short")).toEqual({
-      password: "新密码至少 15 位。"
+    expect(validateNewPassword("abcde", "abcde")).toEqual({
+      password: "新密码至少 6 位。"
     });
-    expect(validateNewPassword("new-password-2026", "new-password-2026")).toEqual({});
+    expect(validateNewPassword("a1b2c3", "a1b2c3")).toEqual({});
+    expect(validateNewPassword("aaaaaa", "aaaaaa")).toEqual({
+      password: "请勿使用常见或容易猜测的密码。",
+    });
   });
 
   it("rejects passwords over the limit and common weak passwords", () => {

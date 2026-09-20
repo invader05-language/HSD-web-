@@ -37,8 +37,8 @@ function interviewExportCells(selection?: RecruitmentInterviewSelection): [strin
   const status = selection.status === "CONFIRMED"
     ? "已确认"
     : selection.status === "RESELECTION_REQUIRED"
-      ? "待重新选择（原时段已调整）"
-      : "报名已撤回";
+      ? "待重新选择"
+      : "已释放";
   return [formatInterviewTimestamp(selection.startAt), formatInterviewTimestamp(selection.endAt), status];
 }
 

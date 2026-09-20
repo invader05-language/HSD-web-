@@ -6,6 +6,7 @@ import { useSessionStore } from "~/stores/session";
 import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
+import { formatInterviewSlotRange } from "~/utils/recruitment-interview-slots";
 
 definePageMeta({ layout: "admin" });
 
@@ -29,6 +30,24 @@ const apiApplication = ref<AdminApplicationView>();
 const apiStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const apiError = ref("");
 let apiGeneration = 0;
+
+type InterviewSelectionView = {
+  status?: string;
+  startAt?: string;
+  endAt?: string;
+} | null | undefined;
+
+function interviewSelectionStatusLabel(status?: string) {
+  if (status === "CONFIRMED") return "已确认";
+  if (status === "RESELECTION_REQUIRED") return "待重新选择";
+  if (status === "RELEASED") return "已释放";
+  return "未选择";
+}
+
+function formatInterviewSelection(selection: InterviewSelectionView) {
+  if (!selection?.startAt || !selection.endAt) return "未选择面试时段";
+  return `${formatInterviewSlotRange({ startAt: selection.startAt, endAt: selection.endAt })} · ${interviewSelectionStatusLabel(selection.status)}`;
+}
 
 async function loadApiApplication() {
   if (useMockApi || !recruitmentGateway) return;
@@ -73,6 +92,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
         <label>第三志愿<input :value="application.preferences[2] || '—'" readonly></label>
         <label>白泽方向<input :value="application.baizeDirection || '—'" readonly></label>
         <label>是否接受调剂<input :value="application.acceptsAdjustment ? '接受' : '不接受'" readonly></label>
+        <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(application.interviewSelection) }}</strong></div>
         <label class="is-wide">个人简介<textarea rows="5" :value="application.bio || '未填写'" readonly></textarea></label>
       </div></div>
     </section>
@@ -92,6 +112,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
       <div class="admin-detail-form"><div class="admin-form-grid">
         <label>姓名<input :value="apiApplication.name" readonly></label><label>学号<input :value="apiApplication.studentId" readonly></label><label>年级<input :value="apiApplication.grade" readonly></label><label>班级<input :value="apiApplication.className" readonly></label><label>联系方式<input :value="apiApplication.contact" readonly></label>
         <label>第一志愿<input :value="apiApplication.preferences[0] || '—'" readonly></label><label>第二志愿<input :value="apiApplication.preferences[1] || '—'" readonly></label><label>第三志愿<input :value="apiApplication.preferences[2] || '—'" readonly></label><label>白泽方向<input :value="apiApplication.baizeDirection || '—'" readonly></label><label>是否接受调剂<input :value="apiApplication.acceptsAdjustment ? '接受' : '不接受'" readonly></label><label>状态<input :value="apiApplication.status" readonly></label>
+        <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(apiApplication.interviewSelection) }}</strong></div>
       </div></div>
     </section>
   </div>

@@ -58,7 +58,20 @@ const apiPage = ref(1);
 const apiPageSize = ref(20);
 const apiStatus = ref<"idle" | "loading" | "success" | "empty" | "error">("idle");
 const apiError = ref("");
+const apiExporting = ref(false);
+const apiExportMessage = ref("");
+const apiExportError = ref("");
 let apiGeneration = 0;
+
+function apiRosterQuery(includePagination = true) {
+  const params = new URLSearchParams({ sort: sort.value });
+  if (includePagination) {
+    params.set("page", String(apiPage.value));
+    params.set("pageSize", String(apiPageSize.value));
+  }
+  if (query.value.trim()) params.set("keyword", query.value.trim());
+  return params.toString();
+}
 
 async function loadApiApplications() {
   if (useMockApi || !recruitmentGateway) return;
@@ -72,9 +85,7 @@ async function loadApiApplications() {
       if (generation !== apiGeneration) return;
       apiBatch.value = detail;
     }
-    const params = new URLSearchParams({ page: String(apiPage.value), pageSize: String(apiPageSize.value), sort: sort.value });
-    if (query.value.trim()) params.set("keyword", query.value.trim());
-    const response = await recruitmentGateway.listAdminApplications(batchId.value, params.toString());
+    const response = await recruitmentGateway.listAdminApplications(batchId.value, apiRosterQuery());
     if (generation !== apiGeneration) return;
     apiPage.value = response.page;
     apiPageSize.value = response.pageSize;
@@ -117,10 +128,30 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}报名人员｜HS
 function exportRecruitmentCsv() {
   if (!visible.value.length || !batch.value) return;
   const blob = new Blob([serializeRecruitmentCsv(visible.value)], { type: "text/csv;charset=utf-8" });
+  downloadBlob(blob, buildRecruitmentExportName(batch.value.name, new Date()));
+}
+
+async function exportApiRecruitmentCsv() {
+  if (!recruitmentGateway || apiExporting.value) return;
+  apiExporting.value = true;
+  apiExportMessage.value = "";
+  apiExportError.value = "";
+  try {
+    const result = await recruitmentGateway.exportAdminApplications(batchId.value, apiRosterQuery(false));
+    downloadBlob(result.blob, result.filename);
+    apiExportMessage.value = "报名表已开始下载。";
+  } catch (cause) {
+    apiExportError.value = cause instanceof Error ? cause.message : "报名表导出失败，请稍后重试。";
+  } finally {
+    apiExporting.value = false;
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = buildRecruitmentExportName(batch.value.name, new Date());
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -136,7 +167,7 @@ function exportRecruitmentCsv() {
     >
       <template #actions>
         <NuxtLink class="button button--ghost" :to="buildRecruitmentBatchRoute(batchId)">返回批次概览</NuxtLink>
-        <button type="button" class="button button--ghost" :disabled="visible.length === 0" @click="exportRecruitmentCsv">导出当前名单</button>
+        <button type="button" class="button button--ghost" :disabled="visible.length === 0" @click="exportRecruitmentCsv">导出报名表</button>
       </template>
     </AdminPageHeading>
 
@@ -162,7 +193,7 @@ function exportRecruitmentCsv() {
               <td>{{ candidate.preferences[2] || "—" }}</td>
               <td>{{ candidate.baizeDirection || "—" }}</td>
               <td>{{ candidate.acceptsAdjustment ? "接受" : "不接受" }}</td>
-              <td>{{ candidate.interviewSelection ? `${formatInterviewTimestamp(candidate.interviewSelection.startAt)} · ${candidate.interviewSelection.status === "CONFIRMED" ? "已确认" : candidate.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回"}` : "未安排" }}</td>
+              <td>{{ candidate.interviewSelection ? `${formatInterviewTimestamp(candidate.interviewSelection.startAt)} · ${candidate.interviewSelection.status === "CONFIRMED" ? "已确认" : candidate.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "已释放"}` : "未安排" }}</td>
               <td>{{ formatRecruitmentApplicationSubmittedAt(candidate) }}</td>
               <td><NuxtLink :to="`/admin/recruitment/batches/${batchId}/applications/${candidate.id}`" :aria-label="`查看报名 ${candidate.name}`">查看报名</NuxtLink></td>
             </tr>
@@ -180,8 +211,11 @@ function exportRecruitmentCsv() {
     >
       <template #actions>
         <NuxtLink class="button button--ghost" :to="buildRecruitmentBatchRoute(batchId)">返回批次概览</NuxtLink>
+        <button type="button" class="button button--ghost" :disabled="apiExporting || apiStatus === 'loading'" @click="exportApiRecruitmentCsv">{{ apiExporting ? "正在导出…" : "导出报名表" }}</button>
       </template>
     </AdminPageHeading>
+    <p v-if="apiExportMessage" class="admin-save-message" role="status">{{ apiExportMessage }}</p>
+    <p v-if="apiExportError" class="admin-save-message admin-save-message--error" role="alert">{{ apiExportError }}</p>
     <section class="admin-list-card">
       <header><div><span>报名名单</span><h2>{{ apiBatch?.name ?? "报名名单" }}</h2></div><p>共 {{ apiTotal }} 人</p></header>
       <div class="admin-filters">
@@ -196,7 +230,7 @@ function exportRecruitmentCsv() {
           <tbody><tr v-for="application in apiRows" :key="application.id">
             <td><strong>{{ application.name }}</strong><small>{{ application.studentId }}</small></td>
             <td>{{ application.preferences[0] || "—" }}</td><td>{{ application.preferences[1] || "—" }}</td><td>{{ application.preferences[2] || "—" }}</td>
-            <td>{{ application.baizeDirection || "—" }}</td><td>{{ application.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ application.status }}</td><td>{{ application.interviewSelection ? `${formatInterviewTimestamp(application.interviewSelection.startAt)} · ${application.interviewSelection.status === "CONFIRMED" ? "已确认" : application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回"}` : "未安排" }}</td><td>{{ formatAdminApplicationSubmittedAt(application.submittedAt) }}</td>
+            <td>{{ application.baizeDirection || "—" }}</td><td>{{ application.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ application.status }}</td><td>{{ application.interviewSelection ? `${formatInterviewTimestamp(application.interviewSelection.startAt)} · ${application.interviewSelection.status === "CONFIRMED" ? "已确认" : application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "已释放"}` : "未安排" }}</td><td>{{ formatAdminApplicationSubmittedAt(application.submittedAt) }}</td>
             <td><NuxtLink :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(application.id)}`" :aria-label="`查看报名 ${application.name}`">查看报名</NuxtLink></td>
           </tr></tbody>
         </table>

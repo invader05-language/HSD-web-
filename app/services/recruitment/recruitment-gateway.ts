@@ -36,6 +36,11 @@ import type {
   NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
 
+export interface RecruitmentExportFile {
+  blob: Blob;
+  filename: string;
+}
+
 export interface RecruitmentGateway {
   getCurrentBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
   getUpcomingBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
@@ -58,6 +63,7 @@ export interface RecruitmentGateway {
   runAdminBatchCommand(batchId: string, command: "publish" | "open-now" | "pause" | "resume" | "close" | "reopen", payload: RecruitmentBatchCommandDto): Promise<AdminRecruitmentBatchDto>;
   archiveAdminBatch(batchId: string, payload: ArchiveRecruitmentBatchPayload): Promise<AdminRecruitmentBatchDto>;
   listAdminApplications(batchId: string, query?: string): Promise<AdminRecruitmentApplicationListDto>;
+  exportAdminApplications(batchId: string, query?: string): Promise<RecruitmentExportFile>;
   getAdminApplication(batchId: string, applicationId: string): Promise<AdminRecruitmentApplicationDto>;
   getAssessmentBatch(batchId: string): Promise<AssessmentBatchResponseDto>;
   getAdjustmentTargets(batchId: string): Promise<AssessmentAdjustmentTargetCatalogResponseDto>;

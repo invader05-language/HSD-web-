@@ -5,7 +5,7 @@ export interface PasswordChangeErrors {
   confirmation?: string;
 }
 
-export const MIN_PASSWORD_LENGTH = 15;
+export const MIN_PASSWORD_LENGTH = 6;
 export const MAX_PASSWORD_LENGTH = 128;
 
 const COMMON_WEAK_PASSWORDS = new Set([

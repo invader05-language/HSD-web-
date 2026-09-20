@@ -341,6 +341,58 @@ describe("recruitment API gateway", () => {
     );
   });
 
+  it("exports the full filtered admin application roster as a raw CSV response", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("姓名,面试开始\n张三,2026-09-20 09:00\n", {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv;charset=utf-8",
+        "Content-Disposition": "attachment; filename*=UTF-8''HSD-%E6%8A%A5%E5%90%8D%E8%A1%A8.csv",
+      },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "request-export-1",
+    });
+
+    const result = await gateway.exportAdminApplications("batch/2026", "keyword=%E5%BC%A0&page=3&pageSize=20&sort=submittedAt.asc");
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/admin/recruitment/batches/batch%2F2026/applications/export.csv?keyword=%E5%BC%A0&sort=submittedAt.asc",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-export-1" },
+      },
+    );
+    expect(result.filename).toBe("HSD-报名表.csv");
+    await expect(result.blob.text()).resolves.toContain("2026-09-20 09:00");
+  });
+
+  it("surfaces roster export failures without parsing the CSV path as a JSON success contract", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: "RECRUITMENT_EXPORT_FORBIDDEN",
+      message: "No access to this roster",
+      requestId: "request-export-denied",
+    }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "",
+      fetcher,
+      createRequestId: () => "request-export-denied",
+    });
+
+    await expect(gateway.exportAdminApplications("batch-1"))
+      .rejects.toMatchObject<Partial<RecruitmentApiError>>({
+        name: "RecruitmentApiError",
+        status: 403,
+        code: "RECRUITMENT_EXPORT_FORBIDDEN",
+        requestId: "request-export-denied",
+      });
+  });
+
   it("reads the authoritative adjustment-target catalog without CSRF and preserves a center absent from the roster", async () => {
     const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       items: [{
