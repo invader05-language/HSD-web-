@@ -43,7 +43,7 @@ function apiBatch(id: string, name: string) {
   };
 }
 
-function apiApplication(batchId: string, id: string, name: string) {
+function apiApplication(batchId: string, id: string, name: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
     batchId,
@@ -64,6 +64,8 @@ function apiApplication(batchId: string, id: string, name: string) {
     submittedAt: "2026-08-10T01:00:00.000Z",
     withdrawnAt: null,
     preferences: [],
+    interviewSelection: null,
+    ...overrides,
   };
 }
 
@@ -202,6 +204,63 @@ describe("production recruitment route reuse", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("Detail B");
     expect(wrapper.text()).not.toContain("Late Detail A");
+  });
+
+  it.each([
+    ["CONFIRMED", "已确认"],
+    ["RESELECTION_REQUIRED", "待重新选择"],
+    ["RELEASED", "已释放"],
+  ])("shows the readonly interview arrangement for %s without exposing internal identifiers", async (status, statusLabel) => {
+    routeState.params.id = "application-interview";
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/batch-a/applications/application-interview")) {
+        return new Response(JSON.stringify(apiApplication("batch-a", "application-interview", "Interview Detail", {
+          interviewSelection: {
+            id: "internal-slot-id",
+            interviewSlotId: "internal-slot-token",
+            status,
+            startAt: "2026-10-09T13:00:00.000Z",
+            endAt: "2026-10-09T14:30:00.000Z",
+            timezone: "Asia/Shanghai",
+            version: 7,
+          },
+        })), { status: 200 });
+      }
+      throw new Error(`Unexpected request: ${pathname}`);
+    }));
+
+    const wrapper = mount(ApplicationDetailPage, { global: { stubs: {
+      AdminPageHeading: headingStub,
+      NuxtLink: linkStub,
+    } } });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("面试安排");
+    expect(wrapper.text()).toContain(`2026-10-09 21:00—22:30（中国标准时间） · ${statusLabel}`);
+    expect(wrapper.text()).not.toContain("internal-slot-id");
+    expect(wrapper.text()).not.toContain("internal-slot-token");
+    expect(wrapper.text()).not.toContain("version");
+  });
+
+  it("shows an empty readonly interview arrangement when no slot is selected", async () => {
+    routeState.params.id = "application-no-interview";
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith("/batch-a/applications/application-no-interview")) {
+        return new Response(JSON.stringify(apiApplication("batch-a", "application-no-interview", "No Interview")), { status: 200 });
+      }
+      throw new Error(`Unexpected request: ${pathname}`);
+    }));
+
+    const wrapper = mount(ApplicationDetailPage, { global: { stubs: {
+      AdminPageHeading: headingStub,
+      NuxtLink: linkStub,
+    } } });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("面试安排");
+    expect(wrapper.text()).toContain("未选择面试时段");
   });
 
   it.each([

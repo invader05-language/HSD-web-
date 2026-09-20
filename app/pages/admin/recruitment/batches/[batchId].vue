@@ -122,6 +122,8 @@ const pendingAction = ref<PendingLifecycleAction | null>(null);
 const reason = ref("");
 const actionMessage = ref("");
 const actionError = ref("");
+const exportStatus = ref<"idle" | "loading" | "success" | "error">("idle");
+const exportMessage = ref("");
 const selectedLifecycleEvent = ref<RecruitmentBatchLifecycleEventView>();
 const lifecycleCopyMessage = ref("");
 const canConfirmPendingAction = computed(() => {
@@ -301,6 +303,30 @@ function clearActionState() {
   reason.value = "";
   actionMessage.value = "";
   actionError.value = "";
+}
+
+async function exportBatchApplications() {
+  if (isMockApi || !recruitmentGateway || exportStatus.value === "loading") return;
+  exportStatus.value = "loading";
+  exportMessage.value = "";
+  try {
+    const result = await recruitmentGateway.exportAdminApplications(batchId.value);
+    downloadBlob(result.blob, result.filename);
+    exportStatus.value = "success";
+    exportMessage.value = "报名表已开始下载。";
+  } catch (cause) {
+    exportStatus.value = "error";
+    exportMessage.value = cause instanceof Error ? cause.message : "报名表导出失败，请稍后重试。";
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function requestAction(action: LifecycleAction) {
@@ -671,6 +697,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
         <div class="admin-batch-actions">
           <NuxtLink class="button button--ghost" to="/admin/recruitment/batches">返回批次列表</NuxtLink>
           <NuxtLink class="button button--ghost" to="/join">查看用户端页面</NuxtLink>
+          <button v-if="!isMockApi" type="button" class="button button--ghost" :disabled="exportStatus === 'loading'" @click="exportBatchApplications">{{ exportStatus === "loading" ? "正在导出…" : "导出报名表" }}</button>
           <button v-if="!isArchived && canManage" type="button" class="button button--ghost" @click="openEditor">{{ isDraft ? "编辑批次" : "调整面试时段" }}</button>
           <button v-if="isMockApi && statusKey === 'draft'" type="button" class="button" :disabled="!canManage || !publishReadiness.ok || !interviewPublishReady" @click="requestAction('publish')">发布批次</button>
           <button v-if="isMockApi && statusKey === 'upcoming'" type="button" class="button" :disabled="!canManage" @click="requestAction('openNow')">立即开放</button>
@@ -691,6 +718,7 @@ useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}｜HSD 管理台`
     </AdminPageHeading>
 
     <p v-if="actionError" class="admin-save-message admin-save-message--error" role="alert">{{ actionError }}</p>
+    <p v-if="exportMessage" :class="['admin-save-message', exportStatus === 'error' ? 'admin-save-message--error' : '']" :role="exportStatus === 'error' ? 'alert' : 'status'">{{ exportMessage }}</p>
     <p v-if="!isMockApi && productionBatch?.commandError.value" class="admin-save-message admin-save-message--error" role="alert">{{ productionBatch.commandError.value }}</p>
 
     <section class="admin-batch-context-summary" aria-label="批次概览">

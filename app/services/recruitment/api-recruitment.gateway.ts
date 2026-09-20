@@ -31,7 +31,7 @@ import {
   type NotificationActionResponseDto,
   type NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
-import type { RecruitmentGateway } from "./recruitment-gateway";
+import type { RecruitmentExportFile, RecruitmentGateway } from "./recruitment-gateway";
 
 export interface ApiRecruitmentGatewayOptions {
   apiBase: string;
@@ -77,6 +77,28 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
     && typeof (value as ErrorResponse).requestId === "string";
 }
 
+function safeRosterFilename(disposition: string | null, batchId: string): string {
+  const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const ascii = disposition?.match(/filename="([^"]+)"/i)?.[1];
+  const decoded = encoded
+    ? safeDecodeURIComponent(encoded)
+    : ascii;
+  const cleaned = (decoded || `HSD-${batchId}-报名名单.csv`)
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.endsWith(".csv") ? cleaned : `${cleaned || "HSD-报名名单"}.csv`;
+}
+
+function safeDecodeURIComponent(value: string): string | undefined {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
+}
+
 export function createApiRecruitmentGateway(
   options: ApiRecruitmentGatewayOptions,
 ): RecruitmentGateway {
@@ -114,6 +136,39 @@ export function createApiRecruitmentGateway(
       headers: { "X-Request-ID": createRequestId() },
     });
     return parseResponse(operation, response);
+  }
+
+  async function readRosterExport(batchId: string, query = ""): Promise<RecruitmentExportFile> {
+    const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+    params.delete("page");
+    params.delete("pageSize");
+    const search = params.toString();
+    const response = await fetcher(
+      `${apiBase}/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/export.csv${search ? `?${search}` : ""}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": createRequestId() },
+      },
+    );
+    if (!response.ok) {
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      throw new RecruitmentApiError({
+        status: response.status,
+        code: isErrorResponse(payload) ? payload.code : "RECRUITMENT_EXPORT_FAILED",
+        message: isErrorResponse(payload) ? payload.message : "Recruitment roster export failed",
+        ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
+      });
+    }
+    return {
+      blob: await response.blob(),
+      filename: safeRosterFilename(response.headers.get("Content-Disposition"), batchId),
+    };
   }
 
   async function mutate<TOperation extends ApiOperation>(
@@ -244,6 +299,7 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/admin/recruitment/batches/{batchId}/applications",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications${query ? `?${query}` : ""}`,
     ),
+    exportAdminApplications: (batchId, query = "") => readRosterExport(batchId, query),
     getAdminApplication: (batchId, applicationId) => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}/applications/{applicationId}",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}`,

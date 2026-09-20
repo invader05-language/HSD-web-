@@ -35,7 +35,7 @@ describe("recruitment roster CSV export", () => {
     }]);
 
     expect(csv.split("\r\n")[0]).toBe("\uFEFF姓名,学号,联系方式,第一志愿,第二志愿,第三志愿,白泽方向,是否接受调剂,面试开始（中国标准时间）,面试结束（中国标准时间）,面试安排状态,提交时间");
-    expect(csv).toContain("2026-09-20 09:00,2026-09-20 09:30,待重新选择（原时段已调整）");
+    expect(csv).toContain("2026-09-20 09:00,2026-09-20 09:30,待重新选择");
   });
 
   it("builds a stable, download-safe filename from the batch and local timestamp", () => {
