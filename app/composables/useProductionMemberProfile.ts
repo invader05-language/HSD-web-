@@ -67,6 +67,12 @@ function errorMessage(error: unknown): string {
   return "资料请求失败，请稍后重试。";
 }
 
+function readFieldErrors(error: unknown): Record<string, string> {
+  const candidate = error as { fieldErrors?: unknown };
+  if (!candidate.fieldErrors || typeof candidate.fieldErrors !== "object" || Array.isArray(candidate.fieldErrors)) return {};
+  return Object.fromEntries(Object.entries(candidate.fieldErrors).filter(([, value]) => typeof value === "string"));
+}
+
 export function createProductionMemberProfileController(input: {
   gateway: MemberProfileGateway;
   apiBase: string;
@@ -76,6 +82,7 @@ export function createProductionMemberProfileController(input: {
   const draft = reactive<ProductionMemberProfileDraft>(emptyDraft());
   const status = ref<"idle" | "loading" | "saving" | "success" | "error" | "conflict">("idle");
   const error = ref("");
+  const fieldErrors = ref<Record<string, string>>({});
   const avatarSource = computed(() => resolveApiMediaUrl(profile.value?.avatarUrl, input.apiBase));
   let stagedAvatarFile: File | undefined;
   let stagedAvatarAssetId: string | undefined;
@@ -83,6 +90,7 @@ export function createProductionMemberProfileController(input: {
   async function load() {
     status.value = "loading";
     error.value = "";
+    fieldErrors.value = {};
     try {
       const loaded = mapMemberProfileResponse(await input.gateway.getCurrentProfile());
       profile.value = loaded;
@@ -95,6 +103,7 @@ export function createProductionMemberProfileController(input: {
       profile.value = undefined;
       status.value = "error";
       error.value = errorMessage(cause);
+      fieldErrors.value = readFieldErrors(cause);
       return undefined;
     }
   }
@@ -108,6 +117,7 @@ export function createProductionMemberProfileController(input: {
     }
     status.value = "saving";
     error.value = "";
+    fieldErrors.value = {};
     try {
       let avatarAssetId: string | undefined;
       const avatarChanged = Boolean(options.avatarFile || options.removeAvatar);
@@ -147,6 +157,7 @@ export function createProductionMemberProfileController(input: {
         status.value = "error";
         error.value = errorMessage(cause);
       }
+      fieldErrors.value = readFieldErrors(cause);
       return false;
     }
   }
@@ -159,6 +170,7 @@ export function createProductionMemberProfileController(input: {
     }
     status.value = "saving";
     error.value = "";
+    fieldErrors.value = {};
     try {
       await input.avatarGateway.remove();
       const reloaded = mapMemberProfileResponse(await input.gateway.getCurrentProfile());
@@ -169,6 +181,7 @@ export function createProductionMemberProfileController(input: {
     } catch (cause) {
       status.value = "error";
       error.value = errorMessage(cause);
+      fieldErrors.value = readFieldErrors(cause);
       return false;
     }
   }
@@ -178,8 +191,9 @@ export function createProductionMemberProfileController(input: {
     stagedAvatarFile = undefined;
     stagedAvatarAssetId = undefined;
     error.value = "";
+    fieldErrors.value = {};
     status.value = "idle";
   }
 
-  return { profile, draft, status, error, avatarSource, load, save, removeAvatar, resetDraft };
+  return { profile, draft, status, error, fieldErrors, avatarSource, load, save, removeAvatar, resetDraft };
 }

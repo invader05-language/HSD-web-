@@ -13,6 +13,7 @@ import {
   isRecruitmentApplicantEligible,
   getRecruitmentCenterOptions,
 } from "../../app/services/recruitment/recruitment-view-models";
+import { createApiRecruitmentGateway } from "../../app/services/recruitment/api-recruitment.gateway";
 
 describe("production recruitment integration", () => {
   it("passes admin batch pagination through the generated client", async () => {
@@ -248,6 +249,50 @@ describe("production recruitment integration", () => {
       className: profile.className,
       bio: profile.bio,
     })).not.toHaveProperty("avatarAssetId");
+  });
+
+  it("omits an empty optional contact from the profile update payload", () => {
+    const profile = mapMemberProfileResponse({
+      id: "person-without-contact",
+      name: "无联系方式成员",
+      studentId: "20260003",
+      grade: "2026",
+      className: "软件工程 3 班",
+      contact: null,
+      bio: null,
+      biography: null,
+      status: "FORMAL_MEMBER",
+      baizeDirection: null,
+      avatar: { kind: "default" },
+      publicProfileEnabled: true,
+      version: 5,
+      membership: null,
+    });
+
+    expect(mapMemberProfileUpdatePayload(profile, {
+      name: profile.name,
+      grade: profile.grade,
+      className: profile.className,
+      bio: profile.biography,
+      contact: profile.contact,
+    })).not.toHaveProperty("contact");
+  });
+
+  it("keeps structured field errors from the recruitment API", async () => {
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher: async () => new Response(JSON.stringify({
+        code: "VALIDATION_FAILED",
+        message: "字段校验失败",
+        requestId: "request-field-errors",
+        fieldErrors: { name: "姓名不能为空" },
+      }), { status: 422, headers: { "Content-Type": "application/json" } }),
+    });
+
+    await expect(gateway.getCurrentProfile()).rejects.toMatchObject({
+      code: "VALIDATION_FAILED",
+      fieldErrors: { name: "姓名不能为空" },
+    });
   });
 
   it("maps an empty production admin batch list without a fixture fallback", () => {

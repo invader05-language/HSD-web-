@@ -44,13 +44,15 @@ export class RecruitmentApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
+  readonly fieldErrors?: Record<string, string>;
 
-  constructor(input: { status: number; code: string; message: string; requestId?: string }) {
+  constructor(input: { status: number; code: string; message: string; requestId?: string; fieldErrors?: Record<string, string> }) {
     super(input.message);
     this.name = "RecruitmentApiError";
     this.status = input.status;
     this.code = input.code;
     this.requestId = input.requestId;
+    this.fieldErrors = input.fieldErrors;
   }
 }
 
@@ -118,6 +120,7 @@ export function createApiRecruitmentGateway(
         code: isErrorResponse(payload) ? payload.code : "RECRUITMENT_API_REQUEST_FAILED",
         message: isErrorResponse(payload) ? payload.message : "Recruitment API request failed",
         ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
+        ...(isErrorResponse(payload) && payload.fieldErrors ? { fieldErrors: payload.fieldErrors } : {}),
       });
     }
     if (!isApiResponse(operation, payload)) {
@@ -212,6 +215,7 @@ export function createApiRecruitmentGateway(
         code: isErrorResponse(payload) ? payload.code : "RECRUITMENT_API_REQUEST_FAILED",
         message: isErrorResponse(payload) ? payload.message : "Recruitment API request failed",
         ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
+        ...(isErrorResponse(payload) && payload.fieldErrors ? { fieldErrors: payload.fieldErrors } : {}),
       });
     }
     return payload as T;
