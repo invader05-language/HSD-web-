@@ -22644,6 +22644,30 @@
             "format": "uuid",
             "nullable": true
           },
+          "adminCenter": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "CENTER_MINISTER"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role"
+            ]
+          },
           "capabilities": {
             "type": "array",
             "items": {
@@ -22655,6 +22679,7 @@
           "id",
           "adminLevel",
           "adminCenterId",
+          "adminCenter",
           "capabilities"
         ]
       },

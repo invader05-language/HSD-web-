@@ -2074,6 +2074,11 @@ export type SessionAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
+  "adminCenter": ({
+  "id": string;
+  "name": string;
+  "role": "CENTER_MINISTER";
+}) | null;
   "capabilities": Array<string>;
 };
 
@@ -12020,6 +12025,30 @@ const API_COMPONENT_SCHEMAS = {
         "format": "uuid",
         "nullable": true
       },
+      "adminCenter": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CENTER_MINISTER"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ]
+      },
       "capabilities": {
         "type": "array",
         "items": {
@@ -12031,6 +12060,7 @@ const API_COMPONENT_SCHEMAS = {
       "id",
       "adminLevel",
       "adminCenterId",
+      "adminCenter",
       "capabilities"
     ]
   },

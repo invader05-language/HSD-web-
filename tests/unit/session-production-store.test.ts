@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { SessionApiError, type ApiSessionGateway } from "../../app/services/api-session.gateway";
 import { SESSION_STORAGE_KEY, useSessionStore } from "../../app/stores/session";
+import { getAdminCenterScope } from "../../app/utils/admin-center-scope";
 
 const ownerSession = {
   account: {
@@ -19,6 +20,11 @@ const centerAdminSession = {
     id: "account-center-admin",
     adminLevel: "ADMIN" as const,
     adminCenterId: "center-media",
+    adminCenter: {
+      id: "center-media",
+      name: "新媒体中心",
+      role: "CENTER_MINISTER",
+    },
     capabilities: ["recruitment.assessment.edit", "content.create"],
   },
   person: { id: "person-center-admin", name: "媒体管理员", status: "FORMAL_MEMBER" as const },
@@ -77,6 +83,8 @@ describe("production session store", () => {
     expect(session.isAuthenticated).toBe(true);
     expect(session.currentMemberId).toBe("person-center-admin");
     expect(session.canAccessAdmin).toBe(true);
+    expect(session.currentAccount?.adminCenterRole).toBe("新媒体中心负责人");
+    expect(getAdminCenterScope(session.currentAccount?.adminCenterRole)).toBe("新媒体中心");
     expect(session.hasCapability("content.create")).toBe(true);
     expect(session.hasCapability("portal.configure")).toBe(false);
   });
