@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
-const session = {
-  account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: ["content.create", "content.review", "content.publish"] },
-  person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const session = currentSessionFixture({
+  accountId: "owner-api",
+  personId: "person-owner",
+  name: "接口负责人",
+  adminLevel: "OWNER",
+  capabilities: ["content.create", "content.review", "content.publish"],
+});
 
 const contentPage = {
   page: 1, pageSize: 20, total: 1,
@@ -201,16 +204,18 @@ test("real content edits a structured paragraph while preserving sibling blocks"
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
   });
   await page.goto("/admin/content/multi-paragraph");
-  await page.getByLabel("正文段落").first().fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
+  const saveButton = page.getByRole("button", { name: "保存草稿" });
+  await page.getByLabel("正文段落").first().fill("Changed body"); await saveButton.click();
   await expect.poll(() => patchBody).toMatchObject({ blocks: [{ type: "paragraph", text: "Changed body" }, blocks[1], blocks[2]] });
   expect(patchCount).toBe(1);
-  await page.getByLabel("正文段落").first().fill("Changed again"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(saveButton).toBeEnabled();
+  await page.getByLabel("正文段落").first().fill("Changed again"); await page.getByLabel("标题").fill("仅改标题"); await saveButton.click();
   await expect.poll(() => patchBody).toMatchObject({ title: "仅改标题", blocks: [{ type: "paragraph", text: "Changed again" }, blocks[1], blocks[2]] });
   expect(patchCount).toBe(2);
 });
 
 test("real content retains its edit draft on 409 and reports a 403 workflow denial without local success", async ({ page }) => {
-  const centerSession = { ...session, account: { id: "center-admin", adminLevel: "ADMIN", adminCenterId: "center-1", capabilities: ["content.create", "content.submit_review"] }, person: { id: "person-center", name: "中心负责人", status: "FORMAL_MEMBER" } };
+  const centerSession = currentSessionFixture({ accountId: "center-admin", personId: "person-center", name: "中心负责人", adminLevel: "ADMIN", center: { id: "center-1", name: "测试中心" }, capabilities: ["content.create", "content.submit_review"] });
   const detail = { id: "conflict-content", publicId: "conflict-public", centerId: "center-1", slug: "conflict-content", kind: "article", status: "draft", version: 4, createdBy: { type: "account", accountId: "center-admin", username: "center-admin", displayName: "中心负责人" }, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", workingRevision: { revisionNumber: 1, title: "冲突内容", summary: "冲突摘要", tag: null, internalTarget: null, expiresAt: null, blocks: [{ type: "paragraph", text: "旧正文" }], internalNote: null }, publishedRevisionNumber: null, rejectionReason: null, publishedAt: null, offlineAt: null, offlineReason: null };
   let patchCount = 0; let lastExpectedVersion: number | undefined;
   await page.context().addCookies([{ name: "hsd_csrf", value: "e2e-csrf", url: "http://127.0.0.1:50101" }]);

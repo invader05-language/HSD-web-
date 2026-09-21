@@ -49,6 +49,12 @@ export type AdminAccountResponseDto = {
   "updatedAt": string;
   "person": AdminPersonSummaryResponseDto;
   "adminCenter": (AdminAccountCenterSummaryResponseDto) | null;
+  "qualification": (AdminAccountQualificationResponseDto) | null;
+};
+
+export type AdminAccountQualificationResponseDto = {
+  "appointedAt": string;
+  "appointedBy": string;
 };
 
 export type AdminActivityListResponseDto = {
@@ -2068,6 +2074,11 @@ export type SessionAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
+  "adminCenter": ({
+  "id": string;
+  "name": string;
+  "role": "CENTER_MINISTER";
+}) | null;
   "capabilities": Array<string>;
 };
 
@@ -12014,6 +12025,30 @@ const API_COMPONENT_SCHEMAS = {
         "format": "uuid",
         "nullable": true
       },
+      "adminCenter": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CENTER_MINISTER"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ]
+      },
       "capabilities": {
         "type": "array",
         "items": {
@@ -12025,6 +12060,7 @@ const API_COMPONENT_SCHEMAS = {
       "id",
       "adminLevel",
       "adminCenterId",
+      "adminCenter",
       "capabilities"
     ]
   },
@@ -13023,6 +13059,14 @@ const API_COMPONENT_SCHEMAS = {
             "$ref": "#/components/schemas/AdminAccountCenterSummaryResponseDto"
           }
         ]
+      },
+      "qualification": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AdminAccountQualificationResponseDto"
+          }
+        ]
       }
     },
     "required": [
@@ -13037,7 +13081,24 @@ const API_COMPONENT_SCHEMAS = {
       "createdAt",
       "updatedAt",
       "person",
-      "adminCenter"
+      "adminCenter",
+      "qualification"
+    ]
+  },
+  "AdminAccountQualificationResponseDto": {
+    "type": "object",
+    "properties": {
+      "appointedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "appointedBy": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "appointedAt",
+      "appointedBy"
     ]
   },
   "AdminAccountListResponseDto": {

@@ -26,6 +26,7 @@ describe("production session API gateway", () => {
           id: "account-owner",
           adminLevel: "OWNER",
           adminCenterId: null,
+          adminCenter: null,
           capabilities: ["recruitment.assessment.edit", "recruitment.result.publish"],
         },
         person: { id: "person-owner", name: "总负责人", status: "FORMAL_MEMBER" },
@@ -62,6 +63,7 @@ describe("production session API gateway", () => {
         id: "account-owner",
         adminLevel: "OWNER",
         adminCenterId: null,
+        adminCenter: null,
         capabilities: ["recruitment.assessment.edit", "recruitment.result.publish"],
       },
       person: { id: "person-owner", name: "总负责人", status: "FORMAL_MEMBER" },
@@ -78,7 +80,7 @@ describe("production session API gateway", () => {
         expiresAt: "2026-08-08T00:00:00.000Z",
       }), { status: 201, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        account: { id: "account-member", adminLevel: "MEMBER", adminCenterId: null, capabilities: [] },
+        account: { id: "account-member", adminLevel: "MEMBER", adminCenterId: null, adminCenter: null, capabilities: [] },
         person: { id: "person-member", name: "新成员", status: "PREPARATORY" },
         mustChangePassword: false,
       }), { status: 200, headers: { "Content-Type": "application/json" } }));

@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const id = "11111111-1111-4111-8111-111111111111";
-const session = { account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] }, person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" }, mustChangePassword: false };
+const session = currentSessionFixture({ accountId: "owner-api", personId: "person-owner", name: "接口负责人", adminLevel: "OWNER" });
 const resource = { id, centerId: "22222222-2222-4222-8222-222222222222", slug: "qa-api-resource", status: "published", version: 4, title: "qa-真实接口资料", summary: "只能来自服务端分页响应。", kind: "pdf", format: "pdf", versionLabel: "v2.0", access: "member", availability: "available", attachmentId: null, revisionNumber: 2, createdBy: { id: "33333333-3333-4333-8333-333333333333", username: "owner", displayName: "接口负责人" }, createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T01:00:00.000Z", publishedAt: "2026-08-23T01:00:00.000Z", offlineAt: null };
 
 test("real admin resources list/detail/version use only API canonical fields", async ({ page }) => {
@@ -42,7 +43,7 @@ test("real admin resources list/detail/version use only API canonical fields", a
 });
 
 test("a center ADMIN receives scoped rows and an explicit 403 detail state without a foreign payload", async ({ page }) => {
-  const adminSession = { account: { id: "center-admin", adminLevel: "ADMIN", adminCenterId: resource.centerId, capabilities: [] }, person: { id: "admin-person", name: "中心管理员", status: "FORMAL_MEMBER" }, mustChangePassword: false };
+  const adminSession = currentSessionFixture({ accountId: "center-admin", personId: "admin-person", name: "中心管理员", adminLevel: "ADMIN", center: { id: resource.centerId, name: "测试中心" } });
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(adminSession) }));
   await page.route("**/api/v1/admin/resources**", (route) => {
     const pathname = new URL(route.request().url()).pathname;

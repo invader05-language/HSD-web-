@@ -7,8 +7,11 @@ describe("password recovery owner page", () => {
     expect(page).toContain("contactedInPerson");
     expect(page).toContain("identityMatched");
     expect(page).toContain("organizationMatched");
-    expect(page).toContain("reason.value.trim().length >= 10");
+    expect(page).toContain("reasonLength.value >= 10");
     expect(page).toContain("重置为系统初始密码");
+    expect(page).toContain("{{ reasonLength }}/10");
+    expect(page).toContain("busyAction");
+    expect(page).toContain("{{ rejectReasonLength }}/10");
   });
   it("does not display the initial password or allow copying it", () => {
     expect(page).not.toMatch(/passwordHash|initialPassword|复制初始密码/);

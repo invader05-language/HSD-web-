@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const batchId = "batch-api-open";
-const ownerSession = {
-  account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] },
-  person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const ownerSession = currentSessionFixture({ accountId: "owner-api", personId: "person-owner", name: "接口负责人", adminLevel: "OWNER" });
 const batch = {
   id: batchId, name: "qa-接口开放批次", startAt: "2026-08-01T00:00:00.000Z", endAt: "2026-09-30T00:00:00.000Z", timezone: "Asia/Shanghai",
   lifecycleStatus: "PUBLISHED", manualOverride: "NONE", effectiveStatus: "open", effectiveStatusReason: "within-window", version: 7,

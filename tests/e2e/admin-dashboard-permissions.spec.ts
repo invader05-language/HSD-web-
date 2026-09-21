@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AdminDashboardSnapshot } from "../../app/types/admin-dashboard";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const adminId = "00000000-0000-4000-8000-000000000101";
 const ownerId = "00000000-0000-4000-8000-000000000102";
@@ -74,16 +75,14 @@ async function stubProductionDashboardApi(page: Page, level: "admin" | "owner") 
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          account: {
-            id: owner ? ownerId : adminId,
-            adminLevel: owner ? "OWNER" : "ADMIN",
-            adminCenterId: owner ? null : centerId,
-            capabilities: dashboardSnapshot(level).operator.capabilities,
-          },
-          person: { id: personId, name: owner ? "联盟负责人" : "中心管理员", status: "FORMAL_MEMBER" },
-          mustChangePassword: false,
-        }),
+        body: JSON.stringify(currentSessionFixture({
+          accountId: owner ? ownerId : adminId,
+          personId,
+          name: owner ? "联盟负责人" : "中心管理员",
+          adminLevel: owner ? "OWNER" : "ADMIN",
+          ...(owner ? {} : { center: { id: centerId, name: "新媒体中心" } }),
+          capabilities: dashboardSnapshot(level).operator.capabilities,
+        })),
       });
       return;
     }
@@ -137,7 +136,8 @@ async function enterDashboard(page: Page, level: "admin" | "owner") {
   await page.getByLabel("密码", { exact: true }).fill("safe-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole("heading", { name: "管理工作台" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "管理工作台", exact: true })).toBeVisible();
 }
 
 async function navigateInProductionRuntime(page: Page, path: string) {

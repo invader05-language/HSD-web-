@@ -415,8 +415,8 @@ export const useAdminAccessStore = defineStore("admin-access", {
         this.qualificationDetails = Object.fromEntries(this.apiAccountRecords.map((account) => [
           account.username,
           {
-            configuredBy: "API",
-            configuredAt: account.updatedAt,
+            configuredBy: account.qualification?.appointedBy ?? "暂无任命记录",
+            configuredAt: account.qualification?.appointedAt ?? "暂无任命记录",
             lastLoginAt: account.lastLoginAt ?? "尚未登录",
           },
         ]));

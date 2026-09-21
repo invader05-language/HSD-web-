@@ -259,7 +259,7 @@ describe("generated browser API client", () => {
       requests.push({ path: request.path, method: request.method });
       if (request.path === API_V1_PATHS.authSession) {
         return {
-          account: { id: "account-id", adminLevel: "MEMBER", adminCenterId: null, capabilities: [] },
+          account: { id: "account-id", adminLevel: "MEMBER", adminCenterId: null, adminCenter: null, capabilities: [] },
           person: { id: "person-id", name: "陈同学", status: "PREPARATORY" },
           mustChangePassword: false,
         };
@@ -300,6 +300,7 @@ describe("generated browser API client", () => {
         id: "c4c9eab9a7f14655a4c3b32dd12ba66f",
         adminLevel: "MEMBER",
         adminCenterId: null,
+        adminCenter: null,
         capabilities: [],
       },
       person: {
@@ -331,6 +332,7 @@ describe("generated browser API client", () => {
       updatedAt: "2026-09-18T00:00:00.000Z",
       person: { id: "11111111-1111-4111-8111-111111111111", name: "中心管理员", studentId: "2026001001", grade: "2026", className: "软件工程 1 班" },
       adminCenter: { id: "0c9515b3-72a1-440f-965d-e3b2b5023005", slug: "new-media", name: "新媒体中心", active: true },
+      qualification: null,
     };
 
     expect(isApiResponse("GET /api/v1/admin/accounts", { page: 1, pageSize: 20, total: 1, items: [account] })).toBe(true);
@@ -352,6 +354,7 @@ describe("generated browser API client", () => {
           id: "account-owner",
           adminLevel: "OWNER",
           adminCenterId: null,
+          adminCenter: null,
           capabilities: ["recruitment.assessment.edit", "recruitment.result.publish"],
         },
         person: { id: "person-owner", name: "总负责人", status: "FORMAL_MEMBER" },

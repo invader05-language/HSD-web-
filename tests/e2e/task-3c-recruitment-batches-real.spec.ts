@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 type RequestShape = { method: string; pathname: string; search: string };
 
@@ -7,11 +8,7 @@ const fixtureBatchStorage = {
   batches: [{ id: "fixture-batch", name: "本地 fixture 批次", startAt: "2026-01-01T00:00:00.000Z", endAt: "2026-01-02T00:00:00.000Z", timezone: "Asia/Shanghai", openCenterIds: [], responsibleAccountIds: [], lifecycleStatus: "draft", manualOverride: "none", version: 1, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
 };
 
-const ownerSession = {
-  account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] },
-  person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const ownerSession = currentSessionFixture({ accountId: "owner-api", personId: "person-owner", name: "接口负责人", adminLevel: "OWNER" });
 
 const currentPermission = {
   accountId: "owner-api",

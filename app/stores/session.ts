@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { DEMO_MEMBER_PROFILE } from "../data/member-profile";
 import {
+  ADMIN_CENTER_LEAD_LABELS,
   DEMO_APPLICANT_ACCOUNT,
   DEMO_MEMBER_ACCOUNT,
   findMockAccount,
@@ -134,20 +135,31 @@ function mockAccountProjection(account: MockAccount): SessionAccountProjection {
   };
 }
 
+function apiAdminCenterRole(
+  adminCenter: CurrentSessionResponseDto["account"]["adminCenter"],
+): AdminCenterRole | undefined {
+  if (adminCenter?.role !== "CENTER_MINISTER") return undefined;
+  const role = `${adminCenter.name}负责人` as AdminCenterRole;
+  return ADMIN_CENTER_LEAD_LABELS.includes(role) ? role : undefined;
+}
+
 function apiAccountProjection(session: CurrentSessionResponseDto): SessionAccountProjection {
   const adminLevel: AdminLevel = session.account.adminLevel === "OWNER"
     ? "owner"
     : session.account.adminLevel === "ADMIN"
       ? "admin"
       : "member";
+  const adminCenterId = session.account.adminCenter?.id ?? session.account.adminCenterId;
+  const adminCenterRole = apiAdminCenterRole(session.account.adminCenter);
   return {
     account: session.account.id,
     memberId: session.person.id,
     name: session.person.name,
     adminLevel,
-    adminAccessEnabled: adminLevel === "owner" || session.account.adminCenterId !== null,
+    adminAccessEnabled: adminLevel === "owner" || adminCenterId !== null,
     mustChangePassword: session.mustChangePassword,
-    ...(session.account.adminCenterId ? { adminCenterId: session.account.adminCenterId } : {}),
+    ...(adminCenterId ? { adminCenterId } : {}),
+    ...(adminCenterRole ? { adminCenterRole } : {}),
     capabilities: [...session.account.capabilities],
   };
 }
@@ -284,6 +296,21 @@ export const useSessionStore = defineStore("session", {
         return false;
       } finally {
         this.isHydrated = true;
+      }
+    },
+    async refreshForRuntime(
+      config: SessionRuntimeConfig,
+      gateway: ApiSessionGateway | undefined,
+    ): Promise<boolean> {
+      if (config.useMockApi) return this.isAuthenticated;
+      if (!gateway || !this.isAuthenticated) return false;
+      try {
+        this.applyApiSession(await gateway.currentSession());
+        return true;
+      } catch {
+        this.clearProductionSession();
+        this.isHydrated = true;
+        return false;
       }
     },
     signIn(
