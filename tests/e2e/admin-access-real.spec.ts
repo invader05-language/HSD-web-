@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const ownerPersonId = "10000000-0000-4000-8000-000000000001";
 const ownerAccountId = "10000000-0000-4000-8000-000000000002";
@@ -51,6 +52,7 @@ function account(
     updatedAt: "2026-08-24T00:00:00.000Z",
     person: { ...person, grade: "2026", className: "软件工程 1 班" },
     adminCenter: adminLevel === "ADMIN" ? { id: centerId, slug: "new-media", name: "新媒体中心", active: true, positions: [] } : null,
+    qualification: adminLevel === "MEMBER" ? null : { appointedAt: "2026-08-24T00:00:00.000Z", appointedBy: ownerAccountId },
   };
 }
 
@@ -122,11 +124,12 @@ async function installApiScenario(
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     if (pathname === "/api/v1/auth/session" && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-        account: { id: ownerAccountId, adminLevel: "OWNER", adminCenterId: null, capabilities: [] },
-        person: { id: ownerPersonId, name: "接口负责人", status: "FORMAL_MEMBER" },
-        mustChangePassword: false,
-      }) });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentSessionFixture({
+        accountId: ownerAccountId,
+        personId: ownerPersonId,
+        name: "接口负责人",
+        adminLevel: "OWNER",
+      })) });
       return;
     }
     if (pathname === "/api/v1/admin/accounts" && request.method() === "GET") {

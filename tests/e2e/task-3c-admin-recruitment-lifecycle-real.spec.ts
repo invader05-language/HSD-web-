@@ -1,22 +1,23 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
-const OWNER_SESSION = {
-  account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: ["recruitment.batch.manage"] },
-  person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const OWNER_SESSION = currentSessionFixture({
+  accountId: "owner-api",
+  personId: "person-owner",
+  name: "接口负责人",
+  adminLevel: "OWNER",
+  capabilities: ["recruitment.batch.manage"],
+});
 
-const ADMIN_SESSION = {
-  account: { id: "admin-api", adminLevel: "ADMIN", adminCenterId: "center-baize", capabilities: [] },
-  person: { id: "person-admin", name: "中心管理员", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const ADMIN_SESSION = currentSessionFixture({
+  accountId: "admin-api",
+  personId: "person-admin",
+  name: "中心管理员",
+  adminLevel: "ADMIN",
+  center: { id: "center-baize", name: "白泽开发中心" },
+});
 
-const MEMBER_SESSION = {
-  account: { id: "member-api", adminLevel: "MEMBER", adminCenterId: null, capabilities: [] },
-  person: { id: "person-member", name: "普通成员", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const MEMBER_SESSION = currentSessionFixture({ accountId: "member-api", personId: "person-member", name: "普通成员", adminLevel: "MEMBER" });
 
 function batch(version = 9, archived = false) {
   return {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const batchId = "11111111-1111-4111-8111-111111111111";
 const centerId = "22222222-2222-4222-8222-222222222222";
@@ -36,11 +37,7 @@ const batch = {
   }],
 };
 
-const ownerSession = {
-  account: { id: accountId, adminLevel: "OWNER", adminCenterId: null, capabilities: [] },
-  person: { id: personId, name: "选择器负责人", status: "FORMAL_MEMBER" },
-  mustChangePassword: false,
-};
+const ownerSession = currentSessionFixture({ accountId, personId, name: "选择器负责人", adminLevel: "OWNER" });
 
 test("real batch editor uses one CST picker for both slot times", async ({ page }) => {
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ownerSession) }));

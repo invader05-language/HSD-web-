@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const personId = "00000000-0000-4000-8000-000000000201";
 const accountId = "00000000-0000-4000-8000-000000000202";
@@ -39,11 +40,13 @@ async function stubPositionApi(page: Page) {
         await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ code: "UNAUTHENTICATED", message: "Authentication is required", requestId: "member-position-e2e" }) });
         return;
       }
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-        account: { id: accountId, adminLevel: "OWNER", adminCenterId: null, capabilities: ["member.create"] },
-        person: { id: personId, name: "陈同学", status: "FORMAL_MEMBER" },
-        mustChangePassword: false,
-      }) });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentSessionFixture({
+        accountId,
+        personId,
+        name: "陈同学",
+        adminLevel: "OWNER",
+        capabilities: ["member.create"],
+      })) });
       return;
     }
     if (pathname === "/api/v1/admin/members" && request.method() === "GET") {
@@ -66,7 +69,7 @@ async function stubPositionApi(page: Page) {
       return;
     }
     if (pathname === "/api/v1/admin/accounts" && request.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [{ id: accountId, username: "2026001001", status: "ENABLED", adminLevel: "MEMBER", adminCenterId: null, mustChangePassword: false, lastLoginAt: null, version: 1, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z", person: { id: personId, name: "陈同学", studentId: "2026001001", grade: "2026", className: "软件工程 1 班" }, adminCenter: null }] }) });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ page: 1, pageSize: 20, total: 1, items: [{ id: accountId, username: "2026001001", status: "ENABLED", adminLevel: "MEMBER", adminCenterId: null, mustChangePassword: false, lastLoginAt: null, version: 1, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z", person: { id: personId, name: "陈同学", studentId: "2026001001", grade: "2026", className: "软件工程 1 班" }, adminCenter: null, qualification: null }] }) });
       return;
     }
     if (pathname === "/api/v1/admin/projects" && request.method() === "GET") {

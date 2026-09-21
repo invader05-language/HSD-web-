@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
 
 const upload = { id: "11111111-1111-4111-8111-111111111111", centerId: "22222222-2222-4222-8222-222222222222", createdBy: { id: "33333333-3333-4333-8333-333333333333", username: "owner", displayName: "接口负责人" }, fileName: "qa-真实接口图片.png", mimeType: "image/png", byteSize: 1536, kind: "image", status: "ready", version: 2, expiresAt: "2026-09-01T00:00:00.000Z", failureCode: null, completedAt: "2026-08-23T01:00:00.000Z", createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T01:00:00.000Z" };
-const ownerSession = { account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] }, person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" }, mustChangePassword: false };
+const ownerSession = currentSessionFixture({ accountId: "owner-api", personId: "person-owner", name: "接口负责人", adminLevel: "OWNER" });
 
 test("real upload queue uses the API canonical list and owner center filter only", async ({ page }) => {
   const requests: string[] = [];
@@ -28,7 +29,7 @@ test("real upload queue uses the API canonical list and owner center filter only
 });
 
 test("a center ADMIN relies on backend scope and shows an explicit 403 state", async ({ page }) => {
-  const adminSession = { account: { id: "center-admin", adminLevel: "ADMIN", adminCenterId: upload.centerId, capabilities: [] }, person: { id: "admin-person", name: "中心管理员", status: "FORMAL_MEMBER" }, mustChangePassword: false };
+  const adminSession = currentSessionFixture({ accountId: "center-admin", personId: "admin-person", name: "中心管理员", adminLevel: "ADMIN", center: { id: upload.centerId, name: "测试中心" } });
   await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(adminSession) }));
   await page.route("**/api/v1/admin/uploads**", (route) => route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "CENTER_SCOPE_FORBIDDEN", message: "Foreign center denied", requestId: "upload-403" }) }));
   await page.goto("/admin/uploads");

@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { currentSessionFixture } from "./support/current-session-fixtures";
+const validMemberSession = currentSessionFixture({ accountId: "member-api", personId: "member-person", name: "普通成员", adminLevel: "MEMBER" });
 
-const ownerSession = { account: { id: "owner-api", adminLevel: "OWNER", adminCenterId: null, capabilities: [] }, person: { id: "person-owner", name: "接口负责人", status: "FORMAL_MEMBER" }, mustChangePassword: false };
-const adminSession = { account: { id: "center-admin", adminLevel: "ADMIN", adminCenterId: "center-1", capabilities: [] }, person: { id: "admin-person", name: "中心管理员", status: "FORMAL_MEMBER" }, mustChangePassword: false };
-const memberSession = { account: { id: "member-api", adminLevel: "MEMBER", adminCenterId: null, capabilities: [] }, person: { id: "member-person", name: "普通成员", status: "FORMAL_MEMBER" }, mustChangePassword: false };
+const ownerSession = currentSessionFixture({ accountId: "owner-api", personId: "person-owner", name: "接口负责人", adminLevel: "OWNER" });
+const adminSession = currentSessionFixture({ accountId: "center-admin", personId: "admin-person", name: "中心管理员", adminLevel: "ADMIN", center: { id: "center-1", name: "测试中心" } });
 const auditEvent = { id: "11111111-1111-4111-8111-111111111111", actor: { type: "account", accountId: "22222222-2222-4222-8222-222222222222", username: "owner", displayName: "接口负责人" }, action: "content.publish", target: { type: "content", id: "33333333-3333-4333-8333-333333333333" }, before: { status: "review", token: "must-not-render", ip: "127.0.0.1", clientIp: "10.0.0.1" }, after: { status: "published", cookie: "must-not-render", allowed: ["published", true] }, reason: "review approved", createdAt: "2026-08-23T00:00:00.000Z" };
 
 test("owner real audit log uses only safe API rows and server filters", async ({ page }) => {
@@ -16,7 +17,7 @@ test("owner real audit log uses only safe API rows and server filters", async ({
 
   await page.goto("/admin/logs");
   await expect(page.getByRole("heading", { level: 1, name: "操作日志" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "管理员操作日志" })).toContainText("content.publish");
+  await expect(page.getByRole("table", { name: "管理员操作日志" })).toContainText("发布官网内容");
   await expect(page.getByText("旧本地审计记录", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/IP 地址|请求环境|导出日志|保留 180 天/)).toHaveCount(0);
   expect(requests).toEqual([expect.stringContaining("/api/v1/admin/audit-events?page=1&pageSize=20")]);
@@ -25,15 +26,16 @@ test("owner real audit log uses only safe API rows and server filters", async ({
   await expect.poll(() => requests.at(-1)).toContain("actionPrefix=content.");
   await page.getByRole("button", { name: "变更前 / 变更后" }).click();
   const drawer = page.getByRole("complementary", { name: "日志详情" });
-  await expect(drawer).toContainText("status: review");
-  await expect(drawer).toContainText("allowed: published, true");
+  await expect(drawer).toContainText("content.publish");
+  await expect(drawer).toContainText("状态：审核中");
+  await expect(drawer).toContainText("允许：已发布、是");
   await expect(drawer).not.toContainText(/must-not-render|127\.0\.0\.1|10\.0\.0\.1|token|cookie|IP|设备|请求环境/);
 });
 
 test("a real-mode MEMBER receives no audit table or seeded local audit fallback", async ({ page }) => {
   let auditRequests = 0;
   await page.addInitScript(() => localStorage.setItem("baiyun-hsd.admin-access", JSON.stringify({ auditRecords: [{ actor: "成员不能读取的本地记录" }] })));
-  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(memberSession) }));
+  await page.route("**/api/v1/auth/session", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(validMemberSession) }));
   await page.route("**/api/v1/admin/audit-events**", (route) => { auditRequests += 1; return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "AUDIT_OWNER_ONLY", message: "Owner only", requestId: "member-403" }) }); });
   await page.goto("/admin/logs");
   await expect(page.getByRole("heading", { level: 1, name: "当前账号没有此项管理权限" })).toBeVisible();
