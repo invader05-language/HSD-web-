@@ -204,10 +204,12 @@ test("real content edits a structured paragraph while preserving sibling blocks"
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(currentDetail) });
   });
   await page.goto("/admin/content/multi-paragraph");
-  await page.getByLabel("正文段落").first().fill("Changed body"); await page.getByRole("button", { name: "保存草稿" }).click();
+  const saveButton = page.getByRole("button", { name: "保存草稿" });
+  await page.getByLabel("正文段落").first().fill("Changed body"); await saveButton.click();
   await expect.poll(() => patchBody).toMatchObject({ blocks: [{ type: "paragraph", text: "Changed body" }, blocks[1], blocks[2]] });
   expect(patchCount).toBe(1);
-  await page.getByLabel("正文段落").first().fill("Changed again"); await page.getByLabel("标题").fill("仅改标题"); await page.getByRole("button", { name: "保存草稿" }).click();
+  await expect(saveButton).toBeEnabled();
+  await page.getByLabel("正文段落").first().fill("Changed again"); await page.getByLabel("标题").fill("仅改标题"); await saveButton.click();
   await expect.poll(() => patchBody).toMatchObject({ title: "仅改标题", blocks: [{ type: "paragraph", text: "Changed again" }, blocks[1], blocks[2]] });
   expect(patchCount).toBe(2);
 });
