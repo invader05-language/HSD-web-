@@ -286,6 +286,21 @@ export const useSessionStore = defineStore("session", {
         this.isHydrated = true;
       }
     },
+    async refreshForRuntime(
+      config: SessionRuntimeConfig,
+      gateway: ApiSessionGateway | undefined,
+    ): Promise<boolean> {
+      if (config.useMockApi) return this.isAuthenticated;
+      if (!gateway || !this.isAuthenticated) return false;
+      try {
+        this.applyApiSession(await gateway.currentSession());
+        return true;
+      } catch {
+        this.clearProductionSession();
+        this.isHydrated = true;
+        return false;
+      }
+    },
     signIn(
       account = DEMO_MEMBER_ACCOUNT,
       passwordOrOptions: string | { requireAdmin?: boolean } = "",

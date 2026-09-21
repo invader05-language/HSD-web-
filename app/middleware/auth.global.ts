@@ -8,6 +8,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
     const config = useRuntimeConfig() as { public: { useMockApi: boolean } };
     await session.restoreForRuntime(config.public, useSessionGateway());
   }
+  if (import.meta.client && session.isAuthenticated && to.path.startsWith("/admin")) {
+    const config = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
+    await session.refreshForRuntime(config.public, useSessionGateway());
+  }
   const target = resolveProtectedRouteTarget(to.path, to.fullPath, session);
   if (target) return navigateTo(target);
 });

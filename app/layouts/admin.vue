@@ -138,7 +138,7 @@ async function signOut() {
               :to="item.to"
               :class="{ 'is-active': activeNavigation.itemId === item.id }"
             >
-              {{ item.label }}<span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span>
+              <span class="admin-nav-link-label">{{ item.label }}</span><span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span>
             </NuxtLink>
           </div>
         </section>
@@ -187,7 +187,7 @@ async function signOut() {
             :to="item.to"
             :class="{ 'is-active': activeNavigation.itemId === item.id }"
             @click="mobileNavigationOpen = false"
-          >{{ item.label }}<span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span></NuxtLink>
+          ><span class="admin-nav-link-label">{{ item.label }}</span><span v-if="item.id === 'password-recovery' && passwordRecoveryPendingCount" class="admin-nav-badge">{{ passwordRecoveryPendingCount > 99 ? '99+' : passwordRecoveryPendingCount }}</span></NuxtLink>
         </section>
       </nav>
 

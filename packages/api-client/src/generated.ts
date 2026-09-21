@@ -49,6 +49,12 @@ export type AdminAccountResponseDto = {
   "updatedAt": string;
   "person": AdminPersonSummaryResponseDto;
   "adminCenter": (AdminAccountCenterSummaryResponseDto) | null;
+  "qualification": (AdminAccountQualificationResponseDto) | null;
+};
+
+export type AdminAccountQualificationResponseDto = {
+  "appointedAt": string;
+  "appointedBy": string;
 };
 
 export type AdminActivityListResponseDto = {
@@ -13023,6 +13029,14 @@ const API_COMPONENT_SCHEMAS = {
             "$ref": "#/components/schemas/AdminAccountCenterSummaryResponseDto"
           }
         ]
+      },
+      "qualification": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AdminAccountQualificationResponseDto"
+          }
+        ]
       }
     },
     "required": [
@@ -13037,7 +13051,24 @@ const API_COMPONENT_SCHEMAS = {
       "createdAt",
       "updatedAt",
       "person",
-      "adminCenter"
+      "adminCenter",
+      "qualification"
+    ]
+  },
+  "AdminAccountQualificationResponseDto": {
+    "type": "object",
+    "properties": {
+      "appointedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "appointedBy": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "appointedAt",
+      "appointedBy"
     ]
   },
   "AdminAccountListResponseDto": {
