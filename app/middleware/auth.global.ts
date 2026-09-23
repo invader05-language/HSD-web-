@@ -13,5 +13,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
     await session.refreshForRuntime(config.public, useSessionGateway());
   }
   const target = resolveProtectedRouteTarget(to.path, to.fullPath, session);
-  if (target) return navigateTo(target);
+  if (target) return navigateTo(target, { replace: true });
 });

@@ -111,7 +111,7 @@ function handleQuickMenuKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   void refresh();
-  void recovery.refresh({ status: "PENDING" });
+  if (session.canManageAdminAccounts) void recovery.refreshPendingCount();
 });
 </script>
 
