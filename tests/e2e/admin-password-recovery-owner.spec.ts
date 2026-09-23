@@ -17,6 +17,6 @@ test("owner can open the password recovery inbox", async ({ page }) => {
 
 test("center administrators cannot see or open the owner-only inbox", async ({ page }) => {
   await signIn(page, "media-admin", "/admin/password-recovery");
-  await expect(page).toHaveURL(/\/admin\/forbidden\?from=\/admin\/password-recovery$/);
-  await expect(page.getByText("联盟总负责人资格", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: "管理工作台" })).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAdminForbiddenTarget,
   getRequiredAdminAccess,
   resolveProtectedRouteTarget
 } from "../../app/utils/route-access";
@@ -57,17 +58,17 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("denies members who try to enter an admin route", () => {
     expect(resolveProtectedRouteTarget("/admin", "/admin", member))
-      .toBe("/admin/forbidden?from=%2Fadmin");
+      .toBe("/admin/forbidden?from=%2Fadmin&required=center&reason=admin_access_required");
   });
 
   it("preserves the canonical denied account configuration target for administrators", () => {
     expect(resolveProtectedRouteTarget("/admin/accounts", "/admin/accounts", admin))
-      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts&required=owner&reason=owner_required");
   });
 
   it("keeps the trailing-slash accounts route owner-only", () => {
     expect(resolveProtectedRouteTarget("/admin/accounts/", "/admin/accounts/", admin))
-      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts&required=owner&reason=owner_required");
   });
 
   it("keeps nested member records owner-only", () => {
@@ -75,7 +76,7 @@ describe("resolveProtectedRouteTarget", () => {
       "/admin/members/member-lin",
       "/admin/members/member-lin?tab=internal",
       admin,
-    )).toBe("/admin/forbidden?from=%2Fadmin%2Fmembers%2Fmember-lin");
+    )).toBe("/admin/forbidden?from=%2Fadmin%2Fmembers%2Fmember-lin%3Ftab%3Dinternal&required=owner&reason=owner_required");
     expect(resolveProtectedRouteTarget(
       "/admin/members/member-lin",
       "/admin/members/member-lin",
@@ -91,7 +92,7 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("denies the legacy roles address to non-owner administrators", () => {
     expect(resolveProtectedRouteTarget("/admin/roles", "/admin/roles", admin))
-      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Faccounts&required=owner&reason=owner_required");
   });
 
   it("redirects the trailing-slash legacy roles address for owners", () => {
@@ -105,12 +106,12 @@ describe("resolveProtectedRouteTarget", () => {
 
   it("denies portal configuration routes when an administrator lacks portal.configure", () => {
     expect(resolveProtectedRouteTarget("/admin/content/home", "/admin/content/home?view=visuals", admin))
-      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhome");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhome%3Fview%3Dvisuals&required=scope&reason=portal_scope_required");
   });
 
   it("denies Help management when an administrator lacks portal.configure", () => {
     expect(resolveProtectedRouteTarget("/admin/content/help", "/admin/content/help", admin))
-      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhelp");
+      .toBe("/admin/forbidden?from=%2Fadmin%2Fcontent%2Fhelp&required=scope&reason=portal_scope_required");
     expect(resolveProtectedRouteTarget("/admin/content/help", "/admin/content/help", owner)).toBeUndefined();
   });
 
@@ -122,5 +123,21 @@ describe("resolveProtectedRouteTarget", () => {
     expect(getRequiredAdminAccess("/admin/accounts/")).toBe("owner");
     expect(getRequiredAdminAccess(["/admin/accounts"])).toBe("admin");
     expect(getRequiredAdminAccess("https://example.com/admin/accounts")).toBe("admin");
+  });
+
+  it("recovers a qualified administrator from a structured forbidden target", () => {
+    const forbidden = buildAdminForbiddenTarget("/admin/accounts", "owner", "owner_required");
+    expect(forbidden).toBe("/admin/forbidden?from=%2Fadmin%2Faccounts&required=owner&reason=owner_required");
+    expect(resolveProtectedRouteTarget("/admin/forbidden", forbidden, owner)).toBe("/admin/accounts");
+    expect(resolveProtectedRouteTarget("/admin/forbidden", "/admin/forbidden", owner)).toBe("/admin");
+    expect(resolveProtectedRouteTarget("/admin/forbidden", forbidden, admin)).toBe("/admin");
+  });
+
+  it("rejects an external forbidden continuation", () => {
+    expect(resolveProtectedRouteTarget(
+      "/admin/forbidden",
+      "/admin/forbidden?from=https%3A%2F%2Fevil.example%2Fadmin",
+      owner,
+    )).toBe("/admin");
   });
 });

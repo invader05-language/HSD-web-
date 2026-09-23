@@ -101,7 +101,11 @@ describe("production session store", () => {
   it("clears local Mock state after an anonymous production session instead of falling back", async () => {
     const gateway: ApiSessionGateway = {
       login: vi.fn(),
-      currentSession: vi.fn().mockRejectedValue(new Error("Authentication is required")),
+      currentSession: vi.fn().mockRejectedValue(new SessionApiError({
+        status: 401,
+        code: "UNAUTHORIZED",
+        message: "Authentication is required",
+      })),
       changePassword: vi.fn(),
       logout: vi.fn(),
     };
@@ -113,6 +117,47 @@ describe("production session store", () => {
     expect(session.isAuthenticated).toBe(false);
     expect(session.currentAccountId).toBeUndefined();
     expect(session.canAccessAdmin).toBe(false);
+  });
+
+  it("preserves the last verified production session across a transient session refresh failure", async () => {
+    const gateway: ApiSessionGateway = {
+      login: vi.fn(),
+      currentSession: vi.fn().mockRejectedValue(new SessionApiError({
+        status: 503,
+        code: "SERVICE_UNAVAILABLE",
+        message: "暂时不可用",
+      })),
+      changePassword: vi.fn(),
+      logout: vi.fn(),
+    };
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    await expect(session.refreshForRuntime({ useMockApi: false }, gateway)).resolves.toBe(false);
+
+    expect(session.isAuthenticated).toBe(true);
+    expect(session.currentAccountId).toBe("account-owner");
+    expect(session.canManageAdminAccounts).toBe(true);
+  });
+
+  it("deduplicates concurrent production session refreshes", async () => {
+    let release!: (value: typeof ownerSession) => void;
+    const currentSession = new Promise<typeof ownerSession>((resolve) => { release = resolve; });
+    const gateway: ApiSessionGateway = {
+      login: vi.fn(),
+      currentSession: vi.fn().mockReturnValue(currentSession),
+      changePassword: vi.fn(),
+      logout: vi.fn(),
+    };
+    const session = useSessionStore();
+    session.applyApiSession(ownerSession);
+
+    const first = session.refreshForRuntime({ useMockApi: false }, gateway);
+    const second = session.refreshForRuntime({ useMockApi: false }, gateway);
+    expect(gateway.currentSession).toHaveBeenCalledOnce();
+
+    release(ownerSession);
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
   });
 
   it("keeps the fixture sign-in path available only when the explicit Mock flag is true", async () => {

@@ -30,7 +30,7 @@ describe("organization position presentation", () => {
       hasCapability: () => false,
     };
 
-    expect(resolveProtectedRouteTarget("/admin/members", "/admin/members", admin)).toBe("/admin/forbidden?from=%2Fadmin%2Fmembers");
+    expect(resolveProtectedRouteTarget("/admin/members", "/admin/members", admin)).toBe("/admin/forbidden?from=%2Fadmin%2Fmembers&required=owner&reason=owner_required");
     expect(resolveProtectedRouteTarget("/admin/projects", "/admin/projects", admin)).toBeUndefined();
   });
 });
