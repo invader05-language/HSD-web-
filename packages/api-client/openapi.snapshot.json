@@ -15041,6 +15041,12 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600,
+            "description": "Retry delay in seconds for rate limits or temporary login unavailability (HTTP 423, 429, or 503)."
           }
         }
       },

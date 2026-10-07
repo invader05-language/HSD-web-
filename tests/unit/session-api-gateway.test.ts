@@ -178,4 +178,48 @@ describe("production session API gateway", () => {
       code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
     });
   });
+
+  it("preserves the safe error contract and retry timing from a login response", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: "LOGIN_RATE_LIMITED",
+      message: "Too many login attempts. Please try again later.",
+      requestId: "login-request-429",
+      retryAfterSeconds: 42,
+    }), { status: 429, headers: { "Retry-After": "60" } }));
+    const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+    await expect(gateway.login({ account: "member", password: " Raw Pass ", rememberMe: false }))
+      .rejects.toMatchObject({
+        status: 429,
+        code: "LOGIN_RATE_LIMITED",
+        message: "Too many login attempts. Please try again later.",
+        requestId: "login-request-429",
+        retryAfterSeconds: 42,
+      });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("uses an HTTP-date Retry-After when the error body has no retry timing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-07T00:00:00.000Z"));
+    try {
+      const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+        code: "LOGIN_ACCOUNT_LOCKED", message: "This account is temporarily locked", requestId: "login-request-423",
+      }), { status: 423, headers: { "Retry-After": "Wed, 07 Oct 2026 00:02:00 GMT" } }));
+      const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+      await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+        .rejects.toMatchObject({ status: 423, retryAfterSeconds: 120 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps status and a safe fallback message when the error response is not JSON", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("untrusted server details", { status: 503 }));
+    const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({ status: 503, code: "SESSION_API_REQUEST_FAILED", message: "Session API request failed" });
+  });
 });

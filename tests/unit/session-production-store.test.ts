@@ -173,6 +173,18 @@ describe("production session store", () => {
     expect(session.canManageAdminAccounts).toBe(true);
   });
 
+  it("passes a production password byte-for-byte and retains the authoritative admin session", async () => {
+    const gateway = {
+      login: vi.fn().mockResolvedValue(ownerSession), currentSession: vi.fn(), changePassword: vi.fn(), logout: vi.fn(),
+    } satisfies ApiSessionGateway;
+    const session = useSessionStore();
+
+    await expect(session.signInForRuntime({ useMockApi: false }, gateway, " member ", "  PássWord  ", { requireAdmin: true }))
+      .resolves.toMatchObject({ status: "success" });
+    expect(gateway.login).toHaveBeenCalledWith({ account: "member", password: "  PássWord  ", rememberMe: false });
+    expect(session.canManageAdminAccounts).toBe(true);
+  });
+
   it("completes a required production password change through the API instead of the Mock account store", async () => {
     const gateway = {
       login: vi.fn(),

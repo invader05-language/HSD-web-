@@ -25,13 +25,15 @@ export class SessionApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
+  readonly retryAfterSeconds?: number;
 
-  constructor(input: { status: number; code: string; message: string; requestId?: string }) {
+  constructor(input: { status: number; code: string; message: string; requestId?: string; retryAfterSeconds?: number }) {
     super(input.message);
     this.name = "SessionApiError";
     this.status = input.status;
     this.code = input.code;
     this.requestId = input.requestId;
+    this.retryAfterSeconds = input.retryAfterSeconds;
   }
 }
 
@@ -57,6 +59,36 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
     && typeof (value as ErrorResponse).requestId === "string";
 }
 
+function retryAfterSeconds(response: Response, payload: unknown): number | undefined {
+  if (typeof payload === "object" && payload !== null && "retryAfterSeconds" in payload) {
+    const seconds = (payload as { retryAfterSeconds?: unknown }).retryAfterSeconds;
+    if (typeof seconds === "number" && Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  }
+  const header = response.headers.get("Retry-After");
+  if (!header) return undefined;
+  if (/^\d+$/.test(header.trim())) return Number(header.trim());
+  const timestamp = Date.parse(header);
+  return Number.isNaN(timestamp) ? undefined : Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+}
+
+async function responseError(response: Response): Promise<SessionApiError> {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = undefined;
+  }
+  const error = isErrorResponse(payload) ? payload : undefined;
+  const retrySeconds = retryAfterSeconds(response, payload);
+  return new SessionApiError({
+    status: response.status,
+    code: error?.code ?? "SESSION_API_REQUEST_FAILED",
+    message: error?.message ?? "Session API request failed",
+    ...(error?.requestId ? { requestId: error.requestId } : {}),
+    ...(retrySeconds === undefined ? {} : { retryAfterSeconds: retrySeconds }),
+  });
+}
+
 export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiSessionGateway {
   const apiBase = options.apiBase.replace(/\/+$/, "");
   const fetcher = options.fetcher ?? globalThis.fetch;
@@ -67,15 +99,10 @@ export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiS
     operation: TOperation,
     response: Response,
   ): Promise<ApiResponseFor<TOperation>> {
-    const payload: unknown = await response.json();
     if (!response.ok) {
-      throw new SessionApiError({
-        status: response.status,
-        code: isErrorResponse(payload) ? payload.code : "SESSION_API_REQUEST_FAILED",
-        message: isErrorResponse(payload) ? payload.message : "Session API request failed",
-        ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
-      });
+      throw await responseError(response);
     }
+    const payload: unknown = await response.json();
     if (!isApiResponse(operation, payload)) {
       throw new Error(`API_RESPONSE_CONTRACT_MISMATCH:${operation}`);
     }
@@ -104,18 +131,7 @@ export function createApiSessionGateway(options: ApiSessionGatewayOptions): ApiS
   }
 
   async function throwResponseError(response: Response): Promise<never> {
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = undefined;
-    }
-    throw new SessionApiError({
-      status: response.status,
-      code: isErrorResponse(payload) ? payload.code : "SESSION_API_REQUEST_FAILED",
-      message: isErrorResponse(payload) ? payload.message : "Session API request failed",
-      ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
-    });
+    throw await responseError(response);
   }
 
   return {

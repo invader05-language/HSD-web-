@@ -1027,6 +1027,7 @@ export type ErrorResponse = {
   "message": string;
   "requestId": string;
   "fieldErrors"?: Record<string, string>;
+  "retryAfterSeconds"?: number;
 };
 
 export type GalleryCommandDto = {
@@ -4423,6 +4424,12 @@ const API_COMPONENT_SCHEMAS = {
         "additionalProperties": {
           "type": "string"
         }
+      },
+      "retryAfterSeconds": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3600,
+        "description": "Retry delay in seconds for rate limits or temporary login unavailability (HTTP 423, 429, or 503)."
       }
     }
   },
