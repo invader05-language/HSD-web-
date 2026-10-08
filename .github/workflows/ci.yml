@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify production Web API base
+        run: pnpm run verify:production-web-api-base
+
       - name: Run unit tests
         run: pnpm run test:unit
 
