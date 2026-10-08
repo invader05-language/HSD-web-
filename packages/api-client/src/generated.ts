@@ -36,6 +36,11 @@ export type AdminAccountListResponseDto = {
   "items": Array<AdminAccountResponseDto>;
 };
 
+export type AdminAccountQualificationResponseDto = {
+  "appointedAt": string;
+  "appointedBy": string;
+};
+
 export type AdminAccountResponseDto = {
   "id": string;
   "username": string;
@@ -50,11 +55,6 @@ export type AdminAccountResponseDto = {
   "person": AdminPersonSummaryResponseDto;
   "adminCenter": (AdminAccountCenterSummaryResponseDto) | null;
   "qualification": (AdminAccountQualificationResponseDto) | null;
-};
-
-export type AdminAccountQualificationResponseDto = {
-  "appointedAt": string;
-  "appointedBy": string;
 };
 
 export type AdminActivityListResponseDto = {
@@ -275,7 +275,7 @@ export type AdminRecruitmentApplicationDto = {
   "submittedAt": string;
   "withdrawnAt": (string) | null;
   "preferences": Array<AdminRecruitmentApplicationPreferenceDto>;
-  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
+  "interviewSelection": (RecruitmentInterviewSelectionDto) | null;
 };
 
 export type AdminRecruitmentApplicationListDto = {
@@ -310,7 +310,7 @@ export type AdminRecruitmentBatchDto = {
   "applicationCount": number;
   "openCenters": Array<AdminRecruitmentCenterDto>;
   "responsibleAccounts": Array<AdminRecruitmentResponsibleAccountDto>;
-  "interviewSlots"?: Array<AdminRecruitmentInterviewSlotDto>;
+  "interviewSlots": Array<AdminRecruitmentInterviewSlotDto>;
 };
 
 export type AdminRecruitmentBatchListDto = {
@@ -1264,8 +1264,27 @@ export type MembershipResponseDto = {
   "center": CenterSummaryResponseDto;
 };
 
+export type MyInterviewContextDto = {
+  "application": MyRecruitmentApplicationResponseDto;
+  "batch": PublicRecruitmentBatchDto;
+  "canChangeInterview": boolean;
+  "changeBlockedReason": ("APPLICATION_LOCKED" | "BATCH_ARCHIVED" | "BATCH_NOT_OPEN" | "INTERVIEW_STARTED" | "NO_AVAILABLE_SLOT" | null) | null;
+};
+
 export type MyRecruitmentApplicationEnvelopeDto = {
   "application": (MyRecruitmentApplicationResponseDto) | null;
+};
+
+export type MyRecruitmentApplicationItemDto = {
+  "application": MyRecruitmentApplicationResponseDto;
+  "batch": MyRecruitmentBatchSummaryDto;
+};
+
+export type MyRecruitmentApplicationListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<MyRecruitmentApplicationItemDto>;
 };
 
 export type MyRecruitmentApplicationResponseDto = {
@@ -1280,7 +1299,17 @@ export type MyRecruitmentApplicationResponseDto = {
   "withdrawnAt": (string) | null;
   "locked": boolean;
   "preferences": Array<RecruitmentApplicationPreferenceDto>;
-  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
+  "interviewSelection": (RecruitmentInterviewSelectionDto) | null;
+};
+
+export type MyRecruitmentBatchSummaryDto = {
+  "effectiveStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
+  "effectiveStatusReason": "draft" | "before-start" | "within-window" | "after-end" | "force-open" | "paused" | "force-closed" | "archived";
+  "id": string;
+  "name": string;
+  "startAt": string;
+  "endAt": string;
+  "timezone": "Asia/Shanghai";
 };
 
 export type MyRecruitmentResultDto = {
@@ -1688,7 +1717,7 @@ export type PublicRecruitmentBatchDto = {
   "endAt": string;
   "timezone": "Asia/Shanghai";
   "openCenters": Array<PublicRecruitmentCenterDto>;
-  "interviewSlots"?: Array<PublicRecruitmentInterviewSlotDto>;
+  "interviewSlots": Array<PublicRecruitmentInterviewSlotDto>;
 };
 
 export type PublicRecruitmentBatchEnvelopeDto = {
@@ -2075,12 +2104,14 @@ export type SessionAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
-  "adminCenter": ({
+  "adminCenter": (SessionAdminCenterSummaryResponseDto) | null;
+  "capabilities": Array<string>;
+};
+
+export type SessionAdminCenterSummaryResponseDto = {
   "id": string;
   "name": string;
   "role": "CENTER_MINISTER";
-}) | null;
-  "capabilities": Array<string>;
 };
 
 export type SessionPersonResponseDto = {
@@ -2389,8 +2420,11 @@ export const API_V1_PATHS = {
   recruitmentCurrent: "/api/v1/recruitment/current",
   recruitmentUpcoming: "/api/v1/recruitment/upcoming",
   recruitmentMyApplication: "/api/v1/recruitment/batches/{batchId}/my-application",
+  recruitmentMyApplications: "/api/v1/recruitment/applications/mine",
+  recruitmentMyInterviewContext: "/api/v1/recruitment/batches/{batchId}/my-interview-context",
   recruitmentApplicationCreate: "/api/v1/recruitment/batches/{batchId}/applications",
   recruitmentApplicationUpdate: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}",
+  recruitmentApplicationInterviewSlot: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot",
   recruitmentApplicationWithdraw: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw",
   adminRecruitmentBatches: "/api/v1/admin/recruitment/batches",
   adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
@@ -2542,8 +2576,11 @@ export const API_OPERATIONS = {
   "GET /api/v1/recruitment/current": { method: "GET", path: "/api/v1/recruitment/current" },
   "GET /api/v1/recruitment/upcoming": { method: "GET", path: "/api/v1/recruitment/upcoming" },
   "GET /api/v1/recruitment/batches/{batchId}/my-application": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-application" },
+  "GET /api/v1/recruitment/applications/mine": { method: "GET", path: "/api/v1/recruitment/applications/mine" },
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-interview-context" },
   "POST /api/v1/recruitment/batches/{batchId}/applications": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications" },
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot" },
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw" },
   "GET /api/v1/admin/recruitment/batches": { method: "GET", path: "/api/v1/admin/recruitment/batches" },
   "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
@@ -2701,8 +2738,11 @@ export interface ApiResponseByOperation {
   "GET /api/v1/recruitment/current": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/upcoming": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/batches/{batchId}/my-application": MyRecruitmentApplicationEnvelopeDto;
+  "GET /api/v1/recruitment/applications/mine": MyRecruitmentApplicationListDto;
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": MyInterviewContextDto;
   "POST /api/v1/recruitment/batches/{batchId}/applications": MyRecruitmentApplicationResponseDto;
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": MyRecruitmentApplicationResponseDto;
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": MyRecruitmentApplicationResponseDto;
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": MyRecruitmentApplicationResponseDto;
   "GET /api/v1/admin/recruitment/batches": AdminRecruitmentBatchListDto;
   "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
@@ -2996,10 +3036,19 @@ const API_RESPONSE_SCHEMAS = {
   "GET /api/v1/recruitment/batches/{batchId}/my-application": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationEnvelopeDto"
   },
+  "GET /api/v1/recruitment/applications/mine": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationListDto"
+  },
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": {
+    "$ref": "#/components/schemas/MyInterviewContextDto"
+  },
   "POST /api/v1/recruitment/batches/{batchId}/applications": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
   },
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
   },
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": {
@@ -3287,8 +3336,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "newPassword": {
         "type": "string",
-        "example": "a-new-password-that-is-long-enough",
-        "minLength": 15,
+        "example": "safe-6",
+        "minLength": 6,
         "maxLength": 128
       }
     },
@@ -4429,7 +4478,7 @@ const API_COMPONENT_SCHEMAS = {
         "type": "integer",
         "minimum": 0,
         "maximum": 3600,
-        "description": "Retry delay in seconds for rate limits or temporary login unavailability (HTTP 423, 429, or 503)."
+        "description": "Optional retry delay for HTTP 423, 429, or 503."
       }
     }
   },
@@ -4833,7 +4882,8 @@ const API_COMPONENT_SCHEMAS = {
       "startAt",
       "endAt",
       "timezone",
-      "openCenters"
+      "openCenters",
+      "interviewSlots"
     ]
   },
   "PublicRecruitmentBatchEnvelopeDto": {
@@ -5008,7 +5058,8 @@ const API_COMPONENT_SCHEMAS = {
       "submittedAt",
       "withdrawnAt",
       "locked",
-      "preferences"
+      "preferences",
+      "interviewSelection"
     ]
   },
   "MyRecruitmentApplicationEnvelopeDto": {
@@ -5025,6 +5076,38 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "application"
+    ]
+  },
+  "MyInterviewContextDto": {
+    "type": "object",
+    "properties": {
+      "application": {
+        "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+      },
+      "batch": {
+        "$ref": "#/components/schemas/PublicRecruitmentBatchDto"
+      },
+      "canChangeInterview": {
+        "type": "boolean"
+      },
+      "changeBlockedReason": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "APPLICATION_LOCKED",
+          "BATCH_ARCHIVED",
+          "BATCH_NOT_OPEN",
+          "INTERVIEW_STARTED",
+          "NO_AVAILABLE_SLOT",
+          null
+        ]
+      }
+    },
+    "required": [
+      "application",
+      "batch",
+      "canChangeInterview",
+      "changeBlockedReason"
     ]
   },
   "RecruitmentPreferenceInputDto": {
@@ -5157,6 +5240,110 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "expectedVersion"
+    ]
+  },
+  "MyRecruitmentBatchSummaryDto": {
+    "type": "object",
+    "properties": {
+      "effectiveStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "upcoming",
+          "open",
+          "paused",
+          "closed",
+          "archived"
+        ]
+      },
+      "effectiveStatusReason": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "before-start",
+          "within-window",
+          "after-end",
+          "force-open",
+          "paused",
+          "force-closed",
+          "archived"
+        ]
+      },
+      "id": {
+        "type": "string",
+        "description": "Opaque public batch token"
+      },
+      "name": {
+        "type": "string"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      }
+    },
+    "required": [
+      "effectiveStatus",
+      "effectiveStatusReason",
+      "id",
+      "name",
+      "startAt",
+      "endAt",
+      "timezone"
+    ]
+  },
+  "MyRecruitmentApplicationItemDto": {
+    "type": "object",
+    "properties": {
+      "application": {
+        "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+      },
+      "batch": {
+        "$ref": "#/components/schemas/MyRecruitmentBatchSummaryDto"
+      }
+    },
+    "required": [
+      "application",
+      "batch"
+    ]
+  },
+  "MyRecruitmentApplicationListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MyRecruitmentApplicationItemDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "CreateRecruitmentBatchDto": {
@@ -5467,7 +5654,8 @@ const API_COMPONENT_SCHEMAS = {
       "updatedAt",
       "applicationCount",
       "openCenters",
-      "responsibleAccounts"
+      "responsibleAccounts",
+      "interviewSlots"
     ]
   },
   "AdminRecruitmentBatchListDto": {
@@ -6115,7 +6303,8 @@ const API_COMPONENT_SCHEMAS = {
       "applicantProfileSnapshot",
       "submittedAt",
       "withdrawnAt",
-      "preferences"
+      "preferences",
+      "interviewSelection"
     ]
   },
   "AdminRecruitmentApplicationListDto": {
@@ -11891,7 +12080,8 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "accepted",
       "message"
-    ]
+    ],
+    "additionalProperties": false
   },
   "ResolvePasswordRecoveryRequestDto": {
     "type": "object",
@@ -12012,6 +12202,29 @@ const API_COMPONENT_SCHEMAS = {
       "expiresAt"
     ]
   },
+  "SessionAdminCenterSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "CENTER_MINISTER"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "role"
+    ]
+  },
   "SessionAccountResponseDto": {
     "type": "object",
     "properties": {
@@ -12033,27 +12246,11 @@ const API_COMPONENT_SCHEMAS = {
         "nullable": true
       },
       "adminCenter": {
-        "type": "object",
         "nullable": true,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "CENTER_MINISTER"
-            ]
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SessionAdminCenterSummaryResponseDto"
           }
-        },
-        "required": [
-          "id",
-          "name",
-          "role"
         ]
       },
       "capabilities": {
@@ -13006,6 +13203,22 @@ const API_COMPONENT_SCHEMAS = {
       "active"
     ]
   },
+  "AdminAccountQualificationResponseDto": {
+    "type": "object",
+    "properties": {
+      "appointedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "appointedBy": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "appointedAt",
+      "appointedBy"
+    ]
+  },
   "AdminAccountResponseDto": {
     "type": "object",
     "properties": {
@@ -13090,22 +13303,6 @@ const API_COMPONENT_SCHEMAS = {
       "person",
       "adminCenter",
       "qualification"
-    ]
-  },
-  "AdminAccountQualificationResponseDto": {
-    "type": "object",
-    "properties": {
-      "appointedAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "appointedBy": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "appointedAt",
-      "appointedBy"
     ]
   },
   "AdminAccountListResponseDto": {
@@ -13533,7 +13730,8 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "count"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryTargetSummaryDto": {
     "type": "object",
@@ -13566,7 +13764,8 @@ const API_COMPONENT_SCHEMAS = {
       "centerName",
       "status",
       "accountVersion"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRequestResponseDto": {
     "type": "object",
@@ -13614,7 +13813,8 @@ const API_COMPONENT_SCHEMAS = {
       "target",
       "resolvedAt",
       "resolutionReason"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRequestListResponseDto": {
     "type": "object",
@@ -13643,7 +13843,8 @@ const API_COMPONENT_SCHEMAS = {
       "pageSize",
       "total",
       "items"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryResetResponseDto": {
     "type": "object",
@@ -13670,7 +13871,8 @@ const API_COMPONENT_SCHEMAS = {
       "resolvedAt",
       "targetName",
       "revokedSessionCount"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRejectResponseDto": {
     "type": "object",
@@ -13688,7 +13890,8 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "status",
       "resolvedAt"
-    ]
+    ],
+    "additionalProperties": false
   }
 } as const;
 

@@ -198,6 +198,7 @@ export const useRecruitmentApplicationStore = defineStore("recruitment-applicati
         ...validateApplicationDraft(applicationDraft, {
           interviewSlots: options.requireInterviewSlot ? batch.interviewSlots : undefined,
           now,
+          heldInterviewSlotId: existing?.interviewSelection?.status === "CONFIRMED" ? existing.interviewSelection.slotId : undefined,
         }),
         ...validateConfirmation(confirmed),
       };

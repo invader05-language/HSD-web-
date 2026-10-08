@@ -37,6 +37,7 @@ const baseBatch = {
   createdAt: "2026-07-30T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
   applicationCount: 0,
+  interviewSlots: [],
   openCenters: [],
   responsibleAccounts: [{
     id: "account-owner",

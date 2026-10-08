@@ -348,7 +348,7 @@ function mapApplicationStatus(status: MyRecruitmentApplicationResponseDto["statu
 export function mapRecruitmentApplicationResponse(
   dto: MyRecruitmentApplicationResponseDto,
   profile: ProductionMemberProfile,
-  batch: PublicRecruitmentBatchView,
+  batch: Pick<PublicRecruitmentBatchView, "name">,
 ): SubmittedRecruitmentApplication {
   const preferences = dto.preferences
     .map((preference) => ({

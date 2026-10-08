@@ -15,7 +15,9 @@ import {
   type ErrorResponse,
   type MemberProfileResponseDto,
   type MyRecruitmentApplicationEnvelopeDto,
+  type MyRecruitmentApplicationListDto,
   type MyRecruitmentApplicationResponseDto,
+  type MyInterviewContextDto,
   type PublishAssessmentDto,
   type PublicRecruitmentBatchEnvelopeDto,
   type RecordRoundResultDto,
@@ -244,6 +246,14 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/recruitment/batches/{batchId}/my-application",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`,
     ),
+    listMyApplications: (page = 1, pageSize = 20) => read(
+      "GET /api/v1/recruitment/applications/mine",
+      `/api/v1/recruitment/applications/mine?page=${page}&pageSize=${pageSize}`,
+    ) as Promise<MyRecruitmentApplicationListDto>,
+    getMyInterviewContext: (batchId) => read(
+      "GET /api/v1/recruitment/batches/{batchId}/my-interview-context",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-interview-context`,
+    ) as Promise<MyInterviewContextDto>,
     submitApplication: (batchId, payload: SubmitApplicationDto) => mutate(
       "POST /api/v1/recruitment/batches/{batchId}/applications",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`,
@@ -349,11 +359,12 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/recruitment/results/me/{resultId}/responsible-contacts/{contactPersonId}",
       `/api/v1/recruitment/results/me/${encodeURIComponent(resultId)}/responsible-contacts/${encodeURIComponent(personId)}`,
     ),
-    changeInterviewSlot: (batchId: string, applicationId: string, payload: ChangeInterviewSlotDto) => rawMutate<MyRecruitmentApplicationResponseDto>(
+    changeInterviewSlot: (batchId: string, applicationId: string, payload: ChangeInterviewSlotDto) => mutate(
+      "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/interview-slot`,
       payload,
       "PATCH",
-    ),
+    ) as Promise<MyRecruitmentApplicationResponseDto>,
     reconcileAdminInterviewSlots: (batchId, payload: ReconcileInterviewSlotsDto) => mutate(
       "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/interview-slots`,

@@ -50,6 +50,7 @@ const archivedBatch: AdminRecruitmentBatchDto = {
   applicationCount: 17,
   openCenters: [],
   responsibleAccounts: [],
+  interviewSlots: [],
 };
 
 describe("Task 3C-G generated recruitment lifecycle client", () => {

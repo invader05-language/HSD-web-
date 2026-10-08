@@ -40,6 +40,7 @@ function apiBatch(id: string, name: string) {
     applicationCount: 1,
     openCenters: [],
     responsibleAccounts: [],
+    interviewSlots: [],
   };
 }
 

@@ -7,6 +7,7 @@ import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admi
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
 import { formatInterviewSlotRange } from "~/utils/recruitment-interview-slots";
+import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 
 definePageMeta({ layout: "admin" });
 
@@ -52,8 +53,7 @@ function formatInterviewSelection(selection: InterviewSelectionView) {
 async function loadApiApplication() {
   if (useMockApi || !recruitmentGateway) return;
   const generation = ++apiGeneration;
-  apiStatus.value = "loading";
-  apiApplication.value = undefined;
+  if (!apiApplication.value) apiStatus.value = "loading";
   apiError.value = "";
   try {
     const response = await recruitmentGateway.getAdminApplication(batchId.value, applicationId.value);
@@ -63,13 +63,18 @@ async function loadApiApplication() {
   } catch (cause) {
     if (generation !== apiGeneration) return;
     apiError.value = cause instanceof Error ? cause.message : "报名记录读取失败。";
-    apiStatus.value = "error";
+    if (!apiApplication.value) apiStatus.value = "error";
+    throw cause;
   }
 }
 
+const detailRefresh = useRecruitmentRefresh(async () => {
+  if (!useMockApi && recruitmentGateway) await loadApiApplication();
+});
+
 watch([batchId, applicationId], () => {
-  void loadApiApplication();
-}, { immediate: true });
+  void loadApiApplication().catch(() => {});
+});
 
 useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
 </script>
@@ -102,13 +107,15 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
       <template #actions><NuxtLink class="button" :to="`/admin/recruitment/batches/${batchId}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
   </div>
-  <div v-else-if="apiStatus === 'loading'" class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Batch Application Record" title="正在读取报名记录" description="正在请求服务端报名详情。" /></div>
+  <div v-else-if="apiStatus === 'loading' && !apiApplication" class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Batch Application Record" title="正在读取报名记录" description="正在请求服务端报名详情。" /></div>
   <div v-else-if="apiApplication" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Batch Application Record" :title="apiApplication.name" description="服务端报名快照；只读展示，不跨批次读取内部考核备注。">
-      <template #actions><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
+      <template #actions><button type="button" class="button button--ghost" :disabled="detailRefresh.refreshing.value" @click="detailRefresh.refresh">{{ detailRefresh.refreshing.value ? "正在刷新…" : "刷新详情" }}</button><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
+    <p v-if="detailRefresh.refreshError.value" class="admin-save-message admin-save-message--error" role="status">详情可能已更新：{{ detailRefresh.refreshError.value }}；当前显示上次成功读取的数据。</p>
     <section class="admin-list-card">
       <header><div><span>报名资料</span><h2>报名资料</h2></div><p>{{ formatAdminApplicationSubmittedAt(apiApplication.submittedAt) }} 提交</p></header>
+      <p>最近读取：{{ detailRefresh.lastUpdatedAt.value?.toLocaleTimeString("zh-CN", { hour12: false }) ?? "尚未更新" }}</p>
       <div class="admin-detail-form"><div class="admin-form-grid">
         <label>姓名<input :value="apiApplication.name" readonly></label><label>学号<input :value="apiApplication.studentId" readonly></label><label>年级<input :value="apiApplication.grade" readonly></label><label>班级<input :value="apiApplication.className" readonly></label><label>联系方式<input :value="apiApplication.contact" readonly></label>
         <label>第一志愿<input :value="apiApplication.preferences[0] || '—'" readonly></label><label>第二志愿<input :value="apiApplication.preferences[1] || '—'" readonly></label><label>第三志愿<input :value="apiApplication.preferences[2] || '—'" readonly></label><label>白泽方向<input :value="apiApplication.baizeDirection || '—'" readonly></label><label>是否接受调剂<input :value="apiApplication.acceptsAdjustment ? '接受' : '不接受'" readonly></label><label>状态<input :value="apiApplication.status" readonly></label>

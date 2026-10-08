@@ -21,6 +21,7 @@ import { useSessionStore } from "~/stores/session";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
 import { formatInterviewTimestamp } from "~/utils/recruitment-interview-slots";
+import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 
 definePageMeta({ layout: "admin" });
 
@@ -61,6 +62,7 @@ const apiError = ref("");
 const apiExporting = ref(false);
 const apiExportMessage = ref("");
 const apiExportError = ref("");
+const apiExportedAt = ref<Date>();
 let apiGeneration = 0;
 
 function apiRosterQuery(includePagination = true) {
@@ -76,17 +78,15 @@ function apiRosterQuery(includePagination = true) {
 async function loadApiApplications() {
   if (useMockApi || !recruitmentGateway) return;
   const generation = ++apiGeneration;
-  apiStatus.value = "loading";
+  if (!apiRows.value.length) apiStatus.value = "loading";
   apiError.value = "";
-  apiRows.value = [];
   try {
-    if (!apiBatch.value) {
-      const detail = await recruitmentGateway.getAdminBatch(batchId.value);
-      if (generation !== apiGeneration) return;
-      apiBatch.value = detail;
-    }
-    const response = await recruitmentGateway.listAdminApplications(batchId.value, apiRosterQuery());
+    const [detail, response] = await Promise.all([
+      recruitmentGateway.getAdminBatch(batchId.value),
+      recruitmentGateway.listAdminApplications(batchId.value, apiRosterQuery()),
+    ]);
     if (generation !== apiGeneration) return;
+    apiBatch.value = detail;
     apiPage.value = response.page;
     apiPageSize.value = response.pageSize;
     apiTotal.value = response.total;
@@ -95,19 +95,24 @@ async function loadApiApplications() {
   } catch (cause) {
     if (generation !== apiGeneration) return;
     apiError.value = cause instanceof Error ? cause.message : "报名名单读取失败。";
-    apiStatus.value = "error";
+    if (!apiRows.value.length) apiStatus.value = "error";
+    throw cause;
   }
 }
+
+const rosterRefresh = useRecruitmentRefresh(async () => {
+  if (!useMockApi && recruitmentGateway && !route.params.id) await loadApiApplications();
+});
 
 const apiPageCount = computed(() => Math.max(1, Math.ceil(apiTotal.value / apiPageSize.value)));
 watch([query, sort], () => {
   if (useMockApi || !recruitmentGateway || route.params.id) return;
   apiPage.value = 1;
-  void loadApiApplications();
+  void loadApiApplications().catch(() => {});
 });
 function requestApiPage(page: number) {
   apiPage.value = Math.max(1, page);
-  if (!useMockApi && recruitmentGateway && !route.params.id) void loadApiApplications();
+  if (!useMockApi && recruitmentGateway && !route.params.id) void loadApiApplications().catch(() => {});
 }
 watch(batchId, () => {
   apiBatch.value = undefined;
@@ -116,12 +121,12 @@ watch(batchId, () => {
   apiPage.value = 1;
   apiError.value = "";
   if (!useMockApi && recruitmentGateway && !route.params.id) {
-    void loadApiApplications();
+    void loadApiApplications().catch(() => {});
   } else {
     apiGeneration += 1;
     apiStatus.value = "idle";
   }
-}, { immediate: true });
+});
 
 useHead(() => ({ title: `${batch.value?.name ?? "招新批次"}报名人员｜HSD 管理台` }));
 
@@ -139,7 +144,9 @@ async function exportApiRecruitmentCsv() {
   try {
     const result = await recruitmentGateway.exportAdminApplications(batchId.value, apiRosterQuery(false));
     downloadBlob(result.blob, result.filename);
-    apiExportMessage.value = "报名表已开始下载。";
+    apiExportedAt.value = new Date();
+    apiExportMessage.value = `报名表已开始下载（导出请求完成时间 ${apiExportedAt.value.toLocaleTimeString("zh-CN", { hour12: false })}）。后续改期请重新导出。`;
+    await rosterRefresh.refresh();
   } catch (cause) {
     apiExportError.value = cause instanceof Error ? cause.message : "报名表导出失败，请稍后重试。";
   } finally {
@@ -211,19 +218,22 @@ function downloadBlob(blob: Blob, filename: string) {
     >
       <template #actions>
         <NuxtLink class="button button--ghost" :to="buildRecruitmentBatchRoute(batchId)">返回批次概览</NuxtLink>
+        <button type="button" class="button button--ghost" :disabled="rosterRefresh.refreshing.value" @click="rosterRefresh.refresh">{{ rosterRefresh.refreshing.value ? "正在刷新…" : "刷新名单" }}</button>
         <button type="button" class="button button--ghost" :disabled="apiExporting || apiStatus === 'loading'" @click="exportApiRecruitmentCsv">{{ apiExporting ? "正在导出…" : "导出报名表" }}</button>
       </template>
     </AdminPageHeading>
     <p v-if="apiExportMessage" class="admin-save-message" role="status">{{ apiExportMessage }}</p>
     <p v-if="apiExportError" class="admin-save-message admin-save-message--error" role="alert">{{ apiExportError }}</p>
     <section class="admin-list-card">
-      <header><div><span>报名名单</span><h2>{{ apiBatch?.name ?? "报名名单" }}</h2></div><p>共 {{ apiTotal }} 人</p></header>
+      <header><div><span>报名名单</span><h2>{{ apiBatch?.name ?? "报名名单" }}</h2><small>最近更新：{{ rosterRefresh.lastUpdatedAt.value?.toLocaleTimeString("zh-CN", { hour12: false }) ?? "尚未更新" }}</small></div><p>共 {{ apiTotal }} 人</p></header>
+      <p v-if="rosterRefresh.refreshError.value" class="admin-save-message admin-save-message--error" role="status">名单可能已更新：{{ rosterRefresh.refreshError.value }}；当前显示上次成功读取的数据。</p>
+      <p v-if="apiError && apiRows.length" class="admin-save-message admin-save-message--error" role="status">{{ apiError }}；当前仍显示上次成功读取的数据。</p>
       <div class="admin-filters">
         <label>搜索报名人<input v-model="query" type="search" placeholder="姓名或学号"></label>
         <label>排序<select v-model="sort"><option value="submittedAt.desc">最新提交</option><option value="submittedAt.asc">最早提交</option></select></label>
       </div>
-      <div v-if="apiStatus === 'loading'" class="admin-empty" role="status"><strong>正在读取报名名单</strong><p>正在请求服务端分页数据。</p></div>
-      <div v-else-if="apiStatus === 'error'" class="admin-empty" role="alert"><strong>报名名单读取失败</strong><p>{{ apiError }}</p></div>
+      <div v-if="apiStatus === 'loading' && !apiRows.length" class="admin-empty" role="status"><strong>正在读取报名名单</strong><p>正在请求服务端分页数据。</p></div>
+      <div v-else-if="apiStatus === 'error' && !apiRows.length" class="admin-empty" role="alert"><strong>报名名单读取失败</strong><p>{{ apiError }}</p></div>
       <div v-else-if="apiRows.length" class="admin-table-scroll">
         <table aria-label="批次报名人员">
           <thead><tr><th>报名人</th><th>第一志愿</th><th>第二志愿</th><th>第三志愿</th><th>白泽方向</th><th>接受调剂</th><th>状态</th><th>面试安排</th><th>提交时间</th><th><span class="sr-only">操作</span></th></tr></thead>
@@ -231,7 +241,7 @@ function downloadBlob(blob: Blob, filename: string) {
             <td><strong>{{ application.name }}</strong><small>{{ application.studentId }}</small></td>
             <td>{{ application.preferences[0] || "—" }}</td><td>{{ application.preferences[1] || "—" }}</td><td>{{ application.preferences[2] || "—" }}</td>
             <td>{{ application.baizeDirection || "—" }}</td><td>{{ application.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ application.status }}</td><td>{{ application.interviewSelection ? `${formatInterviewTimestamp(application.interviewSelection.startAt)} · ${application.interviewSelection.status === "CONFIRMED" ? "已确认" : application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "已释放"}` : "未安排" }}</td><td>{{ formatAdminApplicationSubmittedAt(application.submittedAt) }}</td>
-            <td><NuxtLink :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(application.id)}`" :aria-label="`查看报名 ${application.name}`">查看报名</NuxtLink></td>
+            <td><a :href="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(application.id)}`" :aria-label="`查看报名 ${application.name}`">查看报名</a></td>
           </tr></tbody>
         </table>
       </div>

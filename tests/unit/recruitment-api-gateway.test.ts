@@ -92,7 +92,26 @@ describe("recruitment API gateway", () => {
   });
 
   it("routes interview reselection and admin slot reconciliation through CSRF-protected mutations", async () => {
-    const response = { id: "application-1", version: 4 };
+    const response = {
+      id: "application-1",
+      batchId: "batch-1",
+      contact: "applicant@example.test",
+      baizeDirection: null,
+      acceptsAdjustment: true,
+      status: "SUBMITTED",
+      version: 4,
+      submittedAt: "2026-09-01T00:00:00.000Z",
+      withdrawnAt: null,
+      locked: false,
+      preferences: [],
+      interviewSelection: {
+        id: "slot-public-1",
+        status: "CONFIRMED",
+        startAt: "2026-09-09T02:00:00.000Z",
+        endAt: "2026-09-09T02:30:00.000Z",
+        timezone: "Asia/Shanghai",
+      },
+    };
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({

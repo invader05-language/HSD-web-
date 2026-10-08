@@ -21,6 +21,8 @@ import type {
   MemberProfileResponseDto,
   MyRecruitmentApplicationEnvelopeDto,
   MyRecruitmentApplicationResponseDto,
+  MyRecruitmentApplicationListDto,
+  MyInterviewContextDto,
   PublicRecruitmentBatchEnvelopeDto,
   RecruitmentBatchCommandDto,
   RecruitmentBatchLifecycleEventListDto,
@@ -47,6 +49,8 @@ export interface RecruitmentGateway {
   getCurrentProfile(): Promise<MemberProfileResponseDto>;
   updateCurrentProfile(payload: UpdateMyProfileDto): Promise<MemberProfileResponseDto>;
   getMyApplication(batchId: string): Promise<MyRecruitmentApplicationEnvelopeDto>;
+  listMyApplications(page?: number, pageSize?: number): Promise<MyRecruitmentApplicationListDto>;
+  getMyInterviewContext(batchId: string): Promise<MyInterviewContextDto>;
   submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
@@ -92,6 +96,5 @@ export interface RecruitmentGateway {
   ): Promise<AssessmentPublicationResponseDto>;
   getMyResults(): Promise<MyRecruitmentResultListDto>;
   getMyResponsibleContact(resultId: string, personId: string): Promise<{ personId: string; contact: string }>;
-  /** Optional until the backend publishes dedicated interview-slot operations. */
-  changeInterviewSlot?(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
+  changeInterviewSlot(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
 }

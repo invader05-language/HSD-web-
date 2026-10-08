@@ -7,7 +7,8 @@ import { useRecruitmentApplicationStore } from "~/stores/recruitment-application
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { createProductionMemberProfileController } from "~/composables/useProductionMemberProfile";
-import { mapPublicRecruitmentBatch, mapRecruitmentApplicationResponse } from "~/services/recruitment/recruitment-view-models";
+import { mapRecruitmentApplicationResponse } from "~/services/recruitment/recruitment-view-models";
+import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 import type { SubmittedRecruitmentApplication } from "~/data/recruitment-application";
 import { formatInterviewSlotRange } from "~/utils/recruitment-interview-slots";
 import type { MemberNotificationDto } from "../../../packages/api-client/src";
@@ -24,7 +25,9 @@ const batchStore = isMockApi ? useRecruitmentBatchStore() : undefined;
 const recruitmentGateway = useRecruitmentGateway();
 const productionProfile = recruitmentGateway ? createProductionMemberProfileController({ gateway: recruitmentGateway, apiBase: runtime.public.apiBase }) : undefined;
 const application = ref<SubmittedRecruitmentApplication>();
+const applicationHistory = ref<Array<{ application: SubmittedRecruitmentApplication; batchId: string; batchName: string; effectiveStatus: string }>>([]);
 const batchName = ref("当前招新批次");
+const hasOpenBatch = ref(false);
 const loading = ref(!isMockApi);
 const error = ref("");
 const notifications = ref<MemberNotificationDto[]>([]);
@@ -40,30 +43,43 @@ async function load() {
   if (isMockApi) {
     const current = batchStore?.currentOpenBatchAt(new Date());
     application.value = current && currentMember ? applicationStore?.getApplication(current.id, currentMember.profile.value.id) : undefined;
+    applicationHistory.value = application.value ? [{ application: application.value, batchId: application.value.batchId, batchName: application.value.batchNameSnapshot, effectiveStatus: "open" }] : [];
+    hasOpenBatch.value = Boolean(current);
     batchName.value = current?.name ?? "暂无开放批次";
     return;
   }
   if (!recruitmentGateway) return;
-  loading.value = true;
+  if (!applicationHistory.value.length) loading.value = true;
   error.value = "";
   try {
-    const [current, loadedProfile, notificationPage, unread] = await Promise.all([
+    const [current, loadedProfile, mine, notificationPage, unread] = await Promise.all([
       recruitmentGateway.getCurrentBatch(),
       productionProfile?.load(),
+      recruitmentGateway.listMyApplications(1, 50),
       recruitmentGateway.listNotifications(1, 10),
       recruitmentGateway.unreadNotificationCount(),
     ]);
     notifications.value = notificationPage.items;
     unreadNotifications.value = unread.unreadCount;
-    if (!current.batch || !loadedProfile) { batchName.value = "暂无开放批次"; return; }
-    const mappedBatch = mapPublicRecruitmentBatch(current.batch);
-    batchName.value = mappedBatch.name;
-    const response = await recruitmentGateway.getMyApplication(mappedBatch.id);
-    if (response.application) application.value = mapRecruitmentApplicationResponse(response.application, loadedProfile, mappedBatch);
+    hasOpenBatch.value = Boolean(current.batch);
+    if (!loadedProfile) throw new Error("成员资料暂不可用。");
+    const mapped = mine.items.map((item) => ({
+      application: mapRecruitmentApplicationResponse(item.application, loadedProfile, { name: item.batch.name }),
+      batchId: item.batch.id,
+      batchName: item.batch.name,
+      effectiveStatus: item.batch.effectiveStatus,
+    }));
+    applicationHistory.value = mapped;
+    const pending = mapped.find(({ application: entry }) => entry.interviewSelection?.status === "RESELECTION_REQUIRED");
+    application.value = pending?.application ?? mapped[0]?.application;
+    batchName.value = mapped.length ? "历史及当前招新批次" : current.batch?.name ?? "暂无开放批次";
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : "申请进度暂时不可用。";
+    throw cause;
   } finally { loading.value = false; }
 }
+
+const progressRefresh = useRecruitmentRefresh(load);
 
 async function markNotificationRead(notification: MemberNotificationDto) {
   if (notification.readAt || !recruitmentGateway) return;
@@ -77,7 +93,6 @@ async function markNotificationRead(notification: MemberNotificationDto) {
 }
 
 async function signOut() { if (await session.signOutForRuntime(runtime.public, sessionGateway)) await navigateTo("/"); }
-onMounted(() => void load());
 </script>
 
 <template>
@@ -86,17 +101,20 @@ onMounted(() => void load());
     <main class="section member-space__content">
       <div class="shell">
         <p class="eyebrow">成员空间</p><h1>申请进度</h1><p>查看当前招新申请的处理阶段和允许公开的状态。</p>
-        <p v-if="loading" role="status">正在读取申请进度…</p><p v-else-if="error" role="alert">{{ error }}</p>
-        <article v-else class="member-progress-card">
-          <header><span>招新批次</span><strong>{{ batchName }}</strong></header>
-          <template v-if="application">
-            <p v-if="application.interviewSelection?.status === 'RESELECTION_REQUIRED'" class="form-error" role="alert">原面试时段已调整，请重新选择面试时间后再提交。</p>
-            <dl><div><dt>申请状态</dt><dd>{{ statusLabel(application.status) }}</dd></div><div><dt>提交时间</dt><dd>{{ application.submittedAt }}</dd></div><div><dt>第一志愿</dt><dd>{{ application.firstChoice }}</dd></div><div><dt>第二志愿</dt><dd>{{ application.secondChoice || "未填写" }}</dd></div><div v-if="application.interviewSelection"><dt>面试安排</dt><dd>{{ formatInterviewSlotRange(application.interviewSelection) }} · {{ application.interviewSelection.status === "CONFIRMED" ? "已确认" : application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回" }}</dd></div></dl>
-            <NuxtLink v-if="application.interviewSelection?.status === 'RESELECTION_REQUIRED'" class="button" to="/join">重新选择面试时间</NuxtLink>
+        <div class="member-progress-card">
+          <header><span>申请进度</span><div><strong>{{ batchName }}</strong><button type="button" class="button button--ghost" :disabled="progressRefresh.refreshing.value" @click="progressRefresh.refresh">{{ progressRefresh.refreshing.value ? "正在刷新…" : "刷新" }}</button></div></header>
+          <p>最近更新：{{ progressRefresh.lastUpdatedAt.value?.toLocaleTimeString("zh-CN", { hour12: false }) ?? "尚未更新" }}</p>
+          <p v-if="progressRefresh.refreshError.value" role="status">数据可能已更新：{{ progressRefresh.refreshError.value }}；当前显示上次成功读取的数据。</p>
+          <p v-if="error && !applicationHistory.length" role="alert">{{ error }}</p>
+          <article v-for="entry in applicationHistory" :key="entry.application.id" class="member-progress-card">
+            <header><span>招新批次</span><strong>{{ entry.batchName }}</strong></header>
+            <p v-if="entry.application.interviewSelection?.status === 'RESELECTION_REQUIRED'" class="form-error" role="alert">原面试时段已调整，请重新选择面试时间后再提交。</p>
+            <dl><div><dt>申请状态</dt><dd>{{ statusLabel(entry.application.status) }}</dd></div><div><dt>提交时间</dt><dd>{{ entry.application.submittedAt }}</dd></div><div><dt>第一志愿</dt><dd>{{ entry.application.firstChoice }}</dd></div><div><dt>第二志愿</dt><dd>{{ entry.application.secondChoice || "未填写" }}</dd></div><div v-if="entry.application.interviewSelection"><dt>面试安排</dt><dd>{{ formatInterviewSlotRange(entry.application.interviewSelection) }} · {{ entry.application.interviewSelection.status === "CONFIRMED" ? "已确认" : entry.application.interviewSelection.status === "RESELECTION_REQUIRED" ? "待重新选择" : "报名已撤回" }}</dd></div></dl>
+            <NuxtLink v-if="entry.application.interviewSelection?.status === 'RESELECTION_REQUIRED'" class="button" :to="`/member/interviews/${encodeURIComponent(entry.application.id)}?batchId=${encodeURIComponent(entry.batchId)}`">重新选择面试时间</NuxtLink>
             <p>当前申请已进入平台处理流程，后续状态以管理台发布的信息为准。</p>
-          </template>
-          <template v-else><h2>尚未提交本期申请</h2><p>开放招新后，可从“加入我们”填写报名表。</p><NuxtLink class="button" to="/join">前往报名</NuxtLink></template>
-        </article>
+          </article>
+          <div v-if="!applicationHistory.length && !error"><h2>尚未提交本期申请</h2><p>{{ hasOpenBatch ? "开放招新后，可从“加入我们”填写报名表。" : "当前没有开放批次，也没有历史报名记录。" }}</p><NuxtLink v-if="hasOpenBatch" class="button" to="/join">前往报名</NuxtLink></div>
+        </div>
         <section v-if="!isMockApi" class="member-progress-card member-notifications" aria-label="站内通知">
           <header><span>站内通知</span><strong>{{ unreadNotifications ? `${unreadNotifications} 条未读` : "暂无未读" }}</strong></header>
           <p v-if="notificationError" class="form-error" role="alert">{{ notificationError }}</p>
