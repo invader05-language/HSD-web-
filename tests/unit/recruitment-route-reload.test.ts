@@ -136,6 +136,53 @@ afterEach(() => {
 });
 
 describe("production recruitment route reuse", () => {
+  it("does not read the mock assessment store while resolving the production detail title", async () => {
+    routeState.params.batchId = "cb2ea5ff-e777-4edc-9471-b89b6f2ac7bf";
+    routeState.params.id = "ec849b32-4c68-4ad2-ad28-b6005e2b9ab8";
+    let headInput: unknown;
+    vi.stubGlobal("useHead", (input: unknown) => { headInput = input; });
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify(apiApplication(
+        routeState.params.batchId,
+        routeState.params.id,
+        "冷启动报名人",
+      )), { status: 200 }),
+    ));
+
+    mount(ApplicationDetailPage, { global: { stubs: {
+      AdminPageHeading: headingStub,
+      NuxtLink: linkStub,
+    } } });
+    await flushPromises();
+
+    expect(typeof headInput).toBe("function");
+    expect((headInput as () => { title: string })().title).toBe("冷启动报名人｜HSD 管理台");
+  });
+
+  it.each([
+    [404, "报名记录不存在或已不可访问。"],
+    [403, "当前账号无权查看这条报名记录。"],
+  ])("shows a controlled detail error for HTTP %s", async (status, message) => {
+    routeState.params.id = "missing-application";
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: status === 404 ? "RECRUITMENT_APPLICATION_NOT_FOUND" : "FORBIDDEN",
+        message: "internal server detail",
+        requestId: "request-detail-error",
+      }), { status, headers: { "Content-Type": "application/json" } }),
+    ));
+
+    const wrapper = mount(ApplicationDetailPage, { global: { stubs: {
+      AdminPageHeading: headingStub,
+      NuxtLink: linkStub,
+    } } });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(message);
+    expect(wrapper.text()).not.toContain("internal server detail");
+    expect(wrapper.get("button").text()).toContain("重试");
+  });
+
   it("reloads a reused roster for the new batch and ignores the late old response", async () => {
     const lateBatchA = deferred<Response>();
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {

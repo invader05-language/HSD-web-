@@ -6,6 +6,7 @@ import { useSessionStore } from "~/stores/session";
 import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
+import { RecruitmentApiError } from "~/services/recruitment/api-recruitment.gateway";
 import { formatInterviewSlotRange } from "~/utils/recruitment-interview-slots";
 import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 
@@ -21,16 +22,27 @@ const session = useSessionStore();
 const batchId = computed(() => String(route.params.batchId));
 const applicationId = computed(() => String(route.params.id));
 const batch = computed(() => batchStore.getBatch(batchId.value));
-const application = computed(() => assessmentStore
-  .getCandidates(batchId.value)
-  .map((record) => record.candidate)
-  .find((candidate) => candidate?.id === applicationId.value
-    && canAccessRecruitmentCandidate(candidate, getAdminCenterScope(session.currentAccount?.adminCenterRole))));
+const application = computed(() => {
+  if (!useMockApi) return undefined;
+  return assessmentStore
+    .getCandidates(batchId.value)
+    .map((record) => record.candidate)
+    .find((candidate) => candidate?.id === applicationId.value
+      && canAccessRecruitmentCandidate(candidate, getAdminCenterScope(session.currentAccount?.adminCenterRole)));
+});
 
 const apiApplication = ref<AdminApplicationView>();
 const apiStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const apiError = ref("");
 let apiGeneration = 0;
+
+function applicationErrorMessage(cause: unknown): string {
+  if (cause instanceof RecruitmentApiError) {
+    if (cause.status === 404) return "报名记录不存在或已不可访问。";
+    if (cause.status === 403) return "当前账号无权查看这条报名记录。";
+  }
+  return "报名详情读取失败，请重试。";
+}
 
 type InterviewSelectionView = {
   status?: string;
@@ -62,7 +74,7 @@ async function loadApiApplication() {
     apiStatus.value = "success";
   } catch (cause) {
     if (generation !== apiGeneration) return;
-    apiError.value = cause instanceof Error ? cause.message : "报名记录读取失败。";
+    apiError.value = applicationErrorMessage(cause);
     if (!apiApplication.value) apiStatus.value = "error";
     throw cause;
   }
@@ -76,7 +88,9 @@ watch([batchId, applicationId], () => {
   void loadApiApplication().catch(() => {});
 });
 
-useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
+const applicationName = computed(() => useMockApi ? application.value?.name : apiApplication.value?.name);
+
+useHead(() => ({ title: `${applicationName.value ?? "报名记录"}｜HSD 管理台` }));
 </script>
 
 <template>
@@ -112,7 +126,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
     <AdminPageHeading eyebrow="Batch Application Record" :title="apiApplication.name" description="服务端报名快照；只读展示，不跨批次读取内部考核备注。">
       <template #actions><button type="button" class="button button--ghost" :disabled="detailRefresh.refreshing.value" @click="detailRefresh.refresh">{{ detailRefresh.refreshing.value ? "正在刷新…" : "刷新详情" }}</button><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
-    <p v-if="detailRefresh.refreshError.value" class="admin-save-message admin-save-message--error" role="status">详情可能已更新：{{ detailRefresh.refreshError.value }}；当前显示上次成功读取的数据。</p>
+    <p v-if="detailRefresh.refreshError.value" class="admin-save-message admin-save-message--error" role="status">详情读取失败：{{ apiError || "请稍后重试。" }}；当前显示上次成功读取的数据。</p>
     <section class="admin-list-card">
       <header><div><span>报名资料</span><h2>报名资料</h2></div><p>{{ formatAdminApplicationSubmittedAt(apiApplication.submittedAt) }} 提交</p></header>
       <p>最近读取：{{ detailRefresh.lastUpdatedAt.value?.toLocaleTimeString("zh-CN", { hour12: false }) ?? "尚未更新" }}</p>
@@ -125,7 +139,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
   </div>
   <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Batch Application Record" title="报名记录不可用" :description="apiError || '该报名记录不存在，或当前管理员无权查看。'">
-      <template #actions><NuxtLink class="button" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
+      <template #actions><button type="button" class="button button--ghost" :disabled="detailRefresh.refreshing.value" @click="detailRefresh.refresh">{{ detailRefresh.refreshing.value ? "正在重试…" : "重试" }}</button><NuxtLink class="button" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
   </div>
 </template>
