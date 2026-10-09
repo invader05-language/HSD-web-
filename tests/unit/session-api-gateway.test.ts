@@ -222,4 +222,54 @@ describe("production session API gateway", () => {
     await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
       .rejects.toMatchObject({ status: 503, code: "SESSION_API_REQUEST_FAILED", message: "Session API request failed" });
   });
+
+  it("keeps the login POST and session GET failures distinguishable", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        mustChangePassword: false,
+        csrfToken: "cookie-managed",
+        expiresAt: "2026-08-08T00:00:00.000Z",
+      }), { status: 201, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        code: "SESSION_REQUIRED",
+        message: "Session cookie was not accepted",
+        requestId: "server-session-401",
+      }), { status: 401, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: vi.fn()
+        .mockReturnValueOnce("client-login-1")
+        .mockReturnValueOnce("client-session-1"),
+    });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({
+        status: 401,
+        phase: "session_get",
+        credentialValidated: true,
+        loginRequestId: "client-login-1",
+        requestId: "server-session-401",
+      });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "https://api.example.test/api/v1/auth/session", expect.objectContaining({
+      headers: { "X-Request-ID": "client-session-1" },
+    }));
+  });
+
+  it("wraps a transport failure with the request phase", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("Failed to fetch"));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "client-login-transport",
+    });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({
+        phase: "login_post",
+        kind: "transport",
+        code: "SESSION_API_TRANSPORT_FAILED",
+        credentialValidated: false,
+      });
+  });
 });

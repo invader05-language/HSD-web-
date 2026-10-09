@@ -2,6 +2,7 @@
 import { useActivitiesStore } from "~/stores/activities";
 import { useContentGateway } from "~/composables/useContentGateway";
 import { localizeActivityError } from "~/utils/activity-errors";
+import { resolveBrowserApiBase } from "~/utils/browser-api-base";
 
 definePageMeta({ layout: "admin" });
 useHead({ title: "活动报名名单｜HSD 管理台" });
@@ -101,7 +102,7 @@ function exportCurrent() {
     if (query.value.trim()) params.set("search", query.value.trim());
     if (statusFilter.value) params.set("status", statusFilter.value);
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    window.location.href = `${runtime.public.apiBase.replace(/\/+$/, "")}/api/v1/admin/activities/${encodeURIComponent(activityFilter.value)}/registrations/export.csv${suffix}`;
+    window.location.href = `${resolveBrowserApiBase(runtime.public.apiBase)}/api/v1/admin/activities/${encodeURIComponent(activityFilter.value)}/registrations/export.csv${suffix}`;
     return;
   }
   const activity = activitiesStore.getById(activityFilter.value);

@@ -34,6 +34,7 @@ import {
   type NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
 import type { RecruitmentExportFile, RecruitmentGateway } from "./recruitment-gateway";
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 
 export interface ApiRecruitmentGatewayOptions {
   apiBase: string;
@@ -106,7 +107,7 @@ function safeDecodeURIComponent(value: string): string | undefined {
 export function createApiRecruitmentGateway(
   options: ApiRecruitmentGatewayOptions,
 ): RecruitmentGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
   const createRequestId = options.createRequestId ?? requestId;

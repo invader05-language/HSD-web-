@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 import { sha256File } from "../../utils/sha256";
 
 export interface MemberAvatarUploadIntent {
@@ -44,7 +45,7 @@ function isError(value: unknown): value is { code: string; message: string; requ
 }
 
 export function createApiMemberAvatarGateway(options: ApiMemberAvatarGatewayOptions): MemberAvatarGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
   const checksumSha256 = options.checksumSha256 ?? defaultChecksum;

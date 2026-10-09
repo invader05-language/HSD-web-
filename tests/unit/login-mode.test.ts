@@ -31,10 +31,43 @@ describe("getLoginApiErrorMessage", () => {
   });
 
   it("identifies network failure without suggesting wrong credentials", () => {
-    expect(getLoginApiErrorMessage(new TypeError("Failed to fetch")))
-      .toBe("网络连接失败，请检查网络后重试。");
+    expect(getLoginApiErrorMessage(new TypeError("programming error")))
+      .toBe("页面出现异常，请刷新后重试。");
     expect(getLoginApiErrorMessage(new DOMException("timed out", "TimeoutError")))
       .toBe("登录请求超时，请稍后重试。");
+  });
+
+  it("distinguishes a session failure after verified credentials from a password failure", () => {
+    expect(getLoginApiErrorMessage(new SessionApiError({
+      status: 401,
+      code: "SESSION_REQUIRED",
+      message: "session missing",
+      phase: "session_get",
+      credentialValidated: true,
+    }))).toBe("账号验证已通过，但登录状态未能建立。请重试登录状态。 ".trim());
+  });
+
+  it("maps transport, configuration, and contract errors to their own messages", () => {
+    expect(getLoginApiErrorMessage(new SessionApiError({
+      status: 0,
+      code: "SESSION_API_TRANSPORT_FAILED",
+      message: "transport",
+      kind: "transport",
+    }))).toContain("无法连接登录服务");
+    expect(getLoginApiErrorMessage(new SessionApiError({
+      status: 0,
+      code: "API_ENDPOINT_CONFIGURATION_INVALID",
+      message: "configuration",
+      kind: "configuration",
+    }))).toContain("页面配置已失效");
+    expect(getLoginApiErrorMessage(new SessionApiError({
+      status: 200,
+      code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
+      message: "contract",
+      kind: "contract",
+    }))).toContain("响应异常");
+    expect(getLoginApiErrorMessage(new TypeError("programming error")))
+      .toBe("页面出现异常，请刷新后重试。");
   });
 });
 

@@ -1,6 +1,7 @@
 import { createHsdApiClient, type ApiRequest, type ApiTransport, type ErrorResponse } from "../../../packages/api-client/src";
 import type { ContentMediaAttachment, ContentMediaAspect, ContentMediaRole } from "../../types/content-media";
 import { sha256File } from "../../utils/sha256";
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 
 export interface ContentMediaUploadOwner {
   centerId: string;
@@ -52,7 +53,7 @@ const alt = (name: string) => title(name).replace(/[<>]/g, "").slice(0, 300).tri
 const usesAccessibilityMetadata = (ownerType: ContentMediaUploadOwner["ownerType"]) => ownerType !== "activity" && ownerType !== "gallery";
 
 export function createApiContentMediaGateway(options: ApiContentMediaGatewayOptions): ContentMediaGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
   const createRequestId = options.createRequestId ?? requestId;

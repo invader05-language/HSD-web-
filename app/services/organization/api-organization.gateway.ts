@@ -5,6 +5,7 @@ import {
   type ErrorResponse,
 } from "../../../packages/api-client/src";
 import type { OrganizationGateway } from "./organization-gateway";
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 
 export interface ApiOrganizationGatewayOptions {
   apiBase: string;
@@ -50,7 +51,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
 }
 
 export function createApiOrganizationGateway(options: ApiOrganizationGatewayOptions): OrganizationGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
   const createRequestId = options.createRequestId ?? requestId;

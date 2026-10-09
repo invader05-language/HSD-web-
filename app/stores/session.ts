@@ -12,7 +12,7 @@ import {
   type MockLoginResult
 } from "../data/admin-system";
 import type { CurrentSessionResponseDto, LoginDto } from "../../packages/api-client/src";
-import { SessionApiError, type ApiSessionGateway } from "../services/api-session.gateway";
+import { SessionApiError, type ApiSessionGateway, type LoginRequestContext } from "../services/api-session.gateway";
 import { useAdminAccessStore } from "./admin-access";
 import { DEFAULT_FORMAL_MEMBER_PASSWORD } from "../utils/member-account-form";
 import {
@@ -306,7 +306,7 @@ export const useSessionStore = defineStore("session", {
       gateway: ApiSessionGateway | undefined,
       account: string,
       password: string,
-      options: { requireAdmin?: boolean } = {},
+      options: { requireAdmin?: boolean; attemptId?: string } = {},
     ): Promise<MockLoginResult> {
       if (config.useMockApi) return this.signIn(account, password, options);
       if (!gateway) {
@@ -315,11 +315,14 @@ export const useSessionStore = defineStore("session", {
       }
 
       this.clearProductionSession();
-      const session = await gateway.login({
+      const loginInput = {
         account: account.trim(),
         password,
         rememberMe: false,
-      } satisfies LoginDto);
+      } satisfies LoginDto;
+      const session = options.attemptId
+        ? await gateway.login(loginInput, { attemptId: options.attemptId })
+        : await gateway.login(loginInput);
       this.applyApiSession(session);
 
       if (options.requireAdmin && !this.canAccessAdmin) {
@@ -332,6 +335,23 @@ export const useSessionStore = defineStore("session", {
       return session.mustChangePassword
         ? { status: "password_change_required", account: apiAccountProjection(session) }
         : { status: "success", account: apiAccountProjection(session) };
+    },
+    async retrySessionForRuntime(
+      config: SessionRuntimeConfig,
+      gateway: ApiSessionGateway | undefined,
+      context: LoginRequestContext,
+    ): Promise<boolean> {
+      if (config.useMockApi || !gateway) return false;
+      try {
+        this.applyApiSession(await gateway.currentSession({
+          ...context,
+          phase: "session_get",
+          credentialValidated: true,
+        }));
+        return true;
+      } catch {
+        return false;
+      }
     },
     async restoreForRuntime(
       config: SessionRuntimeConfig,

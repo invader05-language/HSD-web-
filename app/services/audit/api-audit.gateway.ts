@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 import { createHsdApiClient, type ApiRequest, type ApiTransport, type ErrorResponse } from "../../../packages/api-client/src";
 
 export interface ApiAuditGatewayOptions {
@@ -18,7 +19,7 @@ const isError = (value: unknown): value is ErrorResponse => Boolean(
 );
 
 export function createApiAuditGateway(options: ApiAuditGatewayOptions) {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const createRequestId = options.createRequestId ?? (() => globalThis.crypto?.randomUUID?.() ?? `audit-${Date.now()}`);
   const transport: ApiTransport = async (request: ApiRequest) => {

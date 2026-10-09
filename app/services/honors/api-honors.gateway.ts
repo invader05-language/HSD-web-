@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 import { createHsdApiClient, type ApiRequest, type ApiTransport, type ErrorResponse } from '../../../packages/api-client/src'
 
 export interface ApiHonorsGatewayOptions { apiBase: string; fetcher?: typeof globalThis.fetch; readCookie?: (name: string) => string | undefined; createRequestId?: () => string }
@@ -6,7 +7,7 @@ const browserCookie = (name: string) => typeof document === 'undefined' ? undefi
 const isError = (value: unknown): value is ErrorResponse => Boolean(value && typeof value === 'object' && typeof (value as ErrorResponse).code === 'string' && typeof (value as ErrorResponse).message === 'string')
 
 export function createApiHonorsGateway(options: ApiHonorsGatewayOptions) {
-  const apiBase = options.apiBase.replace(/\/+$/, '')
+  const apiBase = resolveBrowserApiBase(options.apiBase)
   const fetcher = options.fetcher ?? globalThis.fetch
   const readCookie = options.readCookie ?? browserCookie
   const createRequestId = options.createRequestId ?? (() => globalThis.crypto?.randomUUID?.() ?? `honor-${Date.now()}`)

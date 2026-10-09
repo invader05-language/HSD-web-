@@ -41,8 +41,10 @@ export default defineNuxtConfig({
     "/gallery": { ssr: true },
     "/resources": { ssr: true },
     "/join/**": { ssr: false },
-    "/member/**": { ssr: false },
-    "/admin/**": { ssr: false }
+    "/login": { headers: { "cache-control": "no-store" } },
+    "/member/**": { ssr: false, headers: { "cache-control": "no-store" } },
+    "/admin/**": { ssr: false, headers: { "cache-control": "no-store" } },
+    "/_nuxt/builds/latest.json": { headers: { "cache-control": "no-store" } }
   },
   vite: {
     build: {
