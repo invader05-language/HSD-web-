@@ -28,7 +28,7 @@ async function load() {
     error.value = status === 404 ? '二维码暂不可用，请刷新结果。' : status === 409 ? '二维码已更新，正在同步。' : '二维码加载失败，请检查网络后重试。';
   } finally { if (request === generation) loading.value = false; }
 }
-watch(() => [props.code.id, props.code.version, props.code.status, props.code.imageUrl], () => { void load(); }, { immediate: true });
+watch([() => props.code.id, () => props.code.version, () => props.code.status, () => props.code.imageUrl], () => { void load(); }, { immediate: true });
 onBeforeUnmount(() => { generation++; release(); });
 </script>
 

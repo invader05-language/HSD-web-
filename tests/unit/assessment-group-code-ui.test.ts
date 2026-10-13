@@ -14,6 +14,17 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn().mockReturnValue('blob:private'); URL.revokeObjectURL = vi.fn();
 });
 describe('round result UI', () => {
+  it('keeps the loaded original image open when polling returns the same reference', async () => {
+    const readImage=vi.fn().mockResolvedValue(new Blob(['image']));
+    const code={id:'id',round:1,version:1,status:'READY' as const,imageUrl:'/api/v1/test/group-code/image?version=1'};
+    const wrapper=mount(PrivateGroupCode,{props:{code,readImage}});
+    await flushPromises();await wrapper.get('button[aria-label="查看二维码原图"]').trigger('click');await flushPromises();
+    await wrapper.setProps({code:{...code}});await flushPromises();
+    expect(readImage).toHaveBeenCalledTimes(1);expect(wrapper.find('dialog img').exists()).toBe(true);
+    await wrapper.setProps({code:{...code,version:2,imageUrl:code.imageUrl+'2'}});await flushPromises();
+    expect(readImage).toHaveBeenCalledTimes(2);expect(wrapper.find('dialog img').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('opens the original image as a native modal and clears it on keyboard cancellation', async () => {
     const showModal=vi.spyOn(HTMLDialogElement.prototype,'showModal');
     const wrapper=mount(PrivateGroupCode,{props:{code:{id:'id',round:1,version:1,status:'READY',imageUrl:'/api/v1/test/group-code/image?version=1'},readImage:vi.fn().mockResolvedValue(new Blob(['image']))}});
