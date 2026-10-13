@@ -431,6 +431,7 @@ export type AdminResourceVersionResponseDto = {
 export type AdvanceAssessmentDto = {
   "expectedVersion": number;
   "confirmed": boolean;
+  "previewFingerprint"?: string;
   "reason"?: string;
 };
 
@@ -578,6 +579,11 @@ export type AvatarResponseDto = {
   "kind": "default" | "asset";
   "publicToken"?: string;
   "variant"?: "white-hsd";
+};
+
+export type BindRoundGroupCodeDto = {
+  "expectedVersion": number;
+  "uploadId": (string) | null;
 };
 
 export type CenterLeadershipResponseDto = {
@@ -740,6 +746,15 @@ export type CreateGalleryDto = {
   "team"?: string;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
+};
+
+export type CreateGroupCodeUploadDto = {
+  "expectedVersion": number;
+  "fileName": string;
+  "mimeType": "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/webm";
+  "byteSize": number;
+  "checksumSha256": string;
+  "kind": "image" | "video";
 };
 
 export type CreateGrowthRecordDto = {
@@ -1045,6 +1060,26 @@ export type GrantAdminQualificationDto = {
   "adminCenterId": string;
 };
 
+export type GroupCodeCenterDto = {
+  "id": string;
+  "name": string;
+  "slug": string;
+  "rounds": Array<GroupCodeReferenceDto>;
+};
+
+export type GroupCodeListDto = {
+  "batchId": string;
+  "centers": Array<GroupCodeCenterDto>;
+};
+
+export type GroupCodeReferenceDto = {
+  "id": (string) | null;
+  "round": number;
+  "version": number;
+  "status": "READY" | "MISSING";
+  "imageUrl": (string) | null;
+};
+
 export type GrowthRecordListResponseDto = {
   "items": Array<GrowthRecordResponseDto>;
 };
@@ -1262,6 +1297,14 @@ export type MembershipResponseDto = {
   "duty": "REGULAR" | "CORE";
   "version": number;
   "center": CenterSummaryResponseDto;
+};
+
+export type MemberStageResultsDto = {
+  "batchId": (string) | null;
+  "batchName": (string) | null;
+  "center": (StageCenterDto) | null;
+  "stages": Array<PublishedStageDto>;
+  "finalGroupCode": (GroupCodeReferenceDto) | null;
 };
 
 export type MyInterviewContextDto = {
@@ -1801,6 +1844,13 @@ export type PublishedPortalConfigurationResponseDto = {
   "publishedAt": string;
 };
 
+export type PublishedStageDto = {
+  "round": number;
+  "outcome": "PASSED" | "FAILED";
+  "publishedAt": string;
+  "groupCode": (GroupCodeReferenceDto) | null;
+};
+
 export type PublishHelpDto = {
   "expectedVersion": number;
   "confirmed": boolean;
@@ -2059,6 +2109,33 @@ export type RevokeOrganizationPositionDto = {
   "reason"?: string;
 };
 
+export type RoundPublicationCenterDto = {
+  "round": number;
+  "centerId": string;
+  "centerName": string;
+  "applicable": boolean;
+  "eligibleCount": number;
+  "recordedCount": number;
+  "missingCount": number;
+  "passedCount": number;
+  "failedCount": number;
+  "groupCodeStatus": "READY" | "MISSING";
+};
+
+export type RoundPublicationPreviewDto = {
+  "batchId": string;
+  "batchName": string;
+  "round": number;
+  "assessmentVersion": number;
+  "previewFingerprint": string;
+  "canPublish": boolean;
+  "blockingReasons": Array<string>;
+  "publishedAt": (string) | null;
+  "roundsToPublish": Array<number>;
+  "publishedRounds": Array<number>;
+  "centers": Array<RoundPublicationCenterDto>;
+};
+
 export type SafeAuditActorDto = {
   "type": "account" | "system";
   "accountId": (string) | null;
@@ -2124,6 +2201,11 @@ export type SessionPersonResponseDto = {
 export type SetCoreMembershipDto = {
   "core": boolean;
   "expectedMembershipVersion": number;
+};
+
+export type StageCenterDto = {
+  "id": string;
+  "name": string;
 };
 
 export type SubmitApplicationDto = {
@@ -2356,6 +2438,11 @@ export type ListActivityRegistrationsDto = {
 };
 
 export const API_V1_PATHS = {
+  assessmentGroupCodes: "/api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes",
+  assessmentGroupCodeUpload: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads",
+  assessmentGroupCodeBind: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code",
+  assessmentAdvancePreview: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
+  memberStageResults: "/api/v1/recruitment/results/me/stages",
   authLogin: "/api/v1/auth/login",
   authSession: "/api/v1/auth/session",
   authChangePassword: "/api/v1/auth/change-password",
@@ -2512,6 +2599,11 @@ export const API_V1_PATHS = {
 } as const;
 
 export const API_OPERATIONS = {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads" },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": { method: "PUT", path: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview" },
+  "GET /api/v1/recruitment/results/me/stages": { method: "GET", path: "/api/v1/recruitment/results/me/stages" },
   "POST /api/v1/auth/login": { method: "POST", path: "/api/v1/auth/login" },
   "GET /api/v1/auth/session": { method: "GET", path: "/api/v1/auth/session" },
   "POST /api/v1/auth/change-password": { method: "POST", path: "/api/v1/auth/change-password" },
@@ -2671,6 +2763,11 @@ export type ApiOperation = keyof typeof API_OPERATIONS;
 export type ApiV1Path = (typeof API_V1_PATHS)[keyof typeof API_V1_PATHS];
 
 export interface ApiResponseByOperation {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": GroupCodeListDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": UploadIntentResponseDto;
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": GroupCodeReferenceDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": RoundPublicationPreviewDto;
+  "GET /api/v1/recruitment/results/me/stages": MemberStageResultsDto;
   "POST /api/v1/auth/login": AuthSessionResponseDto;
   "GET /api/v1/auth/session": CurrentSessionResponseDto;
   "POST /api/v1/auth/change-password": AuthSessionResponseDto;
@@ -2832,6 +2929,21 @@ export interface ApiResponseByOperation {
 export type ApiResponseFor<TOperation extends ApiOperation> = ApiResponseByOperation[TOperation];
 
 const API_RESPONSE_SCHEMAS = {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": {
+    "$ref": "#/components/schemas/GroupCodeListDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": {
+    "$ref": "#/components/schemas/UploadIntentResponseDto"
+  },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": {
+    "$ref": "#/components/schemas/GroupCodeReferenceDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": {
+    "$ref": "#/components/schemas/RoundPublicationPreviewDto"
+  },
+  "GET /api/v1/recruitment/results/me/stages": {
+    "$ref": "#/components/schemas/MemberStageResultsDto"
+  },
   "POST /api/v1/auth/login": {
     "$ref": "#/components/schemas/AuthSessionResponseDto"
   },
@@ -7004,6 +7116,121 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
+  "RoundPublicationCenterDto": {
+    "type": "object",
+    "properties": {
+      "round": {
+        "type": "number"
+      },
+      "centerId": {
+        "type": "string"
+      },
+      "centerName": {
+        "type": "string"
+      },
+      "applicable": {
+        "type": "boolean"
+      },
+      "eligibleCount": {
+        "type": "number"
+      },
+      "recordedCount": {
+        "type": "number"
+      },
+      "missingCount": {
+        "type": "number"
+      },
+      "passedCount": {
+        "type": "number"
+      },
+      "failedCount": {
+        "type": "number"
+      },
+      "groupCodeStatus": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "centerId",
+      "centerName",
+      "applicable",
+      "eligibleCount",
+      "recordedCount",
+      "missingCount",
+      "passedCount",
+      "failedCount",
+      "groupCodeStatus"
+    ]
+  },
+  "RoundPublicationPreviewDto": {
+    "type": "object",
+    "properties": {
+      "batchId": {
+        "type": "string"
+      },
+      "batchName": {
+        "type": "string"
+      },
+      "round": {
+        "type": "number"
+      },
+      "assessmentVersion": {
+        "type": "number"
+      },
+      "previewFingerprint": {
+        "type": "string"
+      },
+      "canPublish": {
+        "type": "boolean"
+      },
+      "blockingReasons": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "publishedAt": {
+        "type": "string",
+        "nullable": true
+      },
+      "roundsToPublish": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "publishedRounds": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "centers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RoundPublicationCenterDto"
+        }
+      }
+    },
+    "required": [
+      "batchId",
+      "batchName",
+      "round",
+      "assessmentVersion",
+      "previewFingerprint",
+      "canPublish",
+      "blockingReasons",
+      "publishedAt",
+      "roundsToPublish",
+      "publishedRounds",
+      "centers"
+    ]
+  },
   "AssessmentCenterDto": {
     "type": "object",
     "properties": {
@@ -7406,6 +7633,10 @@ const API_COMPONENT_SCHEMAS = {
       "confirmed": {
         "type": "boolean"
       },
+      "previewFingerprint": {
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$"
+      },
       "reason": {
         "type": "string",
         "maxLength": 500
@@ -7647,6 +7878,128 @@ const API_COMPONENT_SCHEMAS = {
       "decision"
     ]
   },
+  "StageCenterDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name"
+    ]
+  },
+  "GroupCodeReferenceDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "version": {
+        "type": "number"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      },
+      "imageUrl": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "round",
+      "version",
+      "status",
+      "imageUrl"
+    ]
+  },
+  "PublishedStageDto": {
+    "type": "object",
+    "properties": {
+      "round": {
+        "type": "number"
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "outcome",
+      "publishedAt",
+      "groupCode"
+    ]
+  },
+  "MemberStageResultsDto": {
+    "type": "object",
+    "properties": {
+      "batchId": {
+        "type": "string",
+        "nullable": true
+      },
+      "batchName": {
+        "type": "string",
+        "nullable": true
+      },
+      "center": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StageCenterDto"
+          }
+        ]
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PublishedStageDto"
+        }
+      },
+      "finalGroupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "batchId",
+      "batchName",
+      "center",
+      "stages",
+      "finalGroupCode"
+    ]
+  },
   "RecruitmentResultBatchDto": {
     "type": "object",
     "properties": {
@@ -7792,6 +8145,115 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "personId",
       "contact"
+    ]
+  },
+  "GroupCodeCenterDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "rounds": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GroupCodeReferenceDto"
+        }
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "slug",
+      "rounds"
+    ]
+  },
+  "GroupCodeListDto": {
+    "type": "object",
+    "properties": {
+      "batchId": {
+        "type": "string"
+      },
+      "centers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GroupCodeCenterDto"
+        }
+      }
+    },
+    "required": [
+      "batchId",
+      "centers"
+    ]
+  },
+  "CreateGroupCodeUploadDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "fileName": {
+        "type": "string",
+        "maxLength": 180
+      },
+      "mimeType": {
+        "type": "string",
+        "enum": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "video/mp4",
+          "video/webm"
+        ]
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "checksumSha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "checksumSha256",
+      "kind"
+    ]
+  },
+  "BindRoundGroupCodeDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0
+      },
+      "uploadId": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "uploadId"
     ]
   },
   "CurrentOrganizationPermissionResponseDto": {

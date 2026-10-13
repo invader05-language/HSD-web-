@@ -1,4 +1,5 @@
 import type {
+  GroupCodeListDto, GroupCodeReferenceDto, MemberStageResultsDto, RoundPublicationPreviewDto,
   AdvanceAssessmentDto,
   ArchiveRecruitmentBatchPayload,
   AssessmentBatchResponseDto,
@@ -43,7 +44,15 @@ export interface RecruitmentExportFile {
   filename: string;
 }
 
-export interface RecruitmentGateway {
+export interface RoundGroupGateway {
+  getAssessmentGroupCodes(batchId: string): Promise<GroupCodeListDto>;
+  bindAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, uploadId: string | null): Promise<GroupCodeReferenceDto>;
+  uploadAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, file: File): Promise<GroupCodeReferenceDto>;
+  getAssessmentAdvancePreview(batchId: string): Promise<RoundPublicationPreviewDto>;
+  getMyStageResults(): Promise<MemberStageResultsDto>;
+  readGroupCodeImage(url: string): Promise<Blob>;
+}
+export interface RecruitmentGateway extends Partial<RoundGroupGateway> {
   getCurrentBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
   getUpcomingBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
   getCurrentProfile(): Promise<MemberProfileResponseDto>;

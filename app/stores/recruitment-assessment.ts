@@ -621,10 +621,12 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       gateway: RecruitmentGateway,
       batchId: string,
       reason?: string,
+      preview?: { assessmentVersion: number; previewFingerprint: string },
     ) {
       return this.runApiMutation(gateway, batchId, (expectedVersion) => (
         gateway.advanceAssessment(batchId, {
-          expectedVersion,
+          expectedVersion: preview?.assessmentVersion ?? expectedVersion,
+          ...(preview ? { previewFingerprint: preview.previewFingerprint } : {}),
           confirmed: true,
           ...(reason ? { reason } : {}),
         })

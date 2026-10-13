@@ -196,7 +196,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_NOT_ALLOWED" })).toContain("不符合最终调剂条件");
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_TARGET_FORBIDDEN" })).toContain("不能将成员调剂至该中心");
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_DECISION_ALREADY_EXISTS" })).toContain("已经存在最终处理结果");
-    expect(getRecruitmentAssessmentMessage({ code: "OWNER_PERMISSION_REQUIRED" })).toContain("无权提交最终调剂结果");
+    expect(getRecruitmentAssessmentMessage({ code: "OWNER_PERMISSION_REQUIRED" })).toContain("没有执行该考核操作的权限");
   });
 
   it("keeps publication workbench copy business-facing and avoids exposing raw API errors", () => {

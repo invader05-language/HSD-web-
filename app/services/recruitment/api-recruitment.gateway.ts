@@ -33,7 +33,8 @@ import {
   type NotificationActionResponseDto,
   type NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
-import type { RecruitmentExportFile, RecruitmentGateway } from "./recruitment-gateway";
+import type { RecruitmentExportFile, RecruitmentGateway, RoundGroupGateway } from "./recruitment-gateway";
+import { sha256File } from '../../utils/sha256';
 import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 
 export interface ApiRecruitmentGatewayOptions {
@@ -106,7 +107,7 @@ function safeDecodeURIComponent(value: string): string | undefined {
 
 export function createApiRecruitmentGateway(
   options: ApiRecruitmentGatewayOptions,
-): RecruitmentGateway {
+): RecruitmentGateway & RoundGroupGateway {
   const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
@@ -225,6 +226,29 @@ export function createApiRecruitmentGateway(
   }
 
   return {
+    getAssessmentGroupCodes: (batchId) => read('GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessment-group-codes`),
+    bindAssessmentGroupCode: (batchId, centerId, round, expectedVersion, uploadId) => mutate('PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code`, { expectedVersion, uploadId }, 'PUT'),
+    async uploadAssessmentGroupCode(batchId, centerId, round, expectedVersion, file) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024 || file.size < 1) throw new RecruitmentApiError({ status:422, code:'GROUP_CODE_FILE_INVALID', message:'请选择不超过5MiB的PNG、JPG或WebP图片' });
+      const intent = await mutate('POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code/uploads`, { expectedVersion:0, fileName:file.name, kind:'image', mimeType:file.type, byteSize:file.size, checksumSha256:await sha256File(file) });
+      const storage = await fetcher(intent.upload.url, { method:'PUT', body:file, headers:intent.upload.headers });
+      if (!storage.ok) throw new RecruitmentApiError({status:storage.status,code:'DIRECT_UPLOAD_FAILED',message:'图片上传失败，请重试'});
+      await mutate('POST /api/v1/admin/uploads/{uploadId}/complete', `/api/v1/admin/uploads/${intent.id}/complete`, {expectedVersion:intent.version,parts:[{partNumber:1,etag:storage.headers.get('etag') ?? 'direct-upload'}]});
+      const current = await read('GET /api/v1/admin/uploads/{uploadId}', `/api/v1/admin/uploads/${intent.id}`);
+      if (current.status !== 'ready') throw new RecruitmentApiError({status:409,code:'GROUP_CODE_NOT_READY',message:'图片尚未通过处理，请稍后重试'});
+      return mutate('PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code`, {expectedVersion,uploadId:intent.id}, 'PUT');
+    },
+    getAssessmentAdvancePreview: (batchId) => read('GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance-preview`),
+    getMyStageResults: () => read('GET /api/v1/recruitment/results/me/stages', '/api/v1/recruitment/results/me/stages'),
+    async readGroupCodeImage(url) {
+      if (!url.startsWith('/api/v1/') || !url.includes('/group-code') || !url.includes('/image')) throw new Error('GROUP_CODE_IMAGE_PATH_INVALID');
+      const response = await fetcher(`${apiBase}${url}`, {credentials:'include', cache:'no-store', headers:{'X-Request-ID':createRequestId()}});
+      if (!response.ok) {
+        const payload:unknown = await response.json().catch(()=>null);
+        throw new RecruitmentApiError({status:response.status,code:isErrorResponse(payload)?payload.code:'GROUP_CODE_IMAGE_FAILED',message:isErrorResponse(payload)?payload.message:'二维码加载失败'});
+      }
+      return response.blob();
+    },
     getCurrentBatch: () => read(
       "GET /api/v1/recruitment/current",
       "/api/v1/recruitment/current",

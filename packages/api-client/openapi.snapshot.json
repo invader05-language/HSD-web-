@@ -6657,6 +6657,72 @@
         ]
       }
     },
+    "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": {
+      "get": {
+        "operationId": "AssessmentsAdminController_advancePreview",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundPublicationPreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Preview all round results disclosed by the existing advance operation",
+        "tags": [
+          "Recruitment assessments"
+        ]
+      }
+    },
     "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": {
       "get": {
         "operationId": "AssessmentsAdminController_listAdjustmentTargets",
@@ -7233,6 +7299,128 @@
         ]
       }
     },
+    "/api/v1/recruitment/results/me/stages": {
+      "get": {
+        "operationId": "AssessmentsMemberController_myStages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberStageResultsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Recruitment results"
+        ]
+      }
+    },
+    "/api/v1/recruitment/results/me/group-codes/{groupCodeId}/image": {
+      "get": {
+        "operationId": "AssessmentsMemberController_image",
+        "parameters": [
+          {
+            "name": "groupCodeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Recruitment results"
+        ]
+      }
+    },
     "/api/v1/recruitment/results/me": {
       "get": {
         "operationId": "AssessmentsMemberController_myResults",
@@ -7361,6 +7549,343 @@
         "summary": "Read one complete minister contact for the authenticated person own published result",
         "tags": [
           "Recruitment results"
+        ]
+      }
+    },
+    "/api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": {
+      "get": {
+        "operationId": "RoundGroupCodeAdminController_list",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupCodeListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Assessment group codes"
+        ]
+      }
+    },
+    "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": {
+      "post": {
+        "operationId": "RoundGroupCodeAdminController_upload",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "round",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupCodeUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadIntentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Assessment group codes"
+        ]
+      }
+    },
+    "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": {
+      "put": {
+        "operationId": "RoundGroupCodeAdminController_bind",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "round",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindRoundGroupCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupCodeReferenceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Assessment group codes"
+        ]
+      }
+    },
+    "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/image": {
+      "get": {
+        "operationId": "RoundGroupCodeAdminController_image",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "centerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "round",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "Assessment group codes"
         ]
       }
     },
@@ -18285,6 +18810,121 @@
           "items"
         ]
       },
+      "RoundPublicationCenterDto": {
+        "type": "object",
+        "properties": {
+          "round": {
+            "type": "number"
+          },
+          "centerId": {
+            "type": "string"
+          },
+          "centerName": {
+            "type": "string"
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "eligibleCount": {
+            "type": "number"
+          },
+          "recordedCount": {
+            "type": "number"
+          },
+          "missingCount": {
+            "type": "number"
+          },
+          "passedCount": {
+            "type": "number"
+          },
+          "failedCount": {
+            "type": "number"
+          },
+          "groupCodeStatus": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "MISSING"
+            ]
+          }
+        },
+        "required": [
+          "round",
+          "centerId",
+          "centerName",
+          "applicable",
+          "eligibleCount",
+          "recordedCount",
+          "missingCount",
+          "passedCount",
+          "failedCount",
+          "groupCodeStatus"
+        ]
+      },
+      "RoundPublicationPreviewDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "batchName": {
+            "type": "string"
+          },
+          "round": {
+            "type": "number"
+          },
+          "assessmentVersion": {
+            "type": "number"
+          },
+          "previewFingerprint": {
+            "type": "string"
+          },
+          "canPublish": {
+            "type": "boolean"
+          },
+          "blockingReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "publishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "roundsToPublish": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "publishedRounds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "centers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoundPublicationCenterDto"
+            }
+          }
+        },
+        "required": [
+          "batchId",
+          "batchName",
+          "round",
+          "assessmentVersion",
+          "previewFingerprint",
+          "canPublish",
+          "blockingReasons",
+          "publishedAt",
+          "roundsToPublish",
+          "publishedRounds",
+          "centers"
+        ]
+      },
       "AssessmentCenterDto": {
         "type": "object",
         "properties": {
@@ -18687,6 +19327,10 @@
           "confirmed": {
             "type": "boolean"
           },
+          "previewFingerprint": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
           "reason": {
             "type": "string",
             "maxLength": 500
@@ -18928,6 +19572,128 @@
           "decision"
         ]
       },
+      "StageCenterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "GroupCodeReferenceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "round": {
+            "type": "number"
+          },
+          "version": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "MISSING"
+            ]
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "round",
+          "version",
+          "status",
+          "imageUrl"
+        ]
+      },
+      "PublishedStageDto": {
+        "type": "object",
+        "properties": {
+          "round": {
+            "type": "number"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PASSED",
+              "FAILED"
+            ]
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "groupCode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupCodeReferenceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "round",
+          "outcome",
+          "publishedAt",
+          "groupCode"
+        ]
+      },
+      "MemberStageResultsDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "nullable": true
+          },
+          "batchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "center": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StageCenterDto"
+              }
+            ]
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedStageDto"
+            }
+          },
+          "finalGroupCode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupCodeReferenceDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "batchId",
+          "batchName",
+          "center",
+          "stages",
+          "finalGroupCode"
+        ]
+      },
       "RecruitmentResultBatchDto": {
         "type": "object",
         "properties": {
@@ -19073,6 +19839,115 @@
         "required": [
           "personId",
           "contact"
+        ]
+      },
+      "GroupCodeCenterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "rounds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupCodeReferenceDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "rounds"
+        ]
+      },
+      "GroupCodeListDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "centers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupCodeCenterDto"
+            }
+          }
+        },
+        "required": [
+          "batchId",
+          "centers"
+        ]
+      },
+      "CreateGroupCodeUploadDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "video/mp4",
+              "video/webm"
+            ]
+          },
+          "byteSize": {
+            "type": "number",
+            "minimum": 1
+          },
+          "checksumSha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ]
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "fileName",
+          "mimeType",
+          "byteSize",
+          "checksumSha256",
+          "kind"
+        ]
+      },
+      "BindRoundGroupCodeDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uploadId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "uploadId"
         ]
       },
       "CurrentOrganizationPermissionResponseDto": {

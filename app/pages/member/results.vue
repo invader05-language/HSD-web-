@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import PublishedStageResults from '~/components/member/PublishedStageResults.vue';
+import PrivateGroupCode from '~/components/member/PrivateGroupCode.vue';
+import type { MemberStageResultsDto } from '../../../packages/api-client/src';
+import { createResultRefresh } from '~/utils/assessment-result-refresh';
 import MemberSpaceNav from "~/components/member/MemberSpaceNav.vue";
 import {
   getDemoMemberResult,
@@ -51,13 +55,58 @@ const productionApplication = ref<SubmittedRecruitmentApplication>();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
+const stageResults = ref<MemberStageResultsDto>();
+const stageError = ref('');
+let destroyed = false;
+let sessionExpired = false;
+function expireSession() {
+  if (destroyed || sessionExpired) return;
+  sessionExpired = true;
+  stageResults.value = undefined;
+  productionApplication.value = undefined;
+  assessmentStore.myResults = [];
+  session.clearProductionSession();
+  void navigateTo('/login?redirect=/member/results');
+}
+let projectionRequest: Promise<void> | undefined;
+function refreshResults(): Promise<void> {
+  return projectionRequest ??= loadResults().finally(() => { projectionRequest = undefined; });
+}
+async function loadResults() {
+  if (!recruitmentGateway || destroyed || sessionExpired) return;
+  const [final, stages] = await Promise.allSettled([
+    recruitmentGateway.getMyResults(),
+    recruitmentGateway.getMyStageResults?.(),
+  ]);
+  if (destroyed || sessionExpired) return;
+  const unauthorized = [final, stages].find(item => item.status === 'rejected' && item.reason?.status === 401);
+  if (unauthorized?.status === 'rejected') throw unauthorized.reason;
+  if (final.status === 'fulfilled') { assessmentStore.myResults = final.value.items; assessmentStore.myResultsError = undefined; }
+  else assessmentStore.myResultsError = '结果暂时无法加载，请稍后重试。';
+  if (stages.status === 'fulfilled') { stageResults.value = stages.value; stageError.value = ''; }
+  else stageError.value = '阶段考核结果加载失败，正在重试。';
+  if (final.status === 'rejected') throw final.reason;
+  if (stages.status === 'rejected') throw stages.reason;
+}
+const refresher = createResultRefresh(refreshResults, { unauthorized: expireSession, visible: () => typeof document !== 'undefined' && document.visibilityState === 'visible' });
+function visibilityChanged() { refresher.visibilityChanged(); }
+async function refreshImageReference() {
+  try { await refreshResults(); }
+  catch (cause) { if ((cause as { status?: number })?.status === 401) { refresher.stop(); expireSession(); } }
+}
+const finalGroupCode = computed(() => stageResults.value?.batchId === assessmentStore.myResults[0]?.batch.id
+  ? stageResults.value?.finalGroupCode : undefined);
 onMounted(async () => {
   if (!recruitmentGateway) return;
+  document.addEventListener('visibilitychange', visibilityChanged);
+  refresher.start();
   try {
     const current = await recruitmentGateway.getCurrentBatch();
+    if (destroyed || sessionExpired) return;
     if (current.batch) {
       const batch = mapPublicRecruitmentBatch(current.batch);
       const own = await recruitmentGateway.getMyApplication(batch.id);
+      if (destroyed || sessionExpired) return;
       if (own.application) {
         const profile = session.apiSession?.person;
         if (profile) productionApplication.value = mapRecruitmentApplicationResponse(own.application, {
@@ -78,11 +127,12 @@ onMounted(async () => {
         }, batch);
       }
     }
-    await assessmentStore.refreshMyResults(recruitmentGateway);
-  } catch {
-    // The store exposes the server failure in-page; production never falls back to demo data.
+  } catch (cause) {
+    if ((cause as { status?: number })?.status === 401) { refresher.stop(); expireSession(); }
+    // Current enrollment is optional; published results are queried independently.
   }
 });
+onBeforeUnmount(() => { destroyed = true; refresher.stop(); document.removeEventListener('visibilitychange', visibilityChanged); });
 
 const publishedAssessment = computed(() => {
   if (recruitmentGateway) return undefined;
@@ -168,7 +218,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         </div>
         <aside class="member-results-hero__batch" aria-label="当前招新批次">
           <span>当前招新批次</span>
-          <h2>{{ result.batchLabel }}</h2>
+          <h2>{{ stageResults?.batchName ?? result.batchLabel }}</h2>
           <dl>
             <div><dt>当前账号</dt><dd>{{ currentMember?.name ?? "当前登录成员" }}</dd></div>
             <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
@@ -234,6 +284,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
                 <div><dt>所属方向</dt><dd>{{ result.finalDirection ?? "不适用" }}</dd></div>
               </dl>
 
+              <section v-if="finalGroupCode && recruitmentGateway?.readGroupCodeImage" class="member-final-group"><h3>部门群二维码</h3><PrivateGroupCode :code="finalGroupCode" :read-image="recruitmentGateway.readGroupCodeImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" /></section>
               <footer class="member-result-card__footer">
                 <NuxtLink class="button" to="/member">返回成员空间</NuxtLink>
                 <a
@@ -289,8 +340,10 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
           aria-labelledby="result-tab-assessment"
           tabindex="0"
         >
+          <p v-if="stageError" role="alert">{{ stageError }}</p>
           <div class="member-results-grid">
-            <article class="member-result-card">
+            <PublishedStageResults v-if="stageResults?.stages.length && recruitmentGateway?.readGroupCodeImage" :results="stageResults" :read-image="recruitmentGateway.readGroupCodeImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
+            <article v-else class="member-result-card">
               <header class="member-result-card__header">
                 <span>考核进度</span>
                 <strong class="member-result-status member-result-status--pending">{{ assessment.badge }}</strong>
@@ -311,15 +364,15 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
 
               <footer class="member-result-card__footer">
                 <NuxtLink class="button" to="/member">返回成员空间</NuxtLink>
-                <span>不展示完整考核历程</span>
+                <span>已发布的通过轮次可展开查看群二维码</span>
               </footer>
             </article>
 
             <aside class="member-results-side">
               <section class="member-result-panel member-result-contact">
                 <header><h2>结果说明</h2><span>个人数据</span></header>
-                <p>系统仅展示当前有效状态</p>
-                <h3>结果以负责人最终发布为准</h3>
+                <p>仅展示已发布的个人结果</p>
+                <h3>各轮结果以联盟总负责人统一发布为准</h3>
                 <div><span>如有疑问，请联系对应负责人</span></div>
               </section>
             </aside>
@@ -330,3 +383,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
     </div>
   </div>
 </template>
+
+<style scoped>
+.member-final-group { margin: 24px; border-top: 1px solid #e5e2dd; padding-top: 24px; text-align: center; }
+</style>

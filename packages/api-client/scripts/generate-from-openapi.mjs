@@ -5,6 +5,11 @@ const packageRoot = resolve(import.meta.dirname, "..");
 const snapshotPath = resolve(packageRoot, "openapi.snapshot.json");
 const outputPath = resolve(packageRoot, "src/generated.ts");
 const browserOperations = {
+  assessmentGroupCodes: "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes",
+  assessmentGroupCodeUpload: "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads",
+  assessmentGroupCodeBind: { operation: "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code", successStatus: "200" },
+  assessmentAdvancePreview: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
+  memberStageResults: "GET /api/v1/recruitment/results/me/stages",
   authLogin: "POST /api/v1/auth/login",
   authSession: "GET /api/v1/auth/session",
   authChangePassword: "POST /api/v1/auth/change-password",

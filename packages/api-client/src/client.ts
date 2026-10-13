@@ -5,6 +5,9 @@ import {
   type ApiOperation,
   type ApiResponseFor,
   type ApiV1Path,
+  type AdvanceAssessmentDto,
+  type BindRoundGroupCodeDto,
+  type CreateGroupCodeUploadDto,
   type CreateManagedMemberDto,
   type CreateMembershipDto,
   type CreateContentDto,
@@ -190,6 +193,12 @@ export interface HsdApiClient {
     commit(payload: PreparatoryMemberImportDto): Promise<ApiResponseFor<"POST /api/v1/admin/imports/preparatory-members/commit">>;
   };
   recruitment: {
+    stageResults(): Promise<ApiResponseFor<"GET /api/v1/recruitment/results/me/stages">>;
+    advancePreview(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview">>;
+    advance(batchId: string, payload: AdvanceAssessmentDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/assessments/advance">>;
+    groupCodes(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes">>;
+    groupCodeUpload(batchId: string, centerId: string, round: number, payload: CreateGroupCodeUploadDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads">>;
+    bindGroupCode(batchId: string, centerId: string, round: number, payload: BindRoundGroupCodeDto): Promise<ApiResponseFor<"PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code">>;
     currentBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/current">>;
     upcomingBatch(): Promise<ApiResponseFor<"GET /api/v1/recruitment/upcoming">>;
     myApplication(batchId: string): Promise<ApiResponseFor<"GET /api/v1/recruitment/batches/{batchId}/my-application">>;
@@ -358,6 +367,12 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
       commit: (payload) => requestGenerated(transport, "POST /api/v1/admin/imports/preparatory-members/commit", payload),
     },
     recruitment: {
+      stageResults: () => requestGenerated(transport, "GET /api/v1/recruitment/results/me/stages"),
+      advancePreview: batchId => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance-preview`),
+      advance: (batchId, payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/advance", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance`),
+      groupCodes: batchId => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessment-group-codes`),
+      groupCodeUpload: (batchId, centerId, round, payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code/uploads`),
+      bindGroupCode: (batchId, centerId, round, payload) => requestGenerated(transport, "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code`),
       currentBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/current"),
       upcomingBatch: () => requestGenerated(transport, "GET /api/v1/recruitment/upcoming"),
       myApplication: (batchId) => requestGenerated(transport, "GET /api/v1/recruitment/batches/{batchId}/my-application", undefined, `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`),

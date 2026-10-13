@@ -15,6 +15,16 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
   const serverMessage = errorRecord(error).message;
   if (typeof serverMessage === "string" && /[\u4e00-\u9fff]/.test(serverMessage)) return serverMessage;
   switch (code) {
+    case "ASSESSMENT_PREVIOUS_ROUND_NOT_PUBLISHED":
+      return "请先由联盟总负责人统一发布已完成轮次的结果。";
+    case "ASSESSMENT_ROUND_ALREADY_PUBLISHED":
+    case "RECRUITMENT_ROUND_PUBLISHED":
+      return "本轮结果已发布，不能修改成绩或重新开放报名。";
+    case "ASSESSMENT_PREVIEW_STALE":
+    case "GROUP_CODE_VERSION_CONFLICT":
+      return "数据已更新，请刷新后重新确认。";
+    case "GROUP_CODE_UPLOAD_NOT_READY":
+      return "图片尚未完成安全检查，请稍后重试。";
     case "ASSESSMENT_BATCH_NOT_CLOSED":
       return "关闭报名后才能推进全局考核轮次。";
     case "ASSESSMENT_ROUND_INCOMPLETE":
@@ -35,7 +45,7 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
     case "OWNER_ONLY":
     case "OWNER_PERMISSION_REQUIRED":
     case "FORBIDDEN":
-      return code === "OWNER_PERMISSION_REQUIRED" ? "当前账号无权提交最终调剂结果。" : "当前账号没有执行该考核操作的权限。";
+      return "当前账号没有执行该考核操作的权限。";
     case "ASSESSMENT_ADJUSTMENT_OWNER_ONLY":
       return "调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。";
     case "RECRUITMENT_BATCH_NOT_FOUND":

@@ -16,6 +16,9 @@ import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { getRecruitmentAssessmentMessage } from "~/utils/recruitment-assessment-messages";
 import { matchesAssessmentStage, type AssessmentStageFilter } from "~/utils/recruitment-assessment-filters";
 import { useAdminToast } from "~/composables/useAdminToast";
+import AssessmentGroupCodePanel from './AssessmentGroupCodePanel.vue';
+import type { RoundPublicationPreviewDto } from '../../../packages/api-client/src';
+import type { RoundGroupGateway } from '~/services/recruitment/recruitment-gateway';
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
@@ -29,6 +32,9 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const route = useRoute();
 const recruitmentGateway = useRecruitmentGateway();
+const roundGroupGateway = recruitmentGateway?.getAssessmentGroupCodes && recruitmentGateway?.getAssessmentAdvancePreview
+  ? recruitmentGateway as typeof recruitmentGateway & RoundGroupGateway : undefined;
+
 const adminToast = useAdminToast();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 
@@ -84,6 +90,8 @@ const adjustmentDecision = ref<AdjustmentDraft>("");
 const adjustmentSuggestion = ref<"" | string>("");
 const showSaveConfirmation = ref(false);
 const showAdvanceConfirmation = ref(false);
+const advancePreview = ref<RoundPublicationPreviewDto>();
+const advancePreviewBusy = ref(false);
 const saveMessage = ref("");
 const saveError = ref("");
 const closeButton = ref<HTMLButtonElement>();
@@ -101,6 +109,8 @@ watch(() => props.batchId, async (batchId) => {
   selectedCandidateId.value = undefined;
   showSaveConfirmation.value = false;
   showAdvanceConfirmation.value = false;
+  advancePreview.value = undefined;
+  advancePreviewBusy.value = false;
   saveMessage.value = "";
   saveError.value = "";
   if (!recruitmentGateway) return;
@@ -149,7 +159,8 @@ const advanceLabel = computed(() => {
   if (state.value.status !== "assessing") return "考核已完成，等待发布";
   if (effectiveBatchStatus.value !== "closed") return "关闭报名后推进全局轮次";
   if (roundIncomplete.value) return "完成当前轮后推进";
-  return state.value.currentRound === 3 ? "结束考核并进入结果发布" : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
+  const hasNext = state.value.currentRound < 3 && candidates.value.some(candidate => candidate.center === "白泽开发中心" && candidate.roundOutcomes[state.value.currentRound] === "passed");
+  return !hasNext ? "结束考核并进入结果发布" : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
 });
 const advanceDisabledReason = computed(() => {
   if (!isOwner.value) return "仅联盟总负责人可推进全局轮次。";
@@ -385,8 +396,21 @@ async function confirmSave() {
   }
 }
 
-function requestAdvance() {
-  if (!canAdvance.value) return;
+async function requestAdvance() {
+  if (!canAdvance.value || advancePreviewBusy.value) return;
+  const generation = apiGeneration;
+  const batchId = props.batchId;
+  advancePreview.value = undefined;
+  if (roundGroupGateway) {
+    advancePreviewBusy.value = true;
+    try {
+      const preview = await roundGroupGateway.getAssessmentAdvancePreview(batchId);
+      if (generation !== apiGeneration) return;
+      advancePreview.value = preview;
+      if (!advancePreview.value.canPublish) { saveError.value = advancePreview.value.blockingReasons.map(code => getRecruitmentAssessmentMessage({ code })).join(' '); return; }
+    } catch (cause) { if (generation === apiGeneration) saveError.value = getRecruitmentAssessmentMessage(cause, '推进确认加载失败，请重试。'); return; }
+    finally { if (generation === apiGeneration) advancePreviewBusy.value = false; }
+  }
   showAdvanceConfirmation.value = true;
 }
 
@@ -396,14 +420,15 @@ async function confirmAdvance() {
       await assessmentStore.advanceAssessmentRoundFromApi(
         recruitmentGateway,
         props.batchId,
-        "管理端确认推进全局考核轮次",
+        "管理端确认公开已完成轮次结果并推进全局考核轮次",
+        advancePreview.value,
       );
     } else {
       assessmentStore.advanceAssessmentRound(props.batchId, true, new Date(), "管理端确认推进全局考核轮次");
     }
     showAdvanceConfirmation.value = false;
     saveError.value = "";
-    saveMessage.value = "全局考核轮次已更新，已保存的上一轮结果保持锁定。";
+    saveMessage.value = "本轮结果已向成员公开，考核状态已更新；通过者可查看对应群二维码。";
     adminToast.success(saveMessage.value);
   } catch (error) {
     showAdvanceConfirmation.value = false;
@@ -418,7 +443,7 @@ async function confirmAdvance() {
       <div>
         <p class="eyebrow">招新考核</p>
         <h1>{{ batch?.name ?? "未知批次" }} · 预备成员考核</h1>
-        <p class="admin-page-heading__intro">当前批次的考核结果仅在完成整批发布后向成员公开。</p>
+        <p class="admin-page-heading__intro">联盟总负责人确认推进轮次时同步公开本轮结果，通过者可查看群二维码；最终录取仍使用整批发布。</p>
       </div>
       <div class="admin-batch-card">
         <span>当前批次</span>
@@ -443,6 +468,10 @@ async function confirmAdvance() {
       <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 
+    <AssessmentGroupCodePanel v-if="roundGroupGateway" :batch-id="batchId" :owner="isOwner" :gateway="roundGroupGateway" />
+
+    <p v-if="roundGroupGateway && isOwner" class="admin-inline-note">完成本轮录入后，确认推进轮次即可同步向成员公开本轮结果和通过者群二维码。</p>
+
     <section class="admin-roster">
       <aside class="admin-groups" aria-label="第一志愿分组">
         <header><h2>第一志愿分组</h2></header>
@@ -458,7 +487,7 @@ async function confirmAdvance() {
           <div><h2>预备成员名单</h2></div>
           <div>
             <p>共 {{ filteredCandidates.length }} 人</p>
-            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy ? "处理中…" : advanceLabel }}</button>
+            <button v-if="isOwner" type="button" class="button button--ghost" :disabled="!canAdvance || advancePreviewBusy" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy || advancePreviewBusy ? "处理中…" : advanceLabel }}</button>
             <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
           </div>
         </header>
@@ -507,6 +536,15 @@ async function confirmAdvance() {
       </aside>
     </div>
 
-    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>推进后，上一轮结果将保持锁定；本操作只影响 {{ batch?.name ?? batchId }}。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
+    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>确认后将同时公开已完成轮次结果并推进考核状态；本操作只影响 {{ batch?.name ?? batchId }}。</p>
+        <p v-if="advancePreview">本次公开轮次：{{ advancePreview.roundsToPublish.map(round => `第 ${round} 轮`).join('、') }}。范围为各轮全部适用中心，与名单筛选无关。</p>
+        <div v-if="advancePreview" class="assessment-advance-summary"><table><thead><tr><th>轮次 / 中心</th><th>应考</th><th>通过 / 未通过</th><th>二维码</th></tr></thead><tbody><tr v-for="item in advancePreview.centers" :key="`${item.round}-${item.centerId}`"><th>第 {{ item.round }} 轮 · {{ item.centerName }}</th><td>{{ item.eligibleCount }}</td><td>{{ item.passedCount }} / {{ item.failedCount }}</td><td>{{ item.groupCodeStatus === 'READY' ? '已上传' : '暂未上传' }}</td></tr></tbody></table></div>
+        <p>结果公开后不可修改。未上传二维码不影响推进，稍后补图即可；此操作不会变更成员身份或中心归属。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
   </div>
 </template>
+
+<style scoped>
+.assessment-advance-summary { max-width: 100%; overflow-x: auto; margin: 20px 0; }
+.assessment-advance-summary table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.assessment-advance-summary th,.assessment-advance-summary td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #e5e2dd; white-space: nowrap; }
+</style>
