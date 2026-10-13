@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import type { GroupCodeReferenceDto } from '../../../packages/api-client/src';
 const props = defineProps<{ code: GroupCodeReferenceDto; readImage: (url: string) => Promise<Blob> }>();
 const emit = defineEmits<{ refresh: []; unauthorized: [] }>();
 const blobUrl = ref(''), error = ref(''), loading = ref(false), expanded = ref(false);
+const originalDialog = ref<HTMLDialogElement>();
 let generation = 0;
 let conflictRetried = false;
-function release() { if (blobUrl.value) URL.revokeObjectURL(blobUrl.value); blobUrl.value = ''; expanded.value = false; }
+function closeOriginal() { originalDialog.value?.close(); expanded.value = false; }
+async function openOriginal() { expanded.value = true; await nextTick(); if (expanded.value && blobUrl.value) originalDialog.value?.showModal(); }
+function release() { closeOriginal(); if (blobUrl.value) URL.revokeObjectURL(blobUrl.value); blobUrl.value = ''; }
 async function load() {
   const request = ++generation;
   release(); error.value = ''; loading.value = false;
@@ -34,9 +37,9 @@ onBeforeUnmount(() => { generation++; release(); });
     <p v-if="code.status === 'MISSING'" class="private-group-code__empty">二维码暂未上传</p>
     <p v-else-if="loading" role="status">正在加载二维码…</p>
     <div v-else-if="error" role="alert"><p>{{ error }}</p><button v-if="!error.includes('正在同步')" type="button" @click="load">重试加载</button></div>
-    <button v-else-if="blobUrl" class="private-group-code__image" type="button" aria-label="查看二维码原图" @click="expanded = true"><img :src="blobUrl" alt="部门群二维码"></button>
-    <dialog :open="expanded" class="private-group-code__dialog" @keydown.esc="expanded = false" @click.self="expanded = false">
-      <div><button type="button" autofocus @click="expanded = false">关闭原图</button><img v-if="expanded && blobUrl" :src="blobUrl" alt="部门群二维码原图"></div>
+    <button v-else-if="blobUrl" class="private-group-code__image" type="button" aria-label="查看二维码原图" @click="openOriginal"><img :src="blobUrl" alt="部门群二维码"></button>
+    <dialog ref="originalDialog" class="private-group-code__dialog" aria-label="部门群二维码原图" @close="expanded = false" @cancel="expanded = false" @click.self="closeOriginal">
+      <div><button type="button" autofocus @click="closeOriginal">关闭原图</button><img v-if="expanded && blobUrl" :src="blobUrl" alt="部门群二维码原图"></div>
     </dialog>
   </div>
 </template>

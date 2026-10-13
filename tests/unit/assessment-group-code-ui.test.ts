@@ -14,6 +14,15 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn().mockReturnValue('blob:private'); URL.revokeObjectURL = vi.fn();
 });
 describe('round result UI', () => {
+  it('opens the original image as a native modal and clears it on keyboard cancellation', async () => {
+    const showModal=vi.spyOn(HTMLDialogElement.prototype,'showModal');
+    const wrapper=mount(PrivateGroupCode,{props:{code:{id:'id',round:1,version:1,status:'READY',imageUrl:'/api/v1/test/group-code/image?version=1'},readImage:vi.fn().mockResolvedValue(new Blob(['image']))}});
+    await flushPromises();await wrapper.get('button[aria-label="查看二维码原图"]').trigger('click');await flushPromises();
+    expect(showModal).toHaveBeenCalledTimes(1);
+    await wrapper.get('dialog').trigger('cancel');await flushPromises();
+    expect(wrapper.find('dialog img').exists()).toBe(false);
+    wrapper.unmount();showModal.mockRestore();
+  });
   it('highlights only the latest round and retains older passed rounds in collapsed history', () => {
     const wrapper = mount(PublishedStageResults,{props:{results:stages,readImage:vi.fn()}});
     expect(wrapper.find('.published-stages__current').text()).toContain('第 3 轮群二维码');
