@@ -122,6 +122,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function summarizeApiError(error: unknown): { code?: string; status?: number; message: string; requestId?: string } {
+  if (!isRecord(error)) return { message: "RECRUITMENT_API_REQUEST_FAILED" };
+  return {
+    ...(typeof error.code === "string" ? { code: error.code } : {}),
+    ...(typeof error.status === "number" ? { status: error.status } : {}),
+    message: typeof error.message === "string" ? error.message : "RECRUITMENT_API_REQUEST_FAILED",
+    ...(typeof error.requestId === "string" ? { requestId: error.requestId } : {}),
+  };
+}
+
 function cloneAssessmentRecord(record: RecruitmentAssessmentRecord): RecruitmentAssessmentRecord {
   return {
     ...record,
@@ -302,14 +312,18 @@ function apiCenterIdentity(center: { id: string; slug: string; name: string }) {
   return { id: center.id, slug: center.slug, name: center.name };
 }
 
-function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string {
-  return [
+function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string | undefined {
+  const values = [
     ...candidate.roundResults.map((result) => result.createdAt),
     candidate.adjustmentProposal?.createdAt,
     candidate.adjustmentDecision?.createdAt,
     candidate.finalResult?.publishedAt,
-  ].filter((value): value is string => Boolean(value)).sort().at(-1)
-    ?? "1970-01-01T00:00:00.000Z";
+  ].filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)));
+  let latest = values[0];
+  for (const value of values.slice(1)) {
+    if (latest && Date.parse(value) > Date.parse(latest)) latest = value;
+  }
+  return latest;
 }
 
 function mapApiCandidate(
@@ -357,7 +371,7 @@ function mapApiCandidate(
     ...(publishedAt ? { publishedAt } : {}),
   };
   const admitted = finalDecision === "ADMITTED";
-  const profile: AdminCandidate = {
+  const profile = {
     id: candidate.applicationId,
     batchId,
     memberId: candidate.person.id,
@@ -373,10 +387,9 @@ function mapApiCandidate(
     stage: publishedAt ? "已结束" : ROUND_LABELS[apiRound(latestRound?.round ?? 1)] ?? "第一轮考核",
     result: publishedAt ? admitted ? "已录取" : "未通过" : "待公布",
     ...(finalCenterIdentity ? { finalCenter: apiCenterName(finalCenterIdentity.name) } : {}),
-    submittedAt: updatedAt,
-    updatedAt,
+    ...(updatedAt ? { updatedAt } : {}),
     ...(latestRound?.internalNote ? { internalNote: latestRound.internalNote } : {}),
-  };
+  } as AdminCandidate;
   return { record, profile };
 }
 
@@ -532,7 +545,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     apiWorkflowByBatch: {} as Record<string, RecruitmentAssessmentWorkflowSummary | undefined>,
     apiLoadingByBatch: {} as Record<string, boolean>,
     apiMutatingByBatch: {} as Record<string, boolean>,
-    apiErrorByBatch: {} as Record<string, string | undefined>,
+    apiErrorByBatch: {} as Record<string, { code?: string; status?: number; message: string; requestId?: string } | undefined>,
     myResults: [] as MyRecruitmentResultDto[],
     myResultsLoading: false,
     myResultsError: undefined as string | undefined,
@@ -564,7 +577,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         this.apiWorkflowByBatch[batchId] = apiWorkflowSummary(response);
         return mapped.state;
       } catch (error) {
-        this.apiErrorByBatch[batchId] = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
+        this.apiErrorByBatch[batchId] = summarizeApiError(error);
         throw error;
       } finally {
         this.apiLoadingByBatch[batchId] = false;
@@ -655,10 +668,19 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       delete this.apiErrorByBatch[batchId];
       try {
         await mutation(this.getBatchState(batchId).version);
+      } catch (error) {
+        this.apiErrorByBatch[batchId] = summarizeApiError(error);
+        throw error;
+      }
+      try {
         return await this.refreshAssessmentBatch(batchId, gateway);
       } catch (error) {
-        this.apiErrorByBatch[batchId] = error instanceof Error ? error.message : "RECRUITMENT_API_REQUEST_FAILED";
-        throw error;
+        this.apiErrorByBatch[batchId] = {
+          code: "POST_SAVED_REFRESH_FAILED",
+          message: "结果已保存，名单刷新失败，请重试刷新。",
+          ...(summarizeApiError(error).requestId ? { requestId: summarizeApiError(error).requestId } : {}),
+        };
+        return this.getBatchState(batchId);
       } finally {
         this.apiMutatingByBatch[batchId] = false;
       }

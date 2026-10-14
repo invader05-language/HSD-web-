@@ -228,7 +228,13 @@ function outcomeLabel(candidate: RecruitmentAssessmentCandidate) {
 }
 
 function formatUpdatedAt(candidate: RecruitmentAssessmentCandidate) {
-  return candidate.updatedAt ? new Date(candidate.updatedAt).toLocaleString("zh-CN", { hour12: false }) : "未保存";
+  if (!candidate.updatedAt) return Object.keys(candidate.roundOutcomes).length ? "—" : "未录入";
+  const timestamp = Date.parse(candidate.updatedAt);
+  if (!Number.isFinite(timestamp)) return "—";
+  return new Date(timestamp).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+  });
 }
 
 function canEdit(candidate: RecruitmentAssessmentCandidate) {
@@ -501,8 +507,8 @@ async function confirmAdvance() {
           <label>调剂意愿<select v-model="filters.adjustment"><option>全部</option><option>接受调剂</option><option>不接受调剂</option></select></label>
         </div>
 
-        <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
-        <p v-else-if="apiError" class="admin-save-message" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
+        <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
+        <p v-else-if="apiError" class="admin-save-message admin-save-message--error" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
         <div class="admin-table-scroll" tabindex="0" aria-label="预备成员名单表格区域">
           <table aria-label="预备成员名单">
             <thead><tr><th>成员</th><th>第一志愿</th><th>白泽方向</th><th>当前阶段</th><th>处理状态</th><th>当前结果</th><th>调剂</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead>
@@ -525,7 +531,7 @@ async function confirmAdvance() {
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="预备成员详情" @keydown="handleDrawerKeydown">
         <header class="admin-drawer__header"><div><h2>{{ candidateName(selectedCandidate) }}</h2><p>{{ selectedCandidate.candidate?.studentId ?? selectedCandidate.memberId }} · {{ selectedCandidate.center }}</p></div><button ref="closeButton" type="button" aria-label="关闭详情" @click="closeCandidate">×</button></header>
         <div class="admin-drawer__body">
-          <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
+          <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
           <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
           <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label></section>

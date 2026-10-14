@@ -15,6 +15,10 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
   const serverMessage = errorRecord(error).message;
   if (typeof serverMessage === "string" && /[\u4e00-\u9fff]/.test(serverMessage)) return serverMessage;
   switch (code) {
+    case "ROUND_RESULT_ALREADY_RECORDED":
+      return "该成员本轮结果已录入，请核对服务器当前结果。";
+    case "POST_SAVED_REFRESH_FAILED":
+      return "结果已保存，名单刷新失败，请重试刷新。";
     case 'UPLOAD_CHECKSUM_MISMATCH':
       return '文件完整性校验失败，请重新选择图片上传。';
     case 'UPLOAD_MIME_TYPE_MISMATCH':
