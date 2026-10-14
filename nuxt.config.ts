@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import { resolveApiRuntimeConfig } from "./app/utils/api-runtime-config";
+import { preserveReleaseAssetsBeforeBuild } from "./scripts/preserve-release-assets.mjs";
 
 const browserApiRuntimeConfig = resolveApiRuntimeConfig({
   nodeEnv: process.env.NODE_ENV,
@@ -11,6 +12,13 @@ const browserApiRuntimeConfig = resolveApiRuntimeConfig({
 export default defineNuxtConfig({
   compatibilityDate: "2026-07-28",
   devtools: { enabled: false },
+  nitro: {
+    hooks: {
+      "rollup:before": async (nitro) => {
+        await preserveReleaseAssetsBeforeBuild(nitro);
+      },
+    },
+  },
   runtimeConfig: {
     public: {
       apiBase: browserApiRuntimeConfig.apiBase,

@@ -27,6 +27,16 @@ pnpm run build
 pnpm run preview
 ```
 
+发布构建需要兼容已打开的旧页面时，必须在构建前将 `HSD_PREVIOUS_RELEASE_PUBLIC` 设置为已核验的上一发布版本 `.output/public` 的绝对路径（真实目录）：
+
+```bash
+HSD_PREVIOUS_RELEASE_PUBLIC=/absolute/path/to/verified-release/frontend/.output/public pnpm run build
+```
+
+Nuxt 会在 Nitro 生成静态资源清单前保留旧版本的哈希资源；HTML、`latest.json` 和构建元数据均被排除，同名哈希文件内容冲突会中止构建。构建结束后单独复制文件不能代替这一步，因为文件可能存在于磁盘却未注册到服务端清单，HTTP 请求仍返回 404。普通开发和无旧版本的 CI 构建可省略此变量。
+
+发布切换前，确认旧版本清单中的不可变哈希资源路径均已注册到候选服务端清单，并通过候选 HTTP 服务请求旧 JS：状态必须为 200、`Content-Type` 必须为 JavaScript、响应内容的 SHA-256 必须与已核验的源文件一致。切换后再次执行相同检查。
+
 ## 真实 API 接入
 
 将浏览器可访问的 API 根地址设置为 `NUXT_PUBLIC_API_BASE`。生产环境禁止启用 Mock API；只有明确标识的 E2E 场景才可使用测试 Mock。

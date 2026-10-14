@@ -1,9 +1,8 @@
 import { cp, mkdir, readdir, readFile, lstat } from "node:fs/promises";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HASHED_ASSET = /^[0-9a-f]{8,64}\.(?:js|css|map|woff2?|ttf|eot|png|jpe?g|webp|svg|avif)$/i;
-const LOCAL_IMPORT = /(?:from\s*["']\.\/([^"']+)["']|import\s*["']\.\/([^"']+)["']|import\s*\(\s*["']\.\/([^"']+)["']\s*\))/g;
 
 function assertInside(root, candidate) {
   const rel = relative(resolve(root), resolve(candidate));
@@ -38,9 +37,9 @@ async function copyIfUnchanged(source, target) {
 }
 
 /**
- * Preserve immutable client resources from verified releases before final
- * candidate hashes are calculated. HTML, latest.json, and build metadata are
- * deliberately excluded.
+ * Preserve immutable client resources from verified releases before Nitro
+ * bundles its public-asset manifest. HTML, latest.json, and build metadata are
+ * deliberately excluded. Copying after the server build cannot register assets.
  */
 export async function preserveReleaseAssets({ targetRoot, sourceRoots }) {
   const target = resolve(targetRoot);
@@ -67,6 +66,25 @@ export async function preserveReleaseAssets({ targetRoot, sourceRoots }) {
     else existing += 1;
   }
   return { candidates: candidates.size, copied, existing };
+}
+
+/** Run from Nitro's awaited rollup:before hook, before its static-asset manifest
+ * scans output.publicDir. A copy after bundling leaves old files unservable.
+ * The release builder supplies the verified previous release's public root.
+ */
+export async function preserveReleaseAssetsBeforeBuild(nitro) {
+  const sourceRoot = process.env.HSD_PREVIOUS_RELEASE_PUBLIC;
+  if (nitro.options.dev || !sourceRoot) return;
+  if (!isAbsolute(sourceRoot)) {
+    throw new Error("HSD_PREVIOUS_RELEASE_PUBLIC must be an absolute verified release public directory");
+  }
+  const source = resolve(sourceRoot);
+  const target = resolve(nitro.options.output.publicDir);
+  const sourceStat = await lstat(source);
+  if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory() || source === target) {
+    throw new Error("HSD_PREVIOUS_RELEASE_PUBLIC must be a separate real release public directory");
+  }
+  return preserveReleaseAssets({ targetRoot: target, sourceRoots: [source] });
 }
 
 const invoked = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
