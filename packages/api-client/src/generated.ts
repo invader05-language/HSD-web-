@@ -7774,7 +7774,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "round": {
         "type": "number",
@@ -7820,7 +7821,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "targetCenterId": {
         "type": "string",
@@ -7853,7 +7855,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "decision": {
         "type": "string",

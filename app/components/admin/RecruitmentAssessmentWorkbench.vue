@@ -6,7 +6,7 @@ import type {
   AssessmentRoundNumber,
 } from "~/types/recruitment-assessment";
 import { getAssessmentRounds } from "~/utils/recruitment-assessment-rules";
-import { useRecruitmentAssessmentStore, type RecruitmentAssessmentCandidate } from "~/stores/recruitment-assessment";
+import { useRecruitmentAssessmentStore, type RecruitmentAssessmentCandidate, type AssessmentPersonalSaveState, type AssessmentPersonalSaveResult } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope } from "~/utils/admin-center-scope";
@@ -94,13 +94,30 @@ const advancePreview = ref<RoundPublicationPreviewDto>();
 const advancePreviewBusy = ref(false);
 const saveMessage = ref("");
 const saveError = ref("");
+const personalSaveState = ref<AssessmentPersonalSaveState>("editing");
+const personalSaveResult = ref<AssessmentPersonalSaveResult>();
+const draftRound = ref<AssessmentRoundNumber>();
+const draftOperation = ref<"round" | "adjustment">("round");
+const candidateDrafts = new Map<string, {
+  rounds: Partial<Record<AssessmentRoundNumber, RoundDraft>>;
+  note: string;
+  adjustment: AdjustmentDraft;
+  round?: AssessmentRoundNumber;
+  operation: "round" | "adjustment";
+}>();
+let selectionGeneration = 0;
 const closeButton = ref<HTMLButtonElement>();
 let previousFocus: HTMLElement | undefined;
 const apiBusy = computed(() => Boolean(
   assessmentStore.apiLoadingByBatch[props.batchId]
   || assessmentStore.apiMutatingByBatch[props.batchId],
 ));
-const apiError = computed(() => assessmentStore.apiErrorByBatch[props.batchId]);
+const apiError = computed(() => {
+  const error = assessmentStore.apiErrorByBatch[props.batchId];
+  // Personal feedback is shown only in the corresponding member drawer.
+  return Object.values(assessmentStore.apiPersonalSaveByBatch[props.batchId] ?? {})
+    .some(result => result.error === error) ? undefined : error;
+});
 const apiWorkflowSummary = computed(() => assessmentStore.getApiWorkflowSummary(props.batchId));
 
 let apiGeneration = 0;
@@ -180,16 +197,43 @@ const adjustmentTargets = computed(() => recruitmentGateway
     .filter((center) => center !== "白泽开发中心")
     .map((center) => ({ id: center, slug: center, name: center })));
 
-watch(selectedCandidateId, async (candidateId) => {
+watch(selectedCandidateId, async (candidateId, previousCandidateId) => {
+  selectionGeneration++;
+  if (previousCandidateId) candidateDrafts.set(previousCandidateId, {
+    rounds: { ...roundDrafts.value }, note: internalNote.value,
+    adjustment: adjustmentDecision.value, round: draftRound.value, operation: draftOperation.value,
+  });
+  if (personalSaveResult.value) delete assessmentStore.apiErrorByBatch[props.batchId];
+  saveMessage.value = "";
+  saveError.value = "";
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  draftRound.value = undefined;
   if (!candidateId) {
     document.body.classList.remove("is-admin-drawer-open");
     previousFocus?.focus();
     return;
   }
   resetDrafts();
+  const previousDraft = candidateDrafts.get(candidateId);
+  if (previousDraft) {
+    roundDrafts.value = { ...previousDraft.rounds };
+    internalNote.value = previousDraft.note;
+    adjustmentDecision.value = previousDraft.adjustment;
+    draftRound.value = previousDraft.round;
+    draftOperation.value = previousDraft.operation;
+  }
+  const previousResult = assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[candidateId];
+  if (previousResult) showPersonalSaveResult(previousResult);
   document.body.classList.add("is-admin-drawer-open");
   await nextTick();
   closeButton.value?.focus();
+});
+
+watch(() => selectedCandidateId.value
+  ? assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[selectedCandidateId.value]
+  : undefined, result => {
+  if (result && personalSaveState.value === "editing") showPersonalSaveResult(result);
 });
 
 onBeforeUnmount(() => document.body.classList.remove("is-admin-drawer-open"));
@@ -228,9 +272,11 @@ function outcomeLabel(candidate: RecruitmentAssessmentCandidate) {
 }
 
 function formatUpdatedAt(candidate: RecruitmentAssessmentCandidate) {
-  if (!candidate.updatedAt) return Object.keys(candidate.roundOutcomes).length ? "—" : "未录入";
+  const hasRecord = Object.keys(candidate.roundOutcomes).length > 0
+    || candidate.adjustmentSuggestion || candidate.finalDecision || candidate.publishedAt;
+  if (!candidate.updatedAt) return hasRecord ? "—" : "未录入";
   const timestamp = Date.parse(candidate.updatedAt);
-  if (!Number.isFinite(timestamp)) return "—";
+  if (!Number.isFinite(timestamp) || new Date(timestamp).getUTCFullYear() === 1970) return hasRecord ? "—" : "未录入";
   return new Date(timestamp).toLocaleString("zh-CN", {
     timeZone: "Asia/Shanghai",
     hour12: false,
@@ -252,13 +298,25 @@ function isRoundEditable(round: AssessmentRoundNumber) {
   const candidate = selectedCandidate.value;
   return Boolean(candidate
     && canEdit(candidate)
+    && state.value.status === "assessing"
+    && (!candidate.roundOutcomes[round] || candidate.roundOutcomes[round] === "pending")
+    && round === draftRound.value
+    && !personalConflictBlocksEditing.value
     && candidate.currentPhase === roundLabel(round)
     && state.value.currentRound === round);
 }
 
+const personalConflictBlocksEditing = computed(() => personalSaveState.value === "conflict" && (
+  ["ROUND_RESULT_ALREADY_RECORDED", "ADJUSTMENT_DECISION_ALREADY_EXISTS"].includes(personalSaveResult.value?.error?.code ?? "")
+  || personalSaveResult.value?.error?.status === 403
+  || !personalSaveResult.value?.refreshed
+));
+
 const canSaveSelectedCandidate = computed(() => {
   const candidate = selectedCandidate.value;
   if (!candidate || !canEdit(candidate)) return false;
+  if (personalConflictBlocksEditing.value || draftRound.value !== state.value.currentRound) return false;
+  if (["saving", "saved", "saved-refresh-failed", "unknown"].includes(personalSaveState.value)) return false;
   return selectedRounds.value.some(isRoundEditable)
     || (isOwner.value
       && candidate.processingStatus === "adjustment-suggestion-pending"
@@ -268,6 +326,8 @@ const canSaveSelectedCandidate = computed(() => {
 function resetDrafts() {
   const candidate = selectedCandidate.value;
   if (!candidate) return;
+  draftRound.value = state.value.currentRound;
+  draftOperation.value = candidate.processingStatus === "adjustment-suggestion-pending" ? "adjustment" : "round";
   roundDrafts.value = Object.fromEntries(
     getAssessmentRounds(candidate.center).map((round) => [round, candidate.roundOutcomes[round] ?? ""]),
   ) as Partial<Record<AssessmentRoundNumber, RoundDraft>>;
@@ -298,7 +358,6 @@ function openCandidate(candidate: RecruitmentAssessmentCandidate, event: Event) 
 
 function closeCandidate() {
   showSaveConfirmation.value = false;
-  resetDrafts();
   selectedCandidateId.value = undefined;
 }
 
@@ -311,7 +370,7 @@ function handleDrawerKeydown(event: KeyboardEvent) {
 
 function requestSave() {
   const candidate = selectedCandidate.value;
-  if (!candidate) return;
+  if (!candidate || apiBusy.value || !canSaveSelectedCandidate.value) return;
   const round = selectedRounds.value.find(isRoundEditable);
   if (round && roundDrafts.value[round]) {
     showSaveConfirmation.value = true;
@@ -336,18 +395,28 @@ function errorText(error: unknown, fallback: string) {
 
 async function confirmSave() {
   const candidate = selectedCandidate.value;
-  if (!candidate) return;
+  if (!candidate || apiBusy.value || personalSaveState.value === "saving" || !canSaveSelectedCandidate.value) return;
+  const generation = selectionGeneration;
+  const batchGeneration = apiGeneration;
+  const stillSelected = () => generation === selectionGeneration && batchGeneration === apiGeneration;
+  saveError.value = "";
+  saveMessage.value = "";
   try {
     const round = selectedRounds.value.find(isRoundEditable);
+    personalSaveState.value = "saving";
     if (round && roundDrafts.value[round]) {
       if (recruitmentGateway) {
-        await assessmentStore.saveRoundOutcomeFromApi(recruitmentGateway, {
+        const result = await assessmentStore.saveRoundOutcomeFromApi(recruitmentGateway, {
           batchId: props.batchId,
           candidateId: candidate.candidateId,
           round,
           outcome: roundDrafts.value[round] as "passed" | "failed",
           internalNote: internalNote.value,
         });
+        if (!stillSelected()) return;
+        showSaveConfirmation.value = false;
+        showPersonalSaveResult(result);
+        return;
       } else {
         assessmentStore.saveRoundOutcome({
           batchId: props.batchId,
@@ -369,12 +438,16 @@ async function confirmSave() {
           )) {
             throw new Error("ASSESSMENT_TARGET_CENTER_UNAVAILABLE");
           }
-          await assessmentStore.recordAdjustmentDecisionFromApi(recruitmentGateway, {
+          const result = await assessmentStore.recordAdjustmentDecisionFromApi(recruitmentGateway, {
             batchId: props.batchId,
             candidateId: candidate.candidateId,
             decision: adjustmentDecision.value === "not-admitted" ? "NOT_ADMITTED" : "ADMITTED",
             ...(targetCenterId ? { targetCenterId } : {}),
           });
+          if (!stillSelected()) return;
+          showSaveConfirmation.value = false;
+          showPersonalSaveResult(result);
+          return;
         } else {
           assessmentStore.recordAdjustmentDecision({
             batchId: props.batchId,
@@ -389,17 +462,79 @@ async function confirmSave() {
     } else {
       throw new Error("ASSESSMENT_DRAFT_INCOMPLETE");
     }
+    if (!stillSelected()) return;
     showSaveConfirmation.value = false;
+    personalSaveState.value = "saved";
     saveError.value = "";
     saveMessage.value = recruitmentGateway
       ? "结果已保存到服务器，尚未对成员发布。"
       : "结果已保存到当前批次的内部状态，尚未对成员发布。";
     adminToast.success(saveMessage.value);
-    selectedCandidateId.value = undefined;
   } catch (error) {
+    if (!stillSelected()) return;
     showSaveConfirmation.value = false;
+    personalSaveState.value = "editing";
     saveError.value = errorText(error, "保存失败");
   }
+}
+
+function showPersonalSaveResult(result: AssessmentPersonalSaveResult) {
+  personalSaveResult.value = result;
+  personalSaveState.value = result.status;
+  saveError.value = "";
+  saveMessage.value = "";
+  if (result.status === "saved") {
+    saveMessage.value = "结果已保存到服务器，尚未对成员发布。";
+    adminToast.success(saveMessage.value);
+  } else if (result.status === "saved-refresh-failed") {
+    saveError.value = "结果已保存，名单刷新失败，请重试刷新。";
+  } else if (result.status === "unknown") {
+    saveError.value = "暂不能确认保存状态，请先刷新核对。";
+  } else if (result.error?.code === "ROUND_RESULT_ALREADY_RECORDED") {
+    saveError.value = result.refreshed
+      ? "该成员本轮结果已录入，已刷新当前记录。"
+      : "该成员本轮结果已录入，暂未能读取最新记录，请重试刷新。";
+  } else {
+    saveError.value = errorText(result.error, "保存未完成，请刷新核对当前记录。");
+  }
+}
+
+async function retryPersonalRefresh() {
+  if (!recruitmentGateway || apiBusy.value || !personalSaveResult.value) return;
+  const generation = selectionGeneration;
+  const batchGeneration = apiGeneration;
+  const previous = personalSaveResult.value;
+  try {
+    await assessmentStore.refreshAssessmentBatch(props.batchId, recruitmentGateway);
+    if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
+    const result: AssessmentPersonalSaveResult = { ...previous, refreshed: true, status: previous.status === "saved-refresh-failed" ? "saved" : previous.status };
+    assessmentStore.rememberPersonalSaveResult(props.batchId, selectedCandidateId.value!, result);
+    showPersonalSaveResult(result);
+  } catch {
+    if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
+    const result: AssessmentPersonalSaveResult = { ...previous, refreshed: false };
+    assessmentStore.rememberPersonalSaveResult(props.batchId, selectedCandidateId.value!, result);
+    showPersonalSaveResult(result);
+  }
+}
+
+const canReconfirmUnknown = computed(() => {
+  const candidate = selectedCandidate.value;
+  const round = draftRound.value;
+  if (!candidate || !round || personalSaveState.value !== "unknown" || !personalSaveResult.value?.refreshed
+    || round !== state.value.currentRound || !canEdit(candidate) || state.value.status === "published") return false;
+  return draftOperation.value === "adjustment"
+    ? candidate.processingStatus === "adjustment-suggestion-pending" && !candidate.finalDecision
+    : !candidate.roundOutcomes[round];
+});
+
+function reconfirmUnknown() {
+  if (!canReconfirmUnknown.value || apiBusy.value) return;
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  if (selectedCandidateId.value) delete assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[selectedCandidateId.value];
+  saveError.value = "";
+  saveMessage.value = "已核对当前记录；再次保存仍需明确确认。";
 }
 
 async function requestAdvance() {
@@ -508,7 +643,8 @@ async function confirmAdvance() {
         </div>
 
         <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
-        <p v-else-if="apiError" class="admin-save-message admin-save-message--error" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
+        <p v-else-if="apiError && !selectedCandidate" class="admin-save-message admin-save-message--error" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
+        <p v-if="saveMessage && !selectedCandidate" class="admin-save-message" role="status">{{ saveMessage }}</p>
         <div class="admin-table-scroll" tabindex="0" aria-label="预备成员名单表格区域">
           <table aria-label="预备成员名单">
             <thead><tr><th>成员</th><th>第一志愿</th><th>白泽方向</th><th>当前阶段</th><th>处理状态</th><th>当前结果</th><th>调剂</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead>
@@ -532,8 +668,15 @@ async function confirmAdvance() {
         <header class="admin-drawer__header"><div><h2>{{ candidateName(selectedCandidate) }}</h2><p>{{ selectedCandidate.candidate?.studentId ?? selectedCandidate.memberId }} · {{ selectedCandidate.center }}</p></div><button ref="closeButton" type="button" aria-label="关闭详情" @click="closeCandidate">×</button></header>
         <div class="admin-drawer__body">
           <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
+          <p v-if="saveMessage" class="admin-save-message" role="status">{{ saveMessage }}</p>
+          <div v-if="personalSaveResult && personalSaveState !== 'saved'" class="admin-inline-note">
+            <button type="button" data-testid="assessment-retry-refresh" :disabled="apiBusy" @click="retryPersonalRefresh">{{ apiBusy ? '刷新中…' : '重试刷新' }}</button>
+            <p v-if="personalSaveState === 'unknown'">请核对下方服务器当前记录。暂未查到结果时，原请求仍可能处理中。</p>
+            <button v-if="canReconfirmUnknown" type="button" data-testid="assessment-reconfirm" :disabled="apiBusy" @click="reconfirmUnknown">已核对当前记录，允许重新确认保存</button>
+          </div>
+          <p v-if="selectedCandidate.finalDecision" class="admin-inline-note">服务器当前最终结果：{{ selectedCandidate.finalDecision === 'admitted' ? selectedCandidate.finalCenter ? `录取至${selectedCandidate.finalCenter}` : '录取' : '不录取' }}</p>
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
-          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
+          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select :value="isRoundEditable(round) ? roundDrafts[round] : selectedCandidate.roundOutcomes[round] ?? ''" @change="roundDrafts[round] = ($event.target as HTMLSelectElement).value as RoundDraft" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select><small v-if="roundDrafts[round] && !isRoundEditable(round) && roundDrafts[round] !== selectedCandidate.roundOutcomes[round]">未提交草稿：{{ roundDrafts[round] === 'passed' ? '通过' : '不通过' }}</small></label></div><p v-if="selectedCandidate.internalNote" class="admin-inline-note">服务器当前备注：{{ selectedCandidate.internalNote }}</p></section>
           <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明" :disabled="!selectedCandidate.currentPhase || selectedCandidate.processingStatus !== 'assessing'"></textarea></label></section>
         </div>

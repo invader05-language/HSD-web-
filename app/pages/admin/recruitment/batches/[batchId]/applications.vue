@@ -2,7 +2,6 @@
 import {
   filterAndSortRecruitmentApplications,
   formatRecruitmentApplicationSubmittedAt,
-  type AdminCandidate,
   type RecruitmentCenter,
   type RecruitmentApplicationSort
 } from "~/data/recruitment-admin";
@@ -10,7 +9,7 @@ import {
   buildRecruitmentBatchRoute,
   formatRecruitmentBatchPeriod
 } from "~/data/recruitment-admin-context";
-import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
+import { useRecruitmentAssessmentStore, type AssessmentCandidateProfile } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import {
   buildRecruitmentExportName,
@@ -38,10 +37,10 @@ const query = ref("");
 const center = ref<RecruitmentCenter | "全部中心">("全部中心");
 const centerScope = computed(() => getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const sort = ref<RecruitmentApplicationSort>("submittedAt.desc");
-const scopedCandidates = computed<AdminCandidate[]>(() => assessmentStore
+const scopedCandidates = computed<AssessmentCandidateProfile[]>(() => assessmentStore
   .getCandidates(batchId.value)
   .map((record) => record.candidate)
-  .filter((candidate): candidate is AdminCandidate => Boolean(candidate))
+  .filter((candidate): candidate is AssessmentCandidateProfile => Boolean(candidate))
   .filter((candidate) => canAccessRecruitmentCandidate(candidate, centerScope.value)));
 watch(centerScope, (scope) => {
   center.value = scope ?? "全部中心";

@@ -82,7 +82,7 @@ const lifecyclePageCount = computed(() => Math.max(1, Math.ceil(
 function selectLifecyclePage(page: number) {
   if (!isMockApi) void productionBatch?.loadLifecyclePage(page);
 }
-function canViewCandidate(candidate: { candidate?: AdminCandidate }) {
+function canViewCandidate(candidate: { candidate?: Pick<AdminCandidate, "preferences"> }) {
   return !centerScope.value || Boolean(candidate.candidate && canAccessRecruitmentCandidate(candidate.candidate, centerScope.value));
 }
 const overviewRoute = computed(() => buildRecruitmentBatchRoute(batchId.value));

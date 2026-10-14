@@ -3,6 +3,7 @@ function errorRecord(error: unknown): Record<string, unknown> {
 }
 
 function errorCode(error: unknown): string | undefined {
+  if (typeof error === "string") return error;
   const code = errorRecord(error).code;
   if (typeof code === "string") return code;
   const message = error instanceof Error ? error.message : undefined;
@@ -19,6 +20,10 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
       return "该成员本轮结果已录入，请核对服务器当前结果。";
     case "POST_SAVED_REFRESH_FAILED":
       return "结果已保存，名单刷新失败，请重试刷新。";
+    case "ASSESSMENT_ROUND_CHANGED":
+    case "ASSESSMENT_CURRENT_ROUND_CHANGED":
+    case "ASSESSMENT_ROUND_NOT_CURRENT":
+      return "当前考核轮次已变化，请刷新核对后重新确认。";
     case 'UPLOAD_CHECKSUM_MISMATCH':
       return '文件完整性校验失败，请重新选择图片上传。';
     case 'UPLOAD_MIME_TYPE_MISMATCH':
@@ -63,6 +68,8 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
     case "OWNER_ONLY":
     case "OWNER_PERMISSION_REQUIRED":
     case "FORBIDDEN":
+    case "ASSESSMENT_CENTER_SCOPE_FORBIDDEN":
+    case "ASSESSMENT_SCOPE_FORBIDDEN":
       return "当前账号没有执行该考核操作的权限。";
     case "ASSESSMENT_ADJUSTMENT_OWNER_ONLY":
       return "调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。";
@@ -71,6 +78,7 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
     case "RECRUITMENT_CSRF_TOKEN_MISSING":
       return "安全令牌缺失，请刷新页面后重试。";
     default:
+      if (errorRecord(error).status === 403) return "当前账号没有执行该考核操作的权限。";
       return fallback;
   }
 }

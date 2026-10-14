@@ -34,6 +34,7 @@ import {
 import { getEffectiveRecruitmentBatchStatus } from "../utils/recruitment-batch-rules";
 import { baizeDirectionLabel } from "../utils/baize-direction-label";
 import type { RecruitmentGateway } from "../services/recruitment/recruitment-gateway";
+import { RecruitmentApiError } from "../services/recruitment/api-recruitment.gateway";
 import { useAdminAccessStore } from "./admin-access";
 import { useMemberAdministrationStore } from "./member-administration";
 import { MEMBER_PROFILE_STORAGE_KEY, useMemberProfileStore } from "./member-profile";
@@ -79,10 +80,29 @@ export interface RecruitmentAssessmentWorkflowSummary {
   nextAction?: AssessmentBatchResponseDto["nextAction"];
 }
 
+export type AssessmentCandidateProfile = Omit<AdminCandidate, "submittedAt" | "updatedAt"> & {
+  submittedAt?: string;
+  updatedAt?: string;
+};
+
+export interface AssessmentApiError {
+  code?: string;
+  status?: number;
+  message: string;
+  requestId?: string;
+}
+
+export type AssessmentPersonalSaveState = "editing" | "saving" | "saved" | "saved-refresh-failed" | "conflict" | "unknown";
+export interface AssessmentPersonalSaveResult {
+  status: Exclude<AssessmentPersonalSaveState, "editing" | "saving">;
+  refreshed: boolean;
+  error?: AssessmentApiError;
+}
+
 export interface RecruitmentAssessmentCandidate extends RecruitmentAssessmentRecord {
   currentPhase?: "第一轮考核" | "第二轮考核" | "第三轮考核";
   processingStatus: AssessmentProcessingStatus;
-  candidate?: AdminCandidate;
+  candidate?: AssessmentCandidateProfile;
 }
 
 export interface PublicationSummary {
@@ -122,7 +142,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function summarizeApiError(error: unknown): { code?: string; status?: number; message: string; requestId?: string } {
+function summarizeApiError(error: unknown): AssessmentApiError {
+  if (typeof error === "string") return { code: error, message: error };
   if (!isRecord(error)) return { message: "RECRUITMENT_API_REQUEST_FAILED" };
   return {
     ...(typeof error.code === "string" ? { code: error.code } : {}),
@@ -318,7 +339,8 @@ function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string | u
     candidate.adjustmentProposal?.createdAt,
     candidate.adjustmentDecision?.createdAt,
     candidate.finalResult?.publishedAt,
-  ].filter((value): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)));
+  ].filter((value): value is string => typeof value === "string"
+    && Number.isFinite(Date.parse(value)) && new Date(value).getUTCFullYear() !== 1970);
   let latest = values[0];
   for (const value of values.slice(1)) {
     if (latest && Date.parse(value) > Date.parse(latest)) latest = value;
@@ -329,7 +351,7 @@ function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string | u
 function mapApiCandidate(
   batchId: string,
   candidate: AssessmentCandidateDto,
-): { record: RecruitmentAssessmentRecord; profile: AdminCandidate } {
+): { record: RecruitmentAssessmentRecord; profile: AssessmentCandidateProfile } {
   const preferences = candidate.preferences
     .slice()
     .sort((left, right) => ["FIRST", "SECOND", "THIRD"].indexOf(left.rank)
@@ -371,7 +393,7 @@ function mapApiCandidate(
     ...(publishedAt ? { publishedAt } : {}),
   };
   const admitted = finalDecision === "ADMITTED";
-  const profile = {
+  const profile: AssessmentCandidateProfile = {
     id: candidate.applicationId,
     batchId,
     memberId: candidate.person.id,
@@ -389,7 +411,7 @@ function mapApiCandidate(
     ...(finalCenterIdentity ? { finalCenter: apiCenterName(finalCenterIdentity.name) } : {}),
     ...(updatedAt ? { updatedAt } : {}),
     ...(latestRound?.internalNote ? { internalNote: latestRound.internalNote } : {}),
-  } as AdminCandidate;
+  };
   return { record, profile };
 }
 
@@ -539,13 +561,15 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
   state: () => ({
     batches: restorePersistedBatches(),
     apiMode: false,
-    apiCandidateProfiles: {} as Record<string, Record<string, AdminCandidate>>,
+    apiCandidateProfiles: {} as Record<string, Record<string, AssessmentCandidateProfile>>,
     apiAdjustmentTargetsByBatch: {} as Record<string, AssessmentAdjustmentTargetCatalogResponseDto["items"]>,
     apiBatchContextByBatch: {} as Record<string, RecruitmentAssessmentBatchContext | undefined>,
     apiWorkflowByBatch: {} as Record<string, RecruitmentAssessmentWorkflowSummary | undefined>,
     apiLoadingByBatch: {} as Record<string, boolean>,
+    apiRefreshGenerationByBatch: {} as Record<string, number>,
     apiMutatingByBatch: {} as Record<string, boolean>,
-    apiErrorByBatch: {} as Record<string, { code?: string; status?: number; message: string; requestId?: string } | undefined>,
+    apiPersonalSaveByBatch: {} as Record<string, Record<string, AssessmentPersonalSaveResult>>,
+    apiErrorByBatch: {} as Record<string, AssessmentApiError | undefined>,
     myResults: [] as MyRecruitmentResultDto[],
     myResultsLoading: false,
     myResultsError: undefined as string | undefined,
@@ -559,9 +583,12 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.apiAdjustmentTargetsByBatch = {};
       this.apiBatchContextByBatch = {};
       this.apiWorkflowByBatch = {};
+      this.apiPersonalSaveByBatch = {};
     },
     async refreshAssessmentBatch(batchId: string, gateway: RecruitmentGateway) {
       this.enableApiMode();
+      const generation = (this.apiRefreshGenerationByBatch[batchId] ?? 0) + 1;
+      this.apiRefreshGenerationByBatch[batchId] = generation;
       this.apiLoadingByBatch[batchId] = true;
       delete this.apiErrorByBatch[batchId];
       try {
@@ -569,6 +596,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
           gateway.getAssessmentBatch(batchId),
           gateway.getAdjustmentTargets(batchId),
         ]);
+        if (generation !== this.apiRefreshGenerationByBatch[batchId]) return this.getBatchState(batchId);
         const mapped = mapApiBatch(batchId, response);
         this.batches[batchId] = mapped.state;
         this.apiCandidateProfiles[batchId] = mapped.profiles;
@@ -577,10 +605,10 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         this.apiWorkflowByBatch[batchId] = apiWorkflowSummary(response);
         return mapped.state;
       } catch (error) {
-        this.apiErrorByBatch[batchId] = summarizeApiError(error);
+        if (generation === this.apiRefreshGenerationByBatch[batchId]) this.apiErrorByBatch[batchId] = summarizeApiError(error);
         throw error;
       } finally {
-        this.apiLoadingByBatch[batchId] = false;
+        if (generation === this.apiRefreshGenerationByBatch[batchId]) this.apiLoadingByBatch[batchId] = false;
       }
     },
     async saveRoundOutcomeFromApi(
@@ -592,43 +620,117 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         outcome: Exclude<AssessmentOutcome, "pending">;
         internalNote?: string;
       },
-    ) {
-      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
+    ): Promise<AssessmentPersonalSaveResult> {
+      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
         gateway.recordRoundResult(input.batchId, input.candidateId, {
           expectedVersion,
           round: input.round,
           outcome: input.outcome === "passed" ? "PASSED" : "FAILED",
           ...(input.internalNote !== undefined ? { internalNote: input.internalNote } : {}),
         })
-      ));
+      ), response => {
+        const record = this.getBatchState(input.batchId).records.find(item => item.candidateId === input.candidateId);
+        if (!record) return;
+        record.roundOutcomes[apiRound(response.result.round)] = response.result.outcome === "PASSED" ? "passed" : "failed";
+        record.internalNote = response.result.internalNote ?? undefined;
+        this.applyPersonalTimestamp(input.batchId, input.candidateId, response.result.createdAt);
+      });
     },
     async recordAdjustmentSuggestionFromApi(
       gateway: RecruitmentGateway,
       input: { batchId: string; candidateId: string; targetCenterId: string },
     ) {
-      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
-        gateway.proposeAdjustment(input.batchId, input.candidateId, {
-          expectedVersion,
-          targetCenterId: input.targetCenterId,
-        })
-      ));
+      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
+        gateway.proposeAdjustment(input.batchId, input.candidateId, { expectedVersion, targetCenterId: input.targetCenterId })
+      ), response => {
+        const record = this.getBatchState(input.batchId).records.find(item => item.candidateId === input.candidateId);
+        if (!record) return;
+        record.adjustmentSuggestionIdentity = apiCenterIdentity(response.proposal.targetCenter);
+        record.adjustmentSuggestion = apiCenterName(response.proposal.targetCenter.name) as AdjustmentDestination;
+        this.applyPersonalTimestamp(input.batchId, input.candidateId, response.proposal.createdAt);
+      });
     },
     async recordAdjustmentDecisionFromApi(
       gateway: RecruitmentGateway,
-      input: {
-        batchId: string;
-        candidateId: string;
-        decision: "ADMITTED" | "NOT_ADMITTED";
-        targetCenterId?: string;
-      },
+      input: { batchId: string; candidateId: string; decision: "ADMITTED" | "NOT_ADMITTED"; targetCenterId?: string },
     ) {
-      return this.runApiMutation(gateway, input.batchId, (expectedVersion) => (
+      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
         gateway.decideAdjustment(input.batchId, input.candidateId, {
-          expectedVersion,
-          decision: input.decision,
+          expectedVersion, decision: input.decision,
           ...(input.targetCenterId ? { targetCenterId: input.targetCenterId } : {}),
         })
-      ));
+      ), response => {
+        const record = this.getBatchState(input.batchId).records.find(item => item.candidateId === input.candidateId);
+        if (!record) return;
+        record.finalDecision = response.decision.decision === "ADMITTED" ? "admitted" : "not-admitted";
+        record.finalCenterIdentity = response.decision.targetCenter ? apiCenterIdentity(response.decision.targetCenter) : undefined;
+        record.finalCenter = record.finalCenterIdentity ? apiCenterName(record.finalCenterIdentity.name) : undefined;
+        this.applyPersonalTimestamp(input.batchId, input.candidateId, response.decision.createdAt);
+      });
+    },
+    applyPersonalTimestamp(batchId: string, candidateId: string, createdAt: string) {
+      const record = this.getBatchState(batchId).records.find(item => item.candidateId === candidateId);
+      if (!record) return;
+      const timestamp = Date.parse(createdAt);
+      if (Number.isFinite(timestamp) && new Date(timestamp).getUTCFullYear() !== 1970
+        && (!record.updatedAt || !Number.isFinite(Date.parse(record.updatedAt)) || timestamp >= Date.parse(record.updatedAt))) {
+        record.updatedAt = createdAt;
+      }
+      const profile = this.apiCandidateProfiles[batchId]?.[candidateId];
+      if (profile) {
+        profile.updatedAt = record.updatedAt;
+        profile.internalNote = record.internalNote;
+      }
+    },
+    rememberPersonalSaveResult(batchId: string, candidateId: string, result: AssessmentPersonalSaveResult) {
+      this.apiPersonalSaveByBatch[batchId] ??= {};
+      this.apiPersonalSaveByBatch[batchId][candidateId] = result;
+      return result;
+    },
+    async runPersonalApiMutation<T extends { version: number }>(
+      gateway: RecruitmentGateway,
+      input: { batchId: string; candidateId: string },
+      mutation: (expectedVersion: number) => Promise<T>,
+      applyResponse: (response: T) => void,
+    ): Promise<AssessmentPersonalSaveResult> {
+      this.enableApiMode();
+      const { batchId, candidateId } = input;
+      if (this.apiMutatingByBatch[batchId]) throw new Error("ASSESSMENT_SAVE_IN_PROGRESS");
+      this.apiMutatingByBatch[batchId] = true;
+      delete this.apiErrorByBatch[batchId];
+      try {
+        let response: T;
+        try {
+          response = await mutation(this.getBatchState(batchId).version);
+        } catch (cause) {
+          const error = summarizeApiError(cause);
+          const unknown = error.status === undefined || error.status === 0 || error.status >= 500;
+          let refreshed = false;
+          // A read cannot prove whether an interrupted POST committed or is still in flight.
+          try {
+            await this.refreshAssessmentBatch(batchId, gateway);
+            refreshed = true;
+          } catch { /* Preserve the POST error for diagnostics. */ }
+          this.apiErrorByBatch[batchId] = error;
+          return this.rememberPersonalSaveResult(batchId, candidateId, { status: unknown ? "unknown" : "conflict", refreshed, error });
+        }
+        // The successful POST remains authoritative when its followup read fails.
+        this.apiRefreshGenerationByBatch[batchId] = (this.apiRefreshGenerationByBatch[batchId] ?? 0) + 1;
+        const state = this.getBatchState(batchId);
+        state.version = response.version;
+        state.batchVersion = response.version;
+        applyResponse(response);
+        try {
+          await this.refreshAssessmentBatch(batchId, gateway);
+          return this.rememberPersonalSaveResult(batchId, candidateId, { status: "saved", refreshed: true });
+        } catch (cause) {
+          const error = { ...summarizeApiError(cause), code: "POST_SAVED_REFRESH_FAILED", message: "结果已保存，名单刷新失败，请重试刷新。" };
+          this.apiErrorByBatch[batchId] = error;
+          return this.rememberPersonalSaveResult(batchId, candidateId, { status: "saved-refresh-failed", refreshed: false, error });
+        }
+      } finally {
+        this.apiMutatingByBatch[batchId] = false;
+      }
     },
     async advanceAssessmentRoundFromApi(
       gateway: RecruitmentGateway,
@@ -664,23 +766,28 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       mutation: (expectedVersion: number) => Promise<unknown>,
     ) {
       this.enableApiMode();
+      if (this.apiMutatingByBatch[batchId]) throw new Error("ASSESSMENT_SAVE_IN_PROGRESS");
       this.apiMutatingByBatch[batchId] = true;
       delete this.apiErrorByBatch[batchId];
       try {
-        await mutation(this.getBatchState(batchId).version);
-      } catch (error) {
-        this.apiErrorByBatch[batchId] = summarizeApiError(error);
-        throw error;
-      }
-      try {
-        return await this.refreshAssessmentBatch(batchId, gateway);
-      } catch (error) {
-        this.apiErrorByBatch[batchId] = {
-          code: "POST_SAVED_REFRESH_FAILED",
-          message: "结果已保存，名单刷新失败，请重试刷新。",
-          ...(summarizeApiError(error).requestId ? { requestId: summarizeApiError(error).requestId } : {}),
-        };
-        return this.getBatchState(batchId);
+        try {
+          await mutation(this.getBatchState(batchId).version);
+        } catch (error) {
+          this.apiErrorByBatch[batchId] = summarizeApiError(error);
+          throw error;
+        }
+        try {
+          return await this.refreshAssessmentBatch(batchId, gateway);
+        } catch (cause) {
+          const error = new RecruitmentApiError({
+            status: summarizeApiError(cause).status ?? 0,
+            code: "POST_SAVED_REFRESH_FAILED",
+            message: "操作已提交，最新状态读取失败，请刷新核对。",
+            requestId: summarizeApiError(cause).requestId,
+          });
+          this.apiErrorByBatch[batchId] = summarizeApiError(error);
+          throw error;
+        }
       } finally {
         this.apiMutatingByBatch[batchId] = false;
       }
