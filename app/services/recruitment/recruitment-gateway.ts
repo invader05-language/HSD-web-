@@ -44,10 +44,12 @@ export interface RecruitmentExportFile {
   filename: string;
 }
 
+import type { GroupCodeUploadOptions, GroupCodeUploadTask } from './group-code-upload';
 export interface RoundGroupGateway {
   getAssessmentGroupCodes(batchId: string): Promise<GroupCodeListDto>;
   bindAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, uploadId: string | null): Promise<GroupCodeReferenceDto>;
-  uploadAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, file: File): Promise<GroupCodeReferenceDto>;
+  uploadAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, file: File, options?: GroupCodeUploadOptions): Promise<GroupCodeReferenceDto>;
+  resumeAssessmentGroupCode(task: GroupCodeUploadTask, options?: GroupCodeUploadOptions): Promise<GroupCodeReferenceDto>;
   getAssessmentAdvancePreview(batchId: string): Promise<RoundPublicationPreviewDto>;
   getMyStageResults(): Promise<MemberStageResultsDto>;
   readGroupCodeImage(url: string): Promise<Blob>;

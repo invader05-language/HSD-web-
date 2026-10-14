@@ -52,6 +52,18 @@ describe('round result UI', () => {
     const wrapper=mount(AssessmentGroupCodePanel,{props:{batchId:'batch',owner:false,gateway:gateway()}});await flushPromises();
     expect(wrapper.findAll('article')).toHaveLength(1);expect(wrapper.find('select').exists()).toBe(false);wrapper.unmount();
   });
+  it('keeps a saved configuration distinct from an image preview failure',async()=>{
+    const api=gateway();api.getAssessmentGroupCodes=vi.fn().mockResolvedValue({batchId:'batch',centers:[{id:'c1',name:'人才发展中心',slug:'talent',rounds:[{id:'code',round:1,version:1,status:'READY',imageUrl:'/api/v1/group-code/image',uploadId:'upload',updatedAt:'2026-10-14T00:00:00Z'}]}]});
+    api.readGroupCodeImage=vi.fn().mockRejectedValue({status:500});
+    const wrapper=mount(AssessmentGroupCodePanel,{props:{batchId:'batch',owner:false,gateway:api}});await flushPromises();
+    expect(wrapper.text()).toContain('已上传并保存');expect(wrapper.text()).toContain('预览加载失败');
+    expect(wrapper.text()).not.toContain('二维码暂未上传');wrapper.unmount();
+  });
+  it('clears private configuration and prompts login when the image session expires',async()=>{
+    const api=gateway();api.getAssessmentGroupCodes=vi.fn().mockResolvedValue({batchId:'batch',centers:[{id:'c1',name:'人才发展中心',slug:'talent',rounds:[{id:'code',round:1,version:1,status:'READY',imageUrl:'/api/v1/group-code/image',uploadId:'upload',updatedAt:'2026-10-14T00:00:00Z'}]}]});api.readGroupCodeImage=vi.fn().mockRejectedValue({status:401});
+    const wrapper=mount(AssessmentGroupCodePanel,{props:{batchId:'batch',owner:false,gateway:api}});await flushPromises();
+    expect(wrapper.text()).toContain('登录已过期');expect(wrapper.findAll('article')).toHaveLength(0);wrapper.unmount();
+  });
   it('refreshes image reference only once on repeated 409 and releases private blobs', async () => {
     const readImage=vi.fn().mockRejectedValue({status:409}); const code={id:'id',round:1,version:1,status:'READY' as const,imageUrl:'/api/v1/test/group-code/image?version=1'};
     const wrapper=mount(PrivateGroupCode,{props:{code,readImage}});await flushPromises();expect(wrapper.emitted('refresh')).toHaveLength(1);

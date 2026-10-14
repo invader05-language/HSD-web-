@@ -19841,6 +19841,49 @@
           "contact"
         ]
       },
+      "AdminGroupCodeReferenceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "round": {
+            "type": "number"
+          },
+          "version": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "MISSING"
+            ]
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadId": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "round",
+          "version",
+          "status",
+          "imageUrl",
+          "uploadId",
+          "updatedAt"
+        ]
+      },
       "GroupCodeCenterDto": {
         "type": "object",
         "properties": {
@@ -19856,7 +19899,7 @@
           "rounds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/GroupCodeReferenceDto"
+              "$ref": "#/components/schemas/AdminGroupCodeReferenceDto"
             }
           }
         },

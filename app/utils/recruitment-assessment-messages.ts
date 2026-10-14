@@ -15,6 +15,19 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
   const serverMessage = errorRecord(error).message;
   if (typeof serverMessage === "string" && /[\u4e00-\u9fff]/.test(serverMessage)) return serverMessage;
   switch (code) {
+    case 'UPLOAD_CHECKSUM_MISMATCH':
+      return '文件完整性校验失败，请重新选择图片上传。';
+    case 'UPLOAD_MIME_TYPE_MISMATCH':
+    case 'PRIVATE_IMAGE_INVALID':
+    case 'GROUP_CODE_FILE_INVALID':
+      return '图片格式无效，请选择不超过5MiB的PNG、JPEG或WebP图片。';
+    case 'UPLOAD_INTENT_EXPIRED':
+      return '上传任务已过期，请重新选择图片上传。';
+    case 'OBJECT_STORAGE_UNAVAILABLE':
+      return '存储服务暂不可用，请稍后重试。';
+    case 'UPLOAD_PROCESSING_FAILED':
+    case 'MEDIA_SCANNER_UNAVAILABLE':
+      return '图片安全检查未完成，请稍后重试；持续失败请联系管理员。';
     case "ASSESSMENT_PREVIOUS_ROUND_NOT_PUBLISHED":
       return "请先由联盟总负责人统一发布已完成轮次的结果。";
     case "ASSESSMENT_ROUND_ALREADY_PUBLISHED":
@@ -24,6 +37,7 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
     case "GROUP_CODE_VERSION_CONFLICT":
       return "数据已更新，请刷新后重新确认。";
     case "GROUP_CODE_UPLOAD_NOT_READY":
+    case 'GROUP_CODE_NOT_READY':
       return "图片尚未完成安全检查，请稍后重试。";
     case "ASSESSMENT_BATCH_NOT_CLOSED":
       return "关闭报名后才能推进全局考核轮次。";

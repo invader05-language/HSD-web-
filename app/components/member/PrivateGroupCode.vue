@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import type { GroupCodeReferenceDto } from '../../../packages/api-client/src';
-const props = defineProps<{ code: GroupCodeReferenceDto; readImage: (url: string) => Promise<Blob> }>();
+const props = defineProps<{ code: GroupCodeReferenceDto; readImage: (url: string) => Promise<Blob>; context?: 'admin' | 'member' }>();
 const emit = defineEmits<{ refresh: []; unauthorized: [] }>();
 const blobUrl = ref(''), error = ref(''), loading = ref(false), expanded = ref(false);
 const originalDialog = ref<HTMLDialogElement>();
@@ -25,7 +25,7 @@ async function load() {
     const status = (cause as { status?: number })?.status;
     if (status === 401) { emit('unauthorized'); return; }
     if (status === 409 && !conflictRetried) { conflictRetried = true; emit('refresh'); }
-    error.value = status === 404 ? '二维码暂不可用，请刷新结果。' : status === 409 ? '二维码已更新，正在同步。' : '二维码加载失败，请检查网络后重试。';
+    error.value = status === 403 ? '当前账号没有预览此二维码的权限，请刷新配置。' : status === 404 ? (props.context === 'admin' ? '二维码图片暂不可用，请刷新配置。' : '二维码暂不可用，请刷新结果。') : status === 409 ? '二维码已更新，正在同步。' : props.context === 'admin' ? '二维码已保存，预览加载失败，请重试预览。' : '二维码加载失败，请检查网络后重试。';
   } finally { if (request === generation) loading.value = false; }
 }
 watch([() => props.code.id, () => props.code.version, () => props.code.status, () => props.code.imageUrl], () => { void load(); }, { immediate: true });

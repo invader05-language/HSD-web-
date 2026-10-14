@@ -174,6 +174,16 @@ export type AdminGalleryResponseDto = {
   "revisionNumber": number;
 };
 
+export type AdminGroupCodeReferenceDto = {
+  "id": (string) | null;
+  "round": number;
+  "version": number;
+  "status": "READY" | "MISSING";
+  "imageUrl": (string) | null;
+  "uploadId": (string) | null;
+  "updatedAt": (string) | null;
+};
+
 export type AdminHelpListResponseDto = {
   "items": Array<AdminHelpResponseDto>;
 };
@@ -1064,7 +1074,7 @@ export type GroupCodeCenterDto = {
   "id": string;
   "name": string;
   "slug": string;
-  "rounds": Array<GroupCodeReferenceDto>;
+  "rounds": Array<AdminGroupCodeReferenceDto>;
 };
 
 export type GroupCodeListDto = {
@@ -8147,6 +8157,49 @@ const API_COMPONENT_SCHEMAS = {
       "contact"
     ]
   },
+  "AdminGroupCodeReferenceDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "version": {
+        "type": "number"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      },
+      "imageUrl": {
+        "type": "string",
+        "nullable": true
+      },
+      "uploadId": {
+        "type": "string",
+        "nullable": true
+      },
+      "updatedAt": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "round",
+      "version",
+      "status",
+      "imageUrl",
+      "uploadId",
+      "updatedAt"
+    ]
+  },
   "GroupCodeCenterDto": {
     "type": "object",
     "properties": {
@@ -8162,7 +8215,7 @@ const API_COMPONENT_SCHEMAS = {
       "rounds": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          "$ref": "#/components/schemas/AdminGroupCodeReferenceDto"
         }
       }
     },
