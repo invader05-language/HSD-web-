@@ -65,7 +65,7 @@ function remove(round: number, version: number) {
   const batchId = props.batchId, centerId = center.value?.id;
   if (centerId) void run(round, () => props.gateway.bindAssessmentGroupCode(batchId, centerId, round, version, null));
 }
-function updatedAt(value: string | null) { return value ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value)) : ''; }
+function updatedAt(value: string | null | undefined) { return value ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value)) : ''; }
 </script>
 
 <template>

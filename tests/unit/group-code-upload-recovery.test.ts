@@ -4,10 +4,11 @@ import { createApiRecruitmentGateway } from '../../app/services/recruitment/api-
 const metadata = { id:'upload-1',centerId:'center',createdBy:{id:'actor',username:'admin',displayName:'管理员'},fileName:'qr.png',mimeType:'image/png',byteSize:3,kind:'image',status:'uploading',version:1,expiresAt:'2026-10-14T12:00:00Z',failureCode:null,completedAt:null,createdAt:'2026-10-14T00:00:00Z',updatedAt:'2026-10-14T00:00:00Z' };
 const code = {id:'code',round:1,version:1,status:'READY',imageUrl:'/api/v1/admin/group-code/image?version=1',uploadId:'upload-1',updatedAt:'2026-10-14T00:00:00Z'};
 const configuration = (uploadId='upload-1') => ({batchId:'batch',centers:[{id:'center',name:'人才发展中心',slug:'talent',rounds:[{...code,uploadId}]}]});
-function harness(overrides:{url?:string;processing?:boolean;lostBind?:boolean;otherUpload?:boolean;scanFailure?:boolean;lostConfig?:boolean;neverReady?:boolean}={}) {
+function harness(overrides:{url?:string;processing?:boolean;lostBind?:boolean;otherUpload?:boolean;scanFailure?:boolean;lostConfig?:boolean;neverReady?:boolean;nativeReceiver?:boolean}={}) {
   let polls=0,configReads=0;
-  const fetcher=vi.fn(async (url:Parameters<typeof fetch>[0],init?:RequestInit) => {
-    const path=String(url);
+  const fetcher=vi.fn(async function(this:unknown,url:Parameters<typeof fetch>[0],init?:RequestInit) {
+    if(overrides.nativeReceiver&&this!==undefined&&this!==globalThis)throw new TypeError('Illegal invocation');
+    const path=new URL(String(url)).pathname;
     if(path.includes('/storage/'))return new Response('',{status:200,headers:{etag:'test-etag'}});
     if(path.endsWith('/group-code/uploads'))return Response.json({...metadata,upload:{url:overrides.url??'https://example.test/storage/bucket/key?signature=secret',headers:{'content-type':'image/png'}}});
     if(path.endsWith('/complete'))return Response.json({...metadata,status:overrides.processing?'processing':'ready',version:2});
@@ -67,5 +68,9 @@ describe('group code upload recovery',()=>{
     const {gateway,fetcher}=harness();const controller=new AbortController();controller.abort();
     await expect(gateway.uploadAssessmentGroupCode('batch','center',1,0,new File(['png'],'qr.png',{type:'image/png'}),{signal:controller.signal})).rejects.toBeDefined();
     expect(fetcher).not.toHaveBeenCalled();
+  });
+  it('calls the native browser fetch without a custom object receiver',async()=>{
+    const {gateway}=harness({nativeReceiver:true});
+    await expect(gateway.uploadAssessmentGroupCode('batch','center',1,0,new File(['png'],'qr.png',{type:'image/png'}))).resolves.toMatchObject({uploadId:'upload-1'});
   });
 });

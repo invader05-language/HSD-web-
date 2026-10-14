@@ -102,7 +102,9 @@ export async function uploadGroupCode(client: GroupCodeUploadClient, batchId: st
   const task = { batchId, centerId, round, expectedVersion, uploadId: intent.id, uploadVersion: intent.version, etag: '' };
   progress(options, 'uploading', task);
   let storage: Response;
-  try { storage = await client.fetcher(destination.href, { method: 'PUT', body: file, headers: intent.upload.headers, signal: signal(options) }); }
+  // Native Window.fetch rejects a custom object as its receiver.
+  const fetcher = client.fetcher;
+  try { storage = await fetcher(destination.href, { method: 'PUT', body: file, headers: intent.upload.headers, signal: signal(options) }); }
   catch { options.signal?.throwIfAborted(); throw new GroupCodeUploadError('DIRECT_UPLOAD_NETWORK_FAILED', '文件未完成上传，请检查网络后重新上传；持续失败请联系管理员检查上传入口。', 0); }
   if (!storage.ok) throw new GroupCodeUploadError('DIRECT_UPLOAD_FAILED', '存储服务未接收文件，请重试上传。', storage.status);
   task.etag = storage.headers.get('etag') ?? 'direct-upload';

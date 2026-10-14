@@ -180,8 +180,8 @@ export type AdminGroupCodeReferenceDto = {
   "version": number;
   "status": "READY" | "MISSING";
   "imageUrl": (string) | null;
-  "uploadId": (string) | null;
-  "updatedAt": (string) | null;
+  "uploadId"?: (string) | null;
+  "updatedAt"?: (string) | null;
 };
 
 export type AdminHelpListResponseDto = {
@@ -8195,9 +8195,7 @@ const API_COMPONENT_SCHEMAS = {
       "round",
       "version",
       "status",
-      "imageUrl",
-      "uploadId",
-      "updatedAt"
+      "imageUrl"
     ]
   },
   "GroupCodeCenterDto": {
