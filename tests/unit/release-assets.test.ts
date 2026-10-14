@@ -33,6 +33,11 @@ describe("release asset preservation", () => {
     const previousPublic = await fixture({
       "_nuxt/1009fa88.js": 'export const previous = "retained";',
       "_nuxt/108f57142.css": ".retained { color: red; }",
+      "_nuxt/assessment.5e8f789a.css": ".assessment { color: blue; }",
+      "_nuxt/PrivateGroupCode.50a3e12f.css": ".private-code { color: green; }",
+      "_nuxt/admin.108f57142.js": 'export const prefixed = "retained";',
+      "_nuxt/icons.abcdef12.woff2": "previous font",
+      "_nuxt/assessment.notahash.css": "not immutable",
       "_nuxt/builds/latest.json": '{"id":"previous"}',
       "_nuxt/builds/meta/abcdef12.json": '{"id":"previous"}',
       "_nuxt/builds/abcdef12.js": "previous build metadata",
@@ -74,6 +79,13 @@ describe("release asset preservation", () => {
       expect(previous.status).toBe(200);
       expect(await previous.text()).toBe('export const previous = "retained";');
       expect((await fetch(`${base}/_nuxt/108f57142.css`)).status).toBe(200);
+      const assessmentStyle = await fetch(`${base}/_nuxt/assessment.5e8f789a.css`);
+      expect(assessmentStyle.status).toBe(200);
+      expect(await assessmentStyle.text()).toBe(".assessment { color: blue; }");
+      expect((await fetch(`${base}/_nuxt/PrivateGroupCode.50a3e12f.css`)).status).toBe(200);
+      expect((await fetch(`${base}/_nuxt/admin.108f57142.js`)).status).toBe(200);
+      expect((await fetch(`${base}/_nuxt/icons.abcdef12.woff2`)).status).toBe(200);
+      expect((await fetch(`${base}/_nuxt/assessment.notahash.css`)).status).toBe(404);
       expect((await fetch(`${base}/_nuxt/abcdef12.js`)).status).toBe(200);
       expect((await fetch(`${base}/_nuxt/builds/latest.json`)).status).toBe(404);
       expect((await fetch(`${base}/_nuxt/builds/abcdef12.js`)).status).toBe(404);
@@ -86,11 +98,11 @@ describe("release asset preservation", () => {
     }
   }, 30_000);
 
-  it("rejects different bytes under an existing immutable filename", async () => {
-    const previousPublic = await fixture({ "_nuxt/1009fa88.js": "previous" });
-    const outputPublic = await fixture({ "_nuxt/1009fa88.js": "current" });
+  it.each(["1009fa88.js", "assessment.5e8f789a.css"])("rejects different bytes under the existing immutable filename %s", async (name) => {
+    const previousPublic = await fixture({ [`_nuxt/${name}`]: "previous" });
+    const outputPublic = await fixture({ [`_nuxt/${name}`]: "current" });
     await expect(preserveReleaseAssets({ targetRoot: outputPublic, sourceRoots: [previousPublic] })).rejects.toThrow("Hashed asset collision");
-    expect(await readFile(join(outputPublic, "_nuxt/1009fa88.js"), "utf8")).toBe("current");
+    expect(await readFile(join(outputPublic, `_nuxt/${name}`), "utf8")).toBe("current");
   });
 
   it("leaves ordinary builds and development independent of previous releases", async () => {

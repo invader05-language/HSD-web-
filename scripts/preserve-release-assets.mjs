@@ -2,7 +2,7 @@ import { cp, mkdir, readdir, readFile, lstat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HASHED_ASSET = /^[0-9a-f]{8,64}\.(?:js|css|map|woff2?|ttf|eot|png|jpe?g|webp|svg|avif)$/i;
+const HASHED_ASSET = /^(?:[^/\\]+\.)?[0-9a-f]{8,64}\.(?:js|css|map|woff2?|ttf|eot|png|jpe?g|webp|svg|avif)$/i;
 
 function assertInside(root, candidate) {
   const rel = relative(resolve(root), resolve(candidate));

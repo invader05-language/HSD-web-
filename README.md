@@ -33,9 +33,9 @@ pnpm run preview
 HSD_PREVIOUS_RELEASE_PUBLIC=/absolute/path/to/verified-release/frontend/.output/public pnpm run build
 ```
 
-Nuxt 会在 Nitro 生成静态资源清单前保留旧版本的哈希资源；HTML、`latest.json` 和构建元数据均被排除，同名哈希文件内容冲突会中止构建。构建结束后单独复制文件不能代替这一步，因为文件可能存在于磁盘却未注册到服务端清单，HTTP 请求仍返回 404。普通开发和无旧版本的 CI 构建可省略此变量。
+Nuxt 会在 Nitro 生成静态资源清单前保留旧版本的哈希资源，包括 `1009fa88.js` 和 `assessment.5e8f789a.css` 这类裸哈希或带名称前缀的文件；HTML、`latest.json` 和构建元数据均被排除，同名哈希文件内容冲突会中止构建。构建结束后单独复制文件不能代替这一步，因为文件可能存在于磁盘却未注册到服务端清单，HTTP 请求仍返回 404。普通开发和无旧版本的 CI 构建可省略此变量。
 
-发布切换前，确认旧版本清单中的不可变哈希资源路径均已注册到候选服务端清单，并通过候选 HTTP 服务请求旧 JS：状态必须为 200、`Content-Type` 必须为 JavaScript、响应内容的 SHA-256 必须与已核验的源文件一致。切换后再次执行相同检查。
+发布切换前，确认旧版本清单中的不可变哈希资源路径均已注册到候选服务端清单，并通过候选 HTTP 服务逐项请求旧 JS 和 CSS：状态必须为 200、`Content-Type` 必须分别为 JavaScript 和 `text/css`、响应内容的 SHA-256 必须与已核验的源文件一致。切换后再次执行相同检查。
 
 ## 真实 API 接入
 
