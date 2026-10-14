@@ -93,7 +93,19 @@ export interface AssessmentApiError {
 }
 
 export type AssessmentPersonalSaveState = "editing" | "saving" | "saved" | "saved-refresh-failed" | "conflict" | "unknown";
+export interface AssessmentPersonalSaveScope {
+  candidateId: string;
+  operation: "round" | "adjustment" | "proposal";
+  round: AssessmentRoundNumber;
+}
+export function assessmentPersonalSaveKey(scope: AssessmentPersonalSaveScope): string {
+  // Round results recur; each member has one final adjustment/proposal operation.
+  return JSON.stringify(scope.operation === "round"
+    ? [scope.candidateId, scope.operation, scope.round]
+    : [scope.candidateId, scope.operation]);
+}
 export interface AssessmentPersonalSaveResult {
+  scope: AssessmentPersonalSaveScope;
   status: Exclude<AssessmentPersonalSaveState, "editing" | "saving">;
   refreshed: boolean;
   error?: AssessmentApiError;
@@ -621,7 +633,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         internalNote?: string;
       },
     ): Promise<AssessmentPersonalSaveResult> {
-      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
+      return this.runPersonalApiMutation(gateway, { ...input, operation: "round" }, expectedVersion => (
         gateway.recordRoundResult(input.batchId, input.candidateId, {
           expectedVersion,
           round: input.round,
@@ -640,7 +652,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       gateway: RecruitmentGateway,
       input: { batchId: string; candidateId: string; targetCenterId: string },
     ) {
-      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
+      return this.runPersonalApiMutation(gateway, { ...input, operation: "proposal", round: this.currentRound(input.batchId) }, expectedVersion => (
         gateway.proposeAdjustment(input.batchId, input.candidateId, { expectedVersion, targetCenterId: input.targetCenterId })
       ), response => {
         const record = this.getBatchState(input.batchId).records.find(item => item.candidateId === input.candidateId);
@@ -654,7 +666,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       gateway: RecruitmentGateway,
       input: { batchId: string; candidateId: string; decision: "ADMITTED" | "NOT_ADMITTED"; targetCenterId?: string },
     ) {
-      return this.runPersonalApiMutation(gateway, input, expectedVersion => (
+      return this.runPersonalApiMutation(gateway, { ...input, operation: "adjustment", round: this.currentRound(input.batchId) }, expectedVersion => (
         gateway.decideAdjustment(input.batchId, input.candidateId, {
           expectedVersion, decision: input.decision,
           ...(input.targetCenterId ? { targetCenterId: input.targetCenterId } : {}),
@@ -682,19 +694,21 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         profile.internalNote = record.internalNote;
       }
     },
-    rememberPersonalSaveResult(batchId: string, candidateId: string, result: AssessmentPersonalSaveResult) {
+    rememberPersonalSaveResult(batchId: string, scope: AssessmentPersonalSaveScope, result: Omit<AssessmentPersonalSaveResult, "scope">): AssessmentPersonalSaveResult {
       this.apiPersonalSaveByBatch[batchId] ??= {};
-      this.apiPersonalSaveByBatch[batchId][candidateId] = result;
-      return result;
+      const scopedResult = { ...result, scope: { ...scope } };
+      this.apiPersonalSaveByBatch[batchId][assessmentPersonalSaveKey(scope)] = scopedResult;
+      return scopedResult;
     },
     async runPersonalApiMutation<T extends { version: number }>(
       gateway: RecruitmentGateway,
-      input: { batchId: string; candidateId: string },
+      input: AssessmentPersonalSaveScope & { batchId: string },
       mutation: (expectedVersion: number) => Promise<T>,
       applyResponse: (response: T) => void,
     ): Promise<AssessmentPersonalSaveResult> {
       this.enableApiMode();
-      const { batchId, candidateId } = input;
+      const { batchId, candidateId, operation, round } = input;
+      const scope: AssessmentPersonalSaveScope = { candidateId, operation, round };
       if (this.apiMutatingByBatch[batchId]) throw new Error("ASSESSMENT_SAVE_IN_PROGRESS");
       this.apiMutatingByBatch[batchId] = true;
       delete this.apiErrorByBatch[batchId];
@@ -712,7 +726,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
             refreshed = true;
           } catch { /* Preserve the POST error for diagnostics. */ }
           this.apiErrorByBatch[batchId] = error;
-          return this.rememberPersonalSaveResult(batchId, candidateId, { status: unknown ? "unknown" : "conflict", refreshed, error });
+          return this.rememberPersonalSaveResult(batchId, scope, { status: unknown ? "unknown" : "conflict", refreshed, error });
         }
         // The successful POST remains authoritative when its followup read fails.
         this.apiRefreshGenerationByBatch[batchId] = (this.apiRefreshGenerationByBatch[batchId] ?? 0) + 1;
@@ -722,11 +736,11 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         applyResponse(response);
         try {
           await this.refreshAssessmentBatch(batchId, gateway);
-          return this.rememberPersonalSaveResult(batchId, candidateId, { status: "saved", refreshed: true });
+          return this.rememberPersonalSaveResult(batchId, scope, { status: "saved", refreshed: true });
         } catch (cause) {
           const error = { ...summarizeApiError(cause), code: "POST_SAVED_REFRESH_FAILED", message: "结果已保存，名单刷新失败，请重试刷新。" };
           this.apiErrorByBatch[batchId] = error;
-          return this.rememberPersonalSaveResult(batchId, candidateId, { status: "saved-refresh-failed", refreshed: false, error });
+          return this.rememberPersonalSaveResult(batchId, scope, { status: "saved-refresh-failed", refreshed: false, error });
         }
       } finally {
         this.apiMutatingByBatch[batchId] = false;

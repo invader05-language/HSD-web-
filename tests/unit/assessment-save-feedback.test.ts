@@ -6,6 +6,7 @@ import type { AssessmentBatchResponseDto, AssessmentCandidateDto } from "../../p
 import type { RecruitmentGateway } from "../../app/services/recruitment/recruitment-gateway";
 import { RecruitmentApiError } from "../../app/services/recruitment/api-recruitment.gateway";
 import { useRecruitmentAssessmentStore } from "../../app/stores/recruitment-assessment";
+import { useRecruitmentBatchStore } from "../../app/stores/recruitment-batch";
 import { useSessionStore } from "../../app/stores/session";
 import { getRecruitmentAssessmentMessage } from "../../app/utils/recruitment-assessment-messages";
 import { filterAndSortRecruitmentApplications } from "../../app/data/recruitment-admin";
@@ -65,6 +66,88 @@ async function save(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) {
 }
 
 describe("assessment save feedback and recovery", () => {
+  it.each([false, true])("allows the owner's next adjustment operation after saving a failed round, reopen=%s", async (reopen) => {
+    const gateway = api(); runtime.gateway = gateway;
+    const failed = { ...result, outcome: "FAILED" as const };
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ items: [candidate({ acceptsAdjustment: true })] }));
+    gateway.recordRoundResult.mockResolvedValue({ version: 4, result: failed });
+    gateway.decideAdjustment = vi.fn().mockResolvedValue({ version: 5, decision: { decision: "NOT_ADMITTED", targetCenter: null, createdAt: result.createdAt } });
+    const wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    await wrapper.get('[aria-label="第一轮结果"]').setValue("failed");
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ version: 4, items: [candidate({ acceptsAdjustment: true, roundResults: [failed] })] }));
+    await save(wrapper);
+    if (reopen) {
+      await wrapper.get('[aria-label="关闭详情"]').trigger("click");
+      await wrapper.get('.admin-filters select').setValue("全部成员");
+      await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    }
+    await wrapper.get('[aria-label="最终调剂结果"]').setValue("not-admitted");
+    expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeUndefined();
+    await save(wrapper);
+    expect(gateway.recordRoundResult).toHaveBeenCalledTimes(1);
+    expect(gateway.decideAdjustment).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["open", "reopen", "remount"])("allows a new Baize round without restoring the prior round's saved state, mode=%s", async (mode) => {
+    const gateway = api(); runtime.gateway = gateway;
+    const baize = candidate({ preferences: [{ rank: "FIRST", center: { id: "baize", slug: "baize", name: "白泽开发中心" } }] });
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ items: [baize] }));
+    let wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    await wrapper.get('[aria-label="第一轮结果"]').setValue("passed");
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ version: 4, items: [candidate({ ...baize, roundResults: [result] })] }));
+    await save(wrapper);
+    if (mode === "reopen") await wrapper.get('[aria-label="关闭详情"]').trigger("click");
+    if (mode === "remount") wrapper.unmount();
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ currentRound: 2, version: 5, items: [candidate({ ...baize, roundResults: [result] })] }));
+    await useRecruitmentAssessmentStore().refreshAssessmentBatch("batch-1", gateway); await flushPromises();
+    if (mode === "remount") {
+      wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    }
+    if (mode !== "open") await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    expect(wrapper.get('[aria-label="第二轮结果"]').attributes("disabled")).toBeUndefined();
+    await wrapper.get('[aria-label="第二轮结果"]').setValue("passed");
+    expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeUndefined();
+    gateway.recordRoundResult.mockResolvedValue({ version: 6, result: { ...result, round: 2 } });
+    await save(wrapper);
+    expect(gateway.recordRoundResult).toHaveBeenLastCalledWith("batch-1", "application-1", expect.objectContaining({ round: 2, expectedVersion: 5 }));
+  });
+
+  it("keeps an old unknown operation recorded without blocking an authoritative new round", async () => {
+    const gateway = api(); runtime.gateway = gateway;
+    const baize = candidate({ preferences: [{ rank: "FIRST", center: { id: "baize", slug: "baize", name: "白泽开发中心" } }] });
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ items: [baize] }));
+    gateway.recordRoundResult.mockRejectedValue(new TypeError("Failed to fetch"));
+    const wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    await wrapper.get('[aria-label="第一轮结果"]').setValue("passed");
+    await wrapper.get('[aria-label="内部备注"]').setValue("old round draft");
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ version: 4, items: [candidate({ ...baize, roundResults: [result] })] }));
+    await save(wrapper);
+    expect(wrapper.text()).toContain("暂不能确认保存状态，请先刷新核对。");
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ currentRound: 2, version: 5, items: [candidate({ ...baize, roundResults: [result] })] }));
+    const store = useRecruitmentAssessmentStore(); await store.refreshAssessmentBatch("batch-1", gateway); await flushPromises();
+    expect(wrapper.get('[aria-label="第二轮结果"]').attributes("disabled")).toBeUndefined();
+    await wrapper.get('[aria-label="第二轮结果"]').setValue("failed");
+    expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeUndefined();
+    expect(Object.values(store.apiPersonalSaveByBatch["batch-1"]!)).toEqual(expect.arrayContaining([expect.objectContaining({ status: "unknown", scope: { candidateId: "application-1", operation: "round", round: 1 } })]));
+    expect(gateway.recordRoundResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a Mock owner to enter adjustment after saving a failed round in the same drawer", async () => {
+    expect(useSessionStore().signIn("admin-alliance", { requireAdmin: true }).status).toBe("success");
+    useRecruitmentBatchStore().close("batch-current", true, new Date("2026-08-04T10:30:00Z"), "test");
+    const wrapper = mount(Workbench, { props: { batchId: "batch-current" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    await wrapper.get('[aria-label="查看处理 王同学"]').trigger("click");
+    await wrapper.get('[aria-label="第一轮结果"]').setValue("failed");
+    await save(wrapper);
+    await wrapper.get('[aria-label="最终调剂结果"]').setValue("not-admitted");
+    expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeUndefined();
+    await save(wrapper);
+    expect(useRecruitmentAssessmentStore().getCandidate("batch-current", "candidate-wang")?.finalDecision).toBe("not-admitted");
+  });
+
   it("releases busy after a rejected POST and preserves structured error fields", async () => {
     const gateway = api(), store = useRecruitmentAssessmentStore();
     await store.refreshAssessmentBatch("batch-1", gateway);
@@ -239,6 +322,24 @@ describe("assessment save feedback and recovery", () => {
     expect(gateway.decideAdjustment).toHaveBeenCalledTimes(1);
     expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeDefined();
     expect(wrapper.find('[data-testid="assessment-reconfirm"]').exists()).toBe(!recordFound);
+  });
+
+  it("keeps an unknown adjustment guarded across a later global-round refresh", async () => {
+    const gateway = api(); runtime.gateway = gateway;
+    const failedCandidate = candidate({ acceptsAdjustment: true, roundResults: [{ ...result, outcome: "FAILED" }] });
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ items: [failedCandidate] }));
+    gateway.decideAdjustment = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    const wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
+    await wrapper.get('.admin-filters select').setValue("全部成员");
+    await wrapper.get('[aria-label="查看处理 张同学"]').trigger("click");
+    await wrapper.get('[aria-label="最终调剂结果"]').setValue("not-admitted");
+    await save(wrapper);
+    gateway.getAssessmentBatch.mockResolvedValue(batch({ currentRound: 2, version: 5, items: [failedCandidate] }));
+    await useRecruitmentAssessmentStore().refreshAssessmentBatch("batch-1", gateway); await flushPromises();
+    await wrapper.get('[aria-label="最终调剂结果"]').setValue("not-admitted");
+    expect(wrapper.text()).toContain("暂不能确认保存状态，请先刷新核对。");
+    expect(wrapper.findAll("button").find(button => button.text() === "保存结果")!.attributes("disabled")).toBeDefined();
+    expect(gateway.decideAdjustment).toHaveBeenCalledTimes(1);
   });
 
   it("applies a committed proposal timestamp and identity before a failing refresh", async () => {

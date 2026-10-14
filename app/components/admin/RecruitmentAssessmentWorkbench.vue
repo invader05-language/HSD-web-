@@ -6,7 +6,7 @@ import type {
   AssessmentRoundNumber,
 } from "~/types/recruitment-assessment";
 import { getAssessmentRounds } from "~/utils/recruitment-assessment-rules";
-import { useRecruitmentAssessmentStore, type RecruitmentAssessmentCandidate, type AssessmentPersonalSaveState, type AssessmentPersonalSaveResult } from "~/stores/recruitment-assessment";
+import { useRecruitmentAssessmentStore, assessmentPersonalSaveKey, type RecruitmentAssessmentCandidate, type AssessmentPersonalSaveState, type AssessmentPersonalSaveResult, type AssessmentPersonalSaveScope } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope } from "~/utils/admin-center-scope";
@@ -98,6 +98,8 @@ const personalSaveState = ref<AssessmentPersonalSaveState>("editing");
 const personalSaveResult = ref<AssessmentPersonalSaveResult>();
 const draftRound = ref<AssessmentRoundNumber>();
 const draftOperation = ref<"round" | "adjustment">("round");
+const draftBatchId = ref(props.batchId);
+const lastDraftScopeByCandidate = new Map<string, AssessmentPersonalSaveScope>();
 const candidateDrafts = new Map<string, {
   rounds: Partial<Record<AssessmentRoundNumber, RoundDraft>>;
   note: string;
@@ -199,10 +201,7 @@ const adjustmentTargets = computed(() => recruitmentGateway
 
 watch(selectedCandidateId, async (candidateId, previousCandidateId) => {
   selectionGeneration++;
-  if (previousCandidateId) candidateDrafts.set(previousCandidateId, {
-    rounds: { ...roundDrafts.value }, note: internalNote.value,
-    adjustment: adjustmentDecision.value, round: draftRound.value, operation: draftOperation.value,
-  });
+  if (previousCandidateId) cacheDraft(previousCandidateId);
   if (personalSaveResult.value) delete assessmentStore.apiErrorByBatch[props.batchId];
   saveMessage.value = "";
   saveError.value = "";
@@ -214,27 +213,76 @@ watch(selectedCandidateId, async (candidateId, previousCandidateId) => {
     previousFocus?.focus();
     return;
   }
-  resetDrafts();
-  const previousDraft = candidateDrafts.get(candidateId);
-  if (previousDraft) {
-    roundDrafts.value = { ...previousDraft.rounds };
-    internalNote.value = previousDraft.note;
-    adjustmentDecision.value = previousDraft.adjustment;
-    draftRound.value = previousDraft.round;
-    draftOperation.value = previousDraft.operation;
-  }
-  const previousResult = assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[candidateId];
-  if (previousResult) showPersonalSaveResult(previousResult);
+  const lastResult = Object.values(assessmentStore.apiPersonalSaveByBatch[props.batchId] ?? {})
+    .filter(result => result.scope.candidateId === candidateId && result.scope.operation !== "proposal").at(-1);
+  restoreDraftScope(nextActionScope()
+    ?? lastDraftScopeByCandidate.get(JSON.stringify([props.batchId, candidateId]))
+    ?? lastResult?.scope
+    ?? { candidateId, operation: "round", round: state.value.currentRound });
   document.body.classList.add("is-admin-drawer-open");
   await nextTick();
   closeButton.value?.focus();
 });
 
-watch(() => selectedCandidateId.value
-  ? assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[selectedCandidateId.value]
-  : undefined, result => {
+watch(() => {
+  const scope = currentSaveScope();
+  return scope ? assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)] : undefined;
+}, result => {
   if (result && personalSaveState.value === "editing") showPersonalSaveResult(result);
 });
+
+watch([apiBusy, personalSaveState, () => state.value.currentRound,
+  () => selectedCandidate.value?.processingStatus, () => selectedCandidate.value?.currentPhase], () => {
+  const nextScope = nextActionScope();
+  const currentScope = currentSaveScope();
+  if (apiBusy.value || personalSaveState.value === "saving"
+    || (personalSaveState.value === "saved-refresh-failed" && assessmentStore.apiErrorByBatch[props.batchId])
+    || !nextScope || !currentScope || assessmentPersonalSaveKey(nextScope) === assessmentPersonalSaveKey(currentScope)) return;
+  cacheDraft(currentScope.candidateId);
+  restoreDraftScope(nextScope);
+});
+
+function currentSaveScope(candidateId = selectedCandidateId.value): AssessmentPersonalSaveScope | undefined {
+  return candidateId && draftRound.value
+    ? { candidateId, operation: draftOperation.value, round: draftRound.value }
+    : undefined;
+}
+
+function nextActionScope(): AssessmentPersonalSaveScope | undefined {
+  const candidate = selectedCandidate.value;
+  if (!candidate) return undefined;
+  const round = state.value.currentRound;
+  if (candidate.processingStatus === "adjustment-suggestion-pending") return { candidateId: candidate.candidateId, operation: "adjustment", round };
+  if (candidate.currentPhase === roundLabel(round)) return { candidateId: candidate.candidateId, operation: "round", round };
+  return undefined;
+}
+
+function cacheDraft(candidateId: string) {
+  const scope = currentSaveScope(candidateId);
+  if (!scope) return;
+  candidateDrafts.set(JSON.stringify([draftBatchId.value, assessmentPersonalSaveKey(scope)]), {
+    rounds: { ...roundDrafts.value }, note: internalNote.value,
+    adjustment: adjustmentDecision.value, round: draftRound.value, operation: draftOperation.value,
+  });
+  lastDraftScopeByCandidate.set(JSON.stringify([draftBatchId.value, candidateId]), scope);
+}
+
+function restoreDraftScope(scope: AssessmentPersonalSaveScope) {
+  resetDrafts();
+  draftBatchId.value = props.batchId;
+  draftRound.value = scope.round;
+  draftOperation.value = scope.operation === "adjustment" ? "adjustment" : "round";
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  const previousDraft = candidateDrafts.get(JSON.stringify([props.batchId, assessmentPersonalSaveKey(scope)]));
+  if (previousDraft) {
+    roundDrafts.value = { ...previousDraft.rounds };
+    internalNote.value = previousDraft.note;
+    adjustmentDecision.value = previousDraft.adjustment;
+  }
+  const previousResult = assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)];
+  if (previousResult) showPersonalSaveResult(previousResult);
+}
 
 onBeforeUnmount(() => document.body.classList.remove("is-admin-drawer-open"));
 
@@ -315,7 +363,7 @@ const personalConflictBlocksEditing = computed(() => personalSaveState.value ===
 const canSaveSelectedCandidate = computed(() => {
   const candidate = selectedCandidate.value;
   if (!candidate || !canEdit(candidate)) return false;
-  if (personalConflictBlocksEditing.value || draftRound.value !== state.value.currentRound) return false;
+  if (personalConflictBlocksEditing.value || (draftOperation.value === "round" && draftRound.value !== state.value.currentRound)) return false;
   if (["saving", "saved", "saved-refresh-failed", "unknown"].includes(personalSaveState.value)) return false;
   return selectedRounds.value.some(isRoundEditable)
     || (isOwner.value
@@ -479,6 +527,8 @@ async function confirmSave() {
 }
 
 function showPersonalSaveResult(result: AssessmentPersonalSaveResult) {
+  const scope = currentSaveScope();
+  if (!scope || assessmentPersonalSaveKey(scope) !== assessmentPersonalSaveKey(result.scope)) return;
   personalSaveResult.value = result;
   personalSaveState.value = result.status;
   saveError.value = "";
@@ -508,12 +558,12 @@ async function retryPersonalRefresh() {
     await assessmentStore.refreshAssessmentBatch(props.batchId, recruitmentGateway);
     if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
     const result: AssessmentPersonalSaveResult = { ...previous, refreshed: true, status: previous.status === "saved-refresh-failed" ? "saved" : previous.status };
-    assessmentStore.rememberPersonalSaveResult(props.batchId, selectedCandidateId.value!, result);
+    assessmentStore.rememberPersonalSaveResult(props.batchId, previous.scope, result);
     showPersonalSaveResult(result);
   } catch {
     if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
     const result: AssessmentPersonalSaveResult = { ...previous, refreshed: false };
-    assessmentStore.rememberPersonalSaveResult(props.batchId, selectedCandidateId.value!, result);
+    assessmentStore.rememberPersonalSaveResult(props.batchId, previous.scope, result);
     showPersonalSaveResult(result);
   }
 }
@@ -522,7 +572,8 @@ const canReconfirmUnknown = computed(() => {
   const candidate = selectedCandidate.value;
   const round = draftRound.value;
   if (!candidate || !round || personalSaveState.value !== "unknown" || !personalSaveResult.value?.refreshed
-    || round !== state.value.currentRound || !canEdit(candidate) || state.value.status === "published") return false;
+    || (draftOperation.value === "round" && round !== state.value.currentRound)
+    || !canEdit(candidate) || state.value.status === "published") return false;
   return draftOperation.value === "adjustment"
     ? candidate.processingStatus === "adjustment-suggestion-pending" && !candidate.finalDecision
     : !candidate.roundOutcomes[round];
@@ -532,7 +583,8 @@ function reconfirmUnknown() {
   if (!canReconfirmUnknown.value || apiBusy.value) return;
   personalSaveState.value = "editing";
   personalSaveResult.value = undefined;
-  if (selectedCandidateId.value) delete assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[selectedCandidateId.value];
+  const scope = currentSaveScope();
+  if (scope) delete assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)];
   saveError.value = "";
   saveMessage.value = "已核对当前记录；再次保存仍需明确确认。";
 }
