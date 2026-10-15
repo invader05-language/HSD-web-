@@ -110,6 +110,9 @@ export function memberResultFromApi(
     currentStage: "考核已结束",
     currentConclusion: admitted ? "通过" : "未通过",
     ...(result.finalCenter ? { finalCenter: result.finalCenter.name } : {}),
+    ...(admitted && result.finalCenter?.slug === 'baize-development' && result.finalBaizeDirection
+      ? { finalDirection: baizeDirectionLabel(result.finalBaizeDirection) }
+      : {}),
     ...(result.responsibleContacts.length
       ? { responsibleContacts: result.responsibleContacts.map((contact) => ({
           personId: contact.personId,
@@ -149,6 +152,7 @@ export interface PublishedAssessmentProjection {
   finalCenter?: CenterName;
   publishedAt?: string;
   batchName?: string;
+  finalBaizeDirection?: MyRecruitmentResultDto['finalBaizeDirection'];
 }
 
 export const DEMO_MEMBER_RESULT: MemberResultRecord = {
@@ -231,6 +235,7 @@ export function applyPublishedAssessmentProjection(
     currentStage: "考核已结束",
     currentConclusion: admitted ? "通过" : "未通过",
     finalCenter: admitted ? projection.finalCenter ?? projection.center : undefined,
+    finalDirection: admitted && projection.finalCenter === '白泽开发中心' && projection.finalBaizeDirection ? baizeDirectionLabel(projection.finalBaizeDirection) : undefined,
   };
 }
 

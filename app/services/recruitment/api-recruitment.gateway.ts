@@ -351,9 +351,14 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/admin/recruitment/batches/{batchId}/assessments",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments`,
     ),
-    getAdjustmentTargets: (batchId) => read(
+    getAdjustmentTargets: (batchId, includeAssessmentTransfers = false) => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
-      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/adjustment-targets`,
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/adjustment-targets${includeAssessmentTransfers ? '?includeAssessmentTransfers=true' : ''}`,
+    ),
+    transferAssessment: (batchId, applicationId, payload) => mutate(
+      'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers',
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/${encodeURIComponent(applicationId)}/assessment-transfers`,
+      payload,
     ),
     recordRoundResult: (batchId, applicationId, payload: RecordRoundResultDto) => mutate(
       "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",

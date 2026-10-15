@@ -164,7 +164,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
       const url = String(input);
-      if (url.endsWith("/adjustment-targets")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      if (new URL(url).pathname.endsWith("/adjustment-targets")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
       if (url.endsWith("/assessments")) return new Response(JSON.stringify(assessmentResponse()), { status: 200 });
       return new Response(JSON.stringify(baseBatch), { status: 200 });
     }));
@@ -285,7 +285,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
       const url = String(input);
-      if (url.endsWith("/adjustment-targets")) {
+      if (new URL(url).pathname.endsWith("/adjustment-targets")) {
         return new Response(JSON.stringify({ items: [{ id: "center-talent", slug: "talent-development", name: "人才发展中心" }] }), { status: 200 });
       }
       if (url.endsWith("/assessments")) {

@@ -6734,6 +6734,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeAssessmentTransfers",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6784,6 +6792,98 @@
           }
         ],
         "summary": "List active non-Baize adjustment targets for assessment decisions",
+        "tags": [
+          "Recruitment assessments"
+        ]
+      }
+    },
+    "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers": {
+      "post": {
+        "operationId": "AssessmentsAdminController_createAssessmentTransfer",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "applicationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssessmentTransferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentTransferMutationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "409": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "423": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "429": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "503": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "summary": "Confirm immutable transfer from original round-one failure into actual Baize rounds two and three",
         "tags": [
           "Recruitment assessments"
         ]
@@ -17984,6 +18084,38 @@
           "items"
         ]
       },
+      "RecruitmentOriginalRoundResultDto": {
+        "type": "object",
+        "properties": {
+          "round": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PASSED",
+              "FAILED"
+            ]
+          },
+          "internalNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "round",
+          "outcome",
+          "internalNote",
+          "createdAt"
+        ]
+      },
       "RecruitmentApplicantSnapshotDto": {
         "type": "object",
         "properties": {
@@ -18034,6 +18166,9 @@
       "AdminRecruitmentApplicationDto": {
         "type": "object",
         "properties": {
+          "originalRoundResult": {
+            "$ref": "#/components/schemas/RecruitmentOriginalRoundResultDto"
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -18933,6 +19068,99 @@
           "centers"
         ]
       },
+      "AssessmentCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "assessmentTransfers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assessmentTransfers"
+        ]
+      },
+      "AssessmentAdjustmentTargetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "TRANSFER_TO_ASSESSMENT"
+            ]
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "blockReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ]
+      },
+      "AssessmentAdjustmentTargetCatalogResponseDto": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/AssessmentCapabilitiesDto"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssessmentAdjustmentTargetDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CreateAssessmentTransferDto": {
+        "type": "object",
+        "properties": {
+          "targetCenterId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Active Baize center. Server verifies the center identity."
+          },
+          "baizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ]
+          },
+          "expectedCurrentRound": {
+            "type": "number",
+            "enum": [
+              1
+            ],
+            "description": "Transfer is only permitted before global round-one advancement."
+          }
+        },
+        "required": [
+          "targetCenterId",
+          "baizeDirection",
+          "expectedCurrentRound"
+        ]
+      },
       "AssessmentCenterDto": {
         "type": "object",
         "properties": {
@@ -18953,18 +19181,62 @@
           "name"
         ]
       },
-      "AssessmentAdjustmentTargetCatalogResponseDto": {
+      "AssessmentTransferDto": {
         "type": "object",
         "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AssessmentCenterDto"
-            }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromCenter": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "toCenter": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "entryRound": {
+            "type": "number",
+            "enum": [
+              2
+            ]
+          },
+          "baizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
-          "items"
+          "id",
+          "fromCenter",
+          "toCenter",
+          "entryRound",
+          "baizeDirection",
+          "createdAt"
+        ]
+      },
+      "AssessmentTransferMutationResponseDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number"
+          },
+          "transfer": {
+            "$ref": "#/components/schemas/AssessmentTransferDto"
+          }
+        },
+        "required": [
+          "version",
+          "transfer"
         ]
       },
       "AssessmentBatchDetailDto": {
@@ -19015,6 +19287,22 @@
         "required": [
           "code",
           "count"
+        ]
+      },
+      "AssessmentTransferEligibilityDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "blockReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "available",
+          "blockReason"
         ]
       },
       "AssessmentPersonDto": {
@@ -19173,6 +19461,23 @@
       "AssessmentCandidateDto": {
         "type": "object",
         "properties": {
+          "assessmentCenter": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "entryRound": {
+            "type": "number"
+          },
+          "transfer": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentTransferDto"
+              }
+            ]
+          },
+          "transferEligibility": {
+            "$ref": "#/components/schemas/AssessmentTransferEligibilityDto"
+          },
           "applicationId": {
             "type": "string",
             "format": "uuid"
@@ -19267,6 +19572,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/AssessmentCapabilitiesDto"
           },
           "batch": {
             "$ref": "#/components/schemas/AssessmentBatchDetailDto"
@@ -19583,19 +19891,45 @@
           "decision"
         ]
       },
-      "StageCenterDto": {
+      "PublishedAssessmentTransferDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
+          "fromCenter": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "toCenter": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "entryRound": {
+            "type": "number",
+            "enum": [
+              2
+            ]
+          },
+          "baizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ]
+          },
+          "publishedAt": {
             "type": "string"
           }
         },
         "required": [
           "id",
-          "name"
+          "fromCenter",
+          "toCenter",
+          "entryRound",
+          "baizeDirection",
+          "publishedAt"
         ]
       },
       "GroupCodeReferenceDto": {
@@ -19631,9 +19965,38 @@
           "imageUrl"
         ]
       },
+      "StageCenterDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "PublishedStageDto": {
         "type": "object",
         "properties": {
+          "center": {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          },
+          "baizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ],
+            "nullable": true
+          },
           "round": {
             "type": "number"
           },
@@ -19666,6 +20029,22 @@
       "MemberStageResultsDto": {
         "type": "object",
         "properties": {
+          "transfer": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublishedAssessmentTransferDto"
+              }
+            ]
+          },
+          "entryGroupCode": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GroupCodeReferenceDto"
+              }
+            ]
+          },
           "batchId": {
             "type": "string",
             "nullable": true
@@ -19752,6 +20131,17 @@
       "MyRecruitmentResultDto": {
         "type": "object",
         "properties": {
+          "finalBaizeDirection": {
+            "type": "string",
+            "enum": [
+              "HARMONYOS_DEVELOPMENT",
+              "BACKEND_ARCHITECTURE",
+              "AIGC_LARGE_MODEL",
+              "UI_UX_DESIGN",
+              "EMBEDDED_DEVELOPMENT"
+            ],
+            "nullable": true
+          },
           "id": {
             "type": "string",
             "format": "uuid"

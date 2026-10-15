@@ -55,14 +55,22 @@ const productionApplication = ref<SubmittedRecruitmentApplication>();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
-const stageResults = ref<MemberStageResultsDto>();
+const apiStageResults = ref<MemberStageResultsDto>();
+const stageResults = computed(() => {
+  if (recruitmentGateway) return apiStageResults.value;
+  const memberId = currentMember.value?.id;
+  if (!memberId) return undefined;
+  return batchStore.batches.map(batch => assessmentStore.getMockStageResults(batch.id, memberId))
+    .filter(result => result.stages.length).sort((a, b) => Date.parse(b.stages.at(-1)?.publishedAt ?? '') - Date.parse(a.stages.at(-1)?.publishedAt ?? ''))[0];
+});
+const readStageImage = computed(() => recruitmentGateway?.readGroupCodeImage ?? (async () => { throw new Error('GROUP_CODE_NOT_READY'); }));
 const stageError = ref('');
 let destroyed = false;
 let sessionExpired = false;
 function expireSession() {
   if (destroyed || sessionExpired) return;
   sessionExpired = true;
-  stageResults.value = undefined;
+  apiStageResults.value = undefined;
   productionApplication.value = undefined;
   assessmentStore.myResults = [];
   session.clearProductionSession();
@@ -83,7 +91,7 @@ async function loadResults() {
   if (unauthorized?.status === 'rejected') throw unauthorized.reason;
   if (final.status === 'fulfilled') { assessmentStore.myResults = final.value.items; assessmentStore.myResultsError = undefined; }
   else assessmentStore.myResultsError = '结果暂时无法加载，请稍后重试。';
-  if (stages.status === 'fulfilled') { stageResults.value = stages.value; stageError.value = ''; }
+  if (stages.status === 'fulfilled') { apiStageResults.value = stages.value; stageError.value = ''; }
   else stageError.value = '阶段考核结果加载失败，正在重试。';
   if (final.status === 'rejected') throw final.reason;
   if (stages.status === 'rejected') throw stages.reason;
@@ -144,6 +152,7 @@ const publishedAssessment = computed(() => {
         center: candidate.center,
         finalDecision: candidate.finalDecision,
         finalCenter: candidate.finalCenter,
+        finalBaizeDirection: candidate.finalBaizeDirection,
         publishedAt: candidate.publishedAt,
         batchName: batch.name,
       }))
@@ -342,7 +351,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         >
           <p v-if="stageError" role="alert">{{ stageError }}</p>
           <div class="member-results-grid">
-            <PublishedStageResults v-if="stageResults?.stages.length && recruitmentGateway?.readGroupCodeImage" :results="stageResults" :read-image="recruitmentGateway.readGroupCodeImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
+            <PublishedStageResults v-if="stageResults?.stages.length" :results="stageResults" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
             <article v-else class="member-result-card">
               <header class="member-result-card__header">
                 <span>考核进度</span>

@@ -89,6 +89,7 @@ watch([batchId, applicationId], () => {
 });
 
 const applicationName = computed(() => useMockApi ? application.value?.name : apiApplication.value?.name);
+const originalMockRound = computed(() => useMockApi && application.value ? assessmentStore.getCandidate(batchId.value, applicationId.value)?.originalRoundResult : undefined);
 
 useHead(() => ({ title: `${applicationName.value ?? "报名记录"}｜HSD 管理台` }));
 </script>
@@ -113,6 +114,7 @@ useHead(() => ({ title: `${applicationName.value ?? "报名记录"}｜HSD 管理
         <label>是否接受调剂<input :value="application.acceptsAdjustment ? '接受' : '不接受'" readonly></label>
         <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(application.interviewSelection) }}</strong></div>
         <label class="is-wide">个人简介<textarea rows="5" :value="application.bio || '未填写'" readonly></textarea></label>
+        <section v-if="originalMockRound" class="is-wide" aria-label="原中心第一轮考核记录"><h3>原中心第一轮考核记录（只读）</h3><p>{{ application.preferences[0] }} · {{ originalMockRound.outcome === 'PASSED' ? '通过' : '不通过' }}</p><p>录入时间：{{ formatAdminApplicationSubmittedAt(originalMockRound.createdAt) }}</p><p v-if="originalMockRound.internalNote">内部备注：{{ originalMockRound.internalNote }}</p></section>
       </div></div>
     </section>
   </div>
@@ -134,6 +136,7 @@ useHead(() => ({ title: `${applicationName.value ?? "报名记录"}｜HSD 管理
         <label>姓名<input :value="apiApplication.name" readonly></label><label>学号<input :value="apiApplication.studentId" readonly></label><label>年级<input :value="apiApplication.grade" readonly></label><label>班级<input :value="apiApplication.className" readonly></label><label>联系方式<input :value="apiApplication.contact" readonly></label>
         <label>第一志愿<input :value="apiApplication.preferences[0] || '—'" readonly></label><label>第二志愿<input :value="apiApplication.preferences[1] || '—'" readonly></label><label>第三志愿<input :value="apiApplication.preferences[2] || '—'" readonly></label><label>白泽方向<input :value="apiApplication.baizeDirection || '—'" readonly></label><label>是否接受调剂<input :value="apiApplication.acceptsAdjustment ? '接受' : '不接受'" readonly></label><label>状态<input :value="apiApplication.status" readonly></label>
         <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(apiApplication.interviewSelection) }}</strong></div>
+        <section v-if="apiApplication.originalRoundResult" class="is-wide" aria-label="原中心第一轮考核记录"><h3>原中心第一轮考核记录（只读）</h3><p>{{ apiApplication.preferences[0] }} · {{ apiApplication.originalRoundResult.outcome === 'PASSED' ? '通过' : '不通过' }}</p><p>录入时间：{{ formatAdminApplicationSubmittedAt(apiApplication.originalRoundResult.createdAt) }}</p><p v-if="apiApplication.originalRoundResult.internalNote">内部备注：{{ apiApplication.originalRoundResult.internalNote }}</p></section>
       </div></div>
     </section>
   </div>

@@ -11,6 +11,8 @@ import type {
   AssessmentRoundMutationResponseDto,
   CreateAdjustmentProposalDto,
   DecideAdjustmentDto,
+  CreateAssessmentTransferDto,
+  AssessmentTransferMutationResponseDto,
   MyRecruitmentResultListDto,
   PublishAssessmentDto,
   RecordRoundResultDto,
@@ -81,7 +83,8 @@ export interface RecruitmentGateway extends Partial<RoundGroupGateway> {
   exportAdminApplications(batchId: string, query?: string): Promise<RecruitmentExportFile>;
   getAdminApplication(batchId: string, applicationId: string): Promise<AdminRecruitmentApplicationDto>;
   getAssessmentBatch(batchId: string): Promise<AssessmentBatchResponseDto>;
-  getAdjustmentTargets(batchId: string): Promise<AssessmentAdjustmentTargetCatalogResponseDto>;
+  getAdjustmentTargets(batchId: string, includeAssessmentTransfers?: boolean): Promise<AssessmentAdjustmentTargetCatalogResponseDto>;
+  transferAssessment?(batchId: string, applicationId: string, payload: CreateAssessmentTransferDto): Promise<AssessmentTransferMutationResponseDto>;
   recordRoundResult(
     batchId: string,
     applicationId: string,

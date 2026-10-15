@@ -369,7 +369,7 @@ describe("assessment dates and error translations", () => {
     expect(value.updatedAt).toBeUndefined(); expect(value.candidate?.updatedAt).toBeUndefined(); expect(value.candidate?.submittedAt).toBeUndefined();
     runtime.gateway = gateway; const wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
     await wrapper.get('.admin-filters select').setValue("全部成员");
-    expect(wrapper.get("tbody tr").findAll("td")[7]!.text()).toBe(roundResults.length ? "—" : "未录入");
+    expect(wrapper.get("tbody tr").findAll("td")[8]!.text()).toBe(roundResults.length ? "—" : "未录入");
   });
 
   it("selects dates numerically and displays Shanghai time in 24 hour form", async () => {
@@ -379,7 +379,7 @@ describe("assessment dates and error translations", () => {
     const wrapper = mount(Workbench, { props: { batchId: "batch-1" }, global: { stubs: { NuxtLink: true } } }); await flushPromises();
     await wrapper.get('.admin-filters select').setValue("全部成员");
     expect(store.getCandidate("batch-1", "application-1")?.updatedAt).toBe("2026-10-15T05:00:00Z");
-    expect(wrapper.get("tbody tr").findAll("td")[7]!.text()).toContain("13:00:00");
+    expect(wrapper.get("tbody tr").findAll("td")[8]!.text()).toContain("13:00:00");
   });
 
   it.each([

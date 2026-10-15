@@ -17,6 +17,7 @@ export interface AdminApplicationView {
   submittedAt: string;
   withdrawnAt: string | null;
   interviewSelection?: RecruitmentInterviewSelection;
+  originalRoundResult?: AdminRecruitmentApplicationDto['originalRoundResult'];
 }
 
 const BAIZE_LABELS: Record<NonNullable<AdminRecruitmentApplicationDto["baizeDirection"]>, string> = {
@@ -50,6 +51,7 @@ export function mapAdminApplication(dto: AdminRecruitmentApplicationDto): AdminA
     version: dto.version,
     submittedAt: dto.submittedAt,
     withdrawnAt: dto.withdrawnAt,
+    ...(dto.originalRoundResult ? { originalRoundResult: { ...dto.originalRoundResult } } : {}),
     interviewSelection: (dto as AdminRecruitmentApplicationDto & { interviewSelection?: RecruitmentInterviewSelection }).interviewSelection
       ? { ...(dto as AdminRecruitmentApplicationDto & { interviewSelection?: RecruitmentInterviewSelection }).interviewSelection! }
       : undefined,
@@ -58,5 +60,5 @@ export function mapAdminApplication(dto: AdminRecruitmentApplicationDto): AdminA
 
 export function formatAdminApplicationSubmittedAt(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+  return Number.isNaN(date.getTime()) || date.getUTCFullYear() === 1970 ? '—' : date.toLocaleString("zh-CN", { timeZone: 'Asia/Shanghai', hour12: false });
 }

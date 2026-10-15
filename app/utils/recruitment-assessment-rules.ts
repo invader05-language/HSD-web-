@@ -17,7 +17,13 @@ function outcomeFor(
   return record.roundOutcomes[round] ?? "pending";
 }
 
-export function getAssessmentRounds(center: RecruitmentCenter): AssessmentRoundNumber[] {
+export function getAssessmentCenter(record: RecruitmentAssessmentRecord): RecruitmentCenter {
+  return (record.assessmentCenter?.name ?? record.transfer?.toCenter.name ?? record.center) as RecruitmentCenter;
+}
+
+export function getAssessmentRounds(value: RecruitmentCenter | RecruitmentAssessmentRecord): AssessmentRoundNumber[] {
+  if (typeof value !== 'string' && value.transfer) return [2, 3];
+  const center = typeof value === 'string' ? value : getAssessmentCenter(value);
   return center === BAIZE_CENTER
     ? [...BAIZE_ASSESSMENT_ROUNDS]
     : [...REGULAR_ASSESSMENT_ROUNDS];
@@ -29,7 +35,7 @@ export function getAssessmentProcessingStatus(
   if (record.publishedAt) return "completed";
   if (record.finalDecision) return "ready-to-publish";
 
-  const rounds = getAssessmentRounds(record.center);
+  const rounds = getAssessmentRounds(record);
   if (rounds.some((round) => outcomeFor(record, round) === "failed")) {
     return record.acceptsAdjustment
       ? "adjustment-suggestion-pending"
@@ -49,7 +55,7 @@ export function getCurrentAssessmentRound(
 ): AssessmentRoundNumber | undefined {
   if (getAssessmentProcessingStatus(record) !== "assessing") return undefined;
 
-  const rounds = getAssessmentRounds(record.center);
+  const rounds = getAssessmentRounds(record);
   const currentRoundIndex = rounds.indexOf(globalRound);
   if (currentRoundIndex === -1) return undefined;
 

@@ -4,6 +4,9 @@ import type {
   AssessmentBatchResponseDto,
   AssessmentAdjustmentTargetCatalogResponseDto,
   AssessmentCandidateDto,
+  CreateAssessmentTransferDto,
+  MemberStageResultsDto,
+  GroupCodeReferenceDto,
   MyRecruitmentResultDto,
 } from "../../packages/api-client/src";
 import { ADMIN_MEMBERS } from "../data/admin-members";
@@ -28,11 +31,12 @@ import type {
 import {
   getAssessmentProcessingStatus,
   getAssessmentRounds,
+  getAssessmentCenter,
   getCurrentAssessmentRound,
   isAssessmentRoundEditable,
 } from "../utils/recruitment-assessment-rules";
 import { getEffectiveRecruitmentBatchStatus } from "../utils/recruitment-batch-rules";
-import { baizeDirectionLabel } from "../utils/baize-direction-label";
+import { baizeDirectionLabel, BAIZE_DIRECTION_LABELS } from "../utils/baize-direction-label";
 import type { RecruitmentGateway } from "../services/recruitment/recruitment-gateway";
 import { RecruitmentApiError } from "../services/recruitment/api-recruitment.gateway";
 import { useAdminAccessStore } from "./admin-access";
@@ -49,7 +53,7 @@ type AssessmentBatchStatus = "assessing" | "ready-to-publish" | "published";
 
 interface AssessmentAuditRecord {
   id: string;
-  action: "save-round" | "record-adjustment-suggestion" | "record-adjustment" | "advance-round" | "publish";
+  action: "save-round" | "transfer" | "record-adjustment-suggestion" | "record-adjustment" | "advance-round" | "publish";
   actorId: string;
   actualAt: string;
   reason?: string;
@@ -64,6 +68,7 @@ export interface RecruitmentAssessmentBatchState {
   records: RecruitmentAssessmentRecord[];
   auditRecords: AssessmentAuditRecord[];
   publishedAt?: string;
+  roundPublishedAt?: Partial<Record<AssessmentRoundNumber, string>>;
 }
 
 export interface RecruitmentAssessmentBatchContext {
@@ -94,11 +99,13 @@ export interface AssessmentApiError {
 
 export type AssessmentPersonalSaveState = "editing" | "saving" | "saved" | "saved-refresh-failed" | "conflict" | "unknown";
 export interface AssessmentPersonalSaveScope {
+  batchId?: string;
   candidateId: string;
-  operation: "round" | "adjustment" | "proposal";
+  operation: "round" | "adjustment" | "proposal" | "transfer";
   round: AssessmentRoundNumber;
 }
 export function assessmentPersonalSaveKey(scope: AssessmentPersonalSaveScope): string {
+  if (scope.operation === 'transfer') return JSON.stringify([scope.batchId, scope.candidateId, scope.operation]);
   // Round results recur; each member has one final adjustment/proposal operation.
   return JSON.stringify(scope.operation === "round"
     ? [scope.candidateId, scope.operation, scope.round]
@@ -169,6 +176,10 @@ function cloneAssessmentRecord(record: RecruitmentAssessmentRecord): Recruitment
   return {
     ...record,
     roundOutcomes: { ...record.roundOutcomes },
+    ...(record.assessmentCenter ? { assessmentCenter: { ...record.assessmentCenter } } : {}),
+    ...(record.transfer ? { transfer: { ...record.transfer, fromCenter: { ...record.transfer.fromCenter }, toCenter: { ...record.transfer.toCenter } } } : {}),
+    ...(record.transferEligibility ? { transferEligibility: { ...record.transferEligibility } } : {}),
+    ...(record.originalRoundResult ? { originalRoundResult: { ...record.originalRoundResult } } : {}),
     ...(record.finalCenterIdentity ? { finalCenterIdentity: { ...record.finalCenterIdentity } } : {}),
     ...(record.adjustmentSuggestionIdentity
       ? { adjustmentSuggestionIdentity: { ...record.adjustmentSuggestionIdentity } }
@@ -181,6 +192,7 @@ function cloneBatchState(state: RecruitmentAssessmentBatchState): RecruitmentAss
     ...state,
     records: state.records.map(cloneAssessmentRecord),
     auditRecords: state.auditRecords.map((record) => ({ ...record })),
+    ...(state.roundPublishedAt ? { roundPublishedAt: { ...state.roundPublishedAt } } : {}),
   };
 }
 
@@ -215,6 +227,28 @@ function isAssessmentRecord(
   if (value.adjustmentSuggestion !== undefined && !isRegularAdjustmentCenter(value.adjustmentSuggestion)) {
     return false;
   }
+  if (value.baizeDirectionCode !== undefined && (typeof value.baizeDirectionCode !== 'string' || !Object.hasOwn(BAIZE_DIRECTION_LABELS, value.baizeDirectionCode))) return false;
+  if (value.finalBaizeDirection !== undefined && value.finalBaizeDirection !== null && (typeof value.finalBaizeDirection !== 'string' || !Object.hasOwn(BAIZE_DIRECTION_LABELS, value.finalBaizeDirection))) return false;
+  if (value.originalRoundResult !== undefined) {
+    const result = value.originalRoundResult;
+    if (!isRecord(result) || result.round !== 1 || !['PASSED', 'FAILED'].includes(result.outcome as string)
+      || !(result.internalNote === null || typeof result.internalNote === 'string')
+      || typeof result.createdAt !== 'string' || !Number.isFinite(Date.parse(result.createdAt)) || new Date(result.createdAt).getUTCFullYear() === 1970
+      || Object.keys(result).some(key => !['round', 'outcome', 'internalNote', 'createdAt'].includes(key))) return false;
+  }
+  if (value.transfer !== undefined) {
+    const transfer = value.transfer;
+    if (!isRecord(transfer) || typeof transfer.id !== 'string' || !transfer.id
+      || Object.keys(transfer).some(key => !['id', 'fromCenter', 'toCenter', 'entryRound', 'baizeDirection', 'createdAt'].includes(key))
+      || transfer.entryRound !== 2 || value.entryRound !== 2
+      || typeof transfer.baizeDirection !== 'string' || !Object.hasOwn(BAIZE_DIRECTION_LABELS, transfer.baizeDirection)
+      || typeof transfer.createdAt !== 'string' || !Number.isFinite(Date.parse(transfer.createdAt)) || new Date(transfer.createdAt).getUTCFullYear() === 1970
+      || !isRecord(transfer.fromCenter) || !isRecord(transfer.toCenter)
+      || transfer.fromCenter.name !== value.center || transfer.toCenter.name !== '白泽开发中心'
+      || ![transfer.fromCenter, transfer.toCenter].every(center => ['id', 'slug', 'name'].every(key => typeof center[key] === 'string' && center[key]))
+      || [transfer.fromCenter, transfer.toCenter].some(center => Object.keys(center).some(key => !['id', 'slug', 'name'].includes(key)))
+      || !isRecord(value.assessmentCenter) || value.assessmentCenter.id !== transfer.toCenter.id) return false;
+  } else if (value.entryRound === 2 || value.assessmentCenter !== undefined) return false;
   return ["internalNote", "updatedAt", "publishedAt"].every((key) => (
     value[key] === undefined || typeof value[key] === "string"
   ));
@@ -237,6 +271,7 @@ function isBatchState(
     || !Array.isArray(value.auditRecords)) {
     return false;
   }
+  if (value.roundPublishedAt !== undefined && (!isRecord(value.roundPublishedAt) || !Object.entries(value.roundPublishedAt).every(([round, time]) => ['1', '2', '3'].includes(round) && typeof time === 'string' && Number.isFinite(Date.parse(time)) && new Date(time).getUTCFullYear() !== 1970))) return false;
   return value.publishedAt === undefined || typeof value.publishedAt === "string";
 }
 
@@ -351,6 +386,7 @@ function latestCandidateTimestamp(candidate: AssessmentCandidateDto): string | u
     candidate.adjustmentProposal?.createdAt,
     candidate.adjustmentDecision?.createdAt,
     candidate.finalResult?.publishedAt,
+    candidate.transfer?.createdAt,
   ].filter((value): value is string => typeof value === "string"
     && Number.isFinite(Date.parse(value)) && new Date(value).getUTCFullYear() !== 1970);
   let latest = values[0];
@@ -385,6 +421,11 @@ function mapApiCandidate(
     candidateId: candidate.applicationId,
     memberId: candidate.person.id,
     center: firstChoice,
+    ...(candidate.assessmentCenter ? { assessmentCenter: apiCenterIdentity(candidate.assessmentCenter) } : {}),
+    ...(candidate.entryRound ? { entryRound: apiRound(candidate.entryRound) } : {}),
+    ...(candidate.transfer ? { transfer: { ...candidate.transfer }, assessmentCenter: apiCenterIdentity(candidate.transfer.toCenter), entryRound: 2 as const } : {}),
+    ...(candidate.transferEligibility ? { transferEligibility: { ...candidate.transferEligibility } } : {}),
+    ...(candidate.baizeDirection ? { baizeDirectionCode: candidate.baizeDirection } : {}),
     acceptsAdjustment: candidate.acceptsAdjustment,
     roundOutcomes: Object.fromEntries(candidate.roundResults.map((result) => [
       apiRound(result.round),
@@ -548,7 +589,7 @@ function candidateMemberId(record: RecruitmentAssessmentRecord): string | undefi
 function getFinalDecision(record: RecruitmentAssessmentRecord): AssessmentFinalDecision | undefined {
   if (record.finalDecision) return record.finalDecision;
   if (getAssessmentProcessingStatus(record) === "ready-to-publish") {
-    return getAssessmentRounds(record.center).some((round) => record.roundOutcomes[round] === "failed")
+    return getAssessmentRounds(record).some((round) => record.roundOutcomes[round] === "failed")
       ? "not-admitted"
       : "admitted";
   }
@@ -558,14 +599,18 @@ function getFinalDecision(record: RecruitmentAssessmentRecord): AssessmentFinalD
 function applyDerivedDecision(record: RecruitmentAssessmentRecord) {
   const status = getAssessmentProcessingStatus(record);
   if (status === "ready-to-publish" && !record.finalDecision) {
-    record.finalDecision = getAssessmentRounds(record.center).some(
+    record.finalDecision = getAssessmentRounds(record).some(
       (round) => record.roundOutcomes[round] === "failed",
     ) ? "not-admitted" : "admitted";
-    if (record.finalDecision === "admitted") record.finalCenter = record.center;
+    if (record.finalDecision === "admitted") {
+      record.finalCenter = getAssessmentCenter(record);
+      record.finalBaizeDirection = record.transfer?.baizeDirection ?? record.baizeDirectionCode ?? null;
+    }
   }
   if (status === "adjustment-suggestion-pending") {
     record.finalDecision = undefined;
     record.finalCenter = undefined;
+    record.finalBaizeDirection = null;
   }
 }
 
@@ -575,6 +620,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     apiMode: false,
     apiCandidateProfiles: {} as Record<string, Record<string, AssessmentCandidateProfile>>,
     apiAdjustmentTargetsByBatch: {} as Record<string, AssessmentAdjustmentTargetCatalogResponseDto["items"]>,
+    apiTransferCapabilitiesByBatch: {} as Record<string, boolean>,
     apiBatchContextByBatch: {} as Record<string, RecruitmentAssessmentBatchContext | undefined>,
     apiWorkflowByBatch: {} as Record<string, RecruitmentAssessmentWorkflowSummary | undefined>,
     apiLoadingByBatch: {} as Record<string, boolean>,
@@ -593,6 +639,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       this.batches = {};
       this.apiCandidateProfiles = {};
       this.apiAdjustmentTargetsByBatch = {};
+      this.apiTransferCapabilitiesByBatch = {};
       this.apiBatchContextByBatch = {};
       this.apiWorkflowByBatch = {};
       this.apiPersonalSaveByBatch = {};
@@ -606,13 +653,14 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       try {
         const [response, adjustmentTargets] = await Promise.all([
           gateway.getAssessmentBatch(batchId),
-          gateway.getAdjustmentTargets(batchId),
+          gateway.getAdjustmentTargets(batchId, true),
         ]);
         if (generation !== this.apiRefreshGenerationByBatch[batchId]) return this.getBatchState(batchId);
         const mapped = mapApiBatch(batchId, response);
         this.batches[batchId] = mapped.state;
         this.apiCandidateProfiles[batchId] = mapped.profiles;
         this.apiAdjustmentTargetsByBatch[batchId] = mapApiAdjustmentTargets(adjustmentTargets);
+        this.apiTransferCapabilitiesByBatch[batchId] = response.capabilities?.assessmentTransfers === true && adjustmentTargets.capabilities?.assessmentTransfers === true;
         this.apiBatchContextByBatch[batchId] = apiBatchContext(response);
         this.apiWorkflowByBatch[batchId] = apiWorkflowSummary(response);
         return mapped.state;
@@ -680,6 +728,48 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         this.applyPersonalTimestamp(input.batchId, input.candidateId, response.decision.createdAt);
       });
     },
+    async transferAssessmentFromApi(
+      gateway: RecruitmentGateway,
+      input: { batchId: string; candidateId: string; targetCenterId: string; baizeDirection: CreateAssessmentTransferDto['baizeDirection'] },
+    ): Promise<AssessmentPersonalSaveResult> {
+      const record = this.getCandidate(input.batchId, input.candidateId);
+      const scope: AssessmentPersonalSaveScope = { batchId: input.batchId, candidateId: input.candidateId, operation: 'transfer', round: 1 };
+      if (record?.transfer) throw new Error('ASSESSMENT_TRANSFER_ALREADY_EXISTS');
+      const previous = this.apiPersonalSaveByBatch[input.batchId]?.[assessmentPersonalSaveKey(scope)];
+      if (previous?.status === 'unknown') throw new Error('ASSESSMENT_TRANSFER_SAVE_UNKNOWN');
+      if (previous?.status === 'saved' || previous?.status === 'saved-refresh-failed') throw new Error('ASSESSMENT_TRANSFER_ALREADY_EXISTS');
+      if (!gateway.transferAssessment || !this.apiTransferCapabilitiesByBatch[input.batchId]) throw new Error('ASSESSMENT_TRANSFER_UNSUPPORTED');
+      const target = this.getApiTransferTarget(input.batchId);
+      if (this.currentRound(input.batchId) !== 1 || this.getBatchState(input.batchId).status !== 'assessing') throw new Error('ASSESSMENT_TRANSFER_WINDOW_CLOSED');
+      if (!record?.transferEligibility?.available) throw new Error(record?.transferEligibility?.blockReason ?? 'ASSESSMENT_TRANSFER_NOT_ALLOWED');
+      if (!target?.available || target.id !== input.targetCenterId) throw new Error(target?.blockReason ?? 'ASSESSMENT_TRANSFER_TARGET_INVALID');
+      if (!Object.hasOwn(BAIZE_DIRECTION_LABELS, input.baizeDirection)) throw new Error('BAIZE_DIRECTION_INVALID');
+      const result = await this.runPersonalApiMutation(gateway, scope as AssessmentPersonalSaveScope & { batchId: string }, () => gateway.transferAssessment!(input.batchId, input.candidateId, {
+        targetCenterId: input.targetCenterId, baizeDirection: input.baizeDirection, expectedCurrentRound: 1,
+      }), response => {
+        const current = this.getBatchState(input.batchId).records.find(item => item.candidateId === input.candidateId);
+        if (!current) return;
+        current.transfer = { ...response.transfer };
+        current.assessmentCenter = apiCenterIdentity(response.transfer.toCenter);
+        current.entryRound = 2;
+        current.transferEligibility = { available: false, blockReason: 'ASSESSMENT_TRANSFER_ALREADY_EXISTS' };
+        this.applyPersonalTimestamp(input.batchId, input.candidateId, response.transfer.createdAt);
+      });
+      if (result.status === 'unknown' && result.refreshed && this.getCandidate(input.batchId, input.candidateId)?.transfer) {
+        return this.rememberPersonalSaveResult(input.batchId, scope, { status: 'saved', refreshed: true });
+      }
+      return result;
+    },
+    async refreshTransferSave(gateway: RecruitmentGateway, batchId: string, previous: AssessmentPersonalSaveResult): Promise<AssessmentPersonalSaveResult> {
+      try {
+        await this.refreshAssessmentBatch(batchId, gateway);
+        const confirmed = this.getCandidate(batchId, previous.scope.candidateId)?.transfer;
+        return this.rememberPersonalSaveResult(batchId, previous.scope, { ...previous, refreshed: true,
+          status: confirmed || previous.status === 'saved-refresh-failed' ? 'saved' : previous.status });
+      } catch {
+        return this.rememberPersonalSaveResult(batchId, previous.scope, { ...previous, refreshed: false });
+      }
+    },
     applyPersonalTimestamp(batchId: string, candidateId: string, createdAt: string) {
       const record = this.getBatchState(batchId).records.find(item => item.candidateId === candidateId);
       if (!record) return;
@@ -708,7 +798,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     ): Promise<AssessmentPersonalSaveResult> {
       this.enableApiMode();
       const { batchId, candidateId, operation, round } = input;
-      const scope: AssessmentPersonalSaveScope = { candidateId, operation, round };
+      const scope: AssessmentPersonalSaveScope = { ...(operation === 'transfer' ? { batchId } : {}), candidateId, operation, round };
       if (this.apiMutatingByBatch[batchId]) throw new Error("ASSESSMENT_SAVE_IN_PROGRESS");
       this.apiMutatingByBatch[batchId] = true;
       delete this.apiErrorByBatch[batchId];
@@ -825,10 +915,15 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       return this.getBatchState(batchId).currentRound;
     },
     getApiAdjustmentTargets(batchId: string) {
-      return this.apiAdjustmentTargetsByBatch[batchId]?.map((center) => ({ ...center })) ?? [];
+      return this.apiAdjustmentTargetsByBatch[batchId]?.filter(center => center.action !== 'TRANSFER_TO_ASSESSMENT' && center.slug !== 'baize-development' && center.name !== '白泽开发中心').map((center) => ({ ...center })) ?? [];
+    },
+    getApiTransferTarget(batchId: string) {
+      if (!this.apiTransferCapabilitiesByBatch[batchId]) return undefined;
+      const target = this.apiAdjustmentTargetsByBatch[batchId]?.find(center => center.action === 'TRANSFER_TO_ASSESSMENT');
+      return target ? { ...target } : undefined;
     },
     getApiAdjustmentTarget(batchId: string, centerId: string) {
-      const center = this.apiAdjustmentTargetsByBatch[batchId]?.find(({ id }) => id === centerId);
+      const center = this.getApiAdjustmentTargets(batchId).find(({ id }) => id === centerId);
       return center ? { ...center } : undefined;
     },
     getApiBatchContext(batchId: string) {
@@ -838,6 +933,29 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
     getApiWorkflowSummary(batchId: string) {
       const summary = this.apiWorkflowByBatch[batchId];
       return summary ? { ...summary, advanceBlocker: summary.advanceBlocker ? { ...summary.advanceBlocker } : undefined } : undefined;
+    },
+    getMockStageResults(batchId: string, memberId: string): MemberStageResultsDto {
+      const state = this.getBatchState(batchId);
+      const record = state.records.find(item => item.memberId === memberId);
+      const empty: MemberStageResultsDto = { batchId: null, batchName: null, center: null, stages: [], transfer: null, entryGroupCode: null, finalGroupCode: null };
+      if (this.apiMode || !record) return empty;
+      const missingCode = (round: number): GroupCodeReferenceDto => ({ round, id: null, version: 0, status: 'MISSING', imageUrl: null });
+      const publishedAt = (round: AssessmentRoundNumber) => state.roundPublishedAt?.[round] ?? record.publishedAt;
+      const stages: MemberStageResultsDto['stages'] = ([1, 2, 3] as AssessmentRoundNumber[]).flatMap(round => {
+        const outcome = record.roundOutcomes[round], time = publishedAt(round);
+        if (!time || !outcome || outcome === 'pending') return [];
+        const original = round === 1;
+        const center = original ? record.transfer?.fromCenter ?? { id: record.center, slug: record.center, name: record.center } : record.assessmentCenter ?? { id: record.center, slug: record.center, name: record.center };
+        return [{ round, outcome: outcome === 'passed' ? 'PASSED' as const : 'FAILED' as const, publishedAt: time, center,
+          ...(record.transfer && !original ? { baizeDirection: record.transfer.baizeDirection } : {}),
+          groupCode: outcome === 'passed' ? missingCode(round) : null }];
+      });
+      const transferTime = publishedAt(1);
+      const transfer = record.transfer && transferTime ? { id: record.transfer.id, fromCenter: { ...record.transfer.fromCenter }, toCenter: { ...record.transfer.toCenter }, entryRound: 2 as const, baizeDirection: record.transfer.baizeDirection, publishedAt: transferTime } : null;
+      return { batchId, batchName: useRecruitmentBatchStore().getBatch(batchId)?.name ?? batchId,
+        center: transfer ? transfer.toCenter : { id: record.center, name: record.center }, stages, transfer,
+        entryGroupCode: transfer ? missingCode(1) : null,
+        finalGroupCode: record.publishedAt && record.finalDecision === 'admitted' ? missingCode(getAssessmentCenter(record) === '白泽开发中心' ? 3 : 1) : null };
     },
     getBatchState(batchId: string): RecruitmentAssessmentBatchState {
       if (this.apiMode) {
@@ -961,7 +1079,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         throw new Error("ASSESSMENT_EDIT_PERMISSION_REQUIRED");
       }
       if (account.adminLevel === "owner") return account;
-      if (account.adminCenterRole !== `${record.center}负责人`) {
+      if (account.adminCenterRole !== `${getAssessmentCenter(record)}负责人`) {
         throw new Error("ASSESSMENT_EDIT_PERMISSION_REQUIRED");
       }
       return account;
@@ -973,7 +1091,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         throw new Error("ASSESSMENT_ADJUSTMENT_SUGGEST_PERMISSION_REQUIRED");
       }
       if (account.adminLevel === "owner") return account;
-      if (account.adminCenterRole !== `${record.center}负责人`) {
+      if (account.adminCenterRole !== `${getAssessmentCenter(record)}负责人`) {
         throw new Error("ASSESSMENT_ADJUSTMENT_SUGGEST_PERMISSION_REQUIRED");
       }
       return account;
@@ -1028,10 +1146,41 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
       applicationStore.lockApplicationForAssessment(input.batchId, record.memberId, input.now);
       record.roundOutcomes[input.round] = input.outcome;
+      if (input.round === 1) record.originalRoundResult = { round: 1, outcome: input.outcome === 'passed' ? 'PASSED' : 'FAILED', internalNote: input.internalNote?.trim() || null, createdAt: input.now.toISOString() };
       if (input.internalNote !== undefined) record.internalNote = input.internalNote.trim();
       record.updatedAt = input.now.toISOString();
       applyDerivedDecision(record);
       this.appendAudit(state, "save-round", actor.account, input.now);
+      this.touch(state);
+      return this.toCandidate(state, record);
+    },
+    getTransferEligibility(batchId: string, candidateId: string) {
+      const record = this.getCandidate(batchId, candidateId);
+      if (this.apiMode) return record?.transferEligibility;
+      const state = this.getBatchState(batchId);
+      const batch = useRecruitmentBatchStore().getBatch(batchId);
+      const blockReason = record?.transfer ? 'ASSESSMENT_TRANSFER_ALREADY_EXISTS'
+        : state.currentRound !== 1 || state.status !== 'assessing' || !batch || ['draft', 'upcoming', 'archived'].includes(batch.lifecycleStatus) ? 'ASSESSMENT_TRANSFER_WINDOW_CLOSED'
+        : record?.finalDecision ? 'ASSESSMENT_TRANSFER_FINAL_DECISION_EXISTS'
+        : !record || record.center === '白泽开发中心' || !record.acceptsAdjustment || record.roundOutcomes[1] !== 'failed' ? 'ASSESSMENT_TRANSFER_NOT_ALLOWED'
+        : null;
+      return { available: !blockReason, blockReason };
+    },
+    transferAssessment(input: { batchId: string; candidateId: string; baizeDirection: CreateAssessmentTransferDto['baizeDirection']; now: Date }) {
+      const actor = this.resolveOwner();
+      this.assertAssessmentWritable(input.batchId, input.now);
+      const eligibility = this.getTransferEligibility(input.batchId, input.candidateId);
+      if (!eligibility?.available) throw new Error(eligibility?.blockReason ?? 'ASSESSMENT_TRANSFER_NOT_ALLOWED');
+      if (!Object.hasOwn(BAIZE_DIRECTION_LABELS, input.baizeDirection)) throw new Error('BAIZE_DIRECTION_INVALID');
+      const state = this.getBatchState(input.batchId);
+      const record = state.records.find(item => item.candidateId === input.candidateId)!;
+      record.transfer = { id: `transfer-${state.batchId}-${record.candidateId}`, fromCenter: { id: record.center, slug: record.center, name: record.center }, toCenter: { id: '白泽开发中心', slug: 'baize-development', name: '白泽开发中心' }, entryRound: 2, baizeDirection: input.baizeDirection, createdAt: input.now.toISOString() };
+      record.assessmentCenter = { ...record.transfer.toCenter };
+      record.entryRound = 2;
+      record.updatedAt = input.now.toISOString();
+      useRecruitmentBatchStore().markAssessmentStarted(input.batchId, input.now.toISOString());
+      useRecruitmentApplicationStore().lockApplicationForAssessment(input.batchId, record.memberId, input.now);
+      this.appendAudit(state, 'transfer', actor.account, input.now);
       this.touch(state);
       return this.toCandidate(state, record);
     },
@@ -1097,6 +1246,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       useRecruitmentApplicationStore().lockApplicationForAssessment(input.batchId, record.memberId, input.now);
       record.finalDecision = admitted ? "admitted" : "not-admitted";
       record.finalCenter = admitted ? decision : undefined;
+      record.finalBaizeDirection = null;
       record.updatedAt = input.now.toISOString();
       this.appendAudit(state, "record-adjustment", actor.account, input.now);
       this.touch(state);
@@ -1118,6 +1268,9 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
         || isAssessmentRoundEditable(record, state.currentRound, state.currentRound)
       ));
       if (incomplete) throw new Error("ASSESSMENT_ROUND_INCOMPLETE");
+
+      state.roundPublishedAt ??= {};
+      state.roundPublishedAt[state.currentRound] = now.toISOString();
 
       const nextRound = ([2, 3] as AssessmentRoundNumber[]).find((round) => (
         round > state.currentRound
@@ -1205,7 +1358,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
             if (!record.finalCenter) throw new Error("ASSESSMENT_NOT_READY");
             const result = administration.promoteMemberToFormal(memberId, {
               center: record.finalCenter,
-              ...(candidate?.baizeDirection ? { baizeDirection: candidate.baizeDirection } : {}),
+              ...(record.transfer ? { baizeDirection: baizeDirectionLabel(record.transfer.baizeDirection) } : candidate?.baizeDirection ? { baizeDirection: candidate.baizeDirection } : {}),
             });
             if (result.status !== "success" && result.status !== "already_formal") {
               throw new Error("ASSESSMENT_PROMOTION_FAILED");

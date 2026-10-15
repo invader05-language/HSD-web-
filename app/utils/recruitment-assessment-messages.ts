@@ -16,6 +16,23 @@ export function getRecruitmentAssessmentMessage(error: unknown, fallback = "考�
   const serverMessage = errorRecord(error).message;
   if (typeof serverMessage === "string" && /[\u4e00-\u9fff]/.test(serverMessage)) return serverMessage;
   switch (code) {
+    case 'ASSESSMENT_TRANSFER_WINDOW_CLOSED':
+      return '白泽调入仅在第一轮结果统一公开前开放；当前窗口已关闭，请刷新核对。';
+    case 'ASSESSMENT_TRANSFER_NOT_ALLOWED':
+      return '仅原第一志愿非白泽、第一轮不通过且接受调剂的成员可调入白泽。';
+    case 'ASSESSMENT_TRANSFER_ALREADY_EXISTS':
+      return '该成员已调入白泽，不能重复调入或修改已确认方向。';
+    case 'ASSESSMENT_TRANSFER_FINAL_DECISION_EXISTS':
+      return '该成员已有最终处理结果，不能再调入白泽考核。';
+    case 'ASSESSMENT_TRANSFER_TARGET_INVALID':
+      return '白泽考核调入目标暂不可用，请刷新核对目标中心。';
+    case 'ASSESSMENT_TRANSFER_UNSUPPORTED':
+      return '当前服务尚未开放白泽考核调入。';
+    case 'ASSESSMENT_TRANSFER_SAVE_UNKNOWN':
+      return '暂不能确认保存状态，请先刷新核对。';
+    case 'BAIZE_DIRECTION_REQUIRED':
+    case 'BAIZE_DIRECTION_INVALID':
+      return '请选择有效的白泽方向后再确认调入。';
     case "ROUND_RESULT_ALREADY_RECORDED":
       return "该成员本轮结果已录入，请核对服务器当前结果。";
     case "POST_SAVED_REFRESH_FAILED":

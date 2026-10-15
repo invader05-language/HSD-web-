@@ -6,6 +6,7 @@ import {
   type ApiResponseFor,
   type ApiV1Path,
   type AdvanceAssessmentDto,
+  type CreateAssessmentTransferDto,
   type BindRoundGroupCodeDto,
   type CreateGroupCodeUploadDto,
   type CreateManagedMemberDto,
@@ -195,6 +196,8 @@ export interface HsdApiClient {
   recruitment: {
     stageResults(): Promise<ApiResponseFor<"GET /api/v1/recruitment/results/me/stages">>;
     advancePreview(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview">>;
+    adjustmentTargets(batchId: string, includeAssessmentTransfers?: boolean): Promise<ApiResponseFor<'GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets'>>;
+    transferAssessment(batchId: string, applicationId: string, payload: CreateAssessmentTransferDto): Promise<ApiResponseFor<'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers'>>;
     advance(batchId: string, payload: AdvanceAssessmentDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/assessments/advance">>;
     groupCodes(batchId: string): Promise<ApiResponseFor<"GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes">>;
     groupCodeUpload(batchId: string, centerId: string, round: number, payload: CreateGroupCodeUploadDto): Promise<ApiResponseFor<"POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads">>;
@@ -369,6 +372,8 @@ export function createHsdApiClient(transport: ApiTransport): HsdApiClient {
     recruitment: {
       stageResults: () => requestGenerated(transport, "GET /api/v1/recruitment/results/me/stages"),
       advancePreview: batchId => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance-preview`),
+      adjustmentTargets: (batchId, includeAssessmentTransfers = false) => requestGenerated(transport, 'GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets', undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/adjustment-targets${includeAssessmentTransfers ? '?includeAssessmentTransfers=true' : ''}`),
+      transferAssessment: (batchId, applicationId, payload) => requestGenerated(transport, 'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers', payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/${encodeURIComponent(applicationId)}/assessment-transfers`),
       advance: (batchId, payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/advance", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance`),
       groupCodes: batchId => requestGenerated(transport, "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes", undefined, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessment-group-codes`),
       groupCodeUpload: (batchId, centerId, round, payload) => requestGenerated(transport, "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads", payload, `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code/uploads`),

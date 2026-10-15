@@ -99,6 +99,7 @@ const browserOperations = {
   adminRecruitmentBatchClose: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/close", successStatus: "200" },
   adminRecruitmentBatchReopen: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/reopen", successStatus: "200" },
   adminRecruitmentBatchArchive: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/archive", successStatus: "200" },
+  assessmentTransfer: 'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers',
   assessmentBatch: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
