@@ -5,7 +5,7 @@ import type { RoundGroupGateway } from '../../services/recruitment/recruitment-g
 import type { GroupCodeUploadOptions, GroupCodeUploadPhase, GroupCodeUploadTask } from '../../services/recruitment/group-code-upload';
 import PrivateGroupCode from '../member/PrivateGroupCode.vue';
 import { getRecruitmentAssessmentMessage } from '../../utils/recruitment-assessment-messages';
-const props = defineProps<{ batchId: string; owner: boolean; gateway: RoundGroupGateway }>();
+const props = defineProps<{ batchId: string; owner: boolean; gateway: RoundGroupGateway; scopeRevision?: string }>();
 const data = ref<GroupCodeListDto>(), selected = ref(''), loading = ref(false), error = ref(''), expired = ref(false);
 type Operation = { phase?: GroupCodeUploadPhase; message?: string; task?: GroupCodeUploadTask; uploadId?: string; failed?: boolean };
 const operations = ref<Record<string, Operation>>({});
@@ -32,6 +32,7 @@ async function load() {
   } finally { if (request === generation) loading.value = false; }
 }
 watch(() => props.batchId, () => { epoch++; controller?.abort(); busy.value = false; data.value = undefined; selected.value = ''; operations.value = {}; expired.value = false; void load(); }, { immediate: true });
+watch(() => props.scopeRevision, () => { void load(); });
 onBeforeUnmount(() => { epoch++; generation++; controller?.abort(); });
 async function run(round: number, action: (options: GroupCodeUploadOptions) => Promise<GroupCodeReferenceDto>) {
   if (!center.value || busy.value || expired.value) return;

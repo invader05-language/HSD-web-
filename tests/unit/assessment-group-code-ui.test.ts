@@ -14,6 +14,24 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn().mockReturnValue('blob:private'); URL.revokeObjectURL = vi.fn();
 });
 describe('round result UI', () => {
+  it('refreshes center scope while preserving an upload in progress and its resumable task', async () => {
+    const api = gateway(); let rejectUpload!: (cause: unknown) => void;
+    const task = { batchId: 'batch', centerId: 'c1', round: 1, uploadId: 'pending-upload' };
+    let signal: AbortSignal | undefined;
+    api.uploadAssessmentGroupCode = vi.fn().mockImplementation((_batch, _center, _round, _version, _file, options) => {
+      signal = options.signal; options.onProgress({ phase: 'uploading', uploadId: 'pending-upload' });
+      return new Promise((_resolve, reject) => { rejectUpload = reject; });
+    });
+    const wrapper = mount(AssessmentGroupCodePanel, { props: { batchId: 'batch', owner: true, gateway: api, scopeRevision: '' } }); await flushPromises();
+    const input = wrapper.get('input[type="file"]'); Object.defineProperty(input.element, 'files', { value: [new File(['image'], 'code.png', { type: 'image/png' })] });
+    await input.trigger('change'); expect(wrapper.text()).toContain('正在上传二维码');
+    api.getAssessmentGroupCodes = vi.fn().mockResolvedValue({ batchId: 'batch', centers: [{ id: 'c1', name: '新媒体中心', slug: 'new-media', rounds: [missing(1)] }, { id: 'baize', name: '白泽开发中心', slug: 'baize-development', rounds: [1, 2, 3].map(missing) }] });
+    await wrapper.setProps({ scopeRevision: 'baize' }); await flushPromises();
+    expect(wrapper.findAll('option').map(option => option.text())).toContain('白泽开发中心'); expect(wrapper.text()).toContain('正在上传二维码'); expect(signal?.aborted).toBe(false);
+    rejectUpload({ task }); await flushPromises();
+    expect(wrapper.findAll('button').some(button => button.text() === '检查保存状态并继续')).toBe(true);
+    expect(api.uploadAssessmentGroupCode).toHaveBeenCalledTimes(1); wrapper.unmount();
+  });
   it('keeps the loaded original image open when polling returns the same reference', async () => {
     const readImage=vi.fn().mockResolvedValue(new Blob(['image']));
     const code={id:'id',round:1,version:1,status:'READY' as const,imageUrl:'/api/v1/test/group-code/image?version=1'};

@@ -955,7 +955,7 @@ export const useRecruitmentAssessmentStore = defineStore("recruitment-assessment
       return { batchId, batchName: useRecruitmentBatchStore().getBatch(batchId)?.name ?? batchId,
         center: transfer ? transfer.toCenter : { id: record.center, name: record.center }, stages, transfer,
         entryGroupCode: transfer ? missingCode(1) : null,
-        finalGroupCode: record.publishedAt && record.finalDecision === 'admitted' ? missingCode(getAssessmentCenter(record) === '白泽开发中心' ? 3 : 1) : null };
+        finalGroupCode: record.publishedAt && record.finalDecision === 'admitted' ? missingCode(record.finalCenter === '白泽开发中心' ? 3 : 1) : null };
     },
     getBatchState(batchId: string): RecruitmentAssessmentBatchState {
       if (this.apiMode) {

@@ -64,6 +64,7 @@ const centerScope = computed(() => recruitmentGateway
 const allCandidates = computed(() => assessmentStore.getCandidates(props.batchId)
   .filter((candidate) => !centerScope.value || getAssessmentCenter(candidate) === centerScope.value));
 const candidates = computed(() => allCandidates.value);
+const groupCodeScopeRevision = computed(() => [...new Set(candidates.value.flatMap(candidate => candidate.transfer ? [candidate.transfer.toCenter.id] : []))].sort().join(','));
 const processedCandidates = computed(() => candidates.value.filter((candidate) => (
   candidate.processingStatus !== "assessing" && candidate.processingStatus !== "adjustment-suggestion-pending"
 )));
@@ -707,7 +708,7 @@ async function confirmAdvance() {
       <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 
-    <AssessmentGroupCodePanel v-if="roundGroupGateway" :batch-id="batchId" :owner="isOwner" :gateway="roundGroupGateway" />
+    <AssessmentGroupCodePanel v-if="roundGroupGateway" :batch-id="batchId" :owner="isOwner" :gateway="roundGroupGateway" :scope-revision="groupCodeScopeRevision" />
 
     <p v-if="roundGroupGateway && isOwner" class="admin-inline-note">完成本轮录入后，确认推进轮次即可同步向成员公开本轮结果和通过者群二维码。</p>
 

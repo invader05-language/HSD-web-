@@ -142,6 +142,28 @@ describe('published transfer privacy, QR and historical directions', () => {
 describe('existing workbench transfer flow', () => {
   function owner(level: 'OWNER' | 'ADMIN' = 'OWNER') { useSessionStore().applyApiSession({ account: { id: 'owner', adminLevel: level, adminCenterId: null, capabilities: ['recruitment.assessment.edit'] }, person: { id: 'owner', name: '负责人', status: 'FORMAL_MEMBER' }, mustChangePassword: false }); }
   async function open(api = gateway()) { runtime.gateway = api; const wrapper = mount(Workbench, { props: { batchId: 'batch-1' }, global: { stubs: { NuxtLink: true } } }); await flushPromises(); await wrapper.get('[aria-label="查看处理 候选人"]').trigger('click'); return { wrapper, api }; }
+  it.each(['confirmed', 'saved-refresh-failed', 'unknown'] as const)('adds newly eligible Baize QR configuration without a page reload after %s transfer', async status => {
+    owner(); const api = gateway(); let transferred = false;
+    const missing = (round: number) => ({ round, id: null, version: 0, status: 'MISSING', imageUrl: null });
+    api.getAssessmentGroupCodes = vi.fn().mockImplementation(async () => ({ batchId: 'batch-1', centers: [{ ...fromCenter, rounds: [missing(1)] }, ...(transferred ? [{ ...toCenter, rounds: [1, 2, 3].map(missing) }] : [])] }));
+    api.getAssessmentAdvancePreview = vi.fn(); api.readGroupCodeImage = vi.fn();
+    const { wrapper } = await open(api);
+    const panel = () => wrapper.get('[aria-label="分轮群二维码配置"]');
+    expect(panel().findAll('option').map(option => option.text())).toEqual(['新媒体中心']);
+    api.transferAssessment.mockImplementation(async () => {
+      transferred = true;
+      api.getAssessmentBatch.mockResolvedValue({ ...batch, version: 4, items: [{ ...candidate, transfer, assessmentCenter: toCenter, entryRound: 2 }] });
+      if (status !== 'confirmed') api.getAssessmentBatch.mockRejectedValueOnce(new Error('read unavailable'));
+      if (status === 'unknown') throw new Error('POST response unavailable');
+      return { version: 4, transfer };
+    });
+    await wrapper.get('[aria-label="最终调剂结果"]').setValue('transfer-to-baize'); await wrapper.get('[aria-label="白泽方向"]').setValue('BACKEND_ARCHITECTURE');
+    await wrapper.findAll('button').find(button => button.text() === '保存结果')!.trigger('click'); await wrapper.findAll('button').find(button => button.text() === '确认保存')!.trigger('click'); await flushPromises();
+    if (status === 'unknown') { expect(panel().findAll('option')).toHaveLength(1); await wrapper.get('[data-testid="assessment-retry-refresh"]').trigger('click'); await flushPromises(); }
+    expect(panel().findAll('option').map(option => option.text())).toEqual(['新媒体中心', '白泽开发中心']);
+    await panel().get('select').setValue('baize'); expect(panel().findAll('article')).toHaveLength(3);
+    expect(api.transferAssessment).toHaveBeenCalledTimes(1);
+  });
   it('offers owner transfer in existing result selector and requires a confirmed direction', async () => {
     owner(); const { wrapper, api } = await open();
     expect(wrapper.text()).toContain('当前考核中心分组');
@@ -220,5 +242,10 @@ describe('Mock transfer lifecycle', () => {
     const state = { batchId: 'batch-current', batchVersion: 1, version: 1, currentRound: 1, status: 'assessing', records: [{ ...record, batchId: 'batch-current', transfer: { ...transfer, futureInternalNote: 'private' } }], auditRecords: [] };
     localStorage.setItem(RECRUITMENT_ASSESSMENT_STORAGE_KEY, JSON.stringify({ version: 1, batches: { 'batch-current': state } }));
     expect(useRecruitmentAssessmentStore().batches['batch-current']).toBeUndefined();
+  });
+  it('uses the final ordinary center round for Mock final QR after a Baize transfer', () => {
+    const store = useRecruitmentAssessmentStore(), state = store.getBatchState('batch-current');
+    state.records = [{ ...record, batchId: 'batch-current', finalCenter: '人才发展中心', finalDecision: 'admitted', finalBaizeDirection: null, publishedAt: '2026-10-15T08:00:00Z' }];
+    expect(store.getMockStageResults('batch-current', record.memberId).finalGroupCode?.round).toBe(1);
   });
 });
