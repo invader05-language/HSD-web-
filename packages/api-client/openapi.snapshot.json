@@ -20244,7 +20244,7 @@
             ]
           },
           "currentRound": {
-            "type": "object",
+            "type": "number",
             "minimum": 1,
             "maximum": 3,
             "nullable": true

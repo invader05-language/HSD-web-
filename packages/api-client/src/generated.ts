@@ -1382,7 +1382,7 @@ export type MemberResultBatchDto = {
   "id": string;
   "name": string;
   "lifecycleStatus": "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED";
-  "currentRound": (Record<string, unknown>) | null;
+  "currentRound": (number) | null;
   "assessmentStatus": ("ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED") | null;
 };
 
@@ -8538,7 +8538,7 @@ const API_COMPONENT_SCHEMAS = {
         ]
       },
       "currentRound": {
-        "type": "object",
+        "type": "number",
         "minimum": 1,
         "maximum": 3,
         "nullable": true
