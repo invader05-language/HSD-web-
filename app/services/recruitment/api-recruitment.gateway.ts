@@ -148,34 +148,8 @@ export function createApiRecruitmentGateway(
     return parseResponse(operation, response);
   }
 
-  /**
-   * Result context is intentionally decoded as a local contract while the
-   * backend OpenAPI snapshot rolls out. Expected payload:
-   * `{ batch, application, stages, adjustment, assessmentTransfer,
-   * currentRouting, finalResult }`. The response is private and already
-   * authorization-scoped by the session cookie.
-   */
   async function readMyResultContext(): Promise<MemberResultContextDto> {
-    const response = await fetcher(`${apiBase}/api/v1/recruitment/results/me/context`, {
-      method: "GET",
-      credentials: "include",
-      headers: { "X-Request-ID": createRequestId() },
-    });
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = undefined;
-    }
-    if (!response.ok) {
-      throw new RecruitmentApiError({
-        status: response.status,
-        code: isErrorResponse(payload) ? payload.code : "RECRUITMENT_RESULT_CONTEXT_FAILED",
-        message: isErrorResponse(payload) ? payload.message : "Recruitment result context request failed",
-        ...(isErrorResponse(payload) ? { requestId: payload.requestId } : {}),
-      });
-    }
-    return payload as MemberResultContextDto;
+    return read("GET /api/v1/recruitment/results/me/context", "/api/v1/recruitment/results/me/context") as Promise<MemberResultContextDto>;
   }
 
   async function readRosterExport(batchId: string, query = ""): Promise<RecruitmentExportFile> {

@@ -93,8 +93,8 @@ describe("recruitment API gateway", () => {
 
   it("reads the coherent member result context without querying the open batch", async () => {
     const context = {
-      batch: { id: "batch-closed", name: "2026 秋季招新", effectiveStatus: "closed" },
-      application: { id: "application-closed", batchId: "batch-closed" },
+      batch: { id: "batch-closed", name: "2026 秋季招新", lifecycleStatus: "CLOSED", currentRound: null, assessmentStatus: "ASSESSING" },
+      application: { id: "application-closed", status: "COMPLETED", firstCenter: { id: "center-1", slug: "center-one", name: "中心一" }, acceptsAdjustment: true },
       stages: [], adjustment: null, assessmentTransfer: null, currentRouting: null, finalResult: null,
     };
     const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(context), {

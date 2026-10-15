@@ -1313,6 +1313,13 @@ export type MemberAvatarUploadResponseDto = {
   "assetId": string;
 };
 
+export type MemberCurrentRoutingDto = {
+  "type": "PASSED_CONTINUE" | "ADJUSTED" | "BAIZE_TRANSFER";
+  "center": AssessmentCenterDto;
+  "round": number;
+  "groupCode": (GroupCodeReferenceDto) | null;
+};
+
 export type MemberNotificationDto = {
   "id": string;
   "type": string;
@@ -1348,6 +1355,62 @@ export type MemberProfileResponseDto = {
   "membership": (MembershipResponseDto) | null;
 };
 
+export type MemberResultAdjustmentDto = {
+  "decision": "ADMITTED" | "NOT_ADMITTED";
+  "targetCenter": (AssessmentCenterDto) | null;
+  "decidedAt": string;
+  "finalPublished": boolean;
+};
+
+export type MemberResultApplicationDto = {
+  "id": string;
+  "status": string;
+  "firstCenter": AssessmentCenterDto;
+  "acceptsAdjustment": boolean;
+};
+
+export type MemberResultAssessmentTransferDto = {
+  "fromCenter": AssessmentCenterDto;
+  "toCenter": AssessmentCenterDto;
+  "entryRound": 2;
+  "baizeDirection": "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+  "publishedAt": (string) | null;
+  "entryGroupCode": (GroupCodeReferenceDto) | null;
+};
+
+export type MemberResultBatchDto = {
+  "id": string;
+  "name": string;
+  "lifecycleStatus": "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED";
+  "currentRound": (Record<string, unknown>) | null;
+  "assessmentStatus": ("ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED") | null;
+};
+
+export type MemberResultContextDto = {
+  "batch": (MemberResultBatchDto) | null;
+  "application": (MemberResultApplicationDto) | null;
+  "stages": Array<MemberResultStageDto>;
+  "adjustment": (MemberResultAdjustmentDto) | null;
+  "assessmentTransfer": (MemberResultAssessmentTransferDto) | null;
+  "currentRouting": (MemberCurrentRoutingDto) | null;
+  "finalResult": (MemberResultFinalDto) | null;
+};
+
+export type MemberResultFinalDto = {
+  "decision": "ADMITTED" | "NOT_ADMITTED";
+  "finalCenter": (AssessmentCenterDto) | null;
+  "publishedAt": string;
+};
+
+export type MemberResultStageDto = {
+  "center"?: AssessmentCenterDto;
+  "baizeDirection"?: ("HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT") | null;
+  "round": number;
+  "outcome": "PASSED" | "FAILED";
+  "publishedAt": string;
+  "groupCode": (GroupCodeReferenceDto) | null;
+};
+
 export type MembershipResponseDto = {
   "duty": "REGULAR" | "CORE";
   "version": number;
@@ -1362,6 +1425,8 @@ export type MemberStageResultsDto = {
   "center": (StageCenterDto) | null;
   "stages": Array<PublishedStageDto>;
   "finalGroupCode": (GroupCodeReferenceDto) | null;
+  "adjustment"?: (MemberResultAdjustmentDto) | null;
+  "currentRouting"?: (MemberCurrentRoutingDto) | null;
 };
 
 export type MyInterviewContextDto = {
@@ -2519,6 +2584,7 @@ export const API_V1_PATHS = {
   assessmentGroupCodeBind: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code",
   assessmentAdvancePreview: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
   memberStageResults: "/api/v1/recruitment/results/me/stages",
+  memberResultContext: "/api/v1/recruitment/results/me/context",
   authLogin: "/api/v1/auth/login",
   authSession: "/api/v1/auth/session",
   authChangePassword: "/api/v1/auth/change-password",
@@ -2681,6 +2747,7 @@ export const API_OPERATIONS = {
   "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": { method: "PUT", path: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview" },
   "GET /api/v1/recruitment/results/me/stages": { method: "GET", path: "/api/v1/recruitment/results/me/stages" },
+  "GET /api/v1/recruitment/results/me/context": { method: "GET", path: "/api/v1/recruitment/results/me/context" },
   "POST /api/v1/auth/login": { method: "POST", path: "/api/v1/auth/login" },
   "GET /api/v1/auth/session": { method: "GET", path: "/api/v1/auth/session" },
   "POST /api/v1/auth/change-password": { method: "POST", path: "/api/v1/auth/change-password" },
@@ -2846,6 +2913,7 @@ export interface ApiResponseByOperation {
   "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": GroupCodeReferenceDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": RoundPublicationPreviewDto;
   "GET /api/v1/recruitment/results/me/stages": MemberStageResultsDto;
+  "GET /api/v1/recruitment/results/me/context": MemberResultContextDto;
   "POST /api/v1/auth/login": AuthSessionResponseDto;
   "GET /api/v1/auth/session": CurrentSessionResponseDto;
   "POST /api/v1/auth/change-password": AuthSessionResponseDto;
@@ -3022,6 +3090,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "GET /api/v1/recruitment/results/me/stages": {
     "$ref": "#/components/schemas/MemberStageResultsDto"
+  },
+  "GET /api/v1/recruitment/results/me/context": {
+    "$ref": "#/components/schemas/MemberResultContextDto"
   },
   "POST /api/v1/auth/login": {
     "$ref": "#/components/schemas/AuthSessionResponseDto"
@@ -8306,6 +8377,73 @@ const API_COMPONENT_SCHEMAS = {
       "groupCode"
     ]
   },
+  "MemberResultAdjustmentDto": {
+    "type": "object",
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "ADMITTED",
+          "NOT_ADMITTED"
+        ]
+      },
+      "targetCenter": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          }
+        ]
+      },
+      "decidedAt": {
+        "type": "string"
+      },
+      "finalPublished": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "decision",
+      "targetCenter",
+      "decidedAt",
+      "finalPublished"
+    ]
+  },
+  "MemberCurrentRoutingDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "PASSED_CONTINUE",
+          "ADJUSTED",
+          "BAIZE_TRANSFER"
+        ]
+      },
+      "center": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "round": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 3
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "type",
+      "center",
+      "round",
+      "groupCode"
+    ]
+  },
   "MemberStageResultsDto": {
     "type": "object",
     "properties": {
@@ -8354,6 +8492,22 @@ const API_COMPONENT_SCHEMAS = {
             "$ref": "#/components/schemas/GroupCodeReferenceDto"
           }
         ]
+      },
+      "adjustment": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAdjustmentDto"
+          }
+        ]
+      },
+      "currentRouting": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberCurrentRoutingDto"
+          }
+        ]
       }
     },
     "required": [
@@ -8362,6 +8516,262 @@ const API_COMPONENT_SCHEMAS = {
       "center",
       "stages",
       "finalGroupCode"
+    ]
+  },
+  "MemberResultBatchDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "lifecycleStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "PUBLISHED",
+          "CLOSED",
+          "ARCHIVED"
+        ]
+      },
+      "currentRound": {
+        "type": "object",
+        "minimum": 1,
+        "maximum": 3,
+        "nullable": true
+      },
+      "assessmentStatus": {
+        "type": "string",
+        "enum": [
+          "ASSESSING",
+          "READY_TO_PUBLISH",
+          "PUBLISHED"
+        ],
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "lifecycleStatus",
+      "currentRound",
+      "assessmentStatus"
+    ]
+  },
+  "MemberResultApplicationDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string"
+      },
+      "firstCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "acceptsAdjustment": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "status",
+      "firstCenter",
+      "acceptsAdjustment"
+    ]
+  },
+  "MemberResultStageDto": {
+    "type": "object",
+    "properties": {
+      "center": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ],
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "outcome",
+      "publishedAt",
+      "groupCode"
+    ]
+  },
+  "MemberResultAssessmentTransferDto": {
+    "type": "object",
+    "properties": {
+      "fromCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "toCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "entryRound": {
+        "type": "number",
+        "enum": [
+          2
+        ]
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      },
+      "publishedAt": {
+        "type": "string",
+        "nullable": true
+      },
+      "entryGroupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "fromCenter",
+      "toCenter",
+      "entryRound",
+      "baizeDirection",
+      "publishedAt",
+      "entryGroupCode"
+    ]
+  },
+  "MemberResultFinalDto": {
+    "type": "object",
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "ADMITTED",
+          "NOT_ADMITTED"
+        ]
+      },
+      "finalCenter": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          }
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "decision",
+      "finalCenter",
+      "publishedAt"
+    ]
+  },
+  "MemberResultContextDto": {
+    "type": "object",
+    "properties": {
+      "batch": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultBatchDto"
+          }
+        ]
+      },
+      "application": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultApplicationDto"
+          }
+        ]
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MemberResultStageDto"
+        }
+      },
+      "adjustment": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAdjustmentDto"
+          }
+        ]
+      },
+      "assessmentTransfer": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAssessmentTransferDto"
+          }
+        ]
+      },
+      "currentRouting": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberCurrentRoutingDto"
+          }
+        ]
+      },
+      "finalResult": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultFinalDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "batch",
+      "application",
+      "stages",
+      "adjustment",
+      "assessmentTransfer",
+      "currentRouting",
+      "finalResult"
     ]
   },
   "RecruitmentResultBatchDto": {

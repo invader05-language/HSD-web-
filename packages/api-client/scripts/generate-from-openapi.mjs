@@ -10,6 +10,7 @@ const browserOperations = {
   assessmentGroupCodeBind: { operation: "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code", successStatus: "200" },
   assessmentAdvancePreview: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
   memberStageResults: "GET /api/v1/recruitment/results/me/stages",
+  memberResultContext: "GET /api/v1/recruitment/results/me/context",
   authLogin: "POST /api/v1/auth/login",
   authSession: "GET /api/v1/auth/session",
   authChangePassword: "POST /api/v1/auth/change-password",
