@@ -110,7 +110,10 @@ describe('transfer path and API save recovery', () => {
   });
 });
 describe('published transfer privacy, QR and historical directions', () => {
-  const render = (results: any) => mount(PublishedStageResults, { props: { results, readImage: vi.fn() }, global: { stubs: { PrivateGroupCode: { props: ['code'], template: '<div class="qr">{{ code?.id }}</div>' } } } });
+  const render = (results: any) => {
+    const { nextRound, ...stageResults } = results;
+    return mount(PublishedStageResults, { props: { results: stageResults, nextRound, readImage: vi.fn() }, global: { stubs: { PrivateGroupCode: { props: ['code'], template: '<div class="qr">{{ code?.id }}</div>' } } } });
+  };
   it('shows only the transfer summary and entry QR before the next Baize round is published', () => {
     const wrapper = render(stages);
     expect(wrapper.text()).not.toContain('本轮考核未通过'); expect(wrapper.text()).not.toContain('第 1 轮 · 新媒体中心');
@@ -129,6 +132,15 @@ describe('published transfer privacy, QR and historical directions', () => {
     expect(wrapper.find('.published-stages__history').text()).not.toContain('新媒体中心 · 未通过');
     const failed = render({ ...stages, stages: [...stages.stages, { round: 2, center: toCenter, outcome: 'FAILED', publishedAt: '2026-10-15T06:00:00.000Z', groupCode: null }] });
     expect(failed.find('.published-stages__current').exists()).toBe(false); expect(failed.text()).toContain('qr-entry');
+  });
+  it('maps the published next-round routing QR for a Baize transfer', () => {
+    const wrapper = render({
+      ...stages,
+      stages: [...stages.stages, { round: 2, center: toCenter, outcome: 'PASSED', publishedAt: '2026-10-15T06:00:00.000Z', groupCode: { ...qr, id: 'qr-two', round: 2 } }],
+      nextRound: { round: 3, center: toCenter, groupCode: { ...qr, id: 'qr-three', round: 3 } },
+    });
+    expect(wrapper.text()).toContain('第 3 轮入场群二维码');
+    expect(wrapper.text()).toContain('qr-three');
   });
   it('uses confirmed final direction while retaining original intent', () => {
     const result = memberResultFromApi({ id: 'r', batch: { id: 'b', name: '招新' }, decision: 'ADMITTED', admissionSource: 'ADJUSTMENT', finalCenter: toCenter, baizeDirection: 'UI_UX_DESIGN', finalBaizeDirection: 'BACKEND_ARCHITECTURE', preferences: [{ rank: 'FIRST', center: fromCenter }], responsibleContacts: [], publishedAt: '2026-10-15T08:00:00.000Z' } as any);

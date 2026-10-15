@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import PublishedStageResults from '~/components/member/PublishedStageResults.vue';
 import PrivateGroupCode from '~/components/member/PrivateGroupCode.vue';
-import type { MemberStageResultsDto } from '../../../packages/api-client/src';
+import MemberCurrentRouting from '~/components/member/MemberCurrentRouting.vue';
+import type { MemberStageResultsDto, MyRecruitmentResultDto } from '../../../packages/api-client/src';
 import { createResultRefresh } from '~/utils/assessment-result-refresh';
 import MemberSpaceNav from "~/components/member/MemberSpaceNav.vue";
 import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
   memberResultFromApi,
-  memberResultFromApplication,
   resultCenterMemberFromSession,
+  memberResultFromContext,
+  stageResultsFromContext,
   describeAdmission,
   describeAssessment,
   type MemberIdentity,
@@ -22,8 +24,6 @@ import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { useSessionGateway } from "~/composables/useSessionGateway";
-import { mapPublicRecruitmentBatch, mapRecruitmentApplicationResponse } from "~/services/recruitment/recruitment-view-models";
-import type { SubmittedRecruitmentApplication } from "~/data/recruitment-application";
 
 type ResultTab = "admission" | "assessment";
 
@@ -51,11 +51,11 @@ const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
 const recruitmentGateway = useRecruitmentGateway();
-const productionApplication = ref<SubmittedRecruitmentApplication>();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
 const apiStageResults = ref<MemberStageResultsDto>();
+const apiResultContext = ref<import("~/data/member-results").MemberResultContextDto>();
 const stageResults = computed(() => {
   if (recruitmentGateway) return apiStageResults.value;
   const memberId = currentMember.value?.id;
@@ -71,7 +71,6 @@ function expireSession() {
   if (destroyed || sessionExpired) return;
   sessionExpired = true;
   apiStageResults.value = undefined;
-  productionApplication.value = undefined;
   assessmentStore.myResults = [];
   session.clearProductionSession();
   void navigateTo('/login?redirect=/member/results');
@@ -82,19 +81,20 @@ function refreshResults(): Promise<void> {
 }
 async function loadResults() {
   if (!recruitmentGateway || destroyed || sessionExpired) return;
-  const [final, stages] = await Promise.allSettled([
-    recruitmentGateway.getMyResults(),
-    recruitmentGateway.getMyStageResults?.(),
-  ]);
+  const context = await recruitmentGateway.getMyResultContext();
   if (destroyed || sessionExpired) return;
-  const unauthorized = [final, stages].find(item => item.status === 'rejected' && item.reason?.status === 401);
-  if (unauthorized?.status === 'rejected') throw unauthorized.reason;
-  if (final.status === 'fulfilled') { assessmentStore.myResults = final.value.items; assessmentStore.myResultsError = undefined; }
-  else assessmentStore.myResultsError = '结果暂时无法加载，请稍后重试。';
-  if (stages.status === 'fulfilled') { apiStageResults.value = stages.value; stageError.value = ''; }
-  else stageError.value = '阶段考核结果加载失败，正在重试。';
-  if (final.status === 'rejected') throw final.reason;
-  if (stages.status === 'rejected') throw stages.reason;
+  apiResultContext.value = context;
+  const finalProjection = context.finalResult;
+  assessmentStore.myResults = finalProjection
+    && typeof finalProjection.id === "string"
+    && finalProjection.batch
+    && finalProjection.preferences
+    && finalProjection.responsibleContacts
+    ? [finalProjection as MyRecruitmentResultDto]
+    : [];
+  assessmentStore.myResultsError = undefined;
+  apiStageResults.value = stageResultsFromContext(context);
+  stageError.value = '';
 }
 const refresher = createResultRefresh(refreshResults, { unauthorized: expireSession, visible: () => typeof document !== 'undefined' && document.visibilityState === 'visible' });
 function visibilityChanged() { refresher.visibilityChanged(); }
@@ -102,43 +102,11 @@ async function refreshImageReference() {
   try { await refreshResults(); }
   catch (cause) { if ((cause as { status?: number })?.status === 401) { refresher.stop(); expireSession(); } }
 }
-const finalGroupCode = computed(() => stageResults.value?.batchId === assessmentStore.myResults[0]?.batch.id
-  ? stageResults.value?.finalGroupCode : undefined);
+const finalGroupCode = computed(() => stageResults.value?.finalGroupCode);
 onMounted(async () => {
   if (!recruitmentGateway) return;
   document.addEventListener('visibilitychange', visibilityChanged);
   refresher.start();
-  try {
-    const current = await recruitmentGateway.getCurrentBatch();
-    if (destroyed || sessionExpired) return;
-    if (current.batch) {
-      const batch = mapPublicRecruitmentBatch(current.batch);
-      const own = await recruitmentGateway.getMyApplication(batch.id);
-      if (destroyed || sessionExpired) return;
-      if (own.application) {
-        const profile = session.apiSession?.person;
-        if (profile) productionApplication.value = mapRecruitmentApplicationResponse(own.application, {
-          id: profile.id,
-          name: profile.name,
-          studentId: "",
-          grade: "",
-          className: "",
-          center: "待确定",
-          memberDuty: "普通成员",
-          identity: currentMemberIdentity.value ?? "预备成员",
-          bio: "",
-          version: 0,
-          contact: "",
-          biography: "",
-          status: profile.status,
-          publicProfileEnabled: false,
-        }, batch);
-      }
-    }
-  } catch (cause) {
-    if ((cause as { status?: number })?.status === 401) { refresher.stop(); expireSession(); }
-    // Current enrollment is optional; published results are queried independently.
-  }
 });
 onBeforeUnmount(() => { destroyed = true; refresher.stop(); document.removeEventListener('visibilitychange', visibilityChanged); });
 
@@ -162,17 +130,37 @@ const publishedAssessment = computed(() => {
   ))[0];
 });
 const result = computed(() => recruitmentGateway
-  ? assessmentStore.myResults[0]
+  ? apiResultContext.value
+    ? memberResultFromContext(apiResultContext.value, currentMemberIdentity.value ?? "预备成员")
+    : assessmentStore.myResults[0]
     ? memberResultFromApi(assessmentStore.myResults[0], currentMemberIdentity.value ?? "预备成员")
-    : productionApplication.value
-      ? memberResultFromApplication(productionApplication.value)
-      : memberResultFromApi(undefined, currentMemberIdentity.value ?? "预备成员")
+    : memberResultFromApi(undefined, currentMemberIdentity.value ?? "预备成员")
   : applyPublishedAssessmentProjection(
       getDemoMemberResult(currentMember.value?.id ?? "", applicationStore.submittedApplication),
       publishedAssessment.value,
     ));
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
+const ordinaryAdjustmentRouting = computed(() => {
+  const context = apiResultContext.value;
+  if (!context || context.finalResult || context.assessmentTransfer || context.adjustment?.decision !== "ADMITTED") return undefined;
+  const center = context.adjustment.targetCenter ?? context.currentRouting?.center;
+  if (!center) return undefined;
+  return {
+    center,
+    round: context.currentRouting?.round ?? context.adjustment.groupCode?.round ?? undefined,
+    groupCode: context.adjustment.groupCode ?? context.currentRouting?.groupCode ?? null,
+  };
+});
+const nextRoundRouting = computed(() => {
+  const context = apiResultContext.value;
+  if (!context?.assessmentTransfer || !context.currentRouting?.round) return undefined;
+  return {
+    round: context.currentRouting.round,
+    center: context.currentRouting.center,
+    groupCode: context.currentRouting.groupCode ?? null,
+  };
+});
 const activeTab = ref<ResultTab>("admission");
 const copyStatus = ref<Record<string, "idle" | "success" | "error">>({});
 let copyResetTimer: number | undefined;
@@ -227,7 +215,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         </div>
         <aside class="member-results-hero__batch" aria-label="当前招新批次">
           <span>当前招新批次</span>
-          <h2>{{ stageResults?.batchName ?? result.batchLabel }}</h2>
+          <h2>{{ apiResultContext?.batch?.name ?? stageResults?.batchName ?? result.batchLabel }}</h2>
           <dl>
             <div><dt>当前账号</dt><dd>{{ currentMember?.name ?? "当前登录成员" }}</dd></div>
             <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
@@ -277,21 +265,32 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
             <article class="member-result-card">
               <header class="member-result-card__header">
                 <span>录取结果</span>
-                <strong class="member-result-status member-result-status--success">{{ admission.badge }}</strong>
+                <strong class="member-result-status" :class="result.finalResultPending ? 'member-result-status--pending' : 'member-result-status--success'">{{ result.finalResultPending ? '结果待公布' : admission.badge }}</strong>
               </header>
 
               <div class="member-result-summary">
                 <p>录取结果</p>
-                <h2>{{ admission.headline }}</h2>
-                <p>{{ admission.description }}</p>
+                <h2>{{ result.finalResultPending ? `当前考核去向：${result.routingCenter ?? result.finalCenter ?? '待确定'}` : admission.headline }}</h2>
+                <p>{{ result.finalResultPending ? '当前中心仅代表考核去向，最终结果待联盟总负责人发布。' : admission.description }}</p>
               </div>
 
               <dl class="member-result-facts">
                 <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
                 <div><dt>当前阶段</dt><dd>{{ result.currentStage }}</dd></div>
-                <div><dt>最终归属</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
+                <div><dt>{{ result.finalResultPending ? '当前考核去向' : '最终归属' }}</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
                 <div><dt>所属方向</dt><dd>{{ result.finalDirection ?? "不适用" }}</dd></div>
               </dl>
+
+              <MemberCurrentRouting
+                v-if="ordinaryAdjustmentRouting"
+                :center="ordinaryAdjustmentRouting.center"
+                :round="ordinaryAdjustmentRouting.round"
+                :group-code="ordinaryAdjustmentRouting.groupCode"
+                final-result-pending
+                :read-image="readStageImage"
+                @refresh="refreshImageReference"
+                @unauthorized="refresher.stop(); expireSession()"
+              />
 
               <section v-if="finalGroupCode && recruitmentGateway?.readGroupCodeImage" class="member-final-group"><h3>部门群二维码</h3><PrivateGroupCode :code="finalGroupCode" :read-image="recruitmentGateway.readGroupCodeImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" /></section>
               <footer class="member-result-card__footer">
@@ -351,7 +350,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         >
           <p v-if="stageError" role="alert">{{ stageError }}</p>
           <div class="member-results-grid">
-            <PublishedStageResults v-if="stageResults?.stages.length" :results="stageResults" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
+            <PublishedStageResults v-if="stageResults?.stages.length" :results="stageResults" :next-round="nextRoundRouting" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
             <article v-else class="member-result-card">
               <header class="member-result-card__header">
                 <span>考核进度</span>

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PublishedStageResults from '../../app/components/member/PublishedStageResults.vue';
+import MemberCurrentRouting from '../../app/components/member/MemberCurrentRouting.vue';
 import PrivateGroupCode from '../../app/components/member/PrivateGroupCode.vue';
 import AssessmentGroupCodePanel from '../../app/components/admin/AssessmentGroupCodePanel.vue';
 import type { MemberStageResultsDto } from '../../packages/api-client/src';
@@ -14,6 +15,22 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn().mockReturnValue('blob:private'); URL.revokeObjectURL = vi.fn();
 });
 describe('round result UI', () => {
+  it('shows an ordinary adjustment destination, QR and explicit pending final state', () => {
+    const wrapper = mount(MemberCurrentRouting, {
+      props: {
+        center: { id: 'talent', slug: 'talent-development', name: '人才发展中心' },
+        round: 1,
+        groupCode: { id: 'qr-adjusted', round: 1, version: 1, status: 'READY', imageUrl: '/qr' },
+        finalResultPending: true,
+        readImage: vi.fn(),
+      },
+      global: { stubs: { PrivateGroupCode: { props: ['code'], template: '<div class="qr">{{ code.id }}</div>' } } },
+    });
+    expect(wrapper.text()).toContain('人才发展中心');
+    expect(wrapper.text()).toContain('最终结果待联盟总负责人发布');
+    expect(wrapper.find('.qr').text()).toBe('qr-adjusted');
+    wrapper.unmount();
+  });
   it('refreshes center scope while preserving an upload in progress and its resumable task', async () => {
     const api = gateway(); let rejectUpload!: (cause: unknown) => void;
     const task = { batchId: 'batch', centerId: 'c1', round: 1, uploadId: 'pending-upload' };

@@ -40,6 +40,7 @@ import type {
   NotificationActionResponseDto,
   NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
+import type { MemberResultContextDto } from "../../data/member-results";
 
 export interface RecruitmentExportFile {
   blob: Blob;
@@ -109,6 +110,8 @@ export interface RecruitmentGateway extends Partial<RoundGroupGateway> {
     payload: PublishAssessmentDto,
   ): Promise<AssessmentPublicationResponseDto>;
   getMyResults(): Promise<MyRecruitmentResultListDto>;
+  /** Reads the coherent member result snapshot, including applications from closed batches. */
+  getMyResultContext(): Promise<MemberResultContextDto>;
   getMyResponsibleContact(resultId: string, personId: string): Promise<{ personId: string; contact: string }>;
   changeInterviewSlot(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
 }

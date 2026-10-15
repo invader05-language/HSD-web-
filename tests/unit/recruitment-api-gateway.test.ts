@@ -91,6 +91,33 @@ describe("recruitment API gateway", () => {
     );
   });
 
+  it("reads the coherent member result context without querying the open batch", async () => {
+    const context = {
+      batch: { id: "batch-closed", name: "2026 秋季招新", effectiveStatus: "closed" },
+      application: { id: "application-closed", batchId: "batch-closed" },
+      stages: [], adjustment: null, assessmentTransfer: null, currentRouting: null, finalResult: null,
+    };
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(context), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "request-result-context",
+    });
+
+    await expect(gateway.getMyResultContext()).resolves.toEqual(context);
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/recruitment/results/me/context",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-result-context" },
+      },
+    );
+  });
+
   it("routes interview reselection and admin slot reconciliation through CSRF-protected mutations", async () => {
     const response = {
       id: "application-1",
