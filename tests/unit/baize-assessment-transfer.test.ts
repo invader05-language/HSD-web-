@@ -111,10 +111,13 @@ describe('transfer path and API save recovery', () => {
 });
 describe('published transfer privacy, QR and historical directions', () => {
   const render = (results: any) => mount(PublishedStageResults, { props: { results, readImage: vi.fn() }, global: { stubs: { PrivateGroupCode: { props: ['code'], template: '<div class="qr">{{ code?.id }}</div>' } } } });
-  it('shows published source failure, confirmed direction, wait for round two and entry QR without pretending a pass', () => {
+  it('shows only the transfer summary and entry QR before the next Baize round is published', () => {
     const wrapper = render(stages);
-    expect(wrapper.text()).toContain('本轮考核未通过'); expect(wrapper.text()).toContain('新媒体中心');
-    expect(wrapper.text()).toContain('已调入白泽开发中心'); expect(wrapper.text()).toContain('后端架构'); expect(wrapper.text()).toContain('待第二轮');
+    expect(wrapper.text()).not.toContain('本轮考核未通过'); expect(wrapper.text()).not.toContain('第 1 轮 · 新媒体中心');
+    expect(wrapper.text()).toContain('原第一志愿：新媒体中心');
+    expect(wrapper.text()).toContain('已调入白泽开发中心'); expect(wrapper.text()).toContain('后端架构');
+    expect(wrapper.text()).not.toContain('待第二轮');
+    expect(wrapper.text()).not.toContain('暂无已发布的阶段考核结果');
     expect(wrapper.text()).toContain('qr-entry');
     expect(render({ ...stages, transfer: null, entryGroupCode: null }).text()).not.toContain('已调入');
   });
@@ -123,7 +126,7 @@ describe('published transfer privacy, QR and historical directions', () => {
     expect(wrapper.text()).toContain('第 2 轮 · 白泽开发中心');
     expect(wrapper.find('.published-stages__current').text()).toContain('qr-two');
     expect(wrapper.find('.published-stages__history').text()).toContain('qr-entry');
-    expect(wrapper.find('.published-stages__history').text()).toContain('新媒体中心 · 未通过');
+    expect(wrapper.find('.published-stages__history').text()).not.toContain('新媒体中心 · 未通过');
     const failed = render({ ...stages, stages: [...stages.stages, { round: 2, center: toCenter, outcome: 'FAILED', publishedAt: '2026-10-15T06:00:00.000Z', groupCode: null }] });
     expect(failed.find('.published-stages__current').exists()).toBe(false); expect(failed.text()).toContain('qr-entry');
   });
