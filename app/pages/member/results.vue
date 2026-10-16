@@ -15,6 +15,7 @@ import {
   describeAdmission,
   describeAssessment,
   type MemberIdentity,
+  type MemberStageView,
 } from "~/data/member-results";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useSessionStore } from "~/stores/session";
@@ -54,7 +55,7 @@ const recruitmentGateway = useRecruitmentGateway();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
-const apiStageResults = ref<MemberStageResultsDto>();
+const apiStageResults = ref<MemberStageView>();
 const apiResultContext = ref<import("~/data/member-results").MemberResultContextDto>();
 const stageResults = computed(() => {
   if (recruitmentGateway) return apiStageResults.value;
@@ -71,6 +72,7 @@ function expireSession() {
   if (destroyed || sessionExpired) return;
   sessionExpired = true;
   apiStageResults.value = undefined;
+  apiResultContext.value = undefined;
   assessmentStore.myResults = [];
   session.clearProductionSession();
   void navigateTo('/login?redirect=/member/results');
@@ -141,25 +143,9 @@ const result = computed(() => recruitmentGateway
     ));
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
-const ordinaryAdjustmentRouting = computed(() => {
+const publishedRouting = computed(() => {
   const context = apiResultContext.value;
-  if (!context || context.finalResult || context.assessmentTransfer || context.adjustment?.decision !== "ADMITTED") return undefined;
-  const center = context.adjustment.targetCenter ?? context.currentRouting?.center;
-  if (!center) return undefined;
-  return {
-    center,
-    round: context.currentRouting?.round ?? context.adjustment.groupCode?.round ?? undefined,
-    groupCode: context.adjustment.groupCode ?? context.currentRouting?.groupCode ?? null,
-  };
-});
-const nextRoundRouting = computed(() => {
-  const context = apiResultContext.value;
-  if (!context?.assessmentTransfer || !context.currentRouting?.round) return undefined;
-  return {
-    round: context.currentRouting.round,
-    center: context.currentRouting.center,
-    groupCode: context.currentRouting.groupCode ?? null,
-  };
+  return !context?.finalResult && context?.currentRouting?.center ? context.currentRouting : undefined;
 });
 const activeTab = ref<ResultTab>("admission");
 const copyStatus = ref<Record<string, "idle" | "success" | "error">>({});
@@ -265,28 +251,26 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
             <article class="member-result-card">
               <header class="member-result-card__header">
                 <span>录取结果</span>
-                <strong class="member-result-status" :class="result.finalResultPending ? 'member-result-status--pending' : 'member-result-status--success'">{{ result.finalResultPending ? '结果待公布' : admission.badge }}</strong>
+                <strong class="member-result-status" :class="result.finalResultPending ? 'member-result-status--pending' : 'member-result-status--success'">{{ publishedRouting ? '已发布结果' : admission.badge }}</strong>
               </header>
 
               <div class="member-result-summary">
-                <p>录取结果</p>
-                <h2>{{ result.finalResultPending ? `当前考核去向：${result.routingCenter ?? result.finalCenter ?? '待确定'}` : admission.headline }}</h2>
-                <p>{{ result.finalResultPending ? '当前中心仅代表考核去向，最终结果待联盟总负责人发布。' : admission.description }}</p>
+                <p>{{ publishedRouting ? '已发布的考核结果' : '录取结果' }}</p>
+                <h2>{{ publishedRouting ? `${publishedRouting.type === 'ADJUSTED' || publishedRouting.type === 'BAIZE_TRANSFER' ? '已调入' : '所属中心：'}${publishedRouting.center?.name}` : admission.headline }}</h2>
+                <p>{{ publishedRouting ? '扫码进入对应中心群。' : admission.description }}</p>
               </div>
 
               <dl class="member-result-facts">
                 <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
                 <div><dt>当前阶段</dt><dd>{{ result.currentStage }}</dd></div>
-                <div><dt>{{ result.finalResultPending ? '当前考核去向' : '最终归属' }}</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
+                <div><dt>{{ publishedRouting ? '所属中心' : '最终归属' }}</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
                 <div><dt>所属方向</dt><dd>{{ result.finalDirection ?? "不适用" }}</dd></div>
               </dl>
 
               <MemberCurrentRouting
-                v-if="ordinaryAdjustmentRouting"
-                :center="ordinaryAdjustmentRouting.center"
-                :round="ordinaryAdjustmentRouting.round"
-                :group-code="ordinaryAdjustmentRouting.groupCode"
-                final-result-pending
+                v-if="publishedRouting?.center"
+                :center="publishedRouting.center"
+                :group-code="publishedRouting.groupCode"
                 :read-image="readStageImage"
                 @refresh="refreshImageReference"
                 @unauthorized="refresher.stop(); expireSession()"
@@ -350,7 +334,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         >
           <p v-if="stageError" role="alert">{{ stageError }}</p>
           <div class="member-results-grid">
-            <PublishedStageResults v-if="stageResults?.stages.length" :results="stageResults" :next-round="nextRoundRouting" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
+            <PublishedStageResults v-if="stageResults && (stageResults.stages.length || stageResults.currentRouting || stageResults.transfer)" :results="stageResults" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
             <article v-else class="member-result-card">
               <header class="member-result-card__header">
                 <span>考核进度</span>

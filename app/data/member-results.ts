@@ -65,7 +65,8 @@ export interface MemberResultContextDto {
   batch: { id: string; name: string; effectiveStatus?: string | null } | null;
   application: {
     id: string;
-    batchId: string;
+    batchId?: string;
+    firstCenter?: { id: string; slug: string; name: string };
     status?: string;
     acceptsAdjustment?: boolean;
     baizeDirection?: string | null;
@@ -77,9 +78,12 @@ export interface MemberResultContextDto {
     targetCenter?: { id: string; slug: string; name: string } | null;
     groupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
     publishedAt?: string | null;
+    decidedAt?: string;
+    finalPublished?: boolean;
   } | null;
-  assessmentTransfer: import("../../packages/api-client/src").PublishedAssessmentTransferDto | null;
+  assessmentTransfer: MemberStageView["transfer"] | null;
   currentRouting: {
+    type?: "PASSED_CONTINUE" | "ADJUSTED" | "BAIZE_TRANSFER";
     center?: { id: string; slug: string; name: string } | null;
     round?: number | null;
     groupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
@@ -90,6 +94,16 @@ export interface MemberResultContextDto {
     publishedAt: string;
   }) | null;
 }
+
+/** Context transfer records have no database id; the legacy stages endpoint does. */
+export type MemberStageView = Omit<MemberStageResultsDto, "transfer" | "adjustment" | "currentRouting"> & {
+  transfer?: (Omit<import("../../packages/api-client/src").PublishedAssessmentTransferDto, "id"> & {
+    id?: string;
+    entryGroupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
+  }) | null;
+  adjustment?: MemberResultContextDto["adjustment"];
+  currentRouting?: MemberResultContextDto["currentRouting"];
+};
 
 export interface ResultPresentation {
   badge: string;
@@ -225,17 +239,16 @@ export function memberResultFromContext(
   const application = context.application;
   if (!application) return memberResultFromApi(undefined, fallbackIdentity);
 
-  const preferences = (application.preferences ?? [])
+  const preferences = (application.preferences ?? (application.firstCenter ? [{ rank: "FIRST" as const, center: application.firstCenter }] : []))
     .map((preference) => {
       const rank = rankValue(preference.rank);
       return rank ? { rank, center: preference.center.name } : undefined;
     })
     .filter((preference): preference is MemberPreference => Boolean(preference))
     .sort((left, right) => left.rank - right.rank);
-  const adjustment = context.adjustment?.decision === "ADMITTED" ? context.adjustment : undefined;
   const routing = context.currentRouting;
-  const routingCenter = adjustment?.targetCenter?.name ?? routing?.center?.name;
-  const routingGroupCode = adjustment?.groupCode ?? routing?.groupCode ?? null;
+  const routingCenter = routing?.center?.name;
+  const routingGroupCode = routing?.groupCode ?? null;
   const routingRound = routing?.round ?? routingGroupCode?.round ?? undefined;
 
   return {
@@ -251,13 +264,15 @@ export function memberResultFromContext(
     ...(routingCenter ? { finalCenter: routingCenter, routingCenter } : {}),
     ...(routingRound ? { routingRound } : {}),
     ...(routingGroupCode ? { routingGroupCode } : {}),
-    ...(adjustment ? { finalResultPending: true } : {}),
+    ...(routingCenter ? { finalResultPending: true } : {}),
+    ...(routingCenter && routing?.center?.slug === "baize-development" && context.assessmentTransfer?.baizeDirection
+      ? { finalDirection: baizeDirectionLabel(context.assessmentTransfer.baizeDirection) } : {}),
   };
 }
 
 export function stageResultsFromContext(
   context: MemberResultContextDto,
-): MemberStageResultsDto | undefined {
+): MemberStageView | undefined {
   if (!context.stages) return undefined;
   const source = (Array.isArray(context.stages)
     ? { stages: context.stages }
@@ -265,11 +280,15 @@ export function stageResultsFromContext(
   return {
     batchId: source.batchId ?? context.batch?.id ?? null,
     batchName: source.batchName ?? context.batch?.name ?? null,
-    center: source.center ?? context.currentRouting?.center ?? null,
+    center: context.currentRouting?.center ?? source.center ?? null,
     stages: source.stages ?? [],
     transfer: source.transfer ?? context.assessmentTransfer ?? null,
-    entryGroupCode: source.entryGroupCode ?? null,
-    finalGroupCode: source.finalGroupCode ?? null,
+    entryGroupCode: context.assessmentTransfer?.entryGroupCode ?? source.entryGroupCode ?? null,
+    finalGroupCode: context.finalResult?.decision === 'ADMITTED'
+      ? context.currentRouting?.groupCode ?? source.finalGroupCode ?? null
+      : context.finalResult ? null : source.finalGroupCode ?? null,
+    adjustment: context.adjustment ?? source.adjustment ?? null,
+    currentRouting: context.currentRouting ?? source.currentRouting ?? null,
   };
 }
 

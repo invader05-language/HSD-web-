@@ -14,9 +14,9 @@ defineEmits<{ refresh: []; unauthorized: [] }>();
 
 <template>
   <section class="member-current-routing" aria-label="当前考核去向">
-    <p class="member-current-routing__eyebrow">当前考核去向</p>
+    <p class="member-current-routing__eyebrow">所属中心</p>
     <h3>{{ center.name }}</h3>
-    <p v-if="round">第 {{ round }} 轮考核入场安排</p>
+    <p>部门群二维码</p>
     <p v-if="finalResultPending" class="member-current-routing__pending">最终结果待联盟总负责人发布</p>
     <PrivateGroupCode
       v-if="groupCode"

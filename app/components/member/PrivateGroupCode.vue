@@ -7,12 +7,15 @@ const blobUrl = ref(''), error = ref(''), loading = ref(false), expanded = ref(f
 const originalDialog = ref<HTMLDialogElement>();
 let generation = 0;
 let conflictRetried = false;
+let automaticRetries = 0;
+let retryable = false;
+const MAX_AUTOMATIC_RETRIES = 2;
 function closeOriginal() { originalDialog.value?.close(); expanded.value = false; }
 async function openOriginal() { expanded.value = true; await nextTick(); if (expanded.value && blobUrl.value) originalDialog.value?.showModal(); }
 function release() { closeOriginal(); if (blobUrl.value) URL.revokeObjectURL(blobUrl.value); blobUrl.value = ''; }
 async function load() {
   const request = ++generation;
-  release(); error.value = ''; loading.value = false;
+  release(); error.value = ''; loading.value = false; retryable = false;
   if (props.code.status !== 'READY' || !props.code.imageUrl) return;
   loading.value = true;
   try {
@@ -23,12 +26,21 @@ async function load() {
   } catch (cause) {
     if (request !== generation) return;
     const status = (cause as { status?: number })?.status;
+    retryable = status !== 401 && status !== 403;
     if (status === 401) { emit('unauthorized'); return; }
     if (status === 409 && !conflictRetried) { conflictRetried = true; emit('refresh'); }
     error.value = status === 403 ? '当前账号没有预览此二维码的权限，请刷新配置。' : status === 404 ? (props.context === 'admin' ? '二维码图片暂不可用，请刷新配置。' : '二维码暂不可用，请刷新结果。') : status === 409 ? '二维码已更新，正在同步。' : props.context === 'admin' ? '二维码已保存，预览加载失败，请重试预览。' : '二维码加载失败，请检查网络后重试。';
   } finally { if (request === generation) loading.value = false; }
 }
-watch([() => props.code.id, () => props.code.version, () => props.code.status, () => props.code.imageUrl], () => { void load(); }, { immediate: true });
+// A fresh context with the same reference may recover a failed image. Keep a
+// successful image (and its open original) intact, and bound automatic retries.
+watch([() => props.code, () => props.code.id, () => props.code.version, () => props.code.status, () => props.code.imageUrl], (current, previous) => {
+  const changed = !previous?.length || current.slice(1).some((value, index) => value !== previous[index + 1]);
+  if (changed) { automaticRetries = 0; void load(); }
+  else if (error.value && retryable && !loading.value && automaticRetries < MAX_AUTOMATIC_RETRIES) {
+    automaticRetries++; void load();
+  }
+}, { immediate: true });
 onBeforeUnmount(() => { generation++; release(); });
 </script>
 
