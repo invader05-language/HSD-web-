@@ -46,8 +46,64 @@ export interface MemberResultRecord {
   currentConclusion: AssessmentConclusion;
   finalCenter?: CenterName;
   finalDirection?: string;
+  /** A current routing destination is visible before the alliance publishes the final result. */
+  finalResultPending?: boolean;
+  routingCenter?: CenterName;
+  routingRound?: number;
+  routingGroupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
   responsibleContacts?: ResponsibleContact[];
 }
+
+/**
+ * Private member result context contract consumed by `/member/results`.
+ * The API returns one coherent snapshot so a closed batch's application can be
+ * displayed together with current routing, adjustment QR, transfer state and
+ * final publication. `stages` may be the existing MemberStageResultsDto shape
+ * or its `stages` array while the backend contract settles.
+ */
+export interface MemberResultContextDto {
+  batch: { id: string; name: string; effectiveStatus?: string | null } | null;
+  application: {
+    id: string;
+    batchId?: string;
+    firstCenter?: { id: string; slug: string; name: string };
+    status?: string;
+    acceptsAdjustment?: boolean;
+    baizeDirection?: string | null;
+    preferences?: Array<{ rank: "FIRST" | "SECOND" | "THIRD" | number; center: { id: string; slug: string; name: string } }>;
+  } | null;
+  stages: import("../../packages/api-client/src").MemberStageResultsDto | import("../../packages/api-client/src").MemberStageResultsDto["stages"] | null;
+  adjustment: {
+    decision: "ADMITTED" | "NOT_ADMITTED";
+    targetCenter?: { id: string; slug: string; name: string } | null;
+    groupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
+    publishedAt?: string | null;
+    decidedAt?: string;
+    finalPublished?: boolean;
+  } | null;
+  assessmentTransfer: MemberStageView["transfer"] | null;
+  currentRouting: {
+    type?: "PASSED_CONTINUE" | "ADJUSTED" | "BAIZE_TRANSFER";
+    center?: { id: string; slug: string; name: string } | null;
+    round?: number | null;
+    groupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
+    status?: string | null;
+  } | null;
+  finalResult: (Partial<MyRecruitmentResultDto> & {
+    decision: "ADMITTED" | "NOT_ADMITTED";
+    publishedAt: string;
+  }) | null;
+}
+
+/** Context transfer records have no database id; the legacy stages endpoint does. */
+export type MemberStageView = Omit<MemberStageResultsDto, "transfer" | "adjustment" | "currentRouting"> & {
+  transfer?: (Omit<import("../../packages/api-client/src").PublishedAssessmentTransferDto, "id"> & {
+    id?: string;
+    entryGroupCode?: import("../../packages/api-client/src").GroupCodeReferenceDto | null;
+  }) | null;
+  adjustment?: MemberResultContextDto["adjustment"];
+  currentRouting?: MemberResultContextDto["currentRouting"];
+};
 
 export interface ResultPresentation {
   badge: string;
@@ -110,6 +166,9 @@ export function memberResultFromApi(
     currentStage: "考核已结束",
     currentConclusion: admitted ? "通过" : "未通过",
     ...(result.finalCenter ? { finalCenter: result.finalCenter.name } : {}),
+    ...(admitted && result.finalCenter?.slug === 'baize-development' && result.finalBaizeDirection
+      ? { finalDirection: baizeDirectionLabel(result.finalBaizeDirection) }
+      : {}),
     ...(result.responsibleContacts.length
       ? { responsibleContacts: result.responsibleContacts.map((contact) => ({
           personId: contact.personId,
@@ -138,6 +197,101 @@ export function memberResultFromApplication(application: SubmittedRecruitmentApp
   };
 }
 
+function stageForRouting(round: number | null | undefined): AssessmentStage {
+  if (round === 1) return "第一轮考核";
+  if (round === 2) return "第二轮考核";
+  if (round === 3) return "第三轮考核";
+  return "尚未开始";
+}
+
+function rankValue(rank: "FIRST" | "SECOND" | "THIRD" | number): 1 | 2 | 3 | undefined {
+  if (rank === "FIRST" || rank === 1) return 1;
+  if (rank === "SECOND" || rank === 2) return 2;
+  if (rank === "THIRD" || rank === 3) return 3;
+  return undefined;
+}
+
+export function memberResultFromContext(
+  context: MemberResultContextDto,
+  fallbackIdentity: MemberIdentity = "预备成员",
+): MemberResultRecord {
+  if (context.finalResult) {
+    const compact = context.finalResult;
+    const application = context.application;
+    const hasFullProjection = Boolean(compact.batch && compact.preferences && compact.responsibleContacts);
+    const fullProjection = hasFullProjection
+      ? compact as MyRecruitmentResultDto
+      : {
+          id: compact.id ?? application?.id ?? "published-result",
+          batch: compact.batch ?? { id: context.batch?.id ?? application?.batchId ?? "unknown-batch", name: context.batch?.name ?? "招新批次" },
+          decision: compact.decision,
+          finalCenter: compact.finalCenter ?? null,
+          admissionSource: compact.admissionSource ?? null,
+          baizeDirection: compact.baizeDirection ?? application?.baizeDirection ?? null,
+          finalBaizeDirection: compact.finalBaizeDirection ?? null,
+          preferences: compact.preferences ?? (application?.preferences ?? []).map((preference) => ({ rank: preference.rank === "FIRST" || preference.rank === 1 ? "FIRST" : preference.rank === "SECOND" || preference.rank === 2 ? "SECOND" : "THIRD", center: preference.center })),
+          responsibleContacts: compact.responsibleContacts ?? [],
+          publishedAt: compact.publishedAt,
+        } as MyRecruitmentResultDto;
+    return memberResultFromApi(fullProjection, fallbackIdentity);
+  }
+
+  const application = context.application;
+  if (!application) return memberResultFromApi(undefined, fallbackIdentity);
+
+  const preferences = (application.preferences ?? (application.firstCenter ? [{ rank: "FIRST" as const, center: application.firstCenter }] : []))
+    .map((preference) => {
+      const rank = rankValue(preference.rank);
+      return rank ? { rank, center: preference.center.name } : undefined;
+    })
+    .filter((preference): preference is MemberPreference => Boolean(preference))
+    .sort((left, right) => left.rank - right.rank);
+  const routing = context.currentRouting;
+  const routingCenter = routing?.center?.name;
+  const routingGroupCode = routing?.groupCode ?? null;
+  const routingRound = routing?.round ?? routingGroupCode?.round ?? undefined;
+
+  return {
+    id: application.id,
+    batchLabel: context.batch?.name ?? "暂无报名批次",
+    status: "pending",
+    identity: fallbackIdentity,
+    preferences,
+    ...(typeof application.acceptsAdjustment === "boolean" ? { acceptsTransfer: application.acceptsAdjustment } : {}),
+    ...(application.baizeDirection ? { baizeInterestDirection: baizeDirectionLabel(application.baizeDirection as any) } : {}),
+    currentStage: stageForRouting(routingRound),
+    currentConclusion: "待公布",
+    ...(routingCenter ? { finalCenter: routingCenter, routingCenter } : {}),
+    ...(routingRound ? { routingRound } : {}),
+    ...(routingGroupCode ? { routingGroupCode } : {}),
+    ...(routingCenter ? { finalResultPending: true } : {}),
+    ...(routingCenter && routing?.center?.slug === "baize-development" && context.assessmentTransfer?.baizeDirection
+      ? { finalDirection: baizeDirectionLabel(context.assessmentTransfer.baizeDirection) } : {}),
+  };
+}
+
+export function stageResultsFromContext(
+  context: MemberResultContextDto,
+): MemberStageView | undefined {
+  if (!context.stages) return undefined;
+  const source = (Array.isArray(context.stages)
+    ? { stages: context.stages }
+    : context.stages) as Partial<MemberStageResultsDto>;
+  return {
+    batchId: source.batchId ?? context.batch?.id ?? null,
+    batchName: source.batchName ?? context.batch?.name ?? null,
+    center: context.currentRouting?.center ?? source.center ?? null,
+    stages: source.stages ?? [],
+    transfer: source.transfer ?? context.assessmentTransfer ?? null,
+    entryGroupCode: context.assessmentTransfer?.entryGroupCode ?? source.entryGroupCode ?? null,
+    finalGroupCode: context.finalResult?.decision === 'ADMITTED'
+      ? context.currentRouting?.groupCode ?? source.finalGroupCode ?? null
+      : context.finalResult ? null : source.finalGroupCode ?? null,
+    adjustment: context.adjustment ?? source.adjustment ?? null,
+    currentRouting: context.currentRouting ?? source.currentRouting ?? null,
+  };
+}
+
 /**
  * The member center consumes only the final, published assessment fields.
  * Internal notes and per-round history deliberately do not cross this boundary.
@@ -149,6 +303,7 @@ export interface PublishedAssessmentProjection {
   finalCenter?: CenterName;
   publishedAt?: string;
   batchName?: string;
+  finalBaizeDirection?: MyRecruitmentResultDto['finalBaizeDirection'];
 }
 
 export const DEMO_MEMBER_RESULT: MemberResultRecord = {
@@ -231,6 +386,7 @@ export function applyPublishedAssessmentProjection(
     currentStage: "考核已结束",
     currentConclusion: admitted ? "通过" : "未通过",
     finalCenter: admitted ? projection.finalCenter ?? projection.center : undefined,
+    finalDirection: admitted && projection.finalCenter === '白泽开发中心' && projection.finalBaizeDirection ? baizeDirectionLabel(projection.finalBaizeDirection) : undefined,
   };
 }
 
@@ -304,5 +460,5 @@ export function describeAssessment(record: MemberResultRecord): ResultPresentati
 }
 import { DEMO_APPLICANT_PROFILE, DEMO_MEMBER_PROFILE } from "./member-profile";
 import type { SubmittedRecruitmentApplication } from "./recruitment-application";
-import type { MyRecruitmentResultDto, SessionPersonResponseDto } from "../../packages/api-client/src";
+import type { MemberStageResultsDto, MyRecruitmentResultDto, SessionPersonResponseDto } from "../../packages/api-client/src";
 import { baizeDirectionLabel } from "../utils/baize-direction-label";

@@ -5,6 +5,12 @@ const packageRoot = resolve(import.meta.dirname, "..");
 const snapshotPath = resolve(packageRoot, "openapi.snapshot.json");
 const outputPath = resolve(packageRoot, "src/generated.ts");
 const browserOperations = {
+  assessmentGroupCodes: "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes",
+  assessmentGroupCodeUpload: "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads",
+  assessmentGroupCodeBind: { operation: "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code", successStatus: "200" },
+  assessmentAdvancePreview: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
+  memberStageResults: "GET /api/v1/recruitment/results/me/stages",
+  memberResultContext: "GET /api/v1/recruitment/results/me/context",
   authLogin: "POST /api/v1/auth/login",
   authSession: "GET /api/v1/auth/session",
   authChangePassword: "POST /api/v1/auth/change-password",
@@ -69,8 +75,11 @@ const browserOperations = {
   recruitmentCurrent: "GET /api/v1/recruitment/current",
   recruitmentUpcoming: "GET /api/v1/recruitment/upcoming",
   recruitmentMyApplication: "GET /api/v1/recruitment/batches/{batchId}/my-application",
+  recruitmentMyApplications: "GET /api/v1/recruitment/applications/mine",
+  recruitmentMyInterviewContext: "GET /api/v1/recruitment/batches/{batchId}/my-interview-context",
   recruitmentApplicationCreate: "POST /api/v1/recruitment/batches/{batchId}/applications",
   recruitmentApplicationUpdate: { operation: "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}", successStatus: "200" },
+  recruitmentApplicationInterviewSlot: { operation: "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot", successStatus: "200" },
   recruitmentApplicationWithdraw: { operation: "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw", successStatus: "200" },
   adminRecruitmentBatches: "GET /api/v1/admin/recruitment/batches",
   adminRecruitmentBatchCreate: "POST /api/v1/admin/recruitment/batches",
@@ -91,6 +100,7 @@ const browserOperations = {
   adminRecruitmentBatchClose: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/close", successStatus: "200" },
   adminRecruitmentBatchReopen: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/reopen", successStatus: "200" },
   adminRecruitmentBatchArchive: { operation: "POST /api/v1/admin/recruitment/batches/{batchId}/archive", successStatus: "200" },
+  assessmentTransfer: 'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers',
   assessmentBatch: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",

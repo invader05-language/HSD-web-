@@ -11,6 +11,7 @@ import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentApplicationStore } from "~/stores/recruitment-application";
 import { useRecruitmentNow } from "~/composables/useRecruitmentNow";
+import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import {
   mapMemberProfileResponse,
@@ -31,7 +32,7 @@ import {
 import { normalizeMemberGrade, validateAvatarFile } from "~/utils/member-profile-form";
 import {
   formatInterviewSlotRange,
-  getInterviewSlotAvailability,
+  getApplicantInterviewSlotAvailability,
   interviewSlotCapacityLabel,
 } from "~/utils/recruitment-interview-slots";
 import type { RecruitmentInterviewSlot } from "~/types/recruitment-interview";
@@ -119,6 +120,7 @@ const confirmation = ref(false);
 const submitting = ref(false);
 const submitError = ref("");
 const editingApplication = ref(false);
+const applicationVersionConflict = ref(false);
 const showWithdrawConfirmation = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 let draftObjectUrl: string | undefined;
@@ -134,6 +136,12 @@ const currentBatchApplication = computed(() => activeBatch.value
     ? applicationStore?.getApplication(activeBatch.value.id, currentProfile.value.id)
     : productionApplication.value
   : undefined);
+const heldInterviewSlotId = computed(() => currentBatchApplication.value?.interviewSelection?.status === "CONFIRMED"
+  ? currentBatchApplication.value.interviewSelection.slotId
+  : undefined);
+function applicantSlotAvailability(slot: RecruitmentInterviewSlot) {
+  return getApplicantInterviewSlotAvailability(slot, now.value, heldInterviewSlotId.value);
+}
 const submittedApplication = computed(() => {
   const application = currentBatchApplication.value;
   return application && application.status !== "withdrawn" && !editingApplication.value
@@ -176,6 +184,7 @@ async function validateStep(target: Step) {
   if (target === 2) setErrors(validateApplicationDraft(applicationDraft, {
     interviewSlots: activeInterviewSlots.value,
     now: now.value,
+    heldInterviewSlotId: heldInterviewSlotId.value,
   }));
   if (target === 3) setErrors(validateConfirmation(confirmation.value));
   if (Object.keys(errors).length) {
@@ -275,6 +284,7 @@ function loadApplicationDraft() {
 
 function startEditingApplication() {
   loadApplicationDraft();
+  applicationVersionConflict.value = false;
   editingApplication.value = true;
 }
 
@@ -355,13 +365,26 @@ async function submitApplication() {
         : await recruitmentGateway.submitApplication(batchId, payload);
       productionApplicationVersion.value = response.version;
       productionApplication.value = mapRecruitmentApplicationResponse(response, productionProfile.value, productionBatch.value);
+      editingApplication.value = false;
+      try {
+        await refreshProductionState();
+      } catch {
+        submitError.value = "报名已保存，但面试名额暂时未能刷新；请稍后手动重新读取。";
+      }
     } else {
       throw new Error("招新服务暂不可用，请稍后重试。");
     }
     draftObjectUrl = undefined;
     editingApplication.value = false;
   } catch (error) {
-    submitError.value = recruitmentErrorMessage(error);
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    if (code === "APPLICATION_VERSION_CONFLICT" && !isMockApi) {
+      try { await refreshProductionState(); } catch { /* retain draft and show the version conflict */ }
+      applicationVersionConflict.value = true;
+      submitError.value = "报名已在其他窗口发生变化。本页草稿已保留，请重新载入最新报名后再修改。";
+    } else {
+      submitError.value = recruitmentErrorMessage(error);
+    }
   } finally {
     submitting.value = false;
   }
@@ -399,12 +422,36 @@ async function loadProductionRecruitment() {
     }
   } catch (error) {
     productionError.value = recruitmentErrorMessage(error);
+    throw error;
   } finally {
     productionLoading.value = false;
   }
 }
 
-onMounted(loadProductionRecruitment);
+async function refreshProductionState() {
+  if (isMockApi || !recruitmentGateway || !productionProfile.value) return;
+  const [current, upcoming] = await Promise.all([
+    recruitmentGateway.getCurrentBatch(),
+    recruitmentGateway.getUpcomingBatch(),
+  ]);
+  productionBatch.value = current.batch ? mapPublicRecruitmentBatch(current.batch) : null;
+  productionUpcomingBatch.value = upcoming.batch ? mapPublicRecruitmentBatch(upcoming.batch) : null;
+  capturedBatchId.value = productionBatch.value?.id;
+  if (!productionBatch.value || productionProfile.value.status !== "PREPARATORY") return;
+  const response = await recruitmentGateway.getMyApplication(productionBatch.value.id);
+  if (!response.application) return;
+  if (editingApplication.value && productionApplicationVersion.value !== response.application.version) {
+    applicationVersionConflict.value = true;
+  }
+  productionApplicationVersion.value = response.application.version;
+  productionApplication.value = mapRecruitmentApplicationResponse(response.application, productionProfile.value, productionBatch.value);
+}
+
+const applicationRefresh = useRecruitmentRefresh(async () => {
+  if (isMockApi) return;
+  if (!productionProfile.value) await loadProductionRecruitment();
+  else await refreshProductionState();
+});
 
 onBeforeUnmount(() => {
   releaseDraftObjectUrl();
@@ -454,6 +501,7 @@ onBeforeUnmount(() => {
             <NuxtLink class="button" to="/member">进入个人中心</NuxtLink>
             <NuxtLink class="button button--ghost" to="/member/results">查看结果中心</NuxtLink>
             <button v-if="canEditSubmittedApplication" class="button button--ghost" type="button" @click="startEditingApplication">修改报名</button>
+            <button v-if="!isMockApi" class="button button--ghost" type="button" :disabled="applicationRefresh.refreshing.value" @click="applicationRefresh.refresh">{{ applicationRefresh.refreshing.value ? "正在刷新…" : "刷新报名与名额" }}</button>
             <button v-if="canEditSubmittedApplication" class="button button--ghost" type="button" @click="showWithdrawConfirmation = true">撤回报名</button>
           </div>
           <details>
@@ -518,7 +566,7 @@ onBeforeUnmount(() => {
                   <label v-if="hasBaizePreference" data-field="baizeDirection" class="registration-fields__wide"><span>白泽意向方向</span><select v-model="applicationDraft.baizeDirection" :aria-invalid="Boolean(errors.baizeDirection)" :aria-describedby="errors.baizeDirection ? 'baize-direction-error' : undefined"><option value="">请选择方向</option><option v-for="direction in BAIZE_DIRECTIONS" :key="direction" :value="direction">{{ direction }}</option></select><small id="baize-direction-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.baizeDirection }" :aria-hidden="!errors.baizeDirection" aria-live="polite">{{ errors.baizeDirection || " " }}</small></label>
                 </div>
                 <fieldset data-field="acceptsAdjustment" class="registration-adjustment" :aria-describedby="errors.acceptsAdjustment ? 'adjustment-error' : undefined"><legend>是否接受调剂</legend><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="true">接受调剂</label><label><input v-model="applicationDraft.acceptsAdjustment" type="radio" :value="false">不接受调剂</label><small id="adjustment-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.acceptsAdjustment }" :aria-hidden="!errors.acceptsAdjustment" aria-live="polite">{{ errors.acceptsAdjustment || " " }}</small></fieldset>
-                <fieldset data-field="interviewSlotId" class="registration-interview-slots" :aria-describedby="errors.interviewSlotId ? 'interview-slot-error' : undefined"><legend>选择面试时间 <small>中国标准时间（UTC+8）</small></legend><p v-if="!activeInterviewSlots.length" class="registration-field-help">当前批次尚未开放面试时段，请稍后再试。</p><div v-for="slot in activeInterviewSlots" :key="slot.id" class="registration-interview-slot"><label><input v-model="applicationDraft.interviewSlotId" type="radio" name="interview-slot" :value="slot.id" :disabled="!getInterviewSlotAvailability(slot, now).selectable"><span><strong>{{ formatInterviewSlotRange(slot) }}</strong><small>{{ interviewSlotCapacityLabel(slot) }}<template v-if="!getInterviewSlotAvailability(slot, now).selectable"> · 当前不可选</template></small></span></label></div><small id="interview-slot-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.interviewSlotId }" :aria-hidden="!errors.interviewSlotId" aria-live="polite">{{ errors.interviewSlotId || " " }}</small></fieldset>
+                <fieldset data-field="interviewSlotId" class="registration-interview-slots" :aria-describedby="errors.interviewSlotId ? 'interview-slot-error' : undefined"><legend>选择面试时间 <small>中国标准时间（UTC+8）</small></legend><p v-if="!activeInterviewSlots.length" class="registration-field-help">当前批次尚未开放面试时段，请稍后再试。</p><div v-for="slot in activeInterviewSlots" :key="slot.id" class="registration-interview-slot"><label><input v-model="applicationDraft.interviewSlotId" type="radio" name="interview-slot" :value="slot.id" :disabled="!applicantSlotAvailability(slot).selectable"><span><strong>{{ formatInterviewSlotRange(slot) }}</strong><small>{{ interviewSlotCapacityLabel(slot) }}<template v-if="slot.id === heldInterviewSlotId && applicantSlotAvailability(slot).selectable"> · 你已占用，可保留</template><template v-else-if="!applicantSlotAvailability(slot).selectable"> · 当前不可选</template></small></span></label></div><small id="interview-slot-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.interviewSlotId }" :aria-hidden="!errors.interviewSlotId" aria-live="polite">{{ errors.interviewSlotId || " " }}</small></fieldset>
               </section>
 
               <section v-show="step === 3" aria-labelledby="application-confirmation-heading">
@@ -530,13 +578,14 @@ onBeforeUnmount(() => {
                 </div>
                 <label data-field="confirmation" class="registration-confirmation"><input v-model="confirmation" type="checkbox" :aria-invalid="Boolean(errors.confirmation)" :aria-describedby="errors.confirmation ? 'confirmation-error' : undefined">我确认以上资料真实，并同意仅将联系方式用于本次招新联系。</label><small id="confirmation-error" class="form-error registration-field-error" :class="{ 'is-empty': !errors.confirmation }" :aria-hidden="!errors.confirmation" aria-live="polite">{{ errors.confirmation || " " }}</small>
                 <p v-if="submitError" class="form-error" role="alert">{{ submitError }}</p>
+                <button v-if="applicationVersionConflict" type="button" class="button button--ghost" @click="startEditingApplication">重新载入最新报名</button>
               </section>
 
               <footer class="recruitment-application-actions">
                 <button v-if="step > 1" class="button button--ghost" type="button" @click="previousStep">上一步</button>
                 <span v-else />
                 <button v-if="step < 3" class="button" type="button" @click="nextStep">下一步</button>
-                <button v-else class="button" type="submit" :disabled="submitting">{{ submitButtonLabel }}</button>
+                <button v-else class="button" type="submit" :disabled="submitting || applicationVersionConflict">{{ submitButtonLabel }}</button>
               </footer>
             </form>
           </div>

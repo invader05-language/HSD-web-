@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 export type MemberActivityStatus = "registered" | "accepted" | "rejected" | "cancelled";
 
 export interface MemberActivityRegistration {
@@ -64,7 +65,7 @@ function normalizeItem(value: Record<string, unknown>): MemberActivityRegistrati
 }
 
 export function createMemberActivitiesGateway(options: Options): MemberActivitiesGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? cookie;
   async function send(path: string, init: RequestInit = {}) {

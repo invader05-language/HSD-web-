@@ -22,4 +22,12 @@ describe("password recovery owner page", () => {
     expect(page).toContain("pageCount");
     expect(page).toContain("v-model=\"page\"");
   });
+
+  it("renders structured owner qualification context on the forbidden page", () => {
+    const page = readFileSync("app/pages/admin/forbidden.vue", "utf8");
+    expect(page).toContain('route.query.required');
+    expect(page).toContain('route.query.reason');
+    expect(page).toContain("联盟总负责人资格");
+    expect(page).toContain("refreshForRuntime");
+  });
 });

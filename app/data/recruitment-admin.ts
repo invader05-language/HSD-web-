@@ -359,10 +359,10 @@ export function getAdminCandidateAssessmentRecord(
   };
 }
 
-export function filterAndSortRecruitmentApplications(
-  candidates: AdminCandidate[],
+export function filterAndSortRecruitmentApplications<T extends Pick<AdminCandidate, "name" | "studentId" | "preferences"> & Partial<Pick<AdminCandidate, "submittedAt">>>(
+  candidates: T[],
   filters: RecruitmentApplicationFilters
-): AdminCandidate[] {
+): T[] {
   const query = filters.query.trim().toLocaleLowerCase();
 
   return candidates
@@ -376,7 +376,12 @@ export function filterAndSortRecruitmentApplications(
     })
     .slice()
     .sort((left, right) => {
-      const difference = Date.parse(left.submittedAt) - Date.parse(right.submittedAt);
+      const leftTime = Date.parse(left.submittedAt ?? "");
+      const rightTime = Date.parse(right.submittedAt ?? "");
+      const leftHasDate = Number.isFinite(leftTime);
+      const rightHasDate = Number.isFinite(rightTime);
+      if (!leftHasDate || !rightHasDate) return leftHasDate ? -1 : rightHasDate ? 1 : 0;
+      const difference = leftTime - rightTime;
       return filters.sort === "submittedAt.asc" ? difference : -difference;
     });
 }
@@ -402,9 +407,9 @@ export function requireRecruitmentApplication(
 }
 
 export function formatRecruitmentApplicationSubmittedAt(
-  application: Pick<AdminCandidate, "submittedAt">
+  application: Partial<Pick<AdminCandidate, "submittedAt">>
 ): string {
-  return application.submittedAt.slice(0, 16).replace("T", " ");
+  return application.submittedAt?.slice(0, 16).replace("T", " ") ?? "—";
 }
 
 export function filterRecruitmentCandidates(

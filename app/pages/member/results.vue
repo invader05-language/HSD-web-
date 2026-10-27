@@ -1,14 +1,21 @@
 <script setup lang="ts">
+import PublishedStageResults from '~/components/member/PublishedStageResults.vue';
+import PrivateGroupCode from '~/components/member/PrivateGroupCode.vue';
+import MemberCurrentRouting from '~/components/member/MemberCurrentRouting.vue';
+import type { MemberStageResultsDto, MyRecruitmentResultDto } from '../../../packages/api-client/src';
+import { createResultRefresh } from '~/utils/assessment-result-refresh';
 import MemberSpaceNav from "~/components/member/MemberSpaceNav.vue";
 import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
   memberResultFromApi,
-  memberResultFromApplication,
   resultCenterMemberFromSession,
+  memberResultFromContext,
+  stageResultsFromContext,
   describeAdmission,
   describeAssessment,
   type MemberIdentity,
+  type MemberStageView,
 } from "~/data/member-results";
 import { useCurrentMember } from "~/composables/useCurrentMember";
 import { useSessionStore } from "~/stores/session";
@@ -18,8 +25,6 @@ import { useRecruitmentAssessmentStore } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { useSessionGateway } from "~/composables/useSessionGateway";
-import { mapPublicRecruitmentBatch, mapRecruitmentApplicationResponse } from "~/services/recruitment/recruitment-view-models";
-import type { SubmittedRecruitmentApplication } from "~/data/recruitment-application";
 
 type ResultTab = "admission" | "assessment";
 
@@ -47,42 +52,65 @@ const applicationStore = useRecruitmentApplicationStore();
 const assessmentStore = useRecruitmentAssessmentStore();
 const batchStore = useRecruitmentBatchStore();
 const recruitmentGateway = useRecruitmentGateway();
-const productionApplication = ref<SubmittedRecruitmentApplication>();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 const resultsError = computed(() => assessmentStore.myResultsError);
 
+const apiStageResults = ref<MemberStageView>();
+const apiResultContext = ref<import("~/data/member-results").MemberResultContextDto>();
+const stageResults = computed(() => {
+  if (recruitmentGateway) return apiStageResults.value;
+  const memberId = currentMember.value?.id;
+  if (!memberId) return undefined;
+  return batchStore.batches.map(batch => assessmentStore.getMockStageResults(batch.id, memberId))
+    .filter(result => result.stages.length).sort((a, b) => Date.parse(b.stages.at(-1)?.publishedAt ?? '') - Date.parse(a.stages.at(-1)?.publishedAt ?? ''))[0];
+});
+const readStageImage = computed(() => recruitmentGateway?.readGroupCodeImage ?? (async () => { throw new Error('GROUP_CODE_NOT_READY'); }));
+const stageError = ref('');
+let destroyed = false;
+let sessionExpired = false;
+function expireSession() {
+  if (destroyed || sessionExpired) return;
+  sessionExpired = true;
+  apiStageResults.value = undefined;
+  apiResultContext.value = undefined;
+  assessmentStore.myResults = [];
+  session.clearProductionSession();
+  void navigateTo('/login?redirect=/member/results');
+}
+let projectionRequest: Promise<void> | undefined;
+function refreshResults(): Promise<void> {
+  return projectionRequest ??= loadResults().finally(() => { projectionRequest = undefined; });
+}
+async function loadResults() {
+  if (!recruitmentGateway || destroyed || sessionExpired) return;
+  const context = await recruitmentGateway.getMyResultContext();
+  if (destroyed || sessionExpired) return;
+  apiResultContext.value = context;
+  const finalProjection = context.finalResult;
+  assessmentStore.myResults = finalProjection
+    && typeof finalProjection.id === "string"
+    && finalProjection.batch
+    && finalProjection.preferences
+    && finalProjection.responsibleContacts
+    ? [finalProjection as MyRecruitmentResultDto]
+    : [];
+  assessmentStore.myResultsError = undefined;
+  apiStageResults.value = stageResultsFromContext(context);
+  stageError.value = '';
+}
+const refresher = createResultRefresh(refreshResults, { unauthorized: expireSession, visible: () => typeof document !== 'undefined' && document.visibilityState === 'visible' });
+function visibilityChanged() { refresher.visibilityChanged(); }
+async function refreshImageReference() {
+  try { await refreshResults(); }
+  catch (cause) { if ((cause as { status?: number })?.status === 401) { refresher.stop(); expireSession(); } }
+}
+const finalGroupCode = computed(() => stageResults.value?.finalGroupCode);
 onMounted(async () => {
   if (!recruitmentGateway) return;
-  try {
-    const current = await recruitmentGateway.getCurrentBatch();
-    if (current.batch) {
-      const batch = mapPublicRecruitmentBatch(current.batch);
-      const own = await recruitmentGateway.getMyApplication(batch.id);
-      if (own.application) {
-        const profile = session.apiSession?.person;
-        if (profile) productionApplication.value = mapRecruitmentApplicationResponse(own.application, {
-          id: profile.id,
-          name: profile.name,
-          studentId: "",
-          grade: "",
-          className: "",
-          center: "待确定",
-          memberDuty: "普通成员",
-          identity: currentMemberIdentity.value ?? "预备成员",
-          bio: "",
-          version: 0,
-          contact: "",
-          biography: "",
-          status: profile.status,
-          publicProfileEnabled: false,
-        }, batch);
-      }
-    }
-    await assessmentStore.refreshMyResults(recruitmentGateway);
-  } catch {
-    // The store exposes the server failure in-page; production never falls back to demo data.
-  }
+  document.addEventListener('visibilitychange', visibilityChanged);
+  refresher.start();
 });
+onBeforeUnmount(() => { destroyed = true; refresher.stop(); document.removeEventListener('visibilitychange', visibilityChanged); });
 
 const publishedAssessment = computed(() => {
   if (recruitmentGateway) return undefined;
@@ -94,6 +122,7 @@ const publishedAssessment = computed(() => {
         center: candidate.center,
         finalDecision: candidate.finalDecision,
         finalCenter: candidate.finalCenter,
+        finalBaizeDirection: candidate.finalBaizeDirection,
         publishedAt: candidate.publishedAt,
         batchName: batch.name,
       }))
@@ -103,17 +132,21 @@ const publishedAssessment = computed(() => {
   ))[0];
 });
 const result = computed(() => recruitmentGateway
-  ? assessmentStore.myResults[0]
+  ? apiResultContext.value
+    ? memberResultFromContext(apiResultContext.value, currentMemberIdentity.value ?? "预备成员")
+    : assessmentStore.myResults[0]
     ? memberResultFromApi(assessmentStore.myResults[0], currentMemberIdentity.value ?? "预备成员")
-    : productionApplication.value
-      ? memberResultFromApplication(productionApplication.value)
-      : memberResultFromApi(undefined, currentMemberIdentity.value ?? "预备成员")
+    : memberResultFromApi(undefined, currentMemberIdentity.value ?? "预备成员")
   : applyPublishedAssessmentProjection(
       getDemoMemberResult(currentMember.value?.id ?? "", applicationStore.submittedApplication),
       publishedAssessment.value,
     ));
 const admission = computed(() => describeAdmission(result.value));
 const assessment = computed(() => describeAssessment(result.value));
+const publishedRouting = computed(() => {
+  const context = apiResultContext.value;
+  return !context?.finalResult && context?.currentRouting?.center ? context.currentRouting : undefined;
+});
 const activeTab = ref<ResultTab>("admission");
 const copyStatus = ref<Record<string, "idle" | "success" | "error">>({});
 let copyResetTimer: number | undefined;
@@ -168,7 +201,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
         </div>
         <aside class="member-results-hero__batch" aria-label="当前招新批次">
           <span>当前招新批次</span>
-          <h2>{{ result.batchLabel }}</h2>
+          <h2>{{ apiResultContext?.batch?.name ?? stageResults?.batchName ?? result.batchLabel }}</h2>
           <dl>
             <div><dt>当前账号</dt><dd>{{ currentMember?.name ?? "当前登录成员" }}</dd></div>
             <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
@@ -218,22 +251,32 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
             <article class="member-result-card">
               <header class="member-result-card__header">
                 <span>录取结果</span>
-                <strong class="member-result-status member-result-status--success">{{ admission.badge }}</strong>
+                <strong class="member-result-status" :class="result.finalResultPending ? 'member-result-status--pending' : 'member-result-status--success'">{{ publishedRouting ? '已发布结果' : admission.badge }}</strong>
               </header>
 
               <div class="member-result-summary">
-                <p>录取结果</p>
-                <h2>{{ admission.headline }}</h2>
-                <p>{{ admission.description }}</p>
+                <p>{{ publishedRouting ? '已发布的考核结果' : '录取结果' }}</p>
+                <h2>{{ publishedRouting ? `${publishedRouting.type === 'ADJUSTED' || publishedRouting.type === 'BAIZE_TRANSFER' ? '已调入' : '所属中心：'}${publishedRouting.center?.name}` : admission.headline }}</h2>
+                <p>{{ publishedRouting ? '扫码进入对应中心群。' : admission.description }}</p>
               </div>
 
               <dl class="member-result-facts">
                 <div><dt>当前身份</dt><dd>{{ result.identity }}</dd></div>
                 <div><dt>当前阶段</dt><dd>{{ result.currentStage }}</dd></div>
-                <div><dt>最终归属</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
+                <div><dt>{{ publishedRouting ? '所属中心' : '最终归属' }}</dt><dd>{{ result.finalCenter ?? "待公布" }}</dd></div>
                 <div><dt>所属方向</dt><dd>{{ result.finalDirection ?? "不适用" }}</dd></div>
               </dl>
 
+              <MemberCurrentRouting
+                v-if="publishedRouting?.center"
+                :center="publishedRouting.center"
+                :group-code="publishedRouting.groupCode"
+                :read-image="readStageImage"
+                @refresh="refreshImageReference"
+                @unauthorized="refresher.stop(); expireSession()"
+              />
+
+              <section v-if="finalGroupCode && recruitmentGateway?.readGroupCodeImage" class="member-final-group"><h3>部门群二维码</h3><PrivateGroupCode :code="finalGroupCode" :read-image="recruitmentGateway.readGroupCodeImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" /></section>
               <footer class="member-result-card__footer">
                 <NuxtLink class="button" to="/member">返回成员空间</NuxtLink>
                 <a
@@ -289,8 +332,10 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
           aria-labelledby="result-tab-assessment"
           tabindex="0"
         >
+          <p v-if="stageError" role="alert">{{ stageError }}</p>
           <div class="member-results-grid">
-            <article class="member-result-card">
+            <PublishedStageResults v-if="stageResults && (stageResults.stages.length || stageResults.currentRouting || stageResults.transfer)" :results="stageResults" :read-image="readStageImage" @refresh="refreshImageReference" @unauthorized="refresher.stop(); expireSession()" />
+            <article v-else class="member-result-card">
               <header class="member-result-card__header">
                 <span>考核进度</span>
                 <strong class="member-result-status member-result-status--pending">{{ assessment.badge }}</strong>
@@ -311,15 +356,15 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
 
               <footer class="member-result-card__footer">
                 <NuxtLink class="button" to="/member">返回成员空间</NuxtLink>
-                <span>不展示完整考核历程</span>
+                <span>已发布的通过轮次可展开查看群二维码</span>
               </footer>
             </article>
 
             <aside class="member-results-side">
               <section class="member-result-panel member-result-contact">
                 <header><h2>结果说明</h2><span>个人数据</span></header>
-                <p>系统仅展示当前有效状态</p>
-                <h3>结果以负责人最终发布为准</h3>
+                <p>仅展示已发布的个人结果</p>
+                <h3>各轮结果以联盟总负责人统一发布为准</h3>
                 <div><span>如有疑问，请联系对应负责人</span></div>
               </section>
             </aside>
@@ -330,3 +375,7 @@ async function signOut() { if (await session.signOutForRuntime(useRuntimeConfig(
     </div>
   </div>
 </template>
+
+<style scoped>
+.member-final-group { margin: 24px; border-top: 1px solid #e5e2dd; padding-top: 24px; text-align: center; }
+</style>

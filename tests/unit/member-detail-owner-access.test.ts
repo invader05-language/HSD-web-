@@ -55,7 +55,7 @@ describe("member detail owner access", () => {
     await nextTick();
 
     expect(navigateTo).toHaveBeenCalledWith(
-      "/admin/forbidden?from=%2Fadmin%2Fmembers%2Fmember-private",
+      "/admin/forbidden?from=%2Fadmin%2Fmembers%2Fmember-private&required=owner&reason=owner_required",
       { replace: true },
     );
     expect(fetcher).not.toHaveBeenCalled();

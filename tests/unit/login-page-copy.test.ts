@@ -21,4 +21,14 @@ describe("login page copy", () => {
     );
     expect(loginPage).not.toContain('to="/help');
   });
+
+  it("offers password recovery, a visibility toggle, and a copyable diagnostic ID", () => {
+    expect(loginPage).toContain('to="/forgot-password"');
+    expect(loginPage).toContain('autocomplete="current-password"');
+    expect(loginPage).toContain('autocomplete="username"');
+    expect(loginPage).toContain('showPassword');
+    expect(loginPage).toContain('diagnosticRequestId');
+    expect(loginPage).toContain('navigator.clipboard.writeText');
+    expect(loginPage).not.toContain('`登录失败（${error.message}）`');
+  });
 });

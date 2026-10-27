@@ -34,6 +34,7 @@ const apiBatch = {
   createdAt: "2026-08-20T00:00:00.000Z",
   updatedAt: "2026-09-05T00:00:00.000Z",
   applicationCount: 17,
+  interviewSlots: [],
   openCenters: [
     { id: "center-active", slug: "active", name: "开放中心", active: true },
     { id: "center-inactive", slug: "inactive", name: "已停用中心", active: false },

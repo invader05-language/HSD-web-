@@ -5,8 +5,9 @@ import type {
   AssessmentCenterIdentity,
   AssessmentRoundNumber,
 } from "~/types/recruitment-assessment";
-import { getAssessmentRounds } from "~/utils/recruitment-assessment-rules";
-import { useRecruitmentAssessmentStore, type RecruitmentAssessmentCandidate } from "~/stores/recruitment-assessment";
+import { getAssessmentRounds, getAssessmentCenter } from "~/utils/recruitment-assessment-rules";
+import { BAIZE_DIRECTION_LABELS, baizeDirectionLabel, type BaizeDirectionCode } from '~/utils/baize-direction-label';
+import { useRecruitmentAssessmentStore, assessmentPersonalSaveKey, type RecruitmentAssessmentCandidate, type AssessmentPersonalSaveState, type AssessmentPersonalSaveResult, type AssessmentPersonalSaveScope } from "~/stores/recruitment-assessment";
 import { useRecruitmentBatchStore } from "~/stores/recruitment-batch";
 import { useSessionStore } from "~/stores/session";
 import { getAdminCenterScope } from "~/utils/admin-center-scope";
@@ -16,6 +17,9 @@ import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { getRecruitmentAssessmentMessage } from "~/utils/recruitment-assessment-messages";
 import { matchesAssessmentStage, type AssessmentStageFilter } from "~/utils/recruitment-assessment-filters";
 import { useAdminToast } from "~/composables/useAdminToast";
+import AssessmentGroupCodePanel from './AssessmentGroupCodePanel.vue';
+import type { RoundPublicationPreviewDto } from '../../../packages/api-client/src';
+import type { RoundGroupGateway } from '~/services/recruitment/recruitment-gateway';
 
 const props = defineProps<{ batchId: string; showBackLink?: boolean }>();
 
@@ -29,6 +33,9 @@ const batchStore = useRecruitmentBatchStore();
 const session = useSessionStore();
 const route = useRoute();
 const recruitmentGateway = useRecruitmentGateway();
+const roundGroupGateway = recruitmentGateway?.getAssessmentGroupCodes && recruitmentGateway?.getAssessmentAdvancePreview
+  ? recruitmentGateway as typeof recruitmentGateway & RoundGroupGateway : undefined;
+
 const adminToast = useAdminToast();
 if (recruitmentGateway) assessmentStore.enableApiMode();
 
@@ -55,13 +62,14 @@ const centerScope = computed(() => recruitmentGateway
   ? undefined
   : getAdminCenterScope(session.currentAccount?.adminCenterRole));
 const allCandidates = computed(() => assessmentStore.getCandidates(props.batchId)
-  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
+  .filter((candidate) => !centerScope.value || getAssessmentCenter(candidate) === centerScope.value));
 const candidates = computed(() => allCandidates.value);
+const groupCodeScopeRevision = computed(() => [...new Set(candidates.value.flatMap(candidate => candidate.transfer ? [candidate.transfer.toCenter.id] : []))].sort().join(','));
 const processedCandidates = computed(() => candidates.value.filter((candidate) => (
   candidate.processingStatus !== "assessing" && candidate.processingStatus !== "adjustment-suggestion-pending"
 )));
 const actionableCandidates = computed(() => assessmentStore.getActionableCandidates(props.batchId)
-  .filter((candidate) => !centerScope.value || candidate.center === centerScope.value));
+  .filter((candidate) => !centerScope.value || getAssessmentCenter(candidate) === centerScope.value));
 const currentRoundLabel = computed(() => `第${["一", "二", "三"][state.value.currentRound - 1]}轮考核`);
 const isOwner = computed(() => session.canManageAdminAccounts);
 const filters = reactive({
@@ -81,18 +89,41 @@ const selectedCandidateId = ref<string>();
 const roundDrafts = ref<Partial<Record<AssessmentRoundNumber, RoundDraft>>>({});
 const internalNote = ref("");
 const adjustmentDecision = ref<AdjustmentDraft>("");
+const transferDirection = ref<'' | BaizeDirectionCode>('');
 const adjustmentSuggestion = ref<"" | string>("");
 const showSaveConfirmation = ref(false);
 const showAdvanceConfirmation = ref(false);
+const advancePreview = ref<RoundPublicationPreviewDto>();
+const advancePreviewBusy = ref(false);
 const saveMessage = ref("");
 const saveError = ref("");
+const personalSaveState = ref<AssessmentPersonalSaveState>("editing");
+const personalSaveResult = ref<AssessmentPersonalSaveResult>();
+const draftRound = ref<AssessmentRoundNumber>();
+const draftOperation = ref<"round" | "adjustment" | "transfer">("round");
+const draftBatchId = ref(props.batchId);
+const lastDraftScopeByCandidate = new Map<string, AssessmentPersonalSaveScope>();
+const candidateDrafts = new Map<string, {
+  rounds: Partial<Record<AssessmentRoundNumber, RoundDraft>>;
+  note: string;
+  adjustment: AdjustmentDraft;
+  transferDirection: '' | BaizeDirectionCode;
+  round?: AssessmentRoundNumber;
+  operation: "round" | "adjustment" | "transfer";
+}>();
+let selectionGeneration = 0;
 const closeButton = ref<HTMLButtonElement>();
 let previousFocus: HTMLElement | undefined;
 const apiBusy = computed(() => Boolean(
   assessmentStore.apiLoadingByBatch[props.batchId]
   || assessmentStore.apiMutatingByBatch[props.batchId],
 ));
-const apiError = computed(() => assessmentStore.apiErrorByBatch[props.batchId]);
+const apiError = computed(() => {
+  const error = assessmentStore.apiErrorByBatch[props.batchId];
+  // Personal feedback is shown only in the corresponding member drawer.
+  return Object.values(assessmentStore.apiPersonalSaveByBatch[props.batchId] ?? {})
+    .some(result => result.error === error) ? undefined : error;
+});
 const apiWorkflowSummary = computed(() => assessmentStore.getApiWorkflowSummary(props.batchId));
 
 let apiGeneration = 0;
@@ -101,6 +132,8 @@ watch(() => props.batchId, async (batchId) => {
   selectedCandidateId.value = undefined;
   showSaveConfirmation.value = false;
   showAdvanceConfirmation.value = false;
+  advancePreview.value = undefined;
+  advancePreviewBusy.value = false;
   saveMessage.value = "";
   saveError.value = "";
   if (!recruitmentGateway) return;
@@ -118,13 +151,13 @@ const selectedCandidate = computed(() => (
     : undefined
 ));
 const selectedRounds = computed(() => (
-  selectedCandidate.value ? getAssessmentRounds(selectedCandidate.value.center) : []
+  selectedCandidate.value ? getAssessmentRounds(selectedCandidate.value) : []
 ));
 const filteredCandidates = computed(() => {
   const query = filters.query.trim().toLocaleLowerCase();
   return candidates.value.filter((candidate) => {
     const source = candidate.candidate;
-    const matchesCenter = filters.center === "全部人员" || candidate.center === filters.center;
+    const matchesCenter = filters.center === "全部人员" || getAssessmentCenter(candidate) === filters.center;
     const matchesQuery = !query
       || source?.name.toLocaleLowerCase().includes(query)
       || source?.studentId.includes(query)
@@ -149,7 +182,8 @@ const advanceLabel = computed(() => {
   if (state.value.status !== "assessing") return "考核已完成，等待发布";
   if (effectiveBatchStatus.value !== "closed") return "关闭报名后推进全局轮次";
   if (roundIncomplete.value) return "完成当前轮后推进";
-  return state.value.currentRound === 3 ? "结束考核并进入结果发布" : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
+  const hasNext = state.value.currentRound < 3 && candidates.value.some(candidate => getAssessmentCenter(candidate) === "白泽开发中心" && (candidate.roundOutcomes[state.value.currentRound] === "passed" || (state.value.currentRound === 1 && candidate.transfer)));
+  return !hasNext ? "结束考核并进入结果发布" : `推进至第${["二", "三"][state.value.currentRound - 1]}轮考核`;
 });
 const advanceDisabledReason = computed(() => {
   if (!isOwner.value) return "仅联盟总负责人可推进全局轮次。";
@@ -168,18 +202,115 @@ const adjustmentTargets = computed(() => recruitmentGateway
   : RECRUITMENT_CENTERS
     .filter((center) => center !== "白泽开发中心")
     .map((center) => ({ id: center, slug: center, name: center })));
+const transferTarget = computed(() => recruitmentGateway
+  ? assessmentStore.getApiTransferTarget(props.batchId)
+  : { id: '白泽开发中心', slug: 'baize-development', name: '白泽开发中心', available: true, blockReason: null });
+const transferEligibility = computed(() => selectedCandidate.value
+  ? assessmentStore.getTransferEligibility(props.batchId, selectedCandidate.value.candidateId) : undefined);
+const canTransfer = computed(() => isOwner.value && state.value.currentRound === 1 && state.value.status === 'assessing'
+  && transferTarget.value?.available === true && transferEligibility.value?.available === true && !selectedCandidate.value?.transfer);
+const transferDisabledReason = computed(() => !canTransfer.value
+  ? getRecruitmentAssessmentMessage({ code: state.value.currentRound !== 1 ? 'ASSESSMENT_TRANSFER_WINDOW_CLOSED' : transferEligibility.value?.blockReason ?? transferTarget.value?.blockReason }, '当前成员暂不符合调入条件。') : '');
 
-watch(selectedCandidateId, async (candidateId) => {
+watch(adjustmentDecision, value => {
+  if (!selectedCandidateId.value || personalSaveState.value === 'unknown' || personalSaveState.value === 'saving') return;
+  const operation = value === 'transfer-to-baize' ? 'transfer' : 'adjustment';
+  if (draftOperation.value === 'round' || draftOperation.value === operation) return;
+  draftOperation.value = operation;
+  draftRound.value = operation === 'transfer' ? 1 : state.value.currentRound;
+  personalSaveState.value = 'editing'; personalSaveResult.value = undefined;
+  const scope = currentSaveScope();
+  const previous = scope && assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)];
+  if (previous) showPersonalSaveResult(previous);
+});
+
+watch(selectedCandidateId, async (candidateId, previousCandidateId) => {
+  selectionGeneration++;
+  if (previousCandidateId) cacheDraft(previousCandidateId);
+  if (personalSaveResult.value) delete assessmentStore.apiErrorByBatch[props.batchId];
+  saveMessage.value = "";
+  saveError.value = "";
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  draftRound.value = undefined;
   if (!candidateId) {
     document.body.classList.remove("is-admin-drawer-open");
     previousFocus?.focus();
     return;
   }
-  resetDrafts();
+  const lastResult = Object.values(assessmentStore.apiPersonalSaveByBatch[props.batchId] ?? {})
+    .filter(result => result.scope.candidateId === candidateId && result.scope.operation !== "proposal").at(-1);
+  const previousScope = lastDraftScopeByCandidate.get(JSON.stringify([props.batchId, candidateId]));
+  const guardedTransfer = lastResult?.scope.operation === 'transfer' && ['unknown', 'saved-refresh-failed'].includes(lastResult.status) ? lastResult.scope : undefined;
+  restoreDraftScope(guardedTransfer ?? (previousScope?.operation === 'transfer' && !selectedCandidate.value?.transfer ? previousScope : undefined) ?? nextActionScope() ?? previousScope
+    ?? lastResult?.scope
+    ?? { candidateId, operation: "round", round: state.value.currentRound });
   document.body.classList.add("is-admin-drawer-open");
   await nextTick();
   closeButton.value?.focus();
 });
+
+watch(() => {
+  const scope = currentSaveScope();
+  return scope ? assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)] : undefined;
+}, result => {
+  if (result && personalSaveState.value === "editing") showPersonalSaveResult(result);
+});
+
+watch([apiBusy, personalSaveState, () => state.value.currentRound,
+  () => selectedCandidate.value?.processingStatus, () => selectedCandidate.value?.currentPhase], () => {
+  const nextScope = nextActionScope();
+  const currentScope = currentSaveScope();
+  if (apiBusy.value || personalSaveState.value === "saving" || draftOperation.value === 'transfer'
+    || (personalSaveState.value === "saved-refresh-failed" && assessmentStore.apiErrorByBatch[props.batchId])
+    || !nextScope || !currentScope || assessmentPersonalSaveKey(nextScope) === assessmentPersonalSaveKey(currentScope)) return;
+  cacheDraft(currentScope.candidateId);
+  restoreDraftScope(nextScope);
+});
+
+function currentSaveScope(candidateId = selectedCandidateId.value): AssessmentPersonalSaveScope | undefined {
+  return candidateId && draftRound.value
+    ? { ...(draftOperation.value === 'transfer' ? { batchId: props.batchId } : {}), candidateId, operation: draftOperation.value, round: draftRound.value }
+    : undefined;
+}
+
+function nextActionScope(): AssessmentPersonalSaveScope | undefined {
+  const candidate = selectedCandidate.value;
+  if (!candidate) return undefined;
+  const round = state.value.currentRound;
+  if (candidate.processingStatus === "adjustment-suggestion-pending") return { candidateId: candidate.candidateId, operation: "adjustment", round };
+  if (candidate.currentPhase === roundLabel(round)) return { candidateId: candidate.candidateId, operation: "round", round };
+  return undefined;
+}
+
+function cacheDraft(candidateId: string) {
+  const scope = currentSaveScope(candidateId);
+  if (!scope) return;
+  candidateDrafts.set(JSON.stringify([draftBatchId.value, assessmentPersonalSaveKey(scope)]), {
+    rounds: { ...roundDrafts.value }, note: internalNote.value,
+    adjustment: adjustmentDecision.value, round: draftRound.value, operation: draftOperation.value,
+    transferDirection: transferDirection.value,
+  });
+  lastDraftScopeByCandidate.set(JSON.stringify([draftBatchId.value, candidateId]), scope);
+}
+
+function restoreDraftScope(scope: AssessmentPersonalSaveScope) {
+  resetDrafts();
+  draftBatchId.value = props.batchId;
+  draftRound.value = scope.round;
+  draftOperation.value = scope.operation === 'transfer' ? 'transfer' : scope.operation === "adjustment" ? "adjustment" : "round";
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  const previousDraft = candidateDrafts.get(JSON.stringify([props.batchId, assessmentPersonalSaveKey(scope)]));
+  if (previousDraft) {
+    roundDrafts.value = { ...previousDraft.rounds };
+    internalNote.value = previousDraft.note;
+    adjustmentDecision.value = previousDraft.adjustment;
+    transferDirection.value = previousDraft.transferDirection;
+  }
+  const previousResult = assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)];
+  if (previousResult) showPersonalSaveResult(previousResult);
+}
 
 onBeforeUnmount(() => document.body.classList.remove("is-admin-drawer-open"));
 
@@ -192,6 +323,7 @@ function roundLabel(round: AssessmentRoundNumber) {
 }
 
 function phaseLabel(candidate: RecruitmentAssessmentCandidate) {
+  if (candidate.transfer && state.value.currentRound === 1) return '待第二轮';
   if (candidate.processingStatus === "adjustment-suggestion-pending") return "待调剂";
   if (candidate.processingStatus === "ready-to-publish" || candidate.processingStatus === "completed") return "已处理/历史结果";
   return candidate.currentPhase ?? "当前待办";
@@ -207,9 +339,10 @@ function processingLabel(candidate: RecruitmentAssessmentCandidate): string {
 }
 
 function outcomeLabel(candidate: RecruitmentAssessmentCandidate) {
+  if (candidate.transfer && !candidate.roundOutcomes[2]) return '待第二轮';
   if (candidate.finalDecision === "admitted") return candidate.processingStatus === "completed" ? "已录取" : "通过";
   if (candidate.finalDecision === "not-admitted") return "未通过";
-  const latestRound = ([3, 2, 1] as AssessmentRoundNumber[]).find((round) => (
+  const latestRound = getAssessmentRounds(candidate).slice().reverse().find((round) => (
     candidate.roundOutcomes[round] && candidate.roundOutcomes[round] !== "pending"
   ));
   if (latestRound) return candidate.roundOutcomes[latestRound] === "passed" ? "通过" : "未通过";
@@ -217,7 +350,15 @@ function outcomeLabel(candidate: RecruitmentAssessmentCandidate) {
 }
 
 function formatUpdatedAt(candidate: RecruitmentAssessmentCandidate) {
-  return candidate.updatedAt ? new Date(candidate.updatedAt).toLocaleString("zh-CN", { hour12: false }) : "未保存";
+  const hasRecord = Object.keys(candidate.roundOutcomes).length > 0
+    || candidate.adjustmentSuggestion || candidate.finalDecision || candidate.publishedAt;
+  if (!candidate.updatedAt) return hasRecord ? "—" : "未录入";
+  const timestamp = Date.parse(candidate.updatedAt);
+  if (!Number.isFinite(timestamp) || new Date(timestamp).getUTCFullYear() === 1970) return hasRecord ? "—" : "未录入";
+  return new Date(timestamp).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+  });
 }
 
 function canEdit(candidate: RecruitmentAssessmentCandidate) {
@@ -227,7 +368,7 @@ function canEdit(candidate: RecruitmentAssessmentCandidate) {
     adminLevel: session.adminLevel,
     hasCapability: session.hasCapability,
     adminCenterRole: session.currentAccount?.adminCenterRole,
-    candidateCenter: candidate.center,
+    candidateCenter: getAssessmentCenter(candidate),
   });
 }
 
@@ -235,13 +376,26 @@ function isRoundEditable(round: AssessmentRoundNumber) {
   const candidate = selectedCandidate.value;
   return Boolean(candidate
     && canEdit(candidate)
+    && state.value.status === "assessing"
+    && (!candidate.roundOutcomes[round] || candidate.roundOutcomes[round] === "pending")
+    && round === draftRound.value
+    && !personalConflictBlocksEditing.value
     && candidate.currentPhase === roundLabel(round)
     && state.value.currentRound === round);
 }
 
+const personalConflictBlocksEditing = computed(() => personalSaveState.value === "conflict" && (
+  ["ROUND_RESULT_ALREADY_RECORDED", "ADJUSTMENT_DECISION_ALREADY_EXISTS"].includes(personalSaveResult.value?.error?.code ?? "")
+  || personalSaveResult.value?.error?.status === 403
+  || !personalSaveResult.value?.refreshed
+));
+
 const canSaveSelectedCandidate = computed(() => {
   const candidate = selectedCandidate.value;
   if (!candidate || !canEdit(candidate)) return false;
+  if (personalConflictBlocksEditing.value || (draftOperation.value === "round" && draftRound.value !== state.value.currentRound)) return false;
+  if (["saving", "saved", "saved-refresh-failed", "unknown"].includes(personalSaveState.value)) return false;
+  if (adjustmentDecision.value === 'transfer-to-baize') return canTransfer.value && Boolean(transferDirection.value);
   return selectedRounds.value.some(isRoundEditable)
     || (isOwner.value
       && candidate.processingStatus === "adjustment-suggestion-pending"
@@ -251,10 +405,13 @@ const canSaveSelectedCandidate = computed(() => {
 function resetDrafts() {
   const candidate = selectedCandidate.value;
   if (!candidate) return;
+  draftRound.value = state.value.currentRound;
+  draftOperation.value = candidate.processingStatus === "adjustment-suggestion-pending" ? "adjustment" : "round";
   roundDrafts.value = Object.fromEntries(
-    getAssessmentRounds(candidate.center).map((round) => [round, candidate.roundOutcomes[round] ?? ""]),
+    getAssessmentRounds(candidate).map((round) => [round, candidate.roundOutcomes[round] ?? ""]),
   ) as Partial<Record<AssessmentRoundNumber, RoundDraft>>;
   internalNote.value = candidate.internalNote ?? "";
+  transferDirection.value = candidate.transfer?.baizeDirection ?? candidate.baizeDirectionCode ?? '';
   const targetSelectionValue = (
     targetIdentity: AssessmentCenterIdentity | undefined,
     mockCenterName: string | undefined,
@@ -281,7 +438,6 @@ function openCandidate(candidate: RecruitmentAssessmentCandidate, event: Event) 
 
 function closeCandidate() {
   showSaveConfirmation.value = false;
-  resetDrafts();
   selectedCandidateId.value = undefined;
 }
 
@@ -294,7 +450,7 @@ function handleDrawerKeydown(event: KeyboardEvent) {
 
 function requestSave() {
   const candidate = selectedCandidate.value;
-  if (!candidate) return;
+  if (!candidate || apiBusy.value || !canSaveSelectedCandidate.value) return;
   const round = selectedRounds.value.find(isRoundEditable);
   if (round && roundDrafts.value[round]) {
     showSaveConfirmation.value = true;
@@ -319,18 +475,37 @@ function errorText(error: unknown, fallback: string) {
 
 async function confirmSave() {
   const candidate = selectedCandidate.value;
-  if (!candidate) return;
+  if (!candidate || apiBusy.value || personalSaveState.value === "saving" || !canSaveSelectedCandidate.value) return;
+  const generation = selectionGeneration;
+  const batchGeneration = apiGeneration;
+  const stillSelected = () => generation === selectionGeneration && batchGeneration === apiGeneration;
+  saveError.value = "";
+  saveMessage.value = "";
   try {
     const round = selectedRounds.value.find(isRoundEditable);
-    if (round && roundDrafts.value[round]) {
+    personalSaveState.value = "saving";
+    if (adjustmentDecision.value === 'transfer-to-baize' && canTransfer.value && transferDirection.value) {
       if (recruitmentGateway) {
-        await assessmentStore.saveRoundOutcomeFromApi(recruitmentGateway, {
+        const result = await assessmentStore.transferAssessmentFromApi(recruitmentGateway, { batchId: props.batchId, candidateId: candidate.candidateId, targetCenterId: transferTarget.value!.id, baizeDirection: transferDirection.value });
+        if (!stillSelected()) return;
+        showSaveConfirmation.value = false;
+        showPersonalSaveResult(result);
+        return;
+      }
+      assessmentStore.transferAssessment({ batchId: props.batchId, candidateId: candidate.candidateId, baizeDirection: transferDirection.value, now: new Date() });
+    } else if (round && roundDrafts.value[round]) {
+      if (recruitmentGateway) {
+        const result = await assessmentStore.saveRoundOutcomeFromApi(recruitmentGateway, {
           batchId: props.batchId,
           candidateId: candidate.candidateId,
           round,
           outcome: roundDrafts.value[round] as "passed" | "failed",
           internalNote: internalNote.value,
         });
+        if (!stillSelected()) return;
+        showSaveConfirmation.value = false;
+        showPersonalSaveResult(result);
+        return;
       } else {
         assessmentStore.saveRoundOutcome({
           batchId: props.batchId,
@@ -352,12 +527,16 @@ async function confirmSave() {
           )) {
             throw new Error("ASSESSMENT_TARGET_CENTER_UNAVAILABLE");
           }
-          await assessmentStore.recordAdjustmentDecisionFromApi(recruitmentGateway, {
+          const result = await assessmentStore.recordAdjustmentDecisionFromApi(recruitmentGateway, {
             batchId: props.batchId,
             candidateId: candidate.candidateId,
             decision: adjustmentDecision.value === "not-admitted" ? "NOT_ADMITTED" : "ADMITTED",
             ...(targetCenterId ? { targetCenterId } : {}),
           });
+          if (!stillSelected()) return;
+          showSaveConfirmation.value = false;
+          showPersonalSaveResult(result);
+          return;
         } else {
           assessmentStore.recordAdjustmentDecision({
             batchId: props.batchId,
@@ -372,21 +551,106 @@ async function confirmSave() {
     } else {
       throw new Error("ASSESSMENT_DRAFT_INCOMPLETE");
     }
+    if (!stillSelected()) return;
     showSaveConfirmation.value = false;
+    personalSaveState.value = "saved";
     saveError.value = "";
     saveMessage.value = recruitmentGateway
       ? "结果已保存到服务器，尚未对成员发布。"
       : "结果已保存到当前批次的内部状态，尚未对成员发布。";
     adminToast.success(saveMessage.value);
-    selectedCandidateId.value = undefined;
   } catch (error) {
+    if (!stillSelected()) return;
     showSaveConfirmation.value = false;
+    personalSaveState.value = "editing";
     saveError.value = errorText(error, "保存失败");
   }
 }
 
-function requestAdvance() {
-  if (!canAdvance.value) return;
+function showPersonalSaveResult(result: AssessmentPersonalSaveResult) {
+  const scope = currentSaveScope();
+  if (!scope || assessmentPersonalSaveKey(scope) !== assessmentPersonalSaveKey(result.scope)) return;
+  personalSaveResult.value = result;
+  personalSaveState.value = result.status;
+  saveError.value = "";
+  saveMessage.value = "";
+  if (result.status === "saved") {
+    saveMessage.value = "结果已保存到服务器，尚未对成员发布。";
+    adminToast.success(saveMessage.value);
+  } else if (result.status === "saved-refresh-failed") {
+    saveError.value = "结果已保存，名单刷新失败，请重试刷新。";
+  } else if (result.status === "unknown") {
+    saveError.value = "暂不能确认保存状态，请先刷新核对。";
+  } else if (result.error?.code === "ROUND_RESULT_ALREADY_RECORDED") {
+    saveError.value = result.refreshed
+      ? "该成员本轮结果已录入，已刷新当前记录。"
+      : "该成员本轮结果已录入，暂未能读取最新记录，请重试刷新。";
+  } else {
+    saveError.value = errorText(result.error, "保存未完成，请刷新核对当前记录。");
+  }
+}
+
+async function retryPersonalRefresh() {
+  if (!recruitmentGateway || apiBusy.value || !personalSaveResult.value) return;
+  const generation = selectionGeneration;
+  const batchGeneration = apiGeneration;
+  const previous = personalSaveResult.value;
+  if (previous.scope.operation === 'transfer') {
+    const result = await assessmentStore.refreshTransferSave(recruitmentGateway, props.batchId, previous);
+    if (generation === selectionGeneration && batchGeneration === apiGeneration) showPersonalSaveResult(result);
+    return;
+  }
+  try {
+    await assessmentStore.refreshAssessmentBatch(props.batchId, recruitmentGateway);
+    if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
+    const result: AssessmentPersonalSaveResult = { ...previous, refreshed: true, status: previous.status === "saved-refresh-failed" ? "saved" : previous.status };
+    assessmentStore.rememberPersonalSaveResult(props.batchId, previous.scope, result);
+    showPersonalSaveResult(result);
+  } catch {
+    if (generation !== selectionGeneration || batchGeneration !== apiGeneration) return;
+    const result: AssessmentPersonalSaveResult = { ...previous, refreshed: false };
+    assessmentStore.rememberPersonalSaveResult(props.batchId, previous.scope, result);
+    showPersonalSaveResult(result);
+  }
+}
+
+const canReconfirmUnknown = computed(() => {
+  const candidate = selectedCandidate.value;
+  const round = draftRound.value;
+  if (!candidate || !round || personalSaveState.value !== "unknown" || !personalSaveResult.value?.refreshed
+    || draftOperation.value === 'transfer'
+    || (draftOperation.value === "round" && round !== state.value.currentRound)
+    || !canEdit(candidate) || state.value.status === "published") return false;
+  return draftOperation.value === "adjustment"
+    ? candidate.processingStatus === "adjustment-suggestion-pending" && !candidate.finalDecision
+    : !candidate.roundOutcomes[round];
+});
+
+function reconfirmUnknown() {
+  if (!canReconfirmUnknown.value || apiBusy.value) return;
+  personalSaveState.value = "editing";
+  personalSaveResult.value = undefined;
+  const scope = currentSaveScope();
+  if (scope) delete assessmentStore.apiPersonalSaveByBatch[props.batchId]?.[assessmentPersonalSaveKey(scope)];
+  saveError.value = "";
+  saveMessage.value = "已核对当前记录；再次保存仍需明确确认。";
+}
+
+async function requestAdvance() {
+  if (!canAdvance.value || advancePreviewBusy.value) return;
+  const generation = apiGeneration;
+  const batchId = props.batchId;
+  advancePreview.value = undefined;
+  if (roundGroupGateway) {
+    advancePreviewBusy.value = true;
+    try {
+      const preview = await roundGroupGateway.getAssessmentAdvancePreview(batchId);
+      if (generation !== apiGeneration) return;
+      advancePreview.value = preview;
+      if (!advancePreview.value.canPublish) { saveError.value = advancePreview.value.blockingReasons.map(code => getRecruitmentAssessmentMessage({ code })).join(' '); return; }
+    } catch (cause) { if (generation === apiGeneration) saveError.value = getRecruitmentAssessmentMessage(cause, '推进确认加载失败，请重试。'); return; }
+    finally { if (generation === apiGeneration) advancePreviewBusy.value = false; }
+  }
   showAdvanceConfirmation.value = true;
 }
 
@@ -396,14 +660,15 @@ async function confirmAdvance() {
       await assessmentStore.advanceAssessmentRoundFromApi(
         recruitmentGateway,
         props.batchId,
-        "管理端确认推进全局考核轮次",
+        "管理端确认公开已完成轮次结果并推进全局考核轮次",
+        advancePreview.value,
       );
     } else {
       assessmentStore.advanceAssessmentRound(props.batchId, true, new Date(), "管理端确认推进全局考核轮次");
     }
     showAdvanceConfirmation.value = false;
     saveError.value = "";
-    saveMessage.value = "全局考核轮次已更新，已保存的上一轮结果保持锁定。";
+    saveMessage.value = "本轮结果已向成员公开，考核状态已更新；通过者可查看对应群二维码。";
     adminToast.success(saveMessage.value);
   } catch (error) {
     showAdvanceConfirmation.value = false;
@@ -418,7 +683,7 @@ async function confirmAdvance() {
       <div>
         <p class="eyebrow">招新考核</p>
         <h1>{{ batch?.name ?? "未知批次" }} · 预备成员考核</h1>
-        <p class="admin-page-heading__intro">当前批次的考核结果仅在完成整批发布后向成员公开。</p>
+        <p class="admin-page-heading__intro">联盟总负责人确认推进轮次时同步公开本轮结果，通过者可查看群二维码；最终录取仍使用整批发布。</p>
       </div>
       <div class="admin-batch-card">
         <span>当前批次</span>
@@ -443,12 +708,16 @@ async function confirmAdvance() {
       <div><span>已处理 / 历史结果</span><strong>{{ processedCandidates.length }}</strong><small>历史轮次只读</small></div>
     </section>
 
+    <AssessmentGroupCodePanel v-if="roundGroupGateway" :batch-id="batchId" :owner="isOwner" :gateway="roundGroupGateway" :scope-revision="groupCodeScopeRevision" />
+
+    <p v-if="roundGroupGateway && isOwner" class="admin-inline-note">完成本轮录入后，确认推进轮次即可同步向成员公开本轮结果和通过者群二维码。</p>
+
     <section class="admin-roster">
-      <aside class="admin-groups" aria-label="第一志愿分组">
-        <header><h2>第一志愿分组</h2></header>
+      <aside class="admin-groups" aria-label="当前考核中心分组">
+        <header><h2>当前考核中心分组</h2></header>
         <button v-for="center in centerGroups" :key="center" type="button" :class="{ 'is-active': filters.center === center }" @click="filters.center = center">
           <span>{{ center }}</span>
-          <strong>{{ center === "全部人员" ? candidates.length : candidates.filter((candidate) => candidate.center === center).length }}</strong>
+          <strong>{{ center === "全部人员" ? candidates.length : candidates.filter((candidate) => getAssessmentCenter(candidate) === center).length }}</strong>
         </button>
         <p>白泽开发中心按全局三轮考核推进，其他中心仅保留第一轮考核。</p>
       </aside>
@@ -458,7 +727,7 @@ async function confirmAdvance() {
           <div><h2>预备成员名单</h2></div>
           <div>
             <p>共 {{ filteredCandidates.length }} 人</p>
-            <button type="button" class="button button--ghost" :disabled="!canAdvance" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy ? "处理中…" : advanceLabel }}</button>
+            <button v-if="isOwner" type="button" class="button button--ghost" :disabled="!canAdvance || advancePreviewBusy" :title="advanceDisabledReason" @click="requestAdvance">{{ apiBusy || advancePreviewBusy ? "处理中…" : advanceLabel }}</button>
             <NuxtLink v-if="showBackLink" class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}`">返回批次概览</NuxtLink>
           </div>
         </header>
@@ -472,15 +741,16 @@ async function confirmAdvance() {
           <label>调剂意愿<select v-model="filters.adjustment"><option>全部</option><option>接受调剂</option><option>不接受调剂</option></select></label>
         </div>
 
-        <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
-        <p v-else-if="apiError" class="admin-save-message" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
+        <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
+        <p v-else-if="apiError && !selectedCandidate" class="admin-save-message admin-save-message--error" role="alert">{{ getRecruitmentAssessmentMessage(apiError, "服务器请求失败，请刷新后重试。") }}</p>
+        <p v-if="saveMessage && !selectedCandidate" class="admin-save-message" role="status">{{ saveMessage }}</p>
         <div class="admin-table-scroll" tabindex="0" aria-label="预备成员名单表格区域">
           <table aria-label="预备成员名单">
-            <thead><tr><th>成员</th><th>第一志愿</th><th>白泽方向</th><th>当前阶段</th><th>处理状态</th><th>当前结果</th><th>调剂</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead>
+            <thead><tr><th>成员</th><th>原第一志愿</th><th>当前考核中心</th><th>白泽方向</th><th>当前阶段</th><th>处理状态</th><th>当前结果</th><th>调剂</th><th>更新时间</th><th><span class="sr-only">操作</span></th></tr></thead>
             <tbody>
               <tr v-for="candidate in filteredCandidates" :key="candidate.candidateId">
                 <td><strong>{{ candidateName(candidate) }}</strong><small>{{ candidate.candidate?.studentId ?? candidate.memberId }}</small></td>
-                <td>{{ candidate.center }}</td><td>{{ candidate.candidate?.baizeDirection ?? "—" }}</td><td>{{ phaseLabel(candidate) }}</td>
+                <td>{{ candidate.center }}</td><td>{{ getAssessmentCenter(candidate) }}<small v-if="candidate.transfer">调剂转入，第2轮起</small></td><td>{{ candidate.transfer ? baizeDirectionLabel(candidate.transfer.baizeDirection) : candidate.candidate?.baizeDirection ?? "—" }}</td><td>{{ phaseLabel(candidate) }}</td>
                 <td>{{ processingLabel(candidate) }}</td><td><span class="admin-result-pill">{{ outcomeLabel(candidate) }}</span></td>
                 <td>{{ candidate.acceptsAdjustment ? "接受" : "不接受" }}</td><td>{{ formatUpdatedAt(candidate) }}</td>
                 <td><button type="button" :aria-label="`查看处理 ${candidateName(candidate)}`" @click="openCandidate(candidate, $event)">查看/处理</button></td>
@@ -496,17 +766,33 @@ async function confirmAdvance() {
       <aside class="admin-candidate-drawer" role="dialog" aria-modal="true" aria-label="预备成员详情" @keydown="handleDrawerKeydown">
         <header class="admin-drawer__header"><div><h2>{{ candidateName(selectedCandidate) }}</h2><p>{{ selectedCandidate.candidate?.studentId ?? selectedCandidate.memberId }} · {{ selectedCandidate.center }}</p></div><button ref="closeButton" type="button" aria-label="关闭详情" @click="closeCandidate">×</button></header>
         <div class="admin-drawer__body">
-          <p v-if="saveError" class="admin-save-message" role="alert">{{ saveError }}</p>
+          <p v-if="saveError" class="admin-save-message admin-save-message--error" role="alert">{{ saveError }}</p>
+          <p v-if="saveMessage" class="admin-save-message" role="status">{{ saveMessage }}</p>
+          <div v-if="personalSaveResult && personalSaveState !== 'saved'" class="admin-inline-note">
+            <button type="button" data-testid="assessment-retry-refresh" :disabled="apiBusy" @click="retryPersonalRefresh">{{ apiBusy ? '刷新中…' : '重试刷新' }}</button>
+            <p v-if="personalSaveState === 'unknown'">请核对下方服务器当前记录。暂未查到结果时，原请求仍可能处理中。</p>
+            <button v-if="canReconfirmUnknown" type="button" data-testid="assessment-reconfirm" :disabled="apiBusy" @click="reconfirmUnknown">已核对当前记录，允许重新确认保存</button>
+          </div>
+          <p v-if="selectedCandidate.finalDecision" class="admin-inline-note">服务器当前最终结果：{{ selectedCandidate.finalDecision === 'admitted' ? selectedCandidate.finalCenter ? `录取至${selectedCandidate.finalCenter}` : '录取' : '不录取' }}</p>
           <section><header><span>01</span><h3>志愿信息</h3></header><ol class="admin-preference-list"><li v-for="(center, index) in selectedCandidate.candidate?.preferences.filter(Boolean) ?? [selectedCandidate.center]" :key="center"><span>0{{ index + 1 }}</span><strong>{{ center }}</strong></li></ol><dl class="admin-detail-grid"><div><dt>白泽方向</dt><dd>{{ selectedCandidate.candidate?.baizeDirection ?? "不适用" }}</dd></div><div><dt>接受调剂</dt><dd>{{ selectedCandidate.acceptsAdjustment ? "是" : "否" }}</dd></div></dl></section>
-          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select v-model="roundDrafts[round]" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select></label></div></section>
-          <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认非白泽中心或淘汰；确认后无需二次面试或成员确认。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label></section>
+          <section><header><span>02</span><h3>当前考核</h3></header><p class="admin-inline-note">原第一志愿：{{ selectedCandidate.center }} · 当前考核中心：{{ getAssessmentCenter(selectedCandidate) }}</p><p v-if="selectedCandidate.transfer" class="admin-inline-note">调剂转入，第2轮起 · 确认方向：{{ baizeDirectionLabel(selectedCandidate.transfer.baizeDirection) }}<span v-if="state.currentRound === 1"> · 待第二轮，等待联盟总负责人推进第一轮</span>。调入不代表最终录取。</p><p v-if="selectedCandidate.transfer" class="admin-inline-note">原中心第一轮：{{ selectedCandidate.roundOutcomes[1] === 'passed' ? '通过' : '不通过' }}（历史只读）</p><p class="admin-inline-note">全局当前轮次：{{ currentRoundLabel }}。上一轮结果和未到达的轮次不可编辑。</p><p v-if="selectedCandidate.processingStatus === 'ready-to-publish' || selectedCandidate.processingStatus === 'completed'" class="admin-inline-note">历史轮次只读，仅展示已处理结果。</p><div class="admin-rounds"><label v-for="round in selectedRounds" :key="round">{{ roundLabel(round) }}<select :value="isRoundEditable(round) ? roundDrafts[round] : selectedCandidate.roundOutcomes[round] ?? ''" @change="roundDrafts[round] = ($event.target as HTMLSelectElement).value as RoundDraft" :aria-label="`${roundLabel(round).replace('考核', '')}结果`" :disabled="!isRoundEditable(round)"><option value="">待录入</option><option value="passed">通过</option><option value="failed">不通过</option></select><small v-if="roundDrafts[round] && !isRoundEditable(round) && roundDrafts[round] !== selectedCandidate.roundOutcomes[round]">未提交草稿：{{ roundDrafts[round] === 'passed' ? '通过' : '不通过' }}</small></label></div><p v-if="selectedCandidate.internalNote" class="admin-inline-note">服务器当前备注：{{ selectedCandidate.internalNote }}</p></section>
+          <section v-if="selectedCandidate.processingStatus === 'adjustment-suggestion-pending' && selectedCandidate.acceptsAdjustment"><header><span>03</span><h3>最终调剂结果</h3></header><p class="admin-inline-note">{{ isOwner ? '联盟总负责人可确认普通中心录取、淘汰，或调入白泽继续考核。白泽调入不代表最终录取。' : '调剂结果由联盟总负责人直接录入，当前账号无需提交线上建议。' }}</p><p v-if="isOwner && selectedCandidate.adjustmentSuggestion" class="admin-inline-note">已有调剂记录：{{ selectedCandidate.adjustmentSuggestion }}</p><label v-if="isOwner">最终调剂结果<select v-model="adjustmentDecision" aria-label="最终调剂结果" :disabled="['saving', 'saved', 'saved-refresh-failed', 'unknown'].includes(personalSaveState)"><option value="">请选择处理结果</option><option value="not-admitted">不录取</option><option v-if="transferTarget" value="transfer-to-baize" :disabled="!canTransfer">调入白泽开发中心，参加第二轮考核</option><option v-for="target in adjustmentTargets" :key="target.id" :value="target.id">录取至{{ target.name }}</option></select></label><p v-if="isOwner && transferTarget && transferDisabledReason" class="admin-inline-note">{{ transferDisabledReason }}</p><label v-if="isOwner && adjustmentDecision === 'transfer-to-baize'">白泽方向（必选）<select v-model="transferDirection" aria-label="白泽方向" :disabled="!canTransfer || ['saving', 'saved', 'saved-refresh-failed', 'unknown'].includes(personalSaveState)"><option value="">请选择白泽方向</option><option v-for="(label, code) in BAIZE_DIRECTION_LABELS" :key="code" :value="code">{{ label }}</option></select></label></section>
           <section><header><span>{{ selectedCandidate.processingStatus === 'adjustment-suggestion-pending' ? '04' : '03' }}</span><h3>内部备注</h3></header><label>仅管理员可见<textarea v-model="internalNote" aria-label="内部备注" rows="4" placeholder="记录必要的内部说明" :disabled="!selectedCandidate.currentPhase || selectedCandidate.processingStatus !== 'assessing'"></textarea></label></section>
         </div>
         <footer class="admin-drawer__footer"><span aria-live="polite"></span><button type="button" class="button button--ghost" @click="closeCandidate">取消</button><button type="button" class="button" :disabled="!canSaveSelectedCandidate || apiBusy" @click="requestSave">{{ apiBusy ? "保存中…" : "保存结果" }}</button></footer>
-        <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
+        <div v-if="showSaveConfirmation" class="admin-confirm-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-save-confirm-title"><h3 id="assessment-save-confirm-title">确认保存本次结果？</h3><p v-if="adjustmentDecision === 'transfer-to-baize'">确认调入白泽开发中心，方向：{{ baizeDirectionLabel(transferDirection || undefined) }}。等待联盟总负责人推进第一轮后，参加白泽第二轮和第三轮考核。此操作不代表最终录取；推进前不向成员公开。</p><p v-else>保存后会锁定本次结果，且不会提前向成员公开。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showSaveConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmSave">{{ apiBusy ? "保存中…" : "确认保存" }}</button></div></section></div>
       </aside>
     </div>
 
-    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>推进后，上一轮结果将保持锁定；本操作只影响 {{ batch?.name ?? batchId }}。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
+    <div v-if="showAdvanceConfirmation" class="admin-modal-backdrop"><section role="alertdialog" aria-modal="true" aria-labelledby="assessment-advance-confirm-title"><h2 id="assessment-advance-confirm-title">确认{{ advanceLabel }}？</h2><p>确认后将同时公开已完成轮次结果并推进考核状态；本操作只影响 {{ batch?.name ?? batchId }}。</p>
+        <p v-if="advancePreview">本次公开轮次：{{ advancePreview.roundsToPublish.map(round => `第 ${round} 轮`).join('、') }}。范围为各轮全部适用中心，与名单筛选无关。</p>
+        <div v-if="advancePreview" class="assessment-advance-summary"><table><thead><tr><th>轮次 / 中心</th><th>应考</th><th>通过 / 未通过</th><th>二维码</th></tr></thead><tbody><tr v-for="item in advancePreview.centers" :key="`${item.round}-${item.centerId}`"><th>第 {{ item.round }} 轮 · {{ item.centerName }}</th><td>{{ item.eligibleCount }}</td><td>{{ item.passedCount }} / {{ item.failedCount }}</td><td>{{ item.groupCodeStatus === 'READY' ? '已上传' : '暂未上传' }}</td></tr></tbody></table></div>
+        <p>结果公开后不可修改。白泽调入人员将在本次第一轮推进后看到调入结果和白泽第一轮入场群二维码；目标白泽应考人数为 0 时仍表示入场二维码配置。未上传二维码不影响推进，稍后补图即可；此操作不会变更成员身份或中心归属。</p><div><button type="button" class="button button--ghost" :disabled="apiBusy" @click="showAdvanceConfirmation = false">返回检查</button><button type="button" class="button" :disabled="apiBusy" @click="confirmAdvance">{{ apiBusy ? "处理中…" : "确认推进" }}</button></div></section></div>
   </div>
 </template>
+
+<style scoped>
+.assessment-advance-summary { max-width: 100%; overflow-x: auto; margin: 20px 0; }
+.assessment-advance-summary table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.assessment-advance-summary th,.assessment-advance-summary td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #e5e2dd; white-space: nowrap; }
+</style>

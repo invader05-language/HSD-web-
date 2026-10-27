@@ -15,7 +15,9 @@ import {
   type ErrorResponse,
   type MemberProfileResponseDto,
   type MyRecruitmentApplicationEnvelopeDto,
+  type MyRecruitmentApplicationListDto,
   type MyRecruitmentApplicationResponseDto,
+  type MyInterviewContextDto,
   type PublishAssessmentDto,
   type PublicRecruitmentBatchEnvelopeDto,
   type RecordRoundResultDto,
@@ -31,7 +33,10 @@ import {
   type NotificationActionResponseDto,
   type NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
-import type { RecruitmentExportFile, RecruitmentGateway } from "./recruitment-gateway";
+import type { RecruitmentExportFile, RecruitmentGateway, RoundGroupGateway } from "./recruitment-gateway";
+import type { MemberResultContextDto } from "../../data/member-results";
+import { uploadGroupCode, resumeGroupCodeUpload, type GroupCodeUploadClient } from './group-code-upload';
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 
 export interface ApiRecruitmentGatewayOptions {
   apiBase: string;
@@ -103,8 +108,8 @@ function safeDecodeURIComponent(value: string): string | undefined {
 
 export function createApiRecruitmentGateway(
   options: ApiRecruitmentGatewayOptions,
-): RecruitmentGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+): RecruitmentGateway & RoundGroupGateway {
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? readBrowserCookie;
   const createRequestId = options.createRequestId ?? requestId;
@@ -132,13 +137,19 @@ export function createApiRecruitmentGateway(
   async function read<TOperation extends ApiOperation>(
     operation: TOperation,
     path: string,
+    signal?: AbortSignal,
   ): Promise<ApiResponseFor<TOperation>> {
     const response = await fetcher(`${apiBase}${path}`, {
       method: "GET",
       credentials: "include",
       headers: { "X-Request-ID": createRequestId() },
+      ...(signal ? { signal } : {}),
     });
     return parseResponse(operation, response);
+  }
+
+  async function readMyResultContext(): Promise<MemberResultContextDto> {
+    return read("GET /api/v1/recruitment/results/me/context", "/api/v1/recruitment/results/me/context") as Promise<MemberResultContextDto>;
   }
 
   async function readRosterExport(batchId: string, query = ""): Promise<RecruitmentExportFile> {
@@ -179,6 +190,7 @@ export function createApiRecruitmentGateway(
     path: string,
     body: unknown,
     method: "POST" | "PATCH" | "PUT" = "POST",
+    signal?: AbortSignal,
   ): Promise<ApiResponseFor<TOperation>> {
     const csrfToken = readCookie("hsd_csrf");
     if (!csrfToken) throw new Error("RECRUITMENT_CSRF_TOKEN_MISSING");
@@ -191,6 +203,7 @@ export function createApiRecruitmentGateway(
         "X-Request-ID": createRequestId(),
       },
       body: JSON.stringify(body),
+      ...(signal ? { signal } : {}),
     });
     return parseResponse(operation, response);
   }
@@ -221,7 +234,30 @@ export function createApiRecruitmentGateway(
     return payload as T;
   }
 
+  const groupClient: GroupCodeUploadClient = {
+    apiBase, fetcher,
+    intent: (batchId, centerId, round, body, signal) => mutate('POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code/uploads`, body, 'POST', signal),
+    complete: (task, signal) => mutate('POST /api/v1/admin/uploads/{uploadId}/complete', `/api/v1/admin/uploads/${encodeURIComponent(task.uploadId)}/complete`, { expectedVersion: task.uploadVersion, parts: [{partNumber:1,etag:task.etag}] }, 'POST', signal),
+    status: (uploadId, signal) => read('GET /api/v1/admin/uploads/{uploadId}', `/api/v1/admin/uploads/${encodeURIComponent(uploadId)}`, signal),
+    configuration: (batchId, signal) => read('GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessment-group-codes?includeUploadMetadata=true`, signal),
+    bind: (task, signal) => mutate('PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code', `/api/v1/admin/recruitment/batches/${encodeURIComponent(task.batchId)}/centers/${encodeURIComponent(task.centerId)}/assessment-rounds/${task.round}/group-code`, {expectedVersion:task.expectedVersion,uploadId:task.uploadId}, 'PUT', signal),
+  };
   return {
+    getAssessmentGroupCodes: (batchId) => read('GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessment-group-codes?includeUploadMetadata=true`),
+    bindAssessmentGroupCode: (batchId, centerId, round, expectedVersion, uploadId) => mutate('PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/centers/${encodeURIComponent(centerId)}/assessment-rounds/${round}/group-code`, { expectedVersion, uploadId }, 'PUT'),
+    uploadAssessmentGroupCode: (batchId, centerId, round, expectedVersion, file, options) => uploadGroupCode(groupClient, batchId, centerId, round, expectedVersion, file, options),
+    resumeAssessmentGroupCode: (task, options) => resumeGroupCodeUpload(groupClient, task, options),
+    getAssessmentAdvancePreview: (batchId) => read('GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview', `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/advance-preview`),
+    getMyStageResults: () => read('GET /api/v1/recruitment/results/me/stages', '/api/v1/recruitment/results/me/stages'),
+    async readGroupCodeImage(url) {
+      if (!url.startsWith('/api/v1/') || !url.includes('/group-code') || !url.includes('/image')) throw new Error('GROUP_CODE_IMAGE_PATH_INVALID');
+      const response = await fetcher(`${apiBase}${url}`, {credentials:'include', cache:'no-store', headers:{'X-Request-ID':createRequestId()}});
+      if (!response.ok) {
+        const payload:unknown = await response.json().catch(()=>null);
+        throw new RecruitmentApiError({status:response.status,code:isErrorResponse(payload)?payload.code:'GROUP_CODE_IMAGE_FAILED',message:isErrorResponse(payload)?payload.message:'二维码加载失败'});
+      }
+      return response.blob();
+    },
     getCurrentBatch: () => read(
       "GET /api/v1/recruitment/current",
       "/api/v1/recruitment/current",
@@ -244,6 +280,14 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/recruitment/batches/{batchId}/my-application",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-application`,
     ),
+    listMyApplications: (page = 1, pageSize = 20) => read(
+      "GET /api/v1/recruitment/applications/mine",
+      `/api/v1/recruitment/applications/mine?page=${page}&pageSize=${pageSize}`,
+    ) as Promise<MyRecruitmentApplicationListDto>,
+    getMyInterviewContext: (batchId) => read(
+      "GET /api/v1/recruitment/batches/{batchId}/my-interview-context",
+      `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/my-interview-context`,
+    ) as Promise<MyInterviewContextDto>,
     submitApplication: (batchId, payload: SubmitApplicationDto) => mutate(
       "POST /api/v1/recruitment/batches/{batchId}/applications",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications`,
@@ -312,9 +356,14 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/admin/recruitment/batches/{batchId}/assessments",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments`,
     ),
-    getAdjustmentTargets: (batchId) => read(
+    getAdjustmentTargets: (batchId, includeAssessmentTransfers = false) => read(
       "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
-      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/adjustment-targets`,
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/adjustment-targets${includeAssessmentTransfers ? '?includeAssessmentTransfers=true' : ''}`,
+    ),
+    transferAssessment: (batchId, applicationId, payload) => mutate(
+      'POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers',
+      `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/assessments/${encodeURIComponent(applicationId)}/assessment-transfers`,
+      payload,
     ),
     recordRoundResult: (batchId, applicationId, payload: RecordRoundResultDto) => mutate(
       "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
@@ -345,15 +394,17 @@ export function createApiRecruitmentGateway(
       "GET /api/v1/recruitment/results/me",
       "/api/v1/recruitment/results/me",
     ),
+    getMyResultContext: readMyResultContext,
     getMyResponsibleContact: (resultId, personId) => read(
       "GET /api/v1/recruitment/results/me/{resultId}/responsible-contacts/{contactPersonId}",
       `/api/v1/recruitment/results/me/${encodeURIComponent(resultId)}/responsible-contacts/${encodeURIComponent(personId)}`,
     ),
-    changeInterviewSlot: (batchId: string, applicationId: string, payload: ChangeInterviewSlotDto) => rawMutate<MyRecruitmentApplicationResponseDto>(
+    changeInterviewSlot: (batchId: string, applicationId: string, payload: ChangeInterviewSlotDto) => mutate(
+      "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot",
       `/api/v1/recruitment/batches/${encodeURIComponent(batchId)}/applications/${encodeURIComponent(applicationId)}/interview-slot`,
       payload,
       "PATCH",
-    ),
+    ) as Promise<MyRecruitmentApplicationResponseDto>,
     reconcileAdminInterviewSlots: (batchId, payload: ReconcileInterviewSlotsDto) => mutate(
       "PUT /api/v1/admin/recruitment/batches/{batchId}/interview-slots",
       `/api/v1/admin/recruitment/batches/${encodeURIComponent(batchId)}/interview-slots`,

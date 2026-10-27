@@ -250,7 +250,7 @@ describe("recruitment assessment API store mode", () => {
 
     await expect(store.refreshAssessmentBatch("batch-current", api)).rejects.toThrow("NETWORK_DOWN");
 
-    expect(store.apiErrorByBatch["batch-current"]).toBe("NETWORK_DOWN");
+    expect(store.apiErrorByBatch["batch-current"]).toEqual({ message: "NETWORK_DOWN" });
     expect(store.getCandidates("batch-current")).toEqual([]);
   });
 

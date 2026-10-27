@@ -36,6 +36,11 @@ export type AdminAccountListResponseDto = {
   "items": Array<AdminAccountResponseDto>;
 };
 
+export type AdminAccountQualificationResponseDto = {
+  "appointedAt": string;
+  "appointedBy": string;
+};
+
 export type AdminAccountResponseDto = {
   "id": string;
   "username": string;
@@ -50,11 +55,6 @@ export type AdminAccountResponseDto = {
   "person": AdminPersonSummaryResponseDto;
   "adminCenter": (AdminAccountCenterSummaryResponseDto) | null;
   "qualification": (AdminAccountQualificationResponseDto) | null;
-};
-
-export type AdminAccountQualificationResponseDto = {
-  "appointedAt": string;
-  "appointedBy": string;
 };
 
 export type AdminActivityListResponseDto = {
@@ -174,6 +174,16 @@ export type AdminGalleryResponseDto = {
   "revisionNumber": number;
 };
 
+export type AdminGroupCodeReferenceDto = {
+  "id": (string) | null;
+  "round": number;
+  "version": number;
+  "status": "READY" | "MISSING";
+  "imageUrl": (string) | null;
+  "uploadId"?: (string) | null;
+  "updatedAt"?: (string) | null;
+};
+
 export type AdminHelpListResponseDto = {
   "items": Array<AdminHelpResponseDto>;
 };
@@ -262,6 +272,7 @@ export type AdminProjectResponseDto = {
 };
 
 export type AdminRecruitmentApplicationDto = {
+  "originalRoundResult"?: RecruitmentOriginalRoundResultDto;
   "id": string;
   "batchId": string;
   "contact": string;
@@ -275,7 +286,7 @@ export type AdminRecruitmentApplicationDto = {
   "submittedAt": string;
   "withdrawnAt": (string) | null;
   "preferences": Array<AdminRecruitmentApplicationPreferenceDto>;
-  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
+  "interviewSelection": (RecruitmentInterviewSelectionDto) | null;
 };
 
 export type AdminRecruitmentApplicationListDto = {
@@ -310,7 +321,7 @@ export type AdminRecruitmentBatchDto = {
   "applicationCount": number;
   "openCenters": Array<AdminRecruitmentCenterDto>;
   "responsibleAccounts": Array<AdminRecruitmentResponsibleAccountDto>;
-  "interviewSlots"?: Array<AdminRecruitmentInterviewSlotDto>;
+  "interviewSlots": Array<AdminRecruitmentInterviewSlotDto>;
 };
 
 export type AdminRecruitmentBatchListDto = {
@@ -431,6 +442,7 @@ export type AdminResourceVersionResponseDto = {
 export type AdvanceAssessmentDto = {
   "expectedVersion": number;
   "confirmed": boolean;
+  "previewFingerprint"?: string;
   "reason"?: string;
 };
 
@@ -451,7 +463,17 @@ export type AssessmentAdjustmentProposalDto = {
 };
 
 export type AssessmentAdjustmentTargetCatalogResponseDto = {
-  "items": Array<AssessmentCenterDto>;
+  "capabilities"?: AssessmentCapabilitiesDto;
+  "items": Array<AssessmentAdjustmentTargetDto>;
+};
+
+export type AssessmentAdjustmentTargetDto = {
+  "id": string;
+  "slug": string;
+  "name": string;
+  "action"?: "TRANSFER_TO_ASSESSMENT";
+  "available"?: boolean;
+  "blockReason"?: (string) | null;
 };
 
 export type AssessmentAdvanceBlockerDto = {
@@ -470,6 +492,7 @@ export type AssessmentBatchResponseDto = {
   "status": "ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED";
   "version": number;
   "publishedAt": (string) | null;
+  "capabilities"?: AssessmentCapabilitiesDto;
   "batch": AssessmentBatchDetailDto;
   "pending": number;
   "adjustmentPending": number;
@@ -487,6 +510,10 @@ export type AssessmentBatchStateResponseDto = {
 };
 
 export type AssessmentCandidateDto = {
+  "assessmentCenter"?: AssessmentCenterDto;
+  "entryRound"?: number;
+  "transfer"?: (AssessmentTransferDto) | null;
+  "transferEligibility"?: AssessmentTransferEligibilityDto;
   "applicationId": string;
   "person": AssessmentPersonDto;
   "acceptsAdjustment": boolean;
@@ -496,6 +523,10 @@ export type AssessmentCandidateDto = {
   "adjustmentProposal": (AssessmentAdjustmentProposalDto) | null;
   "adjustmentDecision": (AssessmentAdjustmentDecisionDto) | null;
   "finalResult": (AssessmentFinalResultDto) | null;
+};
+
+export type AssessmentCapabilitiesDto = {
+  "assessmentTransfers": boolean;
 };
 
 export type AssessmentCenterDto = {
@@ -559,6 +590,25 @@ export type AssessmentRoundResultDto = {
   "createdAt": string;
 };
 
+export type AssessmentTransferDto = {
+  "id": string;
+  "fromCenter": AssessmentCenterDto;
+  "toCenter": AssessmentCenterDto;
+  "entryRound": 2;
+  "baizeDirection": "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+  "createdAt": string;
+};
+
+export type AssessmentTransferEligibilityDto = {
+  "available": boolean;
+  "blockReason": (string) | null;
+};
+
+export type AssessmentTransferMutationResponseDto = {
+  "version": number;
+  "transfer": AssessmentTransferDto;
+};
+
 export type AuthorityAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
@@ -578,6 +628,11 @@ export type AvatarResponseDto = {
   "kind": "default" | "asset";
   "publicToken"?: string;
   "variant"?: "white-hsd";
+};
+
+export type BindRoundGroupCodeDto = {
+  "expectedVersion": number;
+  "uploadId": (string) | null;
 };
 
 export type CenterLeadershipResponseDto = {
@@ -708,6 +763,12 @@ export type CreateAdjustmentProposalDto = {
   "targetCenterId": string;
 };
 
+export type CreateAssessmentTransferDto = {
+  "targetCenterId": string;
+  "baizeDirection": "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+  "expectedCurrentRound": 1;
+};
+
 export type CreateContentDto = {
   "centerId": string;
   "kind": "flash" | "article" | "notice";
@@ -740,6 +801,15 @@ export type CreateGalleryDto = {
   "team"?: string;
   "coverAttachmentId"?: string;
   "detailAttachmentIds"?: Array<string>;
+};
+
+export type CreateGroupCodeUploadDto = {
+  "expectedVersion": number;
+  "fileName": string;
+  "mimeType": "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/webm";
+  "byteSize": number;
+  "checksumSha256": string;
+  "kind": "image" | "video";
 };
 
 export type CreateGrowthRecordDto = {
@@ -1027,6 +1097,7 @@ export type ErrorResponse = {
   "message": string;
   "requestId": string;
   "fieldErrors"?: Record<string, string>;
+  "retryAfterSeconds"?: number;
 };
 
 export type GalleryCommandDto = {
@@ -1042,6 +1113,26 @@ export type GrantAdminQualificationDto = {
   "confirmed"?: boolean;
   "expectedVersion": number;
   "adminCenterId": string;
+};
+
+export type GroupCodeCenterDto = {
+  "id": string;
+  "name": string;
+  "slug": string;
+  "rounds": Array<AdminGroupCodeReferenceDto>;
+};
+
+export type GroupCodeListDto = {
+  "batchId": string;
+  "centers": Array<GroupCodeCenterDto>;
+};
+
+export type GroupCodeReferenceDto = {
+  "id": (string) | null;
+  "round": number;
+  "version": number;
+  "status": "READY" | "MISSING";
+  "imageUrl": (string) | null;
 };
 
 export type GrowthRecordListResponseDto = {
@@ -1222,6 +1313,13 @@ export type MemberAvatarUploadResponseDto = {
   "assetId": string;
 };
 
+export type MemberCurrentRoutingDto = {
+  "type": "PASSED_CONTINUE" | "ADJUSTED" | "BAIZE_TRANSFER";
+  "center": AssessmentCenterDto;
+  "round": number;
+  "groupCode": (GroupCodeReferenceDto) | null;
+};
+
 export type MemberNotificationDto = {
   "id": string;
   "type": string;
@@ -1257,14 +1355,101 @@ export type MemberProfileResponseDto = {
   "membership": (MembershipResponseDto) | null;
 };
 
+export type MemberResultAdjustmentDto = {
+  "decision": "ADMITTED" | "NOT_ADMITTED";
+  "targetCenter": (AssessmentCenterDto) | null;
+  "decidedAt": string;
+  "finalPublished": boolean;
+};
+
+export type MemberResultApplicationDto = {
+  "id": string;
+  "status": string;
+  "firstCenter": AssessmentCenterDto;
+  "acceptsAdjustment": boolean;
+};
+
+export type MemberResultAssessmentTransferDto = {
+  "fromCenter": AssessmentCenterDto;
+  "toCenter": AssessmentCenterDto;
+  "entryRound": 2;
+  "baizeDirection": "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+  "publishedAt": (string) | null;
+  "entryGroupCode": (GroupCodeReferenceDto) | null;
+};
+
+export type MemberResultBatchDto = {
+  "id": string;
+  "name": string;
+  "lifecycleStatus": "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED";
+  "currentRound": (number) | null;
+  "assessmentStatus": ("ASSESSING" | "READY_TO_PUBLISH" | "PUBLISHED") | null;
+};
+
+export type MemberResultContextDto = {
+  "batch": (MemberResultBatchDto) | null;
+  "application": (MemberResultApplicationDto) | null;
+  "stages": Array<MemberResultStageDto>;
+  "adjustment": (MemberResultAdjustmentDto) | null;
+  "assessmentTransfer": (MemberResultAssessmentTransferDto) | null;
+  "currentRouting": (MemberCurrentRoutingDto) | null;
+  "finalResult": (MemberResultFinalDto) | null;
+};
+
+export type MemberResultFinalDto = {
+  "decision": "ADMITTED" | "NOT_ADMITTED";
+  "finalCenter": (AssessmentCenterDto) | null;
+  "publishedAt": string;
+};
+
+export type MemberResultStageDto = {
+  "center"?: AssessmentCenterDto;
+  "baizeDirection"?: ("HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT") | null;
+  "round": number;
+  "outcome": "PASSED" | "FAILED";
+  "publishedAt": string;
+  "groupCode": (GroupCodeReferenceDto) | null;
+};
+
 export type MembershipResponseDto = {
   "duty": "REGULAR" | "CORE";
   "version": number;
   "center": CenterSummaryResponseDto;
 };
 
+export type MemberStageResultsDto = {
+  "transfer"?: (PublishedAssessmentTransferDto) | null;
+  "entryGroupCode"?: (GroupCodeReferenceDto) | null;
+  "batchId": (string) | null;
+  "batchName": (string) | null;
+  "center": (StageCenterDto) | null;
+  "stages": Array<PublishedStageDto>;
+  "finalGroupCode": (GroupCodeReferenceDto) | null;
+  "adjustment"?: (MemberResultAdjustmentDto) | null;
+  "currentRouting"?: (MemberCurrentRoutingDto) | null;
+};
+
+export type MyInterviewContextDto = {
+  "application": MyRecruitmentApplicationResponseDto;
+  "batch": PublicRecruitmentBatchDto;
+  "canChangeInterview": boolean;
+  "changeBlockedReason": ("APPLICATION_LOCKED" | "BATCH_ARCHIVED" | "BATCH_NOT_OPEN" | "INTERVIEW_STARTED" | "NO_AVAILABLE_SLOT" | null) | null;
+};
+
 export type MyRecruitmentApplicationEnvelopeDto = {
   "application": (MyRecruitmentApplicationResponseDto) | null;
+};
+
+export type MyRecruitmentApplicationItemDto = {
+  "application": MyRecruitmentApplicationResponseDto;
+  "batch": MyRecruitmentBatchSummaryDto;
+};
+
+export type MyRecruitmentApplicationListDto = {
+  "page": number;
+  "pageSize": number;
+  "total": number;
+  "items": Array<MyRecruitmentApplicationItemDto>;
 };
 
 export type MyRecruitmentApplicationResponseDto = {
@@ -1279,10 +1464,21 @@ export type MyRecruitmentApplicationResponseDto = {
   "withdrawnAt": (string) | null;
   "locked": boolean;
   "preferences": Array<RecruitmentApplicationPreferenceDto>;
-  "interviewSelection"?: (RecruitmentInterviewSelectionDto) | null;
+  "interviewSelection": (RecruitmentInterviewSelectionDto) | null;
+};
+
+export type MyRecruitmentBatchSummaryDto = {
+  "effectiveStatus": "draft" | "upcoming" | "open" | "paused" | "closed" | "archived";
+  "effectiveStatusReason": "draft" | "before-start" | "within-window" | "after-end" | "force-open" | "paused" | "force-closed" | "archived";
+  "id": string;
+  "name": string;
+  "startAt": string;
+  "endAt": string;
+  "timezone": "Asia/Shanghai";
 };
 
 export type MyRecruitmentResultDto = {
+  "finalBaizeDirection"?: ("HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT") | null;
   "id": string;
   "batch": RecruitmentResultBatchDto;
   "decision": "ADMITTED" | "NOT_ADMITTED";
@@ -1687,7 +1883,7 @@ export type PublicRecruitmentBatchDto = {
   "endAt": string;
   "timezone": "Asia/Shanghai";
   "openCenters": Array<PublicRecruitmentCenterDto>;
-  "interviewSlots"?: Array<PublicRecruitmentInterviewSlotDto>;
+  "interviewSlots": Array<PublicRecruitmentInterviewSlotDto>;
 };
 
 export type PublicRecruitmentBatchEnvelopeDto = {
@@ -1764,11 +1960,29 @@ export type PublishContentDto = {
   "confirmed": boolean;
 };
 
+export type PublishedAssessmentTransferDto = {
+  "id": string;
+  "fromCenter": AssessmentCenterDto;
+  "toCenter": AssessmentCenterDto;
+  "entryRound": 2;
+  "baizeDirection": "HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT";
+  "publishedAt": string;
+};
+
 export type PublishedPortalConfigurationResponseDto = {
   "version": number;
   "entries": Array<PortalResolvedEntryResponseDto>;
   "visuals": Record<string, unknown>;
   "publishedAt": string;
+};
+
+export type PublishedStageDto = {
+  "center"?: AssessmentCenterDto;
+  "baizeDirection"?: ("HARMONYOS_DEVELOPMENT" | "BACKEND_ARCHITECTURE" | "AIGC_LARGE_MODEL" | "UI_UX_DESIGN" | "EMBEDDED_DEVELOPMENT") | null;
+  "round": number;
+  "outcome": "PASSED" | "FAILED";
+  "publishedAt": string;
+  "groupCode": (GroupCodeReferenceDto) | null;
 };
 
 export type PublishHelpDto = {
@@ -1881,6 +2095,13 @@ export type RecruitmentInterviewSelectionDto = {
   "startAt": string;
   "endAt": string;
   "timezone": "Asia/Shanghai";
+};
+
+export type RecruitmentOriginalRoundResultDto = {
+  "round": 1;
+  "outcome": "PASSED" | "FAILED";
+  "internalNote": (string) | null;
+  "createdAt": string;
 };
 
 export type RecruitmentPreferenceInputDto = {
@@ -2029,6 +2250,33 @@ export type RevokeOrganizationPositionDto = {
   "reason"?: string;
 };
 
+export type RoundPublicationCenterDto = {
+  "round": number;
+  "centerId": string;
+  "centerName": string;
+  "applicable": boolean;
+  "eligibleCount": number;
+  "recordedCount": number;
+  "missingCount": number;
+  "passedCount": number;
+  "failedCount": number;
+  "groupCodeStatus": "READY" | "MISSING";
+};
+
+export type RoundPublicationPreviewDto = {
+  "batchId": string;
+  "batchName": string;
+  "round": number;
+  "assessmentVersion": number;
+  "previewFingerprint": string;
+  "canPublish": boolean;
+  "blockingReasons": Array<string>;
+  "publishedAt": (string) | null;
+  "roundsToPublish": Array<number>;
+  "publishedRounds": Array<number>;
+  "centers": Array<RoundPublicationCenterDto>;
+};
+
 export type SafeAuditActorDto = {
   "type": "account" | "system";
   "accountId": (string) | null;
@@ -2074,12 +2322,14 @@ export type SessionAccountResponseDto = {
   "id": string;
   "adminLevel": "MEMBER" | "ADMIN" | "OWNER";
   "adminCenterId": (string) | null;
-  "adminCenter": ({
+  "adminCenter": (SessionAdminCenterSummaryResponseDto) | null;
+  "capabilities": Array<string>;
+};
+
+export type SessionAdminCenterSummaryResponseDto = {
   "id": string;
   "name": string;
   "role": "CENTER_MINISTER";
-}) | null;
-  "capabilities": Array<string>;
 };
 
 export type SessionPersonResponseDto = {
@@ -2092,6 +2342,11 @@ export type SessionPersonResponseDto = {
 export type SetCoreMembershipDto = {
   "core": boolean;
   "expectedMembershipVersion": number;
+};
+
+export type StageCenterDto = {
+  "id": string;
+  "name": string;
 };
 
 export type SubmitApplicationDto = {
@@ -2324,6 +2579,12 @@ export type ListActivityRegistrationsDto = {
 };
 
 export const API_V1_PATHS = {
+  assessmentGroupCodes: "/api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes",
+  assessmentGroupCodeUpload: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads",
+  assessmentGroupCodeBind: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code",
+  assessmentAdvancePreview: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview",
+  memberStageResults: "/api/v1/recruitment/results/me/stages",
+  memberResultContext: "/api/v1/recruitment/results/me/context",
   authLogin: "/api/v1/auth/login",
   authSession: "/api/v1/auth/session",
   authChangePassword: "/api/v1/auth/change-password",
@@ -2388,8 +2649,11 @@ export const API_V1_PATHS = {
   recruitmentCurrent: "/api/v1/recruitment/current",
   recruitmentUpcoming: "/api/v1/recruitment/upcoming",
   recruitmentMyApplication: "/api/v1/recruitment/batches/{batchId}/my-application",
+  recruitmentMyApplications: "/api/v1/recruitment/applications/mine",
+  recruitmentMyInterviewContext: "/api/v1/recruitment/batches/{batchId}/my-interview-context",
   recruitmentApplicationCreate: "/api/v1/recruitment/batches/{batchId}/applications",
   recruitmentApplicationUpdate: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}",
+  recruitmentApplicationInterviewSlot: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot",
   recruitmentApplicationWithdraw: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw",
   adminRecruitmentBatches: "/api/v1/admin/recruitment/batches",
   adminRecruitmentBatchCreate: "/api/v1/admin/recruitment/batches",
@@ -2410,6 +2674,7 @@ export const API_V1_PATHS = {
   adminRecruitmentBatchClose: "/api/v1/admin/recruitment/batches/{batchId}/close",
   adminRecruitmentBatchReopen: "/api/v1/admin/recruitment/batches/{batchId}/reopen",
   adminRecruitmentBatchArchive: "/api/v1/admin/recruitment/batches/{batchId}/archive",
+  assessmentTransfer: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers",
   assessmentBatch: "/api/v1/admin/recruitment/batches/{batchId}/assessments",
   assessmentAdjustmentTargets: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets",
   assessmentRoundResult: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results",
@@ -2477,6 +2742,12 @@ export const API_V1_PATHS = {
 } as const;
 
 export const API_OPERATIONS = {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads" },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": { method: "PUT", path: "/api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code" },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview" },
+  "GET /api/v1/recruitment/results/me/stages": { method: "GET", path: "/api/v1/recruitment/results/me/stages" },
+  "GET /api/v1/recruitment/results/me/context": { method: "GET", path: "/api/v1/recruitment/results/me/context" },
   "POST /api/v1/auth/login": { method: "POST", path: "/api/v1/auth/login" },
   "GET /api/v1/auth/session": { method: "GET", path: "/api/v1/auth/session" },
   "POST /api/v1/auth/change-password": { method: "POST", path: "/api/v1/auth/change-password" },
@@ -2541,8 +2812,11 @@ export const API_OPERATIONS = {
   "GET /api/v1/recruitment/current": { method: "GET", path: "/api/v1/recruitment/current" },
   "GET /api/v1/recruitment/upcoming": { method: "GET", path: "/api/v1/recruitment/upcoming" },
   "GET /api/v1/recruitment/batches/{batchId}/my-application": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-application" },
+  "GET /api/v1/recruitment/applications/mine": { method: "GET", path: "/api/v1/recruitment/applications/mine" },
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": { method: "GET", path: "/api/v1/recruitment/batches/{batchId}/my-interview-context" },
   "POST /api/v1/recruitment/batches/{batchId}/applications": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications" },
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}" },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": { method: "PATCH", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot" },
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": { method: "POST", path: "/api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw" },
   "GET /api/v1/admin/recruitment/batches": { method: "GET", path: "/api/v1/admin/recruitment/batches" },
   "POST /api/v1/admin/recruitment/batches": { method: "POST", path: "/api/v1/admin/recruitment/batches" },
@@ -2563,6 +2837,7 @@ export const API_OPERATIONS = {
   "POST /api/v1/admin/recruitment/batches/{batchId}/close": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/close" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/reopen" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/archive": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/archive" },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments" },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": { method: "GET", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets" },
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": { method: "POST", path: "/api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results" },
@@ -2633,6 +2908,12 @@ export type ApiOperation = keyof typeof API_OPERATIONS;
 export type ApiV1Path = (typeof API_V1_PATHS)[keyof typeof API_V1_PATHS];
 
 export interface ApiResponseByOperation {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": GroupCodeListDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": UploadIntentResponseDto;
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": GroupCodeReferenceDto;
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": RoundPublicationPreviewDto;
+  "GET /api/v1/recruitment/results/me/stages": MemberStageResultsDto;
+  "GET /api/v1/recruitment/results/me/context": MemberResultContextDto;
   "POST /api/v1/auth/login": AuthSessionResponseDto;
   "GET /api/v1/auth/session": CurrentSessionResponseDto;
   "POST /api/v1/auth/change-password": AuthSessionResponseDto;
@@ -2700,8 +2981,11 @@ export interface ApiResponseByOperation {
   "GET /api/v1/recruitment/current": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/upcoming": PublicRecruitmentBatchEnvelopeDto;
   "GET /api/v1/recruitment/batches/{batchId}/my-application": MyRecruitmentApplicationEnvelopeDto;
+  "GET /api/v1/recruitment/applications/mine": MyRecruitmentApplicationListDto;
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": MyInterviewContextDto;
   "POST /api/v1/recruitment/batches/{batchId}/applications": MyRecruitmentApplicationResponseDto;
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": MyRecruitmentApplicationResponseDto;
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": MyRecruitmentApplicationResponseDto;
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": MyRecruitmentApplicationResponseDto;
   "GET /api/v1/admin/recruitment/batches": AdminRecruitmentBatchListDto;
   "POST /api/v1/admin/recruitment/batches": AdminRecruitmentBatchDto;
@@ -2722,6 +3006,7 @@ export interface ApiResponseByOperation {
   "POST /api/v1/admin/recruitment/batches/{batchId}/close": AdminRecruitmentBatchDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/reopen": AdminRecruitmentBatchDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/archive": AdminRecruitmentBatchDto;
+  "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers": AssessmentTransferMutationResponseDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": AssessmentBatchResponseDto;
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/adjustment-targets": AssessmentAdjustmentTargetCatalogResponseDto;
   "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/round-results": AssessmentRoundMutationResponseDto;
@@ -2791,6 +3076,24 @@ export interface ApiResponseByOperation {
 export type ApiResponseFor<TOperation extends ApiOperation> = ApiResponseByOperation[TOperation];
 
 const API_RESPONSE_SCHEMAS = {
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessment-group-codes": {
+    "$ref": "#/components/schemas/GroupCodeListDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code/uploads": {
+    "$ref": "#/components/schemas/UploadIntentResponseDto"
+  },
+  "PUT /api/v1/admin/recruitment/batches/{batchId}/centers/{centerId}/assessment-rounds/{round}/group-code": {
+    "$ref": "#/components/schemas/GroupCodeReferenceDto"
+  },
+  "GET /api/v1/admin/recruitment/batches/{batchId}/assessments/advance-preview": {
+    "$ref": "#/components/schemas/RoundPublicationPreviewDto"
+  },
+  "GET /api/v1/recruitment/results/me/stages": {
+    "$ref": "#/components/schemas/MemberStageResultsDto"
+  },
+  "GET /api/v1/recruitment/results/me/context": {
+    "$ref": "#/components/schemas/MemberResultContextDto"
+  },
   "POST /api/v1/auth/login": {
     "$ref": "#/components/schemas/AuthSessionResponseDto"
   },
@@ -2995,10 +3298,19 @@ const API_RESPONSE_SCHEMAS = {
   "GET /api/v1/recruitment/batches/{batchId}/my-application": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationEnvelopeDto"
   },
+  "GET /api/v1/recruitment/applications/mine": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationListDto"
+  },
+  "GET /api/v1/recruitment/batches/{batchId}/my-interview-context": {
+    "$ref": "#/components/schemas/MyInterviewContextDto"
+  },
   "POST /api/v1/recruitment/batches/{batchId}/applications": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
   },
   "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}": {
+    "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+  },
+  "PATCH /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/interview-slot": {
     "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
   },
   "POST /api/v1/recruitment/batches/{batchId}/applications/{applicationId}/withdraw": {
@@ -3060,6 +3372,9 @@ const API_RESPONSE_SCHEMAS = {
   },
   "POST /api/v1/admin/recruitment/batches/{batchId}/archive": {
     "$ref": "#/components/schemas/AdminRecruitmentBatchDto"
+  },
+  "POST /api/v1/admin/recruitment/batches/{batchId}/assessments/{applicationId}/assessment-transfers": {
+    "$ref": "#/components/schemas/AssessmentTransferMutationResponseDto"
   },
   "GET /api/v1/admin/recruitment/batches/{batchId}/assessments": {
     "$ref": "#/components/schemas/AssessmentBatchResponseDto"
@@ -3286,8 +3601,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "newPassword": {
         "type": "string",
-        "example": "a-new-password-that-is-long-enough",
-        "minLength": 15,
+        "example": "safe-6",
+        "minLength": 6,
         "maxLength": 128
       }
     },
@@ -4423,6 +4738,12 @@ const API_COMPONENT_SCHEMAS = {
         "additionalProperties": {
           "type": "string"
         }
+      },
+      "retryAfterSeconds": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 3600,
+        "description": "Optional retry delay for HTTP 423, 429, or 503."
       }
     }
   },
@@ -4826,7 +5147,8 @@ const API_COMPONENT_SCHEMAS = {
       "startAt",
       "endAt",
       "timezone",
-      "openCenters"
+      "openCenters",
+      "interviewSlots"
     ]
   },
   "PublicRecruitmentBatchEnvelopeDto": {
@@ -5001,7 +5323,8 @@ const API_COMPONENT_SCHEMAS = {
       "submittedAt",
       "withdrawnAt",
       "locked",
-      "preferences"
+      "preferences",
+      "interviewSelection"
     ]
   },
   "MyRecruitmentApplicationEnvelopeDto": {
@@ -5018,6 +5341,38 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "application"
+    ]
+  },
+  "MyInterviewContextDto": {
+    "type": "object",
+    "properties": {
+      "application": {
+        "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+      },
+      "batch": {
+        "$ref": "#/components/schemas/PublicRecruitmentBatchDto"
+      },
+      "canChangeInterview": {
+        "type": "boolean"
+      },
+      "changeBlockedReason": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "APPLICATION_LOCKED",
+          "BATCH_ARCHIVED",
+          "BATCH_NOT_OPEN",
+          "INTERVIEW_STARTED",
+          "NO_AVAILABLE_SLOT",
+          null
+        ]
+      }
+    },
+    "required": [
+      "application",
+      "batch",
+      "canChangeInterview",
+      "changeBlockedReason"
     ]
   },
   "RecruitmentPreferenceInputDto": {
@@ -5150,6 +5505,110 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "expectedVersion"
+    ]
+  },
+  "MyRecruitmentBatchSummaryDto": {
+    "type": "object",
+    "properties": {
+      "effectiveStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "upcoming",
+          "open",
+          "paused",
+          "closed",
+          "archived"
+        ]
+      },
+      "effectiveStatusReason": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "before-start",
+          "within-window",
+          "after-end",
+          "force-open",
+          "paused",
+          "force-closed",
+          "archived"
+        ]
+      },
+      "id": {
+        "type": "string",
+        "description": "Opaque public batch token"
+      },
+      "name": {
+        "type": "string"
+      },
+      "startAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "endAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "timezone": {
+        "type": "string",
+        "enum": [
+          "Asia/Shanghai"
+        ]
+      }
+    },
+    "required": [
+      "effectiveStatus",
+      "effectiveStatusReason",
+      "id",
+      "name",
+      "startAt",
+      "endAt",
+      "timezone"
+    ]
+  },
+  "MyRecruitmentApplicationItemDto": {
+    "type": "object",
+    "properties": {
+      "application": {
+        "$ref": "#/components/schemas/MyRecruitmentApplicationResponseDto"
+      },
+      "batch": {
+        "$ref": "#/components/schemas/MyRecruitmentBatchSummaryDto"
+      }
+    },
+    "required": [
+      "application",
+      "batch"
+    ]
+  },
+  "MyRecruitmentApplicationListDto": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 50
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MyRecruitmentApplicationItemDto"
+        }
+      }
+    },
+    "required": [
+      "page",
+      "pageSize",
+      "total",
+      "items"
     ]
   },
   "CreateRecruitmentBatchDto": {
@@ -5460,7 +5919,8 @@ const API_COMPONENT_SCHEMAS = {
       "updatedAt",
       "applicationCount",
       "openCenters",
-      "responsibleAccounts"
+      "responsibleAccounts",
+      "interviewSlots"
     ]
   },
   "AdminRecruitmentBatchListDto": {
@@ -5975,6 +6435,38 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
+  "RecruitmentOriginalRoundResultDto": {
+    "type": "object",
+    "properties": {
+      "round": {
+        "type": "number",
+        "enum": [
+          1
+        ]
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "internalNote": {
+        "type": "string",
+        "nullable": true
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "required": [
+      "round",
+      "outcome",
+      "internalNote",
+      "createdAt"
+    ]
+  },
   "RecruitmentApplicantSnapshotDto": {
     "type": "object",
     "properties": {
@@ -6025,6 +6517,9 @@ const API_COMPONENT_SCHEMAS = {
   "AdminRecruitmentApplicationDto": {
     "type": "object",
     "properties": {
+      "originalRoundResult": {
+        "$ref": "#/components/schemas/RecruitmentOriginalRoundResultDto"
+      },
       "id": {
         "type": "string",
         "format": "uuid"
@@ -6108,7 +6603,8 @@ const API_COMPONENT_SCHEMAS = {
       "applicantProfileSnapshot",
       "submittedAt",
       "withdrawnAt",
-      "preferences"
+      "preferences",
+      "interviewSelection"
     ]
   },
   "AdminRecruitmentApplicationListDto": {
@@ -6808,6 +7304,214 @@ const API_COMPONENT_SCHEMAS = {
       "items"
     ]
   },
+  "RoundPublicationCenterDto": {
+    "type": "object",
+    "properties": {
+      "round": {
+        "type": "number"
+      },
+      "centerId": {
+        "type": "string"
+      },
+      "centerName": {
+        "type": "string"
+      },
+      "applicable": {
+        "type": "boolean"
+      },
+      "eligibleCount": {
+        "type": "number"
+      },
+      "recordedCount": {
+        "type": "number"
+      },
+      "missingCount": {
+        "type": "number"
+      },
+      "passedCount": {
+        "type": "number"
+      },
+      "failedCount": {
+        "type": "number"
+      },
+      "groupCodeStatus": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "centerId",
+      "centerName",
+      "applicable",
+      "eligibleCount",
+      "recordedCount",
+      "missingCount",
+      "passedCount",
+      "failedCount",
+      "groupCodeStatus"
+    ]
+  },
+  "RoundPublicationPreviewDto": {
+    "type": "object",
+    "properties": {
+      "batchId": {
+        "type": "string"
+      },
+      "batchName": {
+        "type": "string"
+      },
+      "round": {
+        "type": "number"
+      },
+      "assessmentVersion": {
+        "type": "number"
+      },
+      "previewFingerprint": {
+        "type": "string"
+      },
+      "canPublish": {
+        "type": "boolean"
+      },
+      "blockingReasons": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "publishedAt": {
+        "type": "string",
+        "nullable": true
+      },
+      "roundsToPublish": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "publishedRounds": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "centers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RoundPublicationCenterDto"
+        }
+      }
+    },
+    "required": [
+      "batchId",
+      "batchName",
+      "round",
+      "assessmentVersion",
+      "previewFingerprint",
+      "canPublish",
+      "blockingReasons",
+      "publishedAt",
+      "roundsToPublish",
+      "publishedRounds",
+      "centers"
+    ]
+  },
+  "AssessmentCapabilitiesDto": {
+    "type": "object",
+    "properties": {
+      "assessmentTransfers": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "assessmentTransfers"
+    ]
+  },
+  "AssessmentAdjustmentTargetDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "TRANSFER_TO_ASSESSMENT"
+        ]
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "blockReason": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "slug",
+      "name"
+    ]
+  },
+  "AssessmentAdjustmentTargetCatalogResponseDto": {
+    "type": "object",
+    "properties": {
+      "capabilities": {
+        "$ref": "#/components/schemas/AssessmentCapabilitiesDto"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AssessmentAdjustmentTargetDto"
+        }
+      }
+    },
+    "required": [
+      "items"
+    ]
+  },
+  "CreateAssessmentTransferDto": {
+    "type": "object",
+    "properties": {
+      "targetCenterId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Active Baize center. Server verifies the center identity."
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      },
+      "expectedCurrentRound": {
+        "type": "number",
+        "enum": [
+          1
+        ],
+        "description": "Transfer is only permitted before global round-one advancement."
+      }
+    },
+    "required": [
+      "targetCenterId",
+      "baizeDirection",
+      "expectedCurrentRound"
+    ]
+  },
   "AssessmentCenterDto": {
     "type": "object",
     "properties": {
@@ -6828,18 +7532,62 @@ const API_COMPONENT_SCHEMAS = {
       "name"
     ]
   },
-  "AssessmentAdjustmentTargetCatalogResponseDto": {
+  "AssessmentTransferDto": {
     "type": "object",
     "properties": {
-      "items": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/AssessmentCenterDto"
-        }
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "fromCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "toCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "entryRound": {
+        "type": "number",
+        "enum": [
+          2
+        ]
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time"
       }
     },
     "required": [
-      "items"
+      "id",
+      "fromCenter",
+      "toCenter",
+      "entryRound",
+      "baizeDirection",
+      "createdAt"
+    ]
+  },
+  "AssessmentTransferMutationResponseDto": {
+    "type": "object",
+    "properties": {
+      "version": {
+        "type": "number"
+      },
+      "transfer": {
+        "$ref": "#/components/schemas/AssessmentTransferDto"
+      }
+    },
+    "required": [
+      "version",
+      "transfer"
     ]
   },
   "AssessmentBatchDetailDto": {
@@ -6890,6 +7638,22 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "code",
       "count"
+    ]
+  },
+  "AssessmentTransferEligibilityDto": {
+    "type": "object",
+    "properties": {
+      "available": {
+        "type": "boolean"
+      },
+      "blockReason": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "available",
+      "blockReason"
     ]
   },
   "AssessmentPersonDto": {
@@ -7048,6 +7812,23 @@ const API_COMPONENT_SCHEMAS = {
   "AssessmentCandidateDto": {
     "type": "object",
     "properties": {
+      "assessmentCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "entryRound": {
+        "type": "number"
+      },
+      "transfer": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentTransferDto"
+          }
+        ]
+      },
+      "transferEligibility": {
+        "$ref": "#/components/schemas/AssessmentTransferEligibilityDto"
+      },
       "applicationId": {
         "type": "string",
         "format": "uuid"
@@ -7143,6 +7924,9 @@ const API_COMPONENT_SCHEMAS = {
         "format": "date-time",
         "nullable": true
       },
+      "capabilities": {
+        "$ref": "#/components/schemas/AssessmentCapabilitiesDto"
+      },
       "batch": {
         "$ref": "#/components/schemas/AssessmentBatchDetailDto"
       },
@@ -7209,6 +7993,10 @@ const API_COMPONENT_SCHEMAS = {
       },
       "confirmed": {
         "type": "boolean"
+      },
+      "previewFingerprint": {
+        "type": "string",
+        "pattern": "^sha256:[a-f0-9]{64}$"
       },
       "reason": {
         "type": "string",
@@ -7337,7 +8125,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "round": {
         "type": "number",
@@ -7383,7 +8172,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "targetCenterId": {
         "type": "string",
@@ -7416,7 +8206,8 @@ const API_COMPONENT_SCHEMAS = {
     "properties": {
       "expectedVersion": {
         "type": "number",
-        "minimum": 1
+        "minimum": 1,
+        "description": "Compatibility field. Required positive integer; ignored for personal mutation version checks."
       },
       "decision": {
         "type": "string",
@@ -7449,6 +8240,538 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "version",
       "decision"
+    ]
+  },
+  "PublishedAssessmentTransferDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "fromCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "toCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "entryRound": {
+        "type": "number",
+        "enum": [
+          2
+        ]
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "fromCenter",
+      "toCenter",
+      "entryRound",
+      "baizeDirection",
+      "publishedAt"
+    ]
+  },
+  "GroupCodeReferenceDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "version": {
+        "type": "number"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      },
+      "imageUrl": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "round",
+      "version",
+      "status",
+      "imageUrl"
+    ]
+  },
+  "StageCenterDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "name"
+    ]
+  },
+  "PublishedStageDto": {
+    "type": "object",
+    "properties": {
+      "center": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ],
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "outcome",
+      "publishedAt",
+      "groupCode"
+    ]
+  },
+  "MemberResultAdjustmentDto": {
+    "type": "object",
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "ADMITTED",
+          "NOT_ADMITTED"
+        ]
+      },
+      "targetCenter": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          }
+        ]
+      },
+      "decidedAt": {
+        "type": "string"
+      },
+      "finalPublished": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "decision",
+      "targetCenter",
+      "decidedAt",
+      "finalPublished"
+    ]
+  },
+  "MemberCurrentRoutingDto": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "PASSED_CONTINUE",
+          "ADJUSTED",
+          "BAIZE_TRANSFER"
+        ]
+      },
+      "center": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "round": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 3
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "type",
+      "center",
+      "round",
+      "groupCode"
+    ]
+  },
+  "MemberStageResultsDto": {
+    "type": "object",
+    "properties": {
+      "transfer": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PublishedAssessmentTransferDto"
+          }
+        ]
+      },
+      "entryGroupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      },
+      "batchId": {
+        "type": "string",
+        "nullable": true
+      },
+      "batchName": {
+        "type": "string",
+        "nullable": true
+      },
+      "center": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StageCenterDto"
+          }
+        ]
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/PublishedStageDto"
+        }
+      },
+      "finalGroupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      },
+      "adjustment": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAdjustmentDto"
+          }
+        ]
+      },
+      "currentRouting": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberCurrentRoutingDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "batchId",
+      "batchName",
+      "center",
+      "stages",
+      "finalGroupCode"
+    ]
+  },
+  "MemberResultBatchDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "lifecycleStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "PUBLISHED",
+          "CLOSED",
+          "ARCHIVED"
+        ]
+      },
+      "currentRound": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 3,
+        "nullable": true
+      },
+      "assessmentStatus": {
+        "type": "string",
+        "enum": [
+          "ASSESSING",
+          "READY_TO_PUBLISH",
+          "PUBLISHED"
+        ],
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "lifecycleStatus",
+      "currentRound",
+      "assessmentStatus"
+    ]
+  },
+  "MemberResultApplicationDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "type": "string"
+      },
+      "firstCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "acceptsAdjustment": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "status",
+      "firstCenter",
+      "acceptsAdjustment"
+    ]
+  },
+  "MemberResultStageDto": {
+    "type": "object",
+    "properties": {
+      "center": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ],
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "outcome": {
+        "type": "string",
+        "enum": [
+          "PASSED",
+          "FAILED"
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      },
+      "groupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "round",
+      "outcome",
+      "publishedAt",
+      "groupCode"
+    ]
+  },
+  "MemberResultAssessmentTransferDto": {
+    "type": "object",
+    "properties": {
+      "fromCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "toCenter": {
+        "$ref": "#/components/schemas/AssessmentCenterDto"
+      },
+      "entryRound": {
+        "type": "number",
+        "enum": [
+          2
+        ]
+      },
+      "baizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ]
+      },
+      "publishedAt": {
+        "type": "string",
+        "nullable": true
+      },
+      "entryGroupCode": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GroupCodeReferenceDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "fromCenter",
+      "toCenter",
+      "entryRound",
+      "baizeDirection",
+      "publishedAt",
+      "entryGroupCode"
+    ]
+  },
+  "MemberResultFinalDto": {
+    "type": "object",
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": [
+          "ADMITTED",
+          "NOT_ADMITTED"
+        ]
+      },
+      "finalCenter": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssessmentCenterDto"
+          }
+        ]
+      },
+      "publishedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "decision",
+      "finalCenter",
+      "publishedAt"
+    ]
+  },
+  "MemberResultContextDto": {
+    "type": "object",
+    "properties": {
+      "batch": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultBatchDto"
+          }
+        ]
+      },
+      "application": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultApplicationDto"
+          }
+        ]
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/MemberResultStageDto"
+        }
+      },
+      "adjustment": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAdjustmentDto"
+          }
+        ]
+      },
+      "assessmentTransfer": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultAssessmentTransferDto"
+          }
+        ]
+      },
+      "currentRouting": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberCurrentRoutingDto"
+          }
+        ]
+      },
+      "finalResult": {
+        "nullable": true,
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MemberResultFinalDto"
+          }
+        ]
+      }
+    },
+    "required": [
+      "batch",
+      "application",
+      "stages",
+      "adjustment",
+      "assessmentTransfer",
+      "currentRouting",
+      "finalResult"
     ]
   },
   "RecruitmentResultBatchDto": {
@@ -7498,6 +8821,17 @@ const API_COMPONENT_SCHEMAS = {
   "MyRecruitmentResultDto": {
     "type": "object",
     "properties": {
+      "finalBaizeDirection": {
+        "type": "string",
+        "enum": [
+          "HARMONYOS_DEVELOPMENT",
+          "BACKEND_ARCHITECTURE",
+          "AIGC_LARGE_MODEL",
+          "UI_UX_DESIGN",
+          "EMBEDDED_DEVELOPMENT"
+        ],
+        "nullable": true
+      },
       "id": {
         "type": "string",
         "format": "uuid"
@@ -7596,6 +8930,156 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "personId",
       "contact"
+    ]
+  },
+  "AdminGroupCodeReferenceDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "nullable": true
+      },
+      "round": {
+        "type": "number"
+      },
+      "version": {
+        "type": "number"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "MISSING"
+        ]
+      },
+      "imageUrl": {
+        "type": "string",
+        "nullable": true
+      },
+      "uploadId": {
+        "type": "string",
+        "nullable": true
+      },
+      "updatedAt": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "id",
+      "round",
+      "version",
+      "status",
+      "imageUrl"
+    ]
+  },
+  "GroupCodeCenterDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "rounds": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AdminGroupCodeReferenceDto"
+        }
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "slug",
+      "rounds"
+    ]
+  },
+  "GroupCodeListDto": {
+    "type": "object",
+    "properties": {
+      "batchId": {
+        "type": "string"
+      },
+      "centers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GroupCodeCenterDto"
+        }
+      }
+    },
+    "required": [
+      "batchId",
+      "centers"
+    ]
+  },
+  "CreateGroupCodeUploadDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0
+      },
+      "fileName": {
+        "type": "string",
+        "maxLength": 180
+      },
+      "mimeType": {
+        "type": "string",
+        "enum": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "video/mp4",
+          "video/webm"
+        ]
+      },
+      "byteSize": {
+        "type": "number",
+        "minimum": 1
+      },
+      "checksumSha256": {
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ]
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "fileName",
+      "mimeType",
+      "byteSize",
+      "checksumSha256",
+      "kind"
+    ]
+  },
+  "BindRoundGroupCodeDto": {
+    "type": "object",
+    "properties": {
+      "expectedVersion": {
+        "type": "number",
+        "minimum": 0
+      },
+      "uploadId": {
+        "type": "string",
+        "nullable": true
+      }
+    },
+    "required": [
+      "expectedVersion",
+      "uploadId"
     ]
   },
   "CurrentOrganizationPermissionResponseDto": {
@@ -11884,7 +13368,8 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "accepted",
       "message"
-    ]
+    ],
+    "additionalProperties": false
   },
   "ResolvePasswordRecoveryRequestDto": {
     "type": "object",
@@ -12005,6 +13490,29 @@ const API_COMPONENT_SCHEMAS = {
       "expiresAt"
     ]
   },
+  "SessionAdminCenterSummaryResponseDto": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "CENTER_MINISTER"
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "role"
+    ]
+  },
   "SessionAccountResponseDto": {
     "type": "object",
     "properties": {
@@ -12026,27 +13534,11 @@ const API_COMPONENT_SCHEMAS = {
         "nullable": true
       },
       "adminCenter": {
-        "type": "object",
         "nullable": true,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "CENTER_MINISTER"
-            ]
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SessionAdminCenterSummaryResponseDto"
           }
-        },
-        "required": [
-          "id",
-          "name",
-          "role"
         ]
       },
       "capabilities": {
@@ -12999,6 +14491,22 @@ const API_COMPONENT_SCHEMAS = {
       "active"
     ]
   },
+  "AdminAccountQualificationResponseDto": {
+    "type": "object",
+    "properties": {
+      "appointedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "appointedBy": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "appointedAt",
+      "appointedBy"
+    ]
+  },
   "AdminAccountResponseDto": {
     "type": "object",
     "properties": {
@@ -13083,22 +14591,6 @@ const API_COMPONENT_SCHEMAS = {
       "person",
       "adminCenter",
       "qualification"
-    ]
-  },
-  "AdminAccountQualificationResponseDto": {
-    "type": "object",
-    "properties": {
-      "appointedAt": {
-        "type": "string",
-        "format": "date-time"
-      },
-      "appointedBy": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "appointedAt",
-      "appointedBy"
     ]
   },
   "AdminAccountListResponseDto": {
@@ -13526,7 +15018,8 @@ const API_COMPONENT_SCHEMAS = {
     },
     "required": [
       "count"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryTargetSummaryDto": {
     "type": "object",
@@ -13559,7 +15052,8 @@ const API_COMPONENT_SCHEMAS = {
       "centerName",
       "status",
       "accountVersion"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRequestResponseDto": {
     "type": "object",
@@ -13607,7 +15101,8 @@ const API_COMPONENT_SCHEMAS = {
       "target",
       "resolvedAt",
       "resolutionReason"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRequestListResponseDto": {
     "type": "object",
@@ -13636,7 +15131,8 @@ const API_COMPONENT_SCHEMAS = {
       "pageSize",
       "total",
       "items"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryResetResponseDto": {
     "type": "object",
@@ -13663,7 +15159,8 @@ const API_COMPONENT_SCHEMAS = {
       "resolvedAt",
       "targetName",
       "revokedSessionCount"
-    ]
+    ],
+    "additionalProperties": false
   },
   "PasswordRecoveryRejectResponseDto": {
     "type": "object",
@@ -13681,7 +15178,8 @@ const API_COMPONENT_SCHEMAS = {
     "required": [
       "status",
       "resolvedAt"
-    ]
+    ],
+    "additionalProperties": false
   }
 } as const;
 

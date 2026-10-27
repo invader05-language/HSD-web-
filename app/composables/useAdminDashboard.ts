@@ -3,11 +3,12 @@ import type { AdminDashboardSnapshot } from "../types/admin-dashboard";
 import type { AdminDashboardGateway, DashboardSnapshotOptions } from "../services/admin-dashboard/dashboard-gateway";
 import { ApiDashboardGateway } from "../services/admin-dashboard/api-dashboard.gateway";
 import { createMockDashboardGateway } from "../services/admin-dashboard/mock-dashboard.gateway";
+import { resolveBrowserApiBase } from "../utils/browser-api-base";
 
 function createDefaultDashboardGateway(): AdminDashboardGateway {
   const config = useRuntimeConfig() as { public: { apiBase: string; useMockApi: boolean } };
   if (config.public.useMockApi) return createMockDashboardGateway();
-  const apiBase = config.public.apiBase;
+  const apiBase = resolveBrowserApiBase(config.public.apiBase);
   return new ApiDashboardGateway(async (path, options) => {
     const response = await globalThis.fetch(`${apiBase}${path}`, {
       method: options.method,

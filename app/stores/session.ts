@@ -12,7 +12,7 @@ import {
   type MockLoginResult
 } from "../data/admin-system";
 import type { CurrentSessionResponseDto, LoginDto } from "../../packages/api-client/src";
-import type { ApiSessionGateway } from "../services/api-session.gateway";
+import { SessionApiError, type ApiSessionGateway, type LoginRequestContext } from "../services/api-session.gateway";
 import { useAdminAccessStore } from "./admin-access";
 import { DEFAULT_FORMAL_MEMBER_PASSWORD } from "../utils/member-account-form";
 import {
@@ -56,6 +56,65 @@ export type PasswordChangeResult =
   | { status: "api_error"; message: string };
 
 const PASSWORD_CHANGE_API_ERROR_MESSAGE = "密码修改失败，请检查网络后重试。";
+
+interface RuntimeSessionSyncState {
+  epoch: number;
+  request?: Promise<boolean>;
+}
+
+interface RuntimeSessionStore {
+  isAuthenticated: boolean;
+  isHydrated: boolean;
+  applyApiSession: (session: CurrentSessionResponseDto) => void;
+  clearProductionSession: () => void;
+}
+
+const runtimeSessionSync = new WeakMap<object, RuntimeSessionSyncState>();
+
+function getRuntimeSessionSync(store: object): RuntimeSessionSyncState {
+  const existing = runtimeSessionSync.get(store);
+  if (existing) return existing;
+  const created = { epoch: 0 } satisfies RuntimeSessionSyncState;
+  runtimeSessionSync.set(store, created);
+  return created;
+}
+
+function invalidateRuntimeSessionRequests(store: object) {
+  const state = getRuntimeSessionSync(store);
+  state.epoch += 1;
+}
+
+function isUnauthorizedSessionError(cause: unknown): boolean {
+  return cause instanceof SessionApiError && cause.status === 401;
+}
+
+function syncProductionSession(
+  store: RuntimeSessionStore & object,
+  gateway: ApiSessionGateway,
+): Promise<boolean> {
+  const state = getRuntimeSessionSync(store);
+  if (state.request) return state.request;
+
+  const requestEpoch = state.epoch;
+  let request!: Promise<boolean>;
+  request = (async () => {
+    try {
+      const current = await gateway.currentSession();
+      if (requestEpoch !== state.epoch) return store.isAuthenticated;
+      store.applyApiSession(current);
+      return true;
+    } catch (cause) {
+      if (requestEpoch !== state.epoch) return store.isAuthenticated;
+      if (isUnauthorizedSessionError(cause)) store.clearProductionSession();
+      return false;
+    } finally {
+      store.isHydrated = true;
+      if (state.request === request) state.request = undefined;
+    }
+  })();
+  state.request = request;
+  return request;
+}
 
 function getSessionStorage(): Storage | undefined {
   if (import.meta.server) return undefined;
@@ -208,6 +267,7 @@ export const useSessionStore = defineStore("session", {
       getSessionStorage()?.removeItem(SESSION_STORAGE_KEY);
     },
     clearProductionSession() {
+      invalidateRuntimeSessionRequests(this);
       this.apiSession = undefined;
       this.isAuthenticated = false;
       this.currentAccountId = undefined;
@@ -228,6 +288,7 @@ export const useSessionStore = defineStore("session", {
         this.signOutError = "退出登录失败，请检查网络后重试。";
         return false;
       }
+      invalidateRuntimeSessionRequests(this);
       this.isSigningOut = true;
       try {
         await gateway.logout();
@@ -245,7 +306,7 @@ export const useSessionStore = defineStore("session", {
       gateway: ApiSessionGateway | undefined,
       account: string,
       password: string,
-      options: { requireAdmin?: boolean } = {},
+      options: { requireAdmin?: boolean; attemptId?: string } = {},
     ): Promise<MockLoginResult> {
       if (config.useMockApi) return this.signIn(account, password, options);
       if (!gateway) {
@@ -254,11 +315,14 @@ export const useSessionStore = defineStore("session", {
       }
 
       this.clearProductionSession();
-      const session = await gateway.login({
+      const loginInput = {
         account: account.trim(),
         password,
         rememberMe: false,
-      } satisfies LoginDto);
+      } satisfies LoginDto;
+      const session = options.attemptId
+        ? await gateway.login(loginInput, { attemptId: options.attemptId })
+        : await gateway.login(loginInput);
       this.applyApiSession(session);
 
       if (options.requireAdmin && !this.canAccessAdmin) {
@@ -271,6 +335,23 @@ export const useSessionStore = defineStore("session", {
       return session.mustChangePassword
         ? { status: "password_change_required", account: apiAccountProjection(session) }
         : { status: "success", account: apiAccountProjection(session) };
+    },
+    async retrySessionForRuntime(
+      config: SessionRuntimeConfig,
+      gateway: ApiSessionGateway | undefined,
+      context: LoginRequestContext,
+    ): Promise<boolean> {
+      if (config.useMockApi || !gateway) return false;
+      try {
+        this.applyApiSession(await gateway.currentSession({
+          ...context,
+          phase: "session_get",
+          credentialValidated: true,
+        }));
+        return true;
+      } catch {
+        return false;
+      }
     },
     async restoreForRuntime(
       config: SessionRuntimeConfig,
@@ -287,16 +368,7 @@ export const useSessionStore = defineStore("session", {
         return false;
       }
 
-      try {
-        this.clearProductionSession();
-        this.applyApiSession(await gateway.currentSession());
-        return true;
-      } catch {
-        this.clearProductionSession();
-        return false;
-      } finally {
-        this.isHydrated = true;
-      }
+      return syncProductionSession(this, gateway);
     },
     async refreshForRuntime(
       config: SessionRuntimeConfig,
@@ -304,20 +376,14 @@ export const useSessionStore = defineStore("session", {
     ): Promise<boolean> {
       if (config.useMockApi) return this.isAuthenticated;
       if (!gateway || !this.isAuthenticated) return false;
-      try {
-        this.applyApiSession(await gateway.currentSession());
-        return true;
-      } catch {
-        this.clearProductionSession();
-        this.isHydrated = true;
-        return false;
-      }
+      return syncProductionSession(this, gateway);
     },
     signIn(
       account = DEMO_MEMBER_ACCOUNT,
       passwordOrOptions: string | { requireAdmin?: boolean } = "",
       suppliedOptions: { requireAdmin?: boolean } = {},
     ): MockLoginResult {
+      invalidateRuntimeSessionRequests(this);
       this.apiSession = undefined;
       const password = typeof passwordOrOptions === "string" ? passwordOrOptions : "";
       const options = typeof passwordOrOptions === "string" ? suppliedOptions : passwordOrOptions;
@@ -439,6 +505,7 @@ export const useSessionStore = defineStore("session", {
       }
     },
     signOut() {
+      invalidateRuntimeSessionRequests(this);
       this.signOutError = undefined;
       this.apiSession = undefined;
       this.isAuthenticated = false;

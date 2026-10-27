@@ -34,7 +34,7 @@ const passwordRecoveryPendingCount = ref(0);
 const passwordRecoveryGateway = createPasswordRecoveryGateway({ apiBase: apiRuntime.public.apiBase });
 
 async function refreshPasswordRecoveryCount() {
-  if (!session.canManageAdminAccounts || apiRuntime.public.useMockApi) return;
+  if (!session.canManageAdminAccounts || apiRuntime.public.useMockApi || route.path === "/admin") return;
   try {
     passwordRecoveryPendingCount.value = (await passwordRecoveryGateway.pendingCount()).count;
   } catch {

@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 export interface PasswordRecoveryAcceptedResponse { accepted: true; message: string }
 
 export class PasswordRecoveryApiError extends Error {
@@ -23,7 +24,7 @@ export interface PasswordRecoveryList { page: number; pageSize: number; total: n
 export interface ResetPasswordResponse { status: "COMPLETED"; resolvedAt: string; targetName: string; revokedSessionCount: number }
 
 export function createPasswordRecoveryGateway(options: PasswordRecoveryGatewayOptions) {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const readCookie = options.readCookie ?? browserCookie;
   const request = async <T>(path: string, init: RequestInit = {}, csrfRequired = true): Promise<T> => {
