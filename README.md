@@ -1,5 +1,11 @@
 # 白云 HSD 开发者部落 Web
 
+## 团队开发入口
+
+前后端统一使用 `main`（稳定发布源）与 `develop`（开发和联调入口）。个人分支从 `develop` 创建，普通任务 PR 回 `develop`。统一验收完成前，若远程尚无 `develop`，请联系维护者，不能从旧 main 自行选择基线。
+
+请先阅读 [开发环境与入组交接](docs/handoffs/development-onboarding.md)、[分支与发布约定](docs/handoffs/team-workflow.md)、[固定生产源码锚点](docs/handoffs/production-source-baseline.json)。main HEAD 不代表已上线；合并不隐含生产发布。
+
 白云 HSD 开发者部落的 Nuxt 4 前端。它提供公开门户、成员空间和管理端页面，并通过浏览器 HTTP API 与部署中的真实服务集成。
 
 ## 前端范围

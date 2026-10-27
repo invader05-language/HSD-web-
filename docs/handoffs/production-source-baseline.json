@@ -1,0 +1,17 @@
+{
+  "baselineId": "2026-10-27-production-source",
+  "productionReleaseId": "20261016T030522Z-f466ebc-d8bf525",
+  "productionSourceTag": "baseline/2026-10-27-production",
+  "frontend": {
+    "repository": "invader05-language/HSD-web-",
+    "commit": "d8bf525d9645dc05d82e319568f5f5f83bcb998d",
+    "tree": "a66e6dc11c6d385b9424ec0cc3c3ee5d9feaa598"
+  },
+  "backend": {
+    "repository": "invader05-language/HSD_alliance_backend",
+    "commit": "f466ebcf269d3fa39528af080c9d827553dd81b6",
+    "tree": "98c5030bf27a37a21485afcb17dafb2591f71d91"
+  },
+  "openApiSnapshotSha256": "9c26220922a960fb1aa3ebe9be38d479afa94df912c8b692c8d24147005a73cb",
+  "meaning": "Source deployed before repository normalization; this is not a claim that the current main HEAD is deployed."
+}
