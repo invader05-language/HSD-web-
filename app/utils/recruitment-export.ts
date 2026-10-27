@@ -28,8 +28,8 @@ function escapeCsvCell(value: string): string {
     : protectedValue;
 }
 
-function formatSubmittedAt(submittedAt: string): string {
-  return submittedAt.slice(0, 16).replace("T", " ");
+function formatSubmittedAt(submittedAt?: string): string {
+  return submittedAt?.slice(0, 16).replace("T", " ") ?? "";
 }
 
 function interviewExportCells(selection?: RecruitmentInterviewSelection): [string, string, string] {
@@ -48,7 +48,7 @@ function interviewExportCells(selection?: RecruitmentInterviewSelection): [strin
  * Backend replacement contract: generate an `.xlsx` file using the same
  * filters, columns, authorization scope, and date cells as this CSV export.
  */
-export function serializeRecruitmentCsv(records: readonly AdminCandidate[]): string {
+export function serializeRecruitmentCsv(records: readonly (Pick<AdminCandidate, "name" | "studentId" | "contact" | "preferences" | "baizeDirection" | "acceptsAdjustment" | "interviewSelection"> & Partial<Pick<AdminCandidate, "submittedAt">>)[]): string {
   const rows = records.map((record) => [
     record.name,
     record.studentId,

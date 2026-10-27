@@ -1,4 +1,6 @@
 import type { RecruitmentCenter } from "../data/recruitment-application";
+import type { AssessmentTransferDto, AssessmentTransferEligibilityDto, RecruitmentOriginalRoundResultDto } from '../../packages/api-client/src';
+import type { BaizeDirectionCode } from '../utils/baize-direction-label';
 
 export type AssessmentRoundNumber = 1 | 2 | 3;
 
@@ -25,6 +27,13 @@ export interface RecruitmentAssessmentRecord {
   candidateId: string;
   memberId: string;
   center: RecruitmentCenter;
+  assessmentCenter?: AssessmentCenterIdentity;
+  entryRound?: AssessmentRoundNumber;
+  transfer?: AssessmentTransferDto;
+  transferEligibility?: AssessmentTransferEligibilityDto;
+  baizeDirectionCode?: BaizeDirectionCode;
+  finalBaizeDirection?: BaizeDirectionCode | null;
+  originalRoundResult?: RecruitmentOriginalRoundResultDto;
   acceptsAdjustment: boolean;
   roundOutcomes: Partial<Record<AssessmentRoundNumber, AssessmentOutcome>>;
   finalDecision?: AssessmentFinalDecision;

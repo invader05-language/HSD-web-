@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 import type {
   PublicContentListResponseDto,
   PublicContentResponseDto,
@@ -59,7 +60,7 @@ function isErrorPayload(value: unknown): value is { code: string; message: strin
 }
 
 export function createApiPublicContentGateway(options: ApiPublicContentGatewayOptions): PublicContentGateway {
-  const apiBase = options.apiBase.replace(/\/+$/, "");
+  const apiBase = resolveBrowserApiBase(options.apiBase);
   const fetcher = options.fetcher ?? globalThis.fetch;
   const createRequestId = options.createRequestId ?? requestId;
 

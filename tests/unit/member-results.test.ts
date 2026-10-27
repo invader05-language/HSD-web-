@@ -7,6 +7,8 @@ import {
   getDemoMemberResult,
   applyPublishedAssessmentProjection,
   memberResultFromApi,
+  memberResultFromContext,
+  stageResultsFromContext,
   describeAdmission,
   describeAssessment,
   resultCenterMemberFromSession,
@@ -16,11 +18,102 @@ import { useMemberRepository } from "../../app/composables/useMemberRepository";
 import { useMemberProfileStore } from "../../app/stores/member-profile";
 
 describe("member result presentation", () => {
+  it("keeps a closed-batch application visible while its final result is pending", () => {
+    const result = memberResultFromContext({
+      batch: { id: "batch-closed", name: "2026 秋季招新", effectiveStatus: "closed" },
+      application: {
+        id: "application-closed",
+        batchId: "batch-closed",
+        contact: "13800000000",
+        baizeDirection: null,
+        acceptsAdjustment: true,
+        status: "COMPLETED",
+        version: 1,
+        submittedAt: "2026-10-01T00:00:00.000Z",
+        withdrawnAt: null,
+        locked: true,
+        preferences: [
+          { rank: "FIRST", center: { id: "media", slug: "media", name: "新媒体中心" } },
+        ],
+        interviewSelection: null,
+      },
+      stages: [],
+      adjustment: null,
+      assessmentTransfer: null,
+      currentRouting: null,
+      finalResult: null,
+    }, "预备成员");
+
+    expect(result).toMatchObject({
+      id: "application-closed",
+      batchLabel: "2026 秋季招新",
+      status: "pending",
+      preferences: [{ rank: 1, center: "新媒体中心" }],
+    });
+    expect(result.status).not.toBe("no-application");
+  });
+
+  it("projects the authoritative ordinary adjustment routing without treating it as final admission", () => {
+    const context = {
+      batch: { id: "batch-closed", name: "2026 秋季招新", effectiveStatus: "closed" },
+      application: { id: "application-adjusted", batchId: "batch-closed", status: "COMPLETED", preferences: [], acceptsAdjustment: true },
+      stages: [],
+      adjustment: {
+        decision: "ADMITTED",
+        targetCenter: { id: "talent", slug: "talent-development", name: "人才发展中心" },
+        groupCode: { id: "qr-adjusted", round: 1, version: 1, status: "READY", imageUrl: "/qr" },
+      },
+      assessmentTransfer: null,
+      currentRouting: { center: { id: "talent", slug: "talent-development", name: "人才发展中心" }, round: 1, groupCode: { id: "qr-adjusted", round: 1, version: 1, status: "READY", imageUrl: "/qr" } },
+      finalResult: null,
+    } as any;
+
+    const result = memberResultFromContext(context, "预备成员");
+    expect(result).toMatchObject({ status: "pending", finalCenter: "人才发展中心" });
+    expect(result.finalResultPending).toBe(true);
+    expect(result.routingGroupCode).toMatchObject({ id: "qr-adjusted", round: 1 });
+  });
+
+  it("expands a compact final result using the closed-batch application snapshot", () => {
+    const result = memberResultFromContext({
+      batch: { id: "batch-closed", name: "2026 秋季招新", effectiveStatus: "closed" },
+      application: {
+        id: "application-final",
+        batchId: "batch-closed",
+        status: "COMPLETED",
+        acceptsAdjustment: true,
+        preferences: [{ rank: "FIRST", center: { id: "media", slug: "media", name: "新媒体中心" } }],
+      },
+      stages: [], adjustment: null, assessmentTransfer: null, currentRouting: null,
+      finalResult: {
+        decision: "ADMITTED",
+        finalCenter: { id: "media", slug: "media", name: "新媒体中心" },
+        publishedAt: "2026-10-10T00:00:00.000Z",
+      },
+    }, "预备成员");
+
+    expect(result).toMatchObject({ status: "admitted", finalCenter: "新媒体中心", preferences: [{ rank: 1, center: "新媒体中心" }] });
+  });
   it("uses the result card id when copying a responsible contact", () => {
     const source = readFileSync(resolve(process.cwd(), "app/pages/member/results.vue"), "utf8");
     expect(source).toContain("async function copyContact(contact: { personId?: string; contact: string; name: string }, resultId: string)");
     expect(source).toContain("getMyResponsibleContact(resultId, contact.personId)");
     expect(source).toContain('@click="copyContact(contact, result.id)"');
+    expect(source).toContain("getMyResultContext()");
+    expect(source).not.toContain("getCurrentBatch()");
+  });
+
+  it("maps the context's next-round routing center and QR into stage results", () => {
+    const mapped = stageResultsFromContext({
+      batch: { id: "batch", name: "招新" },
+      application: null,
+      stages: [{ round: 1, outcome: "PASSED", publishedAt: "2026-10-01T00:00:00.000Z", groupCode: null }],
+      adjustment: null,
+      assessmentTransfer: null,
+      currentRouting: { center: { id: "media", slug: "media", name: "新媒体中心" }, round: 2, groupCode: { id: "qr-two", round: 2, version: 1, status: "READY", imageUrl: "/qr" } },
+      finalResult: null,
+    } as any);
+    expect(mapped).toMatchObject({ batchId: "batch", batchName: "招新", center: { name: "新媒体中心" }, stages: [{ round: 1 }] });
   });
 
   it("keeps an opted-out formal profile out of the public directory", () => {

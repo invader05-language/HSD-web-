@@ -4,21 +4,133 @@ import { z } from "zod";
 import { useSessionStore } from "~/stores/session";
 import { useSessionGateway } from "~/composables/useSessionGateway";
 import { SessionApiError } from "~/services/api-session.gateway";
+import { formatAuthClientDiagnostics, recordAuthClientDiagnostic } from "~/utils/auth-client-diagnostics";
 import {
   buildLoginTarget,
   resolveLoginContinuation,
   type LoginMode
 } from "~/utils/login-continuation";
-import { getLoginDestination, getLoginErrorMessage } from "~/utils/login-mode";
+import { getLoginApiErrorMessage, getLoginDestination, getLoginErrorMessage } from "~/utils/login-mode";
 import { buildPasswordChangeTarget } from "~/utils/password-change";
 
 const route = useRoute();
 const session = useSessionStore();
 const sessionGateway = useSessionGateway();
 const apiRuntime = useRuntimeConfig() as { public: { useMockApi: boolean } };
+const runtimeConfig = useRuntimeConfig() as { public: { useMockApi: boolean }; app?: { buildId?: string } };
 const submitting = ref(false);
 const hydrated = ref(false);
 const serverError = ref("");
+const diagnosticRequestId = ref("");
+const copiedRequestId = ref(false);
+const requestIdSelected = ref(false);
+const requestIdCode = ref<HTMLElement | null>(null);
+const diagnosticsCopied = ref(false);
+const sessionRecoveryAvailable = ref(false);
+const sessionRecoveryBusy = ref(false);
+const activeAttemptId = ref("");
+const activeLoginRequestId = ref("");
+const showPassword = ref(false);
+const remainingSeconds = ref(0);
+let retryTimer: ReturnType<typeof setInterval> | undefined;
+let retryUntil = 0;
+
+function clearRetryCountdown() {
+  if (retryTimer) clearInterval(retryTimer);
+  retryTimer = undefined;
+  retryUntil = 0;
+  remainingSeconds.value = 0;
+}
+
+function startRetryCountdown(seconds: number) {
+  clearRetryCountdown();
+  if (!Number.isFinite(seconds) || seconds <= 0) return;
+  retryUntil = Date.now() + seconds * 1000;
+  const update = () => {
+    remainingSeconds.value = Math.max(0, Math.ceil((retryUntil - Date.now()) / 1000));
+    if (remainingSeconds.value === 0) clearRetryCountdown();
+  };
+  update();
+  retryTimer = setInterval(update, 1000);
+}
+
+const retryCountdown = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60);
+  const seconds = remainingSeconds.value % 60;
+  return minutes > 0 ? `剩余 ${minutes} 分 ${seconds} 秒` : `剩余 ${seconds} 秒`;
+});
+
+async function copyRequestId() {
+  if (!diagnosticRequestId.value) return;
+  try {
+    await navigator.clipboard.writeText(diagnosticRequestId.value);
+    copiedRequestId.value = true;
+  } catch {
+    const input = document.createElement("textarea");
+    input.value = diagnosticRequestId.value;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    copiedRequestId.value = document.execCommand("copy");
+    input.remove();
+    if (!copiedRequestId.value && requestIdCode.value) {
+      const range = document.createRange();
+      range.selectNodeContents(requestIdCode.value);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      requestIdSelected.value = true;
+    }
+  }
+}
+
+async function copyDiagnostics() {
+  const text = formatAuthClientDiagnostics();
+  try {
+    await navigator.clipboard.writeText(text);
+    diagnosticsCopied.value = true;
+  } catch {
+    const input = document.createElement("textarea");
+    input.value = text;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.select();
+    diagnosticsCopied.value = document.execCommand("copy");
+    input.remove();
+  }
+}
+
+function createAttemptId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `attempt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function recordLoginFailure(error: unknown) {
+  try {
+    const phase = error instanceof SessionApiError ? error.phase : undefined;
+    recordAuthClientDiagnostic({
+      buildId: runtimeConfig.app?.buildId,
+      phase: phase ?? "apply_session",
+      kind: error instanceof SessionApiError ? error.kind ?? "client" : "client",
+      status: error instanceof SessionApiError ? error.status : undefined,
+      code: error instanceof SessionApiError ? error.code : "CLIENT_UNHANDLED_ERROR",
+      attemptId: error instanceof SessionApiError ? error.attemptId : activeAttemptId.value,
+      requestId: error instanceof SessionApiError ? error.requestId : undefined,
+      loginRequestId: error instanceof SessionApiError ? error.loginRequestId : activeLoginRequestId.value || undefined,
+      credentialValidated: error instanceof SessionApiError ? error.credentialValidated : false,
+      apiProtocol: typeof window === "undefined" ? undefined : window.location.protocol,
+      route: typeof window === "undefined" ? undefined : window.location.pathname,
+      navigationType: typeof performance === "undefined"
+        ? undefined
+        : (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type,
+    });
+  } catch {
+    // Diagnostics are best effort and must never replace the login error.
+  }
+}
+
+onUnmounted(clearRetryCountdown);
 const continuation = computed(() => resolveLoginContinuation(route.query));
 const mode = ref<LoginMode>(continuation.value.mode);
 const redirectTarget = computed(() => getLoginDestination(continuation.value, mode.value));
@@ -56,8 +168,17 @@ const rules = {
 };
 
 async function signIn(values: Record<string, unknown>) {
+  if (submitting.value || remainingSeconds.value > 0) return;
   submitting.value = true;
   serverError.value = "";
+  diagnosticRequestId.value = "";
+  copiedRequestId.value = false;
+  requestIdSelected.value = false;
+  diagnosticsCopied.value = false;
+  sessionRecoveryAvailable.value = false;
+  activeAttemptId.value = createAttemptId();
+  activeLoginRequestId.value = "";
+  clearRetryCountdown();
   let result;
   try {
     result = await session.signInForRuntime(
@@ -65,27 +186,67 @@ async function signIn(values: Record<string, unknown>) {
       sessionGateway,
       String(values.account ?? ""),
       String(values.password ?? ""),
-      { requireAdmin: isAdminMode.value },
+      { requireAdmin: isAdminMode.value, attemptId: activeAttemptId.value },
     );
   } catch (error) {
-    serverError.value = error instanceof SessionApiError && error.code === "INVALID_CREDENTIALS"
-      ? "账号或密码不正确，请检查后重试。"
-      : error instanceof Error
-        ? `登录失败（${error.message}）`
-        : "登录失败，请稍后重试。";
+    recordLoginFailure(error);
+    serverError.value = getLoginApiErrorMessage(error);
+    if (error instanceof SessionApiError) {
+      diagnosticRequestId.value = error.requestId ?? error.clientRequestId ?? "";
+      activeLoginRequestId.value = error.loginRequestId ?? "";
+      sessionRecoveryAvailable.value = error.phase === "session_get" && error.credentialValidated;
+      if ((error.status === 423 || error.status === 429) && error.retryAfterSeconds) {
+        startRetryCountdown(error.retryAfterSeconds);
+      }
+    }
     return;
   } finally {
     submitting.value = false;
   }
   if (result.status === "password_change_required") {
-    await navigateTo(buildPasswordChangeTarget(redirectTarget.value));
+    try {
+      await navigateTo(buildPasswordChangeTarget(redirectTarget.value));
+    } catch (error) {
+      recordLoginFailure(error);
+      serverError.value = "登录已成功，但页面未能打开。请重试。";
+    }
     return;
   }
   if (result.status !== "success") {
     serverError.value = getLoginErrorMessage(result.status);
     return;
   }
-  await navigateTo(redirectTarget.value);
+  try {
+    await navigateTo(redirectTarget.value);
+  } catch (error) {
+    recordLoginFailure(error);
+    serverError.value = "登录已成功，但页面未能打开。请重试。";
+  }
+}
+
+async function retrySessionState() {
+  if (!sessionRecoveryAvailable.value || sessionRecoveryBusy.value) return;
+  sessionRecoveryAvailable.value = false;
+  sessionRecoveryBusy.value = true;
+  serverError.value = "";
+  try {
+    const restored = await session.retrySessionForRuntime(apiRuntime.public, sessionGateway, {
+      phase: "session_get",
+      attemptId: activeAttemptId.value,
+      loginRequestId: activeLoginRequestId.value || undefined,
+      credentialValidated: true,
+    });
+    if (!restored) {
+      serverError.value = "登录状态仍未建立，请重新提交登录。";
+      return;
+    }
+    await navigateTo(redirectTarget.value);
+  } catch (error) {
+    recordLoginFailure(error);
+    serverError.value = "登录已成功，但页面未能打开。请重试。";
+  } finally {
+    sessionRecoveryBusy.value = false;
+  }
 }
 </script>
 
@@ -111,13 +272,33 @@ async function signIn(values: Record<string, unknown>) {
         </fieldset>
         <Form v-slot="{ errors }" method="post" @submit="signIn">
           <label>学号或成员账号<Field name="account" autocomplete="username" :rules="rules.account" :disabled="!hydrated" /><small>{{ errors.account }}</small></label>
-          <label>密码<Field name="password" type="password" autocomplete="current-password" :rules="rules.password" :disabled="!hydrated" /><small>{{ errors.password }}</small></label>
+          <label for="login-password">密码</label>
+          <div class="login-page__password-field">
+            <Field id="login-password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" :rules="rules.password" :disabled="!hydrated" />
+            <button type="button" class="login-page__visibility" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" @click="showPassword = !showPassword">{{ showPassword ? "隐藏" : "显示" }}</button>
+          </div>
+          <small>{{ errors.password }}</small>
           <NuxtLink class="login-page__forgot" to="/forgot-password">忘记密码？</NuxtLink>
           <p v-if="serverError" class="form-error" role="alert">{{ serverError }}</p>
-          <button class="button" type="submit" :disabled="submitting || !hydrated">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
+          <button v-if="sessionRecoveryAvailable" type="button" class="login-page__retry-session" :disabled="sessionRecoveryBusy" @click="retrySessionState">{{ sessionRecoveryBusy ? "正在恢复登录状态…" : "重试登录状态" }}</button>
+          <p v-if="remainingSeconds > 0" class="login-page__countdown" role="status">{{ retryCountdown }}</p>
+          <p v-if="diagnosticRequestId" class="login-page__diagnostic">请求编号：<code ref="requestIdCode">{{ diagnosticRequestId }}</code><button type="button" @click="copyRequestId">{{ copiedRequestId ? "已复制" : requestIdSelected ? "已选中，请复制" : "复制编号" }}</button></p>
+          <p v-if="diagnosticRequestId" class="login-page__diagnostic"><button type="button" @click="copyDiagnostics">{{ diagnosticsCopied ? "诊断信息已复制" : "复制诊断信息" }}</button></p>
+          <button class="button" type="submit" :disabled="submitting || !hydrated || remainingSeconds > 0">{{ submitting ? "正在登录…" : "登录并继续" }}</button>
         </Form>
         <p class="login-page__hint">无法登录或忘记账号时，请联系联盟总负责人核验身份并处理账号问题。</p>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.login-page__password-field { position: relative; }
+.login-page__password-field input { padding-right: 4.5rem; }
+.login-page__visibility { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--brand-red); cursor: pointer; }
+.login-page__countdown, .login-page__diagnostic { margin: .5rem 0; font-size: .9rem; }
+.login-page__diagnostic { overflow-wrap: anywhere; }
+.login-page__diagnostic button { margin-left: .5rem; border: 0; background: transparent; color: var(--brand-red); cursor: pointer; text-decoration: underline; }
+.login-page__retry-session { margin: .5rem 0; border: 0; background: transparent; color: var(--brand-red); cursor: pointer; text-decoration: underline; }
+.login-page__retry-session:disabled { cursor: wait; opacity: .6; }
+</style>

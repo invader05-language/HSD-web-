@@ -6,7 +6,9 @@ import { useSessionStore } from "~/stores/session";
 import { canAccessRecruitmentCandidate, getAdminCenterScope } from "~/utils/admin-center-scope";
 import { useRecruitmentGateway } from "~/composables/useRecruitmentGateway";
 import { mapAdminApplication, formatAdminApplicationSubmittedAt, type AdminApplicationView } from "~/services/recruitment/admin-application-view";
+import { RecruitmentApiError } from "~/services/recruitment/api-recruitment.gateway";
 import { formatInterviewSlotRange } from "~/utils/recruitment-interview-slots";
+import { useRecruitmentRefresh } from "~/composables/useRecruitmentRefresh";
 
 definePageMeta({ layout: "admin" });
 
@@ -20,16 +22,27 @@ const session = useSessionStore();
 const batchId = computed(() => String(route.params.batchId));
 const applicationId = computed(() => String(route.params.id));
 const batch = computed(() => batchStore.getBatch(batchId.value));
-const application = computed(() => assessmentStore
-  .getCandidates(batchId.value)
-  .map((record) => record.candidate)
-  .find((candidate) => candidate?.id === applicationId.value
-    && canAccessRecruitmentCandidate(candidate, getAdminCenterScope(session.currentAccount?.adminCenterRole))));
+const application = computed(() => {
+  if (!useMockApi) return undefined;
+  return assessmentStore
+    .getCandidates(batchId.value)
+    .map((record) => record.candidate)
+    .find((candidate) => candidate?.id === applicationId.value
+      && canAccessRecruitmentCandidate(candidate, getAdminCenterScope(session.currentAccount?.adminCenterRole)));
+});
 
 const apiApplication = ref<AdminApplicationView>();
 const apiStatus = ref<"idle" | "loading" | "success" | "error">("idle");
 const apiError = ref("");
 let apiGeneration = 0;
+
+function applicationErrorMessage(cause: unknown): string {
+  if (cause instanceof RecruitmentApiError) {
+    if (cause.status === 404) return "报名记录不存在或已不可访问。";
+    if (cause.status === 403) return "当前账号无权查看这条报名记录。";
+  }
+  return "报名详情读取失败，请重试。";
+}
 
 type InterviewSelectionView = {
   status?: string;
@@ -52,8 +65,7 @@ function formatInterviewSelection(selection: InterviewSelectionView) {
 async function loadApiApplication() {
   if (useMockApi || !recruitmentGateway) return;
   const generation = ++apiGeneration;
-  apiStatus.value = "loading";
-  apiApplication.value = undefined;
+  if (!apiApplication.value) apiStatus.value = "loading";
   apiError.value = "";
   try {
     const response = await recruitmentGateway.getAdminApplication(batchId.value, applicationId.value);
@@ -62,16 +74,24 @@ async function loadApiApplication() {
     apiStatus.value = "success";
   } catch (cause) {
     if (generation !== apiGeneration) return;
-    apiError.value = cause instanceof Error ? cause.message : "报名记录读取失败。";
-    apiStatus.value = "error";
+    apiError.value = applicationErrorMessage(cause);
+    if (!apiApplication.value) apiStatus.value = "error";
+    throw cause;
   }
 }
 
-watch([batchId, applicationId], () => {
-  void loadApiApplication();
-}, { immediate: true });
+const detailRefresh = useRecruitmentRefresh(async () => {
+  if (!useMockApi && recruitmentGateway) await loadApiApplication();
+});
 
-useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管理台` }));
+watch([batchId, applicationId], () => {
+  void loadApiApplication().catch(() => {});
+});
+
+const applicationName = computed(() => useMockApi ? application.value?.name : apiApplication.value?.name);
+const originalMockRound = computed(() => useMockApi && application.value ? assessmentStore.getCandidate(batchId.value, applicationId.value)?.originalRoundResult : undefined);
+
+useHead(() => ({ title: `${applicationName.value ?? "报名记录"}｜HSD 管理台` }));
 </script>
 
 <template>
@@ -94,6 +114,7 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
         <label>是否接受调剂<input :value="application.acceptsAdjustment ? '接受' : '不接受'" readonly></label>
         <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(application.interviewSelection) }}</strong></div>
         <label class="is-wide">个人简介<textarea rows="5" :value="application.bio || '未填写'" readonly></textarea></label>
+        <section v-if="originalMockRound" class="is-wide" aria-label="原中心第一轮考核记录"><h3>原中心第一轮考核记录（只读）</h3><p>{{ application.preferences[0] }} · {{ originalMockRound.outcome === 'PASSED' ? '通过' : '不通过' }}</p><p>录入时间：{{ formatAdminApplicationSubmittedAt(originalMockRound.createdAt) }}</p><p v-if="originalMockRound.internalNote">内部备注：{{ originalMockRound.internalNote }}</p></section>
       </div></div>
     </section>
   </div>
@@ -102,23 +123,26 @@ useHead(() => ({ title: `${application.value?.name ?? "报名记录"}｜HSD 管�
       <template #actions><NuxtLink class="button" :to="`/admin/recruitment/batches/${batchId}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
   </div>
-  <div v-else-if="apiStatus === 'loading'" class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Batch Application Record" title="正在读取报名记录" description="正在请求服务端报名详情。" /></div>
+  <div v-else-if="apiStatus === 'loading' && !apiApplication" class="admin-recruitment-page admin-section-page"><AdminPageHeading eyebrow="Batch Application Record" title="正在读取报名记录" description="正在请求服务端报名详情。" /></div>
   <div v-else-if="apiApplication" class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Batch Application Record" :title="apiApplication.name" description="服务端报名快照；只读展示，不跨批次读取内部考核备注。">
-      <template #actions><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
+      <template #actions><button type="button" class="button button--ghost" :disabled="detailRefresh.refreshing.value" @click="detailRefresh.refresh">{{ detailRefresh.refreshing.value ? "正在刷新…" : "刷新详情" }}</button><NuxtLink class="button button--ghost" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
+    <p v-if="detailRefresh.refreshError.value" class="admin-save-message admin-save-message--error" role="status">详情读取失败：{{ apiError || "请稍后重试。" }}；当前显示上次成功读取的数据。</p>
     <section class="admin-list-card">
       <header><div><span>报名资料</span><h2>报名资料</h2></div><p>{{ formatAdminApplicationSubmittedAt(apiApplication.submittedAt) }} 提交</p></header>
+      <p>最近读取：{{ detailRefresh.lastUpdatedAt.value?.toLocaleTimeString("zh-CN", { hour12: false }) ?? "尚未更新" }}</p>
       <div class="admin-detail-form"><div class="admin-form-grid">
         <label>姓名<input :value="apiApplication.name" readonly></label><label>学号<input :value="apiApplication.studentId" readonly></label><label>年级<input :value="apiApplication.grade" readonly></label><label>班级<input :value="apiApplication.className" readonly></label><label>联系方式<input :value="apiApplication.contact" readonly></label>
         <label>第一志愿<input :value="apiApplication.preferences[0] || '—'" readonly></label><label>第二志愿<input :value="apiApplication.preferences[1] || '—'" readonly></label><label>第三志愿<input :value="apiApplication.preferences[2] || '—'" readonly></label><label>白泽方向<input :value="apiApplication.baizeDirection || '—'" readonly></label><label>是否接受调剂<input :value="apiApplication.acceptsAdjustment ? '接受' : '不接受'" readonly></label><label>状态<input :value="apiApplication.status" readonly></label>
         <div class="admin-interview-readonly is-wide"><span>面试安排</span><strong>{{ formatInterviewSelection(apiApplication.interviewSelection) }}</strong></div>
+        <section v-if="apiApplication.originalRoundResult" class="is-wide" aria-label="原中心第一轮考核记录"><h3>原中心第一轮考核记录（只读）</h3><p>{{ apiApplication.preferences[0] }} · {{ apiApplication.originalRoundResult.outcome === 'PASSED' ? '通过' : '不通过' }}</p><p>录入时间：{{ formatAdminApplicationSubmittedAt(apiApplication.originalRoundResult.createdAt) }}</p><p v-if="apiApplication.originalRoundResult.internalNote">内部备注：{{ apiApplication.originalRoundResult.internalNote }}</p></section>
       </div></div>
     </section>
   </div>
   <div v-else class="admin-recruitment-page admin-section-page">
     <AdminPageHeading eyebrow="Batch Application Record" title="报名记录不可用" :description="apiError || '该报名记录不存在，或当前管理员无权查看。'">
-      <template #actions><NuxtLink class="button" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
+      <template #actions><button type="button" class="button button--ghost" :disabled="detailRefresh.refreshing.value" @click="detailRefresh.refresh">{{ detailRefresh.refreshing.value ? "正在重试…" : "重试" }}</button><NuxtLink class="button" :to="`/admin/recruitment/batches/${encodeURIComponent(batchId)}/applications`">返回报名人员</NuxtLink></template>
     </AdminPageHeading>
   </div>
 </template>

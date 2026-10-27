@@ -62,6 +62,18 @@ export function getInterviewSlotAvailability(
   return { selectable: true, remainingCapacity: remaining };
 }
 
+export function getApplicantInterviewSlotAvailability(
+  slot: Pick<RecruitmentInterviewSlot, "id" | "startAt" | "capacity" | "confirmedCount" | "remainingCapacity" | "status">,
+  now: Date = new Date(),
+  heldInterviewSlotId?: string,
+): RecruitmentInterviewSlotAvailability {
+  const availability = getInterviewSlotAvailability(slot, now);
+  if (availability.reason === "full" && slot.id === heldInterviewSlotId) {
+    return { ...availability, selectable: true };
+  }
+  return availability;
+}
+
 export function hasPublishReadyInterviewSlots(
   slots: readonly Pick<RecruitmentInterviewSlot, "startAt" | "status">[],
   now: string | Date = new Date(),

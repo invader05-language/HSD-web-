@@ -37,6 +37,7 @@ const baseBatch = {
   createdAt: "2026-07-30T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
   applicationCount: 0,
+  interviewSlots: [],
   openCenters: [],
   responsibleAccounts: [{
     id: "account-owner",
@@ -163,7 +164,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
       const url = String(input);
-      if (url.endsWith("/adjustment-targets")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      if (new URL(url).pathname.endsWith("/adjustment-targets")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
       if (url.endsWith("/assessments")) return new Response(JSON.stringify(assessmentResponse()), { status: 200 });
       return new Response(JSON.stringify(baseBatch), { status: 200 });
     }));
@@ -195,7 +196,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_NOT_ALLOWED" })).toContain("不符合最终调剂条件");
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_TARGET_FORBIDDEN" })).toContain("不能将成员调剂至该中心");
     expect(getRecruitmentAssessmentMessage({ code: "ADJUSTMENT_DECISION_ALREADY_EXISTS" })).toContain("已经存在最终处理结果");
-    expect(getRecruitmentAssessmentMessage({ code: "OWNER_PERMISSION_REQUIRED" })).toContain("无权提交最终调剂结果");
+    expect(getRecruitmentAssessmentMessage({ code: "OWNER_PERMISSION_REQUIRED" })).toContain("没有执行该考核操作的权限");
   });
 
   it("keeps publication workbench copy business-facing and avoids exposing raw API errors", () => {
@@ -284,7 +285,7 @@ describe("Task 2 recruitment P0 regressions", () => {
     vi.stubGlobal("useRuntimeConfig", () => ({ public: { apiBase: "https://api.example.test", useMockApi: false } }));
     vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
       const url = String(input);
-      if (url.endsWith("/adjustment-targets")) {
+      if (new URL(url).pathname.endsWith("/adjustment-targets")) {
         return new Response(JSON.stringify({ items: [{ id: "center-talent", slug: "talent-development", name: "人才发展中心" }] }), { status: 200 });
       }
       if (url.endsWith("/assessments")) {

@@ -66,15 +66,15 @@ test("portal configuration loads its client route without failed Nuxt chunks", a
   expect(chunkConsoleErrors).toEqual([]);
 });
 
-test("administrator denial identifies the owner-only destination", async ({ page }) => {
+test("administrator denial safely returns to the admin workbench", async ({ page }) => {
   await page.goto("/admin/accounts");
   await page.getByLabel("学号或成员账号").fill("media-admin");
   await page.getByLabel("密码", { exact: true }).fill("demo-password");
   await page.getByRole("button", { name: "登录并继续" }).click();
 
-  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin/forbidden");
-  await expect.poll(() => new URL(page.url()).searchParams.get("from")).toBe("/admin/accounts");
-  await expect(page.getByText("联盟总负责人资格", { exact: true })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/admin");
+  await expect(page.getByRole("heading", { name: "管理工作台" })).toBeVisible();
+  await expect(page.getByText("联盟总负责人资格", { exact: true })).toHaveCount(0);
 });
 
 test("login modes reject members from administrator access and admit qualified accounts", async ({ page }) => {

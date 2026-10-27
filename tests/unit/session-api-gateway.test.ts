@@ -178,4 +178,98 @@ describe("production session API gateway", () => {
       code: "SESSION_API_RESPONSE_CONTRACT_MISMATCH",
     });
   });
+
+  it("preserves the safe error contract and retry timing from a login response", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      code: "LOGIN_RATE_LIMITED",
+      message: "Too many login attempts. Please try again later.",
+      requestId: "login-request-429",
+      retryAfterSeconds: 42,
+    }), { status: 429, headers: { "Retry-After": "60" } }));
+    const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+    await expect(gateway.login({ account: "member", password: " Raw Pass ", rememberMe: false }))
+      .rejects.toMatchObject({
+        status: 429,
+        code: "LOGIN_RATE_LIMITED",
+        message: "Too many login attempts. Please try again later.",
+        requestId: "login-request-429",
+        retryAfterSeconds: 42,
+      });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("uses an HTTP-date Retry-After when the error body has no retry timing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-07T00:00:00.000Z"));
+    try {
+      const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+        code: "LOGIN_ACCOUNT_LOCKED", message: "This account is temporarily locked", requestId: "login-request-423",
+      }), { status: 423, headers: { "Retry-After": "Wed, 07 Oct 2026 00:02:00 GMT" } }));
+      const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+      await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+        .rejects.toMatchObject({ status: 423, retryAfterSeconds: 120 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps status and a safe fallback message when the error response is not JSON", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("untrusted server details", { status: 503 }));
+    const gateway = createApiSessionGateway({ apiBase: "https://api.example.test", fetcher });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({ status: 503, code: "SESSION_API_REQUEST_FAILED", message: "Session API request failed" });
+  });
+
+  it("keeps the login POST and session GET failures distinguishable", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        mustChangePassword: false,
+        csrfToken: "cookie-managed",
+        expiresAt: "2026-08-08T00:00:00.000Z",
+      }), { status: 201, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        code: "SESSION_REQUIRED",
+        message: "Session cookie was not accepted",
+        requestId: "server-session-401",
+      }), { status: 401, headers: { "Content-Type": "application/json" } }));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: vi.fn()
+        .mockReturnValueOnce("client-login-1")
+        .mockReturnValueOnce("client-session-1"),
+    });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({
+        status: 401,
+        phase: "session_get",
+        credentialValidated: true,
+        loginRequestId: "client-login-1",
+        requestId: "server-session-401",
+      });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "https://api.example.test/api/v1/auth/session", expect.objectContaining({
+      headers: { "X-Request-ID": "client-session-1" },
+    }));
+  });
+
+  it("wraps a transport failure with the request phase", async () => {
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("Failed to fetch"));
+    const gateway = createApiSessionGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "client-login-transport",
+    });
+
+    await expect(gateway.login({ account: "member", password: "password", rememberMe: false }))
+      .rejects.toMatchObject({
+        phase: "login_post",
+        kind: "transport",
+        code: "SESSION_API_TRANSPORT_FAILED",
+        credentialValidated: false,
+      });
+  });
 });

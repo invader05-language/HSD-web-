@@ -1,4 +1,5 @@
 import type {
+  GroupCodeListDto, GroupCodeReferenceDto, MemberStageResultsDto, RoundPublicationPreviewDto,
   AdvanceAssessmentDto,
   ArchiveRecruitmentBatchPayload,
   AssessmentBatchResponseDto,
@@ -10,6 +11,8 @@ import type {
   AssessmentRoundMutationResponseDto,
   CreateAdjustmentProposalDto,
   DecideAdjustmentDto,
+  CreateAssessmentTransferDto,
+  AssessmentTransferMutationResponseDto,
   MyRecruitmentResultListDto,
   PublishAssessmentDto,
   RecordRoundResultDto,
@@ -21,6 +24,8 @@ import type {
   MemberProfileResponseDto,
   MyRecruitmentApplicationEnvelopeDto,
   MyRecruitmentApplicationResponseDto,
+  MyRecruitmentApplicationListDto,
+  MyInterviewContextDto,
   PublicRecruitmentBatchEnvelopeDto,
   RecruitmentBatchCommandDto,
   RecruitmentBatchLifecycleEventListDto,
@@ -35,18 +40,31 @@ import type {
   NotificationActionResponseDto,
   NotificationUnreadCountDto,
 } from "../../../packages/api-client/src";
+import type { MemberResultContextDto } from "../../data/member-results";
 
 export interface RecruitmentExportFile {
   blob: Blob;
   filename: string;
 }
 
-export interface RecruitmentGateway {
+import type { GroupCodeUploadOptions, GroupCodeUploadTask } from './group-code-upload';
+export interface RoundGroupGateway {
+  getAssessmentGroupCodes(batchId: string): Promise<GroupCodeListDto>;
+  bindAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, uploadId: string | null): Promise<GroupCodeReferenceDto>;
+  uploadAssessmentGroupCode(batchId: string, centerId: string, round: number, expectedVersion: number, file: File, options?: GroupCodeUploadOptions): Promise<GroupCodeReferenceDto>;
+  resumeAssessmentGroupCode(task: GroupCodeUploadTask, options?: GroupCodeUploadOptions): Promise<GroupCodeReferenceDto>;
+  getAssessmentAdvancePreview(batchId: string): Promise<RoundPublicationPreviewDto>;
+  getMyStageResults(): Promise<MemberStageResultsDto>;
+  readGroupCodeImage(url: string): Promise<Blob>;
+}
+export interface RecruitmentGateway extends Partial<RoundGroupGateway> {
   getCurrentBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
   getUpcomingBatch(): Promise<PublicRecruitmentBatchEnvelopeDto>;
   getCurrentProfile(): Promise<MemberProfileResponseDto>;
   updateCurrentProfile(payload: UpdateMyProfileDto): Promise<MemberProfileResponseDto>;
   getMyApplication(batchId: string): Promise<MyRecruitmentApplicationEnvelopeDto>;
+  listMyApplications(page?: number, pageSize?: number): Promise<MyRecruitmentApplicationListDto>;
+  getMyInterviewContext(batchId: string): Promise<MyInterviewContextDto>;
   submitApplication(batchId: string, payload: SubmitApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   updateApplication(batchId: string, applicationId: string, payload: UpdateApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
   withdrawApplication(batchId: string, applicationId: string, payload: WithdrawApplicationDto): Promise<MyRecruitmentApplicationResponseDto>;
@@ -66,7 +84,8 @@ export interface RecruitmentGateway {
   exportAdminApplications(batchId: string, query?: string): Promise<RecruitmentExportFile>;
   getAdminApplication(batchId: string, applicationId: string): Promise<AdminRecruitmentApplicationDto>;
   getAssessmentBatch(batchId: string): Promise<AssessmentBatchResponseDto>;
-  getAdjustmentTargets(batchId: string): Promise<AssessmentAdjustmentTargetCatalogResponseDto>;
+  getAdjustmentTargets(batchId: string, includeAssessmentTransfers?: boolean): Promise<AssessmentAdjustmentTargetCatalogResponseDto>;
+  transferAssessment?(batchId: string, applicationId: string, payload: CreateAssessmentTransferDto): Promise<AssessmentTransferMutationResponseDto>;
   recordRoundResult(
     batchId: string,
     applicationId: string,
@@ -91,7 +110,8 @@ export interface RecruitmentGateway {
     payload: PublishAssessmentDto,
   ): Promise<AssessmentPublicationResponseDto>;
   getMyResults(): Promise<MyRecruitmentResultListDto>;
+  /** Reads the coherent member result snapshot, including applications from closed batches. */
+  getMyResultContext(): Promise<MemberResultContextDto>;
   getMyResponsibleContact(resultId: string, personId: string): Promise<{ personId: string; contact: string }>;
-  /** Optional until the backend publishes dedicated interview-slot operations. */
-  changeInterviewSlot?(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
+  changeInterviewSlot(batchId: string, applicationId: string, payload: ChangeInterviewSlotDto): Promise<MyRecruitmentApplicationResponseDto>;
 }

@@ -1,3 +1,4 @@
+import { resolveBrowserApiBase } from "../../utils/browser-api-base";
 import { createHsdApiClient, type ApiRequest, type ApiTransport, type ErrorResponse } from "../../../packages/api-client/src";
 
 export interface ApiResourceGatewayOptions { apiBase: string; fetcher?: typeof globalThis.fetch; readCookie?: (name: string) => string | undefined; createRequestId?: () => string; }
@@ -6,7 +7,7 @@ const browserCookie = (name: string) => typeof document === "undefined" ? undefi
 const isError = (value: unknown): value is ErrorResponse => Boolean(value && typeof value === "object" && typeof (value as ErrorResponse).code === "string" && typeof (value as ErrorResponse).message === "string");
 
 export function createApiResourceGateway(options: ApiResourceGatewayOptions) {
-  const apiBase = options.apiBase.replace(/\/+$/, ""); const fetcher = options.fetcher ?? globalThis.fetch; const readCookie = options.readCookie ?? browserCookie; const createRequestId = options.createRequestId ?? (() => globalThis.crypto?.randomUUID?.() ?? `resource-${Date.now()}`);
+  const apiBase = resolveBrowserApiBase(options.apiBase); const fetcher = options.fetcher ?? globalThis.fetch; const readCookie = options.readCookie ?? browserCookie; const createRequestId = options.createRequestId ?? (() => globalThis.crypto?.randomUUID?.() ?? `resource-${Date.now()}`);
   const transport: ApiTransport = async (request: ApiRequest) => {
     const headers: Record<string, string> = { "X-Request-ID": createRequestId() };
     if (request.method !== "GET") { const csrf = readCookie("hsd_csrf"); if (!csrf) throw new ResourceApiError(403, "RESOURCE_CSRF_TOKEN_MISSING", "Resource request could not be verified"); headers["Content-Type"] = "application/json"; headers["X-CSRF-Token"] = decodeURIComponent(csrf); }

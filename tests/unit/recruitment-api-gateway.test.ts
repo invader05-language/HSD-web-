@@ -91,8 +91,54 @@ describe("recruitment API gateway", () => {
     );
   });
 
+  it("reads the coherent member result context without querying the open batch", async () => {
+    const context = {
+      batch: { id: "batch-closed", name: "2026 秋季招新", lifecycleStatus: "CLOSED", currentRound: null, assessmentStatus: "ASSESSING" },
+      application: { id: "application-closed", status: "COMPLETED", firstCenter: { id: "center-1", slug: "center-one", name: "中心一" }, acceptsAdjustment: true },
+      stages: [], adjustment: null, assessmentTransfer: null, currentRouting: null, finalResult: null,
+    };
+    const fetcher = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(context), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const gateway = createApiRecruitmentGateway({
+      apiBase: "https://api.example.test",
+      fetcher,
+      createRequestId: () => "request-result-context",
+    });
+
+    await expect(gateway.getMyResultContext()).resolves.toEqual(context);
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example.test/api/v1/recruitment/results/me/context",
+      {
+        method: "GET",
+        credentials: "include",
+        headers: { "X-Request-ID": "request-result-context" },
+      },
+    );
+  });
+
   it("routes interview reselection and admin slot reconciliation through CSRF-protected mutations", async () => {
-    const response = { id: "application-1", version: 4 };
+    const response = {
+      id: "application-1",
+      batchId: "batch-1",
+      contact: "applicant@example.test",
+      baizeDirection: null,
+      acceptsAdjustment: true,
+      status: "SUBMITTED",
+      version: 4,
+      submittedAt: "2026-09-01T00:00:00.000Z",
+      withdrawnAt: null,
+      locked: false,
+      preferences: [],
+      interviewSelection: {
+        id: "slot-public-1",
+        status: "CONFIRMED",
+        startAt: "2026-09-09T02:00:00.000Z",
+        endAt: "2026-09-09T02:30:00.000Z",
+        timezone: "Asia/Shanghai",
+      },
+    };
     const fetcher = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
